@@ -236,8 +236,11 @@ function Header({ active, setMobileOpen, streak, user, onSignOut, isSupabaseConf
           <span className="text-sm font-bold text-orange-200">{streak}</span>
         </div>
         <div className="hidden sm:flex items-center gap-2 text-xs text-slate-300">
-          <span className="text-violet-300 font-medium">JPN2easy</span>
-          <span className="text-slate-500">· N2 Prep</span>
+          <span className="text-violet-300 font-medium">Learn</span>
+          <span className="text-slate-500">&middot;</span>
+          <span className="text-violet-300 font-medium">Master</span>
+          <span className="text-slate-500">&middot;</span>
+          <span className="text-violet-300 font-medium">Pass</span>
         </div>
         {isSupabaseConfigured && (
           <div className="flex items-center gap-2">
@@ -275,7 +278,7 @@ function Sidebar({ active, setActive, mobileOpen, setMobileOpen, streak }) {
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-lg shadow-lg">🦝</div>
             <div>
               <h1 className="font-bold text-lg leading-tight">JPN2easy</h1>
-              <p className="text-xs text-slate-400">AI N2 Prep &middot; Free forever</p>
+              <p className="text-xs text-slate-400">Learn &middot; Master &middot; Pass</p>
             </div>
           </div>
         </div>
