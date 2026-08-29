@@ -44,7 +44,7 @@ serve(async (req: Request) => {
     }
 
     const openrouterKey = Deno.env.get('OPENROUTER_API_KEY') ?? ''
-    const referer = Deno.env.get('APP_URL') ?? 'https://n2-prep.vercel.app'
+    const referer = Deno.env.get('APP_URL') ?? 'https://jpn2easy.vercel.app'
     const chatModel = Deno.env.get('OPENROUTER_CHAT_MODEL') ?? 'openrouter/free'
 
     let systemPrompt = N2_PERSONA
@@ -76,7 +76,7 @@ serve(async (req: Request) => {
           'Authorization': `Bearer ${openrouterKey}`,
           'Content-Type': 'application/json',
           'HTTP-Referer': referer,
-          'X-Title': 'N2 Prep',
+          'X-Title': 'JPN2easy',
         },
         body: JSON.stringify({ model: embedModel, input: message }),
       })
@@ -128,7 +128,7 @@ serve(async (req: Request) => {
         'Authorization': `Bearer ${openrouterKey}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': referer,
-        'X-Title': 'N2 Prep',
+        'X-Title': 'JPN2easy',
       },
       body: JSON.stringify({
         model: chatModel,

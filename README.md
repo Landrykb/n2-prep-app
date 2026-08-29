@@ -1,4 +1,4 @@
-# N2 Prep — AI-Powered JLPT N2 Study Command Center
+# JPN2easy — AI-Powered JLPT N2 Study Command Center
 
 A Vite + React + Tailwind app for preparing for the JLPT N2, now with user accounts, an AI tutor, and Supabase-powered vector search (RAG).
 
@@ -68,7 +68,7 @@ APP_URL=https://your-app.vercel.app
 
 1. Push to a GitHub/GitLab repo.
 2. Import the repo in Vercel.
-3. Add the environment variables (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) in Vercel's dashboard.
+3. Add the environment variables (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) in Vercel's dashboard and name the project `JPN2easy`.
 4. Deploy.
 
 ## User isolation
