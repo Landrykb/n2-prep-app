@@ -1185,7 +1185,7 @@ function Videos() {
   useEffect(() => {
     if (!supabase || !isSupabaseConfigured) return
     let cancelled = false
-    const queries = ['JLPT N2 grammar', 'JLPT N2 vocabulary', 'JLPT N2 kanji']
+    const queries = ['日本語の森 JLPT N2 文法', 'JLPT N2 単語 解説', 'JLPT N2 漢字 解説']
     const fetchAll = async () => {
       try {
         const all = []

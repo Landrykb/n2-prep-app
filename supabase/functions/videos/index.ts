@@ -41,7 +41,7 @@ serve(async (req: Request) => {
       id: item.id?.videoId,
       title: item.snippet?.title,
       channel: item.snippet?.channelTitle,
-      embed: `https://www.youtube.com/embed/${item.id?.videoId}`,
+      embed: `https://www.youtube-nocookie.com/embed/${item.id?.videoId}?modestbranding=1&rel=0&iv_load_policy=3`,
       thumb: item.snippet?.thumbnails?.medium?.url || item.snippet?.thumbnails?.default?.url,
     }))
 

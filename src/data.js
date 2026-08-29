@@ -54,7 +54,7 @@ export const resources = [
   { name: 'Maggie Sensei N2', use: 'Natural Japanese explanations and quizzes', category: 'Web', url: 'https://maggiesensei.com/' },
   { name: 'Tofugu Grammar', use: 'Articles on tricky Japanese grammar points', category: 'Web', url: 'https://www.tofugu.com/japanese-grammar/' },
   { name: 'Jisho', use: 'Free dictionary, kanji lookup, and radicals', category: 'Web', url: 'https://jisho.org/' },
-  { name: 'Nihongo no Mori (N2)', use: 'Native teacher grammar & reading videos', category: 'Video', url: 'https://www.youtube.com/watch?v=sBXdW7NmwiQ', video: 'https://www.youtube.com/embed/sBXdW7NmwiQ' },
+  { name: 'Nihongo no Mori (N2)', use: 'Native teacher grammar & reading videos', category: 'Video', url: 'https://www.youtube.com/watch?v=sBXdW7NmwiQ', video: 'https://www.youtube-nocookie.com/embed/sBXdW7NmwiQ?modestbranding=1&rel=0&iv_load_policy=3' },
   { name: 'Japanese Ammo with Misa', use: 'Friendly grammar and JLPT strategy videos', category: 'Video', url: 'https://www.youtube.com/@JapaneseAmmowithMisa' },
   { name: 'Nihongo Con Teppei', use: 'Daily N3-N2 listening podcasts for free', category: 'Video', url: 'https://www.youtube.com/@teppeisn2' },
   { name: 'NHK News Web Easy', use: 'Simplified Japanese news for reading warm-up', category: 'Reading', url: 'https://www3.nhk.or.jp/news/easy/' },
