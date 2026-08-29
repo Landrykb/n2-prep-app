@@ -1,7 +1,81 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { X, Brain, Eye, BookOpen, Play, Search, Loader2, AlertCircle } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient.js'
 import TtsButton from './TtsButton.jsx'
+import { kanjiLessons } from '../data.js'
+
+const meaningEmoji = {
+  time: '⏰', day: '🌞', night: '🌙', person: '👤', people: '👥', money: '💰', work: '💼',
+  study: '📚', book: '📖', read: '📖', write: '✍️', eat: '🍽️', drink: '🥤', go: '🚶', come: '➡️',
+  big: '🏔️', small: '🐜', good: '✅', bad: '❌', happy: '😊', sad: '😢', angry: '😠', love: '❤️',
+  new: '🆕', old: '📜', fast: '⚡', slow: '🐢', many: '🔢', place: '📍', home: '🏠', school: '🏫',
+  city: '🏙️', country: '🗾', water: '💧', fire: '🔥', sun: '☀️', moon: '🌙', star: '⭐', flower: '🌸',
+  tree: '🌳', car: '🚗', train: '🚆', plane: '✈️', walk: '🚶', run: '🏃', speak: '🗣️', listen: '👂',
+  see: '👁️', think: '🧠', know: '🧠', understand: '💡', remember: '🧠', help: '🆘', use: '🛠️',
+  make: '🔨', do: '✅', can: '💪', must: '⭕', should: '✅', need: '🆘', want: '💭', like: '👍',
+  dislike: '👎', agree: '👍', disagree: '👎', accept: '✅', refuse: '🚫', give: '🎁', take: '✋',
+  hold: '🤲', say: '🗣️', talk: '💬', ask: '❓', answer: '✅', question: '❓', problem: '⚠️',
+  reason: '💡', cause: '🔥', result: '➡️', way: '➡️', method: '📋', purpose: '🎯', goal: '🎯',
+  power: '💪', strong: '💪', weak: '🦴', heavy: '🏋️', light: '💡', right: '➡️', left: '⬅️',
+  up: '⬆️', down: '⬇️', before: '⏪', after: '⏩', now: '⏰', then: '⏳', here: '📍', there: '👉',
+  where: '❓', what: '❓', who: '❓', when: '⏰', why: '❓', how: '❓', much: '🔢', more: '➕',
+  less: '➖', part: '➗', full: '📛', enough: '✅', also: '➕', only: '1️⃣', again: '🔁', still: '⏸️',
+  already: '✅', never: '🚫', always: '♾️', often: '🔁', sometimes: '🎲', usually: '📅', back: '🔙',
+  next: '⏭️', first: '1️⃣', last: '🛑', beginning: '▶️', end: '🔚', middle: '⏸️', top: '🔝', bottom: '⬇️',
+  inside: '📦', outside: '🚪', between: '↔️', through: '➡️', around: '🔄', about: '💬', for: '🎁',
+  from: '📍', into: '➡️', of: '🔗', on: '⬆️', out: '⬆️', over: '⬆️', to: '➡️', under: '⬇️', with: '➕',
+  without: '➖', if: '❓', while: '⏳', although: '🤷', because: '💡', just: '⚖️', even: '➕', very: '✨',
+  really: '✨', almost: '⏭️', quite: '✨', rather: '⚖️'
+}
+
+const kanjiEmoji = Object.fromEntries(kanjiLessons.map((k) => [k.char, k.emoji]))
+
+function generateDoodle(item) {
+  if (item.doodle) return item.doodle
+  if (item.image) return item.image
+  if (item.emoji) return item.emoji
+  const emojis = []
+  if (item.meaning) {
+    const words = item.meaning.split(/[^a-zA-Z]+/).filter(Boolean)
+    for (const w of words) {
+      const e = meaningEmoji[w.toLowerCase()]
+      if (e && !emojis.includes(e)) emojis.push(e)
+      if (emojis.length >= 3) break
+    }
+  }
+  if (emojis.length > 0) return emojis.join('')
+  if (item.radicals?.length) return item.radicals.map((r) => r.icon).join('')
+  const target = item.word || item.char || ''
+  const parts = []
+  for (const ch of target) {
+    const e = kanjiEmoji[ch]
+    if (e && !parts.includes(e)) parts.push(e)
+    if (parts.length >= 3) break
+  }
+  if (parts.length > 0) return parts.join('')
+  return '✨'
+}
+
+function useDoodle(item) {
+  const key = useMemo(() => {
+    const id = item?._key || item?.word || item?.pattern || item?.char || item?.front || ''
+    return id ? `n2:mnemonic:${id}` : ''
+  }, [item])
+
+  const doodle = useMemo(() => {
+    if (!key) return '✨'
+    const saved = localStorage.getItem(key)
+    if (saved) return saved
+    return generateDoodle(item) || '✨'
+  }, [key, item])
+
+  useEffect(() => {
+    if (!key) return
+    if (localStorage.getItem(key) !== doodle) localStorage.setItem(key, doodle)
+  }, [key, doodle])
+
+  return doodle
+}
 
 function Glossary({ items }) {
   return (
@@ -187,6 +261,8 @@ function VideoBox({ keyword, type }) {
 }
 
 export default function KanjiModal({ item, onClose }) {
+  const doodle = useDoodle(item)
+
   if (!item) return null
 
   const type = item.type || item._type || (item.char ? 'Kanji' : item.pattern ? 'Grammar' : item.word ? 'Vocab' : 'Common')
@@ -201,7 +277,6 @@ export default function KanjiModal({ item, onClose }) {
   const form = item.form || ''
   const nuance = item.nuance || ''
   const collocation = item.collocation || ''
-  const doodle = item.doodle || ''
   const videoUrl = item.video || null
 
   return (

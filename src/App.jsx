@@ -629,7 +629,7 @@ function Drills() {
   const [daily, setDaily] = useState(() => {
     const today = new Date().toDateString()
     const shuffled = [...questions].map((_, i) => i).sort(() => Math.random() - 0.5)
-    const picked = shuffled.slice(0, Math.min(20, questions.length))
+    const picked = shuffled.slice(0, Math.min(10, questions.length))
     return { date: today, indices: picked, completed: false, score: 0 }
   })
 
@@ -705,8 +705,13 @@ function Drills() {
   }
 
   const next = () => {
+    let requeued = 0
+    if (mode === 'daily' && question && selected !== null && !question.options[selected].correct) {
+      setDaily((d) => ({ ...d, indices: [...d.indices, d.indices[index]] }))
+      requeued = 1
+    }
     const nextIndex = index + 1
-    if (nextIndex >= pool.length) {
+    if (nextIndex >= pool.length + requeued) {
       setFinished(true)
       if (mode === 'daily') setDaily((d) => ({ ...d, completed: true, score, selected: null, answered: false }))
     } else {
@@ -727,7 +732,7 @@ function Drills() {
     if (mode === 'daily') {
       const today = new Date().toDateString()
       const shuffled = [...questions].map((_, i) => i).sort(() => Math.random() - 0.5)
-      const picked = shuffled.slice(0, Math.min(20, questions.length))
+      const picked = shuffled.slice(0, Math.min(10, questions.length))
       setDaily({ date: today, indices: picked, completed: false, score: 0, index: 0, selected: null, answered: false })
     }
     setIndex(0); setSelected(null); setAnswered(false); setScore(0); setFinished(false)
@@ -738,7 +743,7 @@ function Drills() {
     return (
       <div className='max-w-2xl mx-auto text-center py-12 animate-fade-in'>
         <div className='w-20 h-20 mx-auto rounded-full bg-bun-700 flex items-center justify-center text-4xl mb-6'>{pct >= 70 ? '🎉' : '🔥'}</div>
-        <h2 className='text-3xl font-bold text-white mb-2'>Daily 20 Complete</h2>
+        <h2 className='text-3xl font-bold text-white mb-2'>Daily 10 Complete</h2>
         <p className='text-lg text-slate-300 mb-6'>{daily.score || 0} / {pool.length} correct · {pct}%</p>
         <div className='h-3 w-64 mx-auto rounded-full bg-bun-700 overflow-hidden mb-8'><div className={`h-full ${pct >= 70 ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: pct + '%' }} /></div>
         <div className='flex justify-center gap-4'>
@@ -753,7 +758,7 @@ function Drills() {
     return (
       <div className="max-w-2xl mx-auto text-center py-12 animate-fade-in">
         <div className="w-20 h-20 mx-auto rounded-full bg-bun-700 flex items-center justify-center text-4xl mb-6">{pct >= 70 ? '🎉' : '🔥'}</div>
-        <h2 className='text-3xl font-bold text-white mb-2'>{mode === 'daily' ? 'Daily 20 Complete' : 'Drill Complete'}</h2>
+        <h2 className='text-3xl font-bold text-white mb-2'>{mode === 'daily' ? 'Daily 10 Complete' : 'Drill Complete'}</h2>
         <p className="text-lg text-slate-300 mb-6">{score} / {pool.length} correct · {pct}%</p>
         <div className="h-3 w-64 mx-auto rounded-full bg-bun-700 overflow-hidden mb-8"><div className={`h-full ${pct >= 70 ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: pct + '%' }} /></div>
         <div className="flex justify-center gap-4">
@@ -773,7 +778,7 @@ function Drills() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className='flex items-center gap-3 flex-wrap'>
           <h2 className='text-2xl font-bold text-white'>Drills</h2>
-          <span className='text-xs text-slate-500 hidden sm:inline'>{mode === 'daily' ? 'Daily 20' : 'Free practice'}</span>
+          <span className='text-xs text-slate-500 hidden sm:inline'>{mode === 'daily' ? 'Daily 10' : 'Free practice'}</span>
           <div className='flex p-1 rounded-lg bg-bun-700/40 border border-bun-600/30'>
             {['daily', 'free'].map((m) => (
               <button
@@ -795,7 +800,7 @@ function Drills() {
       </div>
       <div className="h-2 w-full rounded-full bg-bun-700 overflow-hidden"><div className="h-full bg-gradient-to-r from-violet-500 to-cyan-500 transition-all" style={{ width: ((index + (answered ? 1 : 0)) / pool.length) * 100 + '%' }} /></div>
       <div className="rounded-3xl glass p-6 sm:p-8 card-glow">
-        <div className='flex items-center justify-between mb-4'><span className='text-sm text-slate-400'>{question.type} · {question.format}</span><span className='text-sm text-slate-400'>{mode === 'daily' ? 'Daily 20 · ' : ''}{index + 1} / {pool.length}</span></div>
+        <div className='flex items-center justify-between mb-4'><span className='text-sm text-slate-400'>{question.type} · {question.format}</span><span className='text-sm text-slate-400'>{mode === 'daily' ? 'Daily 10 · ' : ''}{index + 1} / {pool.length}</span></div>
         <div className="rounded-2xl bg-bun-700/40 border border-bun-600/20 p-5 mb-6"><p className="text-lg text-slate-100 leading-relaxed">{question.prompt}</p>{question.target && <p className="text-sm text-violet-300 mt-3">Target: 「{question.target}」</p>}</div>
         <div className="grid sm:grid-cols-2 gap-3 mb-6">
           {question.options.map((opt, i) => {
@@ -1394,8 +1399,10 @@ function ErrorLog() {
         <p className="text-center text-slate-500 py-8">No errors logged yet. Review this 30 min before each mock.</p>
       ) : (
         <div className="space-y-3">
+          <p className="text-xs text-slate-400">Spaced repetition: each review pushes the next one further — 1, 1, 2, 4, 7, 14, 30 days. Click “Mark reviewed” to move the card forward.</p>
           {logs.map((l) => {
             const isDue = l.next_review && new Date(l.next_review) <= new Date()
+            const days = srs[Math.min((l.review_count || 0) + 1, srs.length - 1)]
             return (
               <div key={l.id} className={`rounded-2xl glass p-4 card-glow flex items-start justify-between gap-3 ${isDue ? 'ring-1 ring-rose-500/40' : ''}`}>
                 <div className="min-w-0">
@@ -1409,7 +1416,7 @@ function ErrorLog() {
                   {l.fix && <p className="text-sm text-emerald-300 mt-1">Fix: {l.fix}</p>}
                 </div>
                 <div className="flex flex-col items-end gap-2 shrink-0">
-                  <button onClick={() => markReview(l)} className="text-xs px-2.5 py-1 rounded-lg bg-violet-600/20 text-violet-300 hover:bg-violet-600/30 transition">Review +{srs[Math.min((l.review_count || 0) + 1, srs.length - 1)]}d</button>
+                  <button onClick={() => markReview(l)} title={`Mark as reviewed; next review in ${days} ${days === 1 ? 'day' : 'days'}`} className="text-xs px-2.5 py-1 rounded-lg bg-violet-600/20 text-violet-300 hover:bg-violet-600/30 transition">Mark reviewed · next in {days}d</button>
                   <button onClick={() => remove(l.id)} className="text-xs text-slate-500 hover:text-rose-400">Delete</button>
                 </div>
               </div>
