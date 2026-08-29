@@ -30,6 +30,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from './hooks/useAuth.js'
 import { useKanjiModal } from './hooks/useKanjiModal.js'
+import { supabase } from './lib/supabaseClient.js'
 import { findStudyItem } from './lib/findStudyItem.js'
 import { daysToJLPT, nextJLPTDate } from './lib/nextJLPT.js'
 import AuthModal from './components/AuthModal.jsx'
