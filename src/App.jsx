@@ -14,7 +14,6 @@ import {
   XCircle,
   Menu,
   Sparkles,
-  BarChart3,
   Filter,
   Search,
   Layers,
@@ -29,10 +28,10 @@ import {
 import { useAuth } from './hooks/useAuth.js'
 import AuthModal from './components/AuthModal.jsx'
 import AiTutor from './components/AiTutor.jsx'
+import Skeleton, { SkeletonText } from './components/Skeleton.jsx'
 import { userKey } from './lib/userKey.js'
 import { getErrorLogs, addErrorLog, deleteErrorLog, getUserProgress, setUserProgress } from './lib/supabaseApi.js'
 import {
-  scores,
   plan,
   readingTips,
   resources,
@@ -179,55 +178,6 @@ function SelectionPopup({ dictionary }) {
   )
 }
 
-function Gauge({ value }) {
-  const r = 52
-  const c = 2 * Math.PI * r
-  const pct = Math.min(100, Math.max(0, value))
-  const dash = c * (pct / 100)
-  return (
-    <div className="relative w-28 h-28 flex items-center justify-center">
-      <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
-        <circle cx="60" cy="60" r={r} stroke="rgba(255,255,255,0.08)" strokeWidth="10" fill="none" />
-        <circle
-          cx="60"
-          cy="60"
-          r={r}
-          stroke="url(#gaugeGradient)"
-          strokeWidth="10"
-          fill="none"
-          strokeLinecap="round"
-          strokeDasharray={`${dash} ${c}`}
-          style={{ transition: 'stroke-dasharray 0.6s ease' }}
-        />
-        <defs>
-          <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#8b5cf6" />
-            <stop offset="100%" stopColor="#ec4899" />
-          </linearGradient>
-        </defs>
-      </svg>
-      <span className="absolute text-2xl font-bold text-white">{value}%</span>
-    </div>
-  )
-}
-
-function ProgressRing({ value, color }) {
-  const r = 42
-  const c = 2 * Math.PI * r
-  const dash = c * (value / 100)
-  const stroke =
-    color === 'emerald' ? '#34d399' : color === 'rose' ? '#f87171' : color === 'amber' ? '#fbbf24' : '#a78bfa'
-  return (
-    <div className="relative w-24 h-24 flex items-center justify-center shrink-0">
-      <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-        <circle cx="50" cy="50" r={r} stroke="rgba(255,255,255,0.06)" strokeWidth="8" fill="none" />
-        <circle cx="50" cy="50" r={r} stroke={stroke} strokeWidth="8" fill="none" strokeLinecap="round" strokeDasharray={`${dash} ${c}`} />
-      </svg>
-      <span className="absolute text-sm font-bold text-slate-100">{value}%</span>
-    </div>
-  )
-}
-
 function Badge({ children, color = 'violet' }) {
   const map = {
     rose: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
@@ -340,10 +290,6 @@ function Sidebar({ active, setActive, mobileOpen, setMobileOpen, streak }) {
 }
 
 function Dashboard({ streak, setActive }) {
-  const total = 64
-  const goal = 100
-  const totalPct = Math.round((total / goal) * 100)
-
   return (
     <div className="space-y-8">
       <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 border border-violet-500/20 p-6 sm:p-10 card-glow">
@@ -364,49 +310,33 @@ function Dashboard({ streak, setActive }) {
         </div>
       </section>
 
-      <section>
-        <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2"><BarChart3 size={20} className="text-violet-400" /> Performance Diagnostic</h3>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {scores.map((s) => (
-            <div key={s.id} className="rounded-2xl glass p-5 card-glow flex flex-col items-center text-center">
-              <Gauge value={s.pct} color={s.color} />
-              <p className="mt-3 text-sm font-medium text-slate-200">{s.name}</p>
-              <p className="text-xs text-slate-400 mt-1">{s.raw} · cutoff {s.cutoff}</p>
-              <div className="mt-3 flex items-center gap-2">
-                <Badge color={s.status === 'passed' ? 'emerald' : s.id === 'total' ? 'amber' : 'rose'}>{s.status}</Badge>
-                <span className="text-xs text-slate-400">Target: {s.target}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="grid lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 rounded-2xl glass p-6 card-glow">
-          <h3 className="text-lg font-bold text-white mb-4">Total Progress to 100+ Points</h3>
-          <div className="flex items-center gap-6">
-            <ProgressRing value={totalPct} color="violet" />
+      <section className="grid lg:grid-cols-2 gap-6">
+        <div className="rounded-2xl glass p-6 card-glow">
+          <h3 className="text-lg font-bold text-white mb-4">Your Progress</h3>
+          <p className="text-slate-300 text-sm leading-relaxed mb-4">
+            This will fill in as you study. Your current streak and drill scores are tracked per account, not hardcoded from any past test.
+          </p>
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-orange-500/20 text-orange-300 flex items-center justify-center text-xl">🔥</div>
             <div>
-              <p className="text-2xl font-bold text-white">{total} / {goal}</p>
-              <p className="text-sm text-slate-400 mt-1">You need ~{goal - total} more points for a safe cushion.</p>
-              <div className="mt-3 h-2 w-48 rounded-full bg-bun-700 overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500" style={{ width: totalPct + '%' }} />
-              </div>
+              <p className="text-2xl font-bold text-white">{streak}</p>
+              <p className="text-xs text-slate-400">day streak</p>
             </div>
+          </div>
+          <div className="mt-5 flex gap-3">
+            <button onClick={() => setActive('drills')} className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition">Start daily drill</button>
+            <button onClick={() => setActive('errors')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-slate-200 text-sm font-medium transition">Log an error</button>
           </div>
         </div>
         <div className="rounded-2xl glass p-6 card-glow">
           <h3 className="text-lg font-bold text-white mb-4">Daily Goal</h3>
           <ul className="space-y-3 text-sm">
-            <li className="flex items-center gap-3 text-slate-300"><CheckCircle2 size={16} className="text-emerald-400" /> 25 SRS cards reviewed</li>
-            <li className="flex items-center gap-3 text-slate-300"><CheckCircle2 size={16} className="text-emerald-400" /> 1 grammar pattern mastered</li>
+            <li className="flex items-center gap-3 text-slate-300"><div className="w-4 h-4 rounded-full border border-slate-500" /> 25 SRS cards reviewed</li>
+            <li className="flex items-center gap-3 text-slate-300"><div className="w-4 h-4 rounded-full border border-slate-500" /> 1 grammar pattern mastered</li>
             <li className="flex items-center gap-3 text-slate-300"><div className="w-4 h-4 rounded-full border border-slate-500" /> 1 daily reading passage</li>
             <li className="flex items-center gap-3 text-slate-300"><div className="w-4 h-4 rounded-full border border-slate-500" /> Log 3 errors</li>
           </ul>
-          <div className="mt-5 h-2 rounded-full bg-bun-700 overflow-hidden">
-            <div className="h-full w-1/2 bg-gradient-to-r from-cyan-500 to-emerald-500" />
-          </div>
-          <p className="text-xs text-slate-400 mt-2">50% · {streak} day streak</p>
+          <p className="text-xs text-slate-400 mt-5">{streak} day streak · check these off as you go</p>
         </div>
       </section>
 
@@ -1237,7 +1167,11 @@ function ErrorLog() {
       </form>
 
       {loading ? (
-        <p className="text-center text-slate-500 py-8 flex items-center justify-center gap-2"><Loader2 size={18} className="animate-spin" /> Loading...</p>
+        <div className="space-y-3 py-4">
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+        </div>
       ) : logs.length === 0 ? (
         <p className="text-center text-slate-500 py-8">No errors logged yet. Review this 30 min before each mock.</p>
       ) : (
@@ -1327,8 +1261,12 @@ function App() {
 
   if (isSupabaseConfigured && loading) {
     return (
-      <div className="min-h-screen bg-bun-900 flex items-center justify-center text-slate-300">
-        <p className="flex items-center gap-2"><Loader2 className="animate-spin" size={20} /> Loading...</p>
+      <div className="min-h-screen bg-bun-900 flex items-center justify-center p-6">
+        <div className="w-full max-w-md rounded-3xl glass p-8 card-glow space-y-5">
+          <Skeleton className="h-12 w-12 rounded-xl" />
+          <SkeletonText lines={3} />
+          <Skeleton className="h-10 w-full" />
+        </div>
       </div>
     )
   }
