@@ -11,6 +11,7 @@ import {
   ChevronRight,
   RotateCcw,
   CheckCircle2,
+  X,
   XCircle,
   Menu,
   Sparkles,
@@ -904,6 +905,7 @@ const resourceIcon = {
 }
 
 function Resources() {
+  const [playing, setPlaying] = useState(null)
   const byCategory = resources.reduce((acc, r) => {
     acc[r.category] = [...(acc[r.category] || []), r]
     return acc
@@ -919,15 +921,17 @@ function Resources() {
             {list.map((r) => (
               <div key={r.name} className="rounded-2xl glass p-5 card-glow hover:border-violet-500/30 transition">
                 {r.video && (
-                  <div className="aspect-video w-full rounded-xl overflow-hidden border border-bun-600/30 mb-4">
-                    <iframe
-                      className="w-full h-full"
-                      src={r.video}
-                      title={r.name}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    />
-                  </div>
+                  <button
+                    onClick={() => setPlaying({ title: r.name, channel: r.use, embed: r.video })}
+                    className="group w-full aspect-video rounded-xl overflow-hidden border border-bun-600/30 mb-4 relative bg-bun-800"
+                  >
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition">
+                      <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur flex items-center justify-center text-white">
+                        <Play size={28} className="ml-1" />
+                      </div>
+                    </div>
+                    <p className="absolute bottom-0 inset-x-0 p-2 text-[10px] text-slate-300 bg-gradient-to-t from-black/70 to-transparent">Click to watch in focus</p>
+                  </button>
                 )}
                 <div className="flex items-start justify-between mb-3">
                   <div className="w-10 h-10 rounded-xl bg-bun-700 flex items-center justify-center text-lg">
@@ -946,6 +950,7 @@ function Resources() {
           </div>
         </div>
       ))}
+      {playing && <VideoModal video={playing} onClose={() => setPlaying(null)} />}
     </div>
   )
 }
@@ -1176,16 +1181,49 @@ function StudyPlan({ daysToExam }) {
   )
 }
 
+function VideoModal({ video, onClose }) {
+  if (!video) return null
+  return (
+    <div className="fixed inset-0 z-50 bg-bun-900/95 p-4 sm:p-8 flex items-center justify-center" onClick={onClose}>
+      <div className="w-full max-w-6xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4 gap-3">
+          <h3 className="text-lg sm:text-xl font-bold text-white line-clamp-1">{video.title}</h3>
+          <button onClick={onClose} className="p-2 rounded-lg bg-bun-700 text-slate-300 hover:text-white shrink-0">
+            <X size={20} />
+          </button>
+        </div>
+        <div className="aspect-video w-full rounded-2xl overflow-hidden border border-bun-600/30 shadow-2xl">
+          <iframe
+            className="w-full h-full"
+            src={video.embed}
+            title={video.title}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        </div>
+        <p className="text-sm text-slate-400 mt-4">{video.channel}</p>
+      </div>
+    </div>
+  )
+}
+
+const FALLBACK_VIDEOS = [
+  { id: 'sBXdW7NmwiQ', title: 'Japanese language lessons! JLPT N2 Grammar (21/22)', channel: '日本語の森', embed: 'https://www.youtube-nocookie.com/embed/sBXdW7NmwiQ?modestbranding=1&rel=0&iv_load_policy=3' },
+]
+
 function Videos() {
   const { isSupabaseConfigured } = useAuth()
   const [videos, setVideos] = useState([])
   const [loading, setLoading] = useState(!isSupabaseConfigured)
   const [error, setError] = useState('')
+  const [playing, setPlaying] = useState(null)
+
+  const display = videos.length ? videos : FALLBACK_VIDEOS
 
   useEffect(() => {
     if (!supabase || !isSupabaseConfigured) return
     let cancelled = false
-    const queries = ['日本語の森 JLPT N2 文法', 'JLPT N2 単語 解説', 'JLPT N2 漢字 解説']
+    const queries = ['JLPT N2 grammar', 'JLPT N2 vocabulary', 'JLPT N2 kanji']
     const fetchAll = async () => {
       try {
         const all = []
@@ -1218,7 +1256,7 @@ function Videos() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-white">N2 Video Dojo</h2>
-        <p className="text-sm text-slate-400 mt-1">Real teachers explaining JLPT N2 grammar, vocabulary, and kanji. If you have a free YouTube Data API key, these update automatically.</p>
+        <p className="text-sm text-slate-400 mt-1">Click any video to open a focused player. Use the fullscreen button inside the player to go full screen.</p>
       </div>
       {loading && (
         <div className="flex items-center gap-2 text-slate-400">
@@ -1226,23 +1264,34 @@ function Videos() {
         </div>
       )}
       {error && <p className="text-rose-300">{error}</p>}
-      <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">
-        {videos.map((v) => (
-          <div key={v.id} className="rounded-2xl glass p-4 card-glow">
-            <div className="aspect-video rounded-xl overflow-hidden border border-bun-600/30 mb-3">
-              <iframe
-                className="w-full h-full"
-                src={v.embed}
-                title={v.title}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
+      {!loading && !error && videos.length === 0 && (
+        <p className="text-amber-300 text-sm bg-amber-900/20 rounded-xl p-4">
+          No videos came back from YouTube. The fallback below is shown while you check that the YouTube Data API is enabled.
+        </p>
+      )}
+      <div className="grid md:grid-cols-2 gap-6">
+        {display.map((v) => (
+          <button
+            key={v.id}
+            onClick={() => setPlaying(v)}
+            className="text-left rounded-2xl glass p-4 card-glow hover:border-violet-500/40 transition group"
+          >
+            <div className="aspect-video rounded-xl overflow-hidden border border-bun-600/30 mb-3 relative bg-bun-800">
+              {v.thumb ? (
+                <img src={v.thumb} alt="" className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none' }} />
+              ) : null}
+              <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition">
+                <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur flex items-center justify-center text-white">
+                  <Play size={28} className="ml-1" />
+                </div>
+              </div>
             </div>
             <h3 className="font-semibold text-white text-sm line-clamp-2">{v.title}</h3>
             <p className="text-[10px] text-slate-400 mt-1">{v.channel}</p>
-          </div>
+          </button>
         ))}
       </div>
+      {playing && <VideoModal video={playing} onClose={() => setPlaying(null)} />}
     </div>
   )
 }

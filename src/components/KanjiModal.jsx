@@ -74,8 +74,7 @@ function VideoBox({ keyword, type }) {
 
   useEffect(() => {
     if (!supabase) return
-    const topic = type === 'Grammar' ? '文法' : type === 'Vocab' ? '単語' : '漢字'
-    const query = `日本語の森 JLPT N2 ${topic} ${keyword}`
+    const query = `JLPT N2 ${keyword}`
     let cancelled = false
     const search = async () => {
       try {
