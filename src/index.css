@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: #0b0c15;
+  color: #e2e8f0;
+}
+
+/* Custom selection */
+::selection {
+  background: rgba(139, 92, 246, 0.35);
+  color: #fff;
+}
+
+/* Bunpro-ish glass utilities */
+.glass {
+  @apply bg-bun-800/60 backdrop-blur border border-bun-600/40;
+}
+
+.card-glow {
+  box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.08), 0 18px 40px -10px rgba(0, 0, 0, 0.45);
+}
