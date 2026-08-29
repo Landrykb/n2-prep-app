@@ -55,6 +55,8 @@ export const resources = [
   { name: 'Tofugu Grammar', use: 'Articles on tricky Japanese grammar points', category: 'Web', url: 'https://www.tofugu.com/japanese-grammar/' },
   { name: 'Jisho', use: 'Free dictionary, kanji lookup, and radicals', category: 'Web', url: 'https://jisho.org/' },
   { name: 'Nihongo no Mori (N2)', use: 'Native teacher grammar & reading videos', category: 'Video', url: 'https://www.youtube.com/watch?v=sBXdW7NmwiQ', video: 'https://www.youtube-nocookie.com/embed/sBXdW7NmwiQ?modestbranding=1&rel=0&iv_load_policy=3' },
+  { name: 'JLPT N2 Vocab Practice', use: 'N2 vocab usage with practice questions', category: 'Video', url: 'https://www.youtube.com/watch?v=WmIdm9GZQR4', video: 'https://www.youtube-nocookie.com/embed/WmIdm9GZQR4?modestbranding=1&rel=0&iv_load_policy=3' },
+  { name: 'JLPT N2 Kanji List', use: 'Full N2 kanji list with vocabulary', category: 'Video', url: 'https://www.youtube.com/watch?v=tWIN1DEgU98', video: 'https://www.youtube-nocookie.com/embed/tWIN1DEgU98?modestbranding=1&rel=0&iv_load_policy=3' },
   { name: 'Japanese Ammo with Misa', use: 'Friendly grammar and JLPT strategy videos', category: 'Web', url: 'https://www.youtube.com/c/JapaneseAmmowithMisa' },
   { name: 'Nihongo Con Teppei', use: 'Daily N3-N2 listening podcasts for free', category: 'Web', url: 'https://www.youtube.com/@nihongoconteppei' },
   { name: 'NHK News Web Easy', use: 'Simplified Japanese news for reading warm-up', category: 'Reading', url: 'https://www3.nhk.or.jp/news/easy/' },

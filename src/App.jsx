@@ -1209,7 +1209,9 @@ function VideoModal({ video, onClose }) {
 }
 
 const FALLBACK_VIDEOS = [
-  { id: 'sBXdW7NmwiQ', title: 'Japanese language lessons! JLPT N2 Grammar (21/22)', channel: '日本語の森', embed: 'https://www.youtube-nocookie.com/embed/sBXdW7NmwiQ?modestbranding=1&rel=0&iv_load_policy=3' },
+  { id: 'sBXdW7NmwiQ', title: 'JLPT N2 Grammar (21/22)', channel: '日本語の森', embed: 'https://www.youtube-nocookie.com/embed/sBXdW7NmwiQ?modestbranding=1&rel=0&iv_load_policy=3', thumb: 'https://img.youtube.com/vi/sBXdW7NmwiQ/0.jpg' },
+  { id: 'WmIdm9GZQR4', title: 'JLPT N2 Vocab Practice', channel: '日本語の森', embed: 'https://www.youtube-nocookie.com/embed/WmIdm9GZQR4?modestbranding=1&rel=0&iv_load_policy=3', thumb: 'https://img.youtube.com/vi/WmIdm9GZQR4/0.jpg' },
+  { id: 'tWIN1DEgU98', title: 'JLPT N2 Kanji Full List', channel: 'N2 Kanji Study', embed: 'https://www.youtube-nocookie.com/embed/tWIN1DEgU98?modestbranding=1&rel=0&iv_load_policy=3', thumb: 'https://img.youtube.com/vi/tWIN1DEgU98/0.jpg' },
 ]
 
 function Videos() {

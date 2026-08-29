@@ -15,6 +15,36 @@ function Glossary({ items }) {
   )
 }
 
+function DoodleStory({ doodle }) {
+  const parts = Array.from(doodle)
+  const [step, setStep] = useState(0)
+
+  useEffect(() => {
+    if (parts.length <= 1) return
+    const id = setInterval(() => {
+      setStep((s) => (s + 1) % parts.length)
+    }, 700)
+    return () => clearInterval(id)
+  }, [parts.length])
+
+  return (
+    <div className="rounded-xl bg-gradient-to-r from-amber-900/20 to-orange-900/20 border border-amber-500/20 p-4">
+      <h4 className="text-xs uppercase tracking-wider text-amber-300 mb-4 flex items-center gap-2"><Eye size={14} /> Visual story</h4>
+      <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
+        {parts.map((c, i) => (
+          <div
+            key={i}
+            className={`text-4xl sm:text-5xl transition-all duration-500 ${i === step ? 'opacity-100 scale-125 -translate-y-2' : 'opacity-40 scale-90'}`}
+          >
+            {c}
+          </div>
+        ))}
+      </div>
+      <p className="text-center text-xs text-slate-400 mt-4">{step + 1} / {parts.length} · the mnemonic comes alive</p>
+    </div>
+  )
+}
+
 function RadicalStory({ radicals, title }) {
   const [step, setStep] = useState(0)
 
@@ -159,6 +189,7 @@ export default function KanjiModal({ item, onClose }) {
   const form = item.form || ''
   const nuance = item.nuance || ''
   const collocation = item.collocation || ''
+  const doodle = item.doodle || ''
   const videoUrl = item.video || null
 
   return (
@@ -191,6 +222,8 @@ export default function KanjiModal({ item, onClose }) {
             {meaning && <span className="text-emerald-300 font-medium">{meaning}</span>}
             {item.meaningFr && <span className="text-slate-400 text-sm">/ {item.meaningFr}</span>}
           </div>
+
+          {doodle && <DoodleStory doodle={doodle} />}
 
           {form && (
             <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4">
