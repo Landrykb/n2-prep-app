@@ -24,17 +24,19 @@ import {
   LogOut,
   Bot,
   Loader2,
+  Calendar,
 } from 'lucide-react'
 import { useAuth } from './hooks/useAuth.js'
 import { useKanjiModal } from './hooks/useKanjiModal.js'
 import { findStudyItem } from './lib/findStudyItem.js'
+import { daysToJLPT, nextJLPTDate } from './lib/nextJLPT.js'
 import AuthModal from './components/AuthModal.jsx'
 import AiTutor from './components/AiTutor.jsx'
 import ChatBubble from './components/ChatBubble.jsx'
 import TtsButton from './components/TtsButton.jsx'
 import Skeleton, { SkeletonText } from './components/Skeleton.jsx'
 import { userKey } from './lib/userKey.js'
-import { getErrorLogs, addErrorLog, deleteErrorLog, getUserProgress, setUserProgress } from './lib/supabaseApi.js'
+import { getErrorLogs, addErrorLog, reviewErrorLog, deleteErrorLog, getUserProgress, setUserProgress } from './lib/supabaseApi.js'
 import {
   plan,
   readingTips,
@@ -219,7 +221,7 @@ function Badge({ children, color = 'violet' }) {
   )
 }
 
-function Header({ active, setMobileOpen, streak, user, onSignOut, isSupabaseConfigured }) {
+function Header({ active, setMobileOpen, streak, daysToExam, user, onSignOut, isSupabaseConfigured }) {
   return (
     <header className="sticky top-0 z-10 bg-bun-900/80 backdrop-blur border-b border-bun-600/30 px-4 sm:px-8 py-4 flex items-center justify-between">
       <button onClick={() => setMobileOpen(true)} className="lg:hidden p-2 rounded-lg bg-bun-700 text-slate-200">
@@ -236,11 +238,8 @@ function Header({ active, setMobileOpen, streak, user, onSignOut, isSupabaseConf
           <span className="text-sm font-bold text-orange-200">{streak}</span>
         </div>
         <div className="hidden sm:flex items-center gap-2 text-xs text-slate-300">
-          <span className="text-violet-300 font-medium">Learn</span>
-          <span className="text-slate-500">&middot;</span>
-          <span className="text-violet-300 font-medium">Master</span>
-          <span className="text-slate-500">&middot;</span>
-          <span className="text-violet-300 font-medium">Pass</span>
+          <Calendar size={14} className="text-violet-300" />
+          <span className="font-medium">{daysToExam} days to JLPT</span>
         </div>
         {isSupabaseConfigured && (
           <div className="flex items-center gap-2">
@@ -311,22 +310,31 @@ function Sidebar({ active, setActive, mobileOpen, setMobileOpen, streak }) {
   )
 }
 
-function Dashboard({ streak, setActive }) {
+function Dashboard({ streak, daysToExam, nextExam, setActive }) {
+  const dateLabel = nextExam?.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+  const focus = daysToExam > 120 ? 'foundation' : daysToExam > 60 ? 'patterns' : daysToExam > 30 ? 'speed' : 'sprint'
+  const focusText = {
+    foundation: 'You have time. Build vocabulary + kanji recognition first.',
+    patterns: 'Focus on grammar patterns and reading strategy.',
+    speed: 'Pick up the pace. Drill past questions and review errors.',
+    sprint: 'Final sprint. Mock tests, error log, and weak points only.',
+  }[focus]
+
   return (
     <div className="space-y-8">
       <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 border border-violet-500/20 p-6 sm:p-10 card-glow">
         <div className="absolute top-0 right-0 w-64 h-64 bg-violet-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
         <div className="relative">
           <div className="flex items-center gap-2 mb-3">
-            <span className="text-3xl">🦝</span>
-            <Badge color="emerald">Study session active</Badge>
+            <Calendar size={18} className="text-violet-300" />
+            <Badge color="emerald">{daysToExam} days to JLPT · {dateLabel}</Badge>
           </div>
           <h2 className="text-3xl sm:text-4xl font-bold text-white mb-3">Crack the N2 pass wall.</h2>
           <p className="max-w-2xl text-slate-300 leading-relaxed mb-6">
-            Your listening is solid. The mission now is to rebuild Vocabulary, Grammar, and Reading into a single, fast recognition engine. Visual memory + deliberate drills will carry you over the cutoff.
+            {focusText} Every day matters. Use the drills, the AI tutor, and the error log to stay on track.
           </p>
           <div className="flex flex-wrap gap-4">
-            <button onClick={() => setActive('lessons')} className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-medium transition shadow-lg shadow-violet-600/25">Continue Memory Lesson</button>
+            <button onClick={() => setActive('plan')} className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-medium transition shadow-lg shadow-violet-600/25">View Plan</button>
             <button onClick={() => setActive('drills')} className="px-5 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-slate-200 font-medium transition">Start Drill</button>
           </div>
         </div>
@@ -336,7 +344,7 @@ function Dashboard({ streak, setActive }) {
         <div className="rounded-2xl glass p-6 card-glow">
           <h3 className="text-lg font-bold text-white mb-4">Your Progress</h3>
           <p className="text-slate-300 text-sm leading-relaxed mb-4">
-            This will fill in as you study. Your current streak and drill scores are tracked per account, not hardcoded from any past test.
+            {daysToExam} days left until the next exam. Stay consistent, and the streak will carry you.
           </p>
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-xl bg-orange-500/20 text-orange-300 flex items-center justify-center text-xl">🔥</div>
@@ -344,10 +352,16 @@ function Dashboard({ streak, setActive }) {
               <p className="text-2xl font-bold text-white">{streak}</p>
               <p className="text-xs text-slate-400">day streak</p>
             </div>
+            <div className="w-px h-10 bg-bun-600/40" />
+            <div className="w-12 h-12 rounded-xl bg-violet-500/20 text-violet-300 flex items-center justify-center text-xl">🎯</div>
+            <div>
+              <p className="text-2xl font-bold text-white">{daysToExam}</p>
+              <p className="text-xs text-slate-400">days to JLPT</p>
+            </div>
           </div>
           <div className="mt-5 flex gap-3">
             <button onClick={() => setActive('drills')} className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition">Start daily drill</button>
-            <button onClick={() => setActive('errors')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-slate-200 text-sm font-medium transition">Log an error</button>
+            <button onClick={() => setActive('errors')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-slate-200 text-sm font-medium transition">Review errors</button>
           </div>
         </div>
         <div className="rounded-2xl glass p-6 card-glow">
@@ -655,7 +669,17 @@ function Drills() {
     if (answered) return
     setSelected(i)
     setAnswered(true)
-    if (question.options[i].correct) setScore((s) => s + 1)
+    if (question.options[i].correct) {
+      setScore((s) => s + 1)
+    } else if (user) {
+      const correct = question.options.find((o) => o.correct)
+      addErrorLog(user.id, {
+        section: question.type,
+        mistake: question.target ? `${question.target} — ${question.prompt}` : question.prompt,
+        cause: `Chose: ${question.options[i].label}`,
+        fix: `Correct: ${correct?.label || ''}${question.explanation ? `. ${question.explanation}` : ''}`.trim(),
+      })
+    }
   }
 
   const next = () => {
@@ -1087,16 +1111,40 @@ function ReadingView() {
   )
 }
 
-function StudyPlan() {
+function StudyPlan({ daysToExam }) {
+  const activeStage = daysToExam > 120 ? 1 : daysToExam > 60 ? 2 : 2
+  const weekFocus = daysToExam > 120
+    ? 'Learn 20 new kanji/vocab + 5 grammar patterns per week. Do not worry about speed yet.'
+    : daysToExam > 90
+    ? 'Shift to pattern recognition. Drill 30 questions a day and review every wrong answer.'
+    : daysToExam > 45
+    ? 'Timed reading + mock drills. Turn weak areas into cards and ask the AI tutor daily.'
+    : 'Only mock tests, error log, and audio shadowing. Sleep > new content at this point.'
+
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-white">Two-Stage Study Plan</h2>
+      <h2 className="text-2xl font-bold text-white">JLPT Study Plan</h2>
+      <div className="rounded-3xl glass p-6 card-glow border-l-4 border-violet-500">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <p className="text-xs text-slate-400 uppercase tracking-wider">Current focus · {daysToExam} days left</p>
+            <h3 className="text-lg font-bold text-white mt-1">{weekFocus}</h3>
+          </div>
+          <div className="px-4 py-2 rounded-xl bg-bun-700/50 text-center">
+            <p className="text-2xl font-bold text-white">{daysToExam}</p>
+            <p className="text-xs text-slate-400">days to N2</p>
+          </div>
+        </div>
+      </div>
       <div className="grid lg:grid-cols-2 gap-5">
         {plan.map((p, i) => (
-          <div key={i} className="rounded-3xl glass p-6 card-glow relative overflow-hidden">
+          <div key={i} className={`rounded-3xl glass p-6 card-glow relative overflow-hidden ${p.stage === activeStage ? 'ring-2 ring-violet-500/40' : ''}`}>
             <div className={`absolute top-0 left-0 w-1.5 h-full ${p.stage === 1 ? 'bg-gradient-to-b from-cyan-400 to-blue-500' : 'bg-gradient-to-b from-violet-400 to-fuchsia-500'}`} />
             <div className="ml-4">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Stage {p.stage}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Stage {p.stage}</span>
+                {p.stage === activeStage && <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-600/20 text-violet-300">active</span>}
+              </div>
               <h3 className="text-lg font-bold text-white mt-1">{p.phase}</h3>
               <p className="text-sm text-slate-400 mt-2 mb-4">{p.focus}</p>
               <div className="grid sm:grid-cols-2 gap-3">
@@ -1142,11 +1190,21 @@ function ErrorLog() {
     return () => { cancelled = true }
   }, [user])
 
+  const srs = [1, 1, 2, 4, 7, 14, 30]
+
   const add = async (e) => {
     e.preventDefault()
     if (!mistake.trim() || saving) return
     setSaving(true)
-    const entry = { section, mistake: mistake.trim(), cause, fix, created_at: new Date().toISOString() }
+    const entry = {
+      section,
+      mistake: mistake.trim(),
+      cause,
+      fix,
+      created_at: new Date().toISOString(),
+      review_count: 0,
+      next_review: (() => { const t = new Date(); t.setDate(t.getDate() + 1); return t.toISOString() })(),
+    }
     let log = null
     if (user) {
       log = await addErrorLog(user.id, entry)
@@ -1161,6 +1219,20 @@ function ErrorLog() {
     }
     setMistake(''); setCause(''); setFix('')
     setSaving(false)
+  }
+
+  const markReview = async (l) => {
+    const nextCount = (l.review_count || 0) + 1
+    const days = srs[Math.min(nextCount, srs.length - 1)]
+    const nextDate = new Date()
+    nextDate.setDate(nextDate.getDate() + days)
+    const nextReview = nextDate.toISOString()
+    if (user) await reviewErrorLog(user.id, l.id, l.review_count || 0)
+    const updated = logs.map((x) => (x.id === l.id ? { ...x, review_count: nextCount, next_review: nextReview } : x))
+    setLogs(updated)
+    if (!user || !isSupabaseConfigured) {
+      localStorage.setItem(userKey(user, 'error-log'), JSON.stringify(updated))
+    }
   }
 
   const remove = async (id) => {
@@ -1213,20 +1285,27 @@ function ErrorLog() {
         <p className="text-center text-slate-500 py-8">No errors logged yet. Review this 30 min before each mock.</p>
       ) : (
         <div className="space-y-3">
-          {logs.map((l) => (
-            <div key={l.id} className="rounded-2xl glass p-4 card-glow flex items-start justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2 mb-1.5">
-                  <Badge color={l.section === 'Vocabulary' ? 'emerald' : l.section === 'Grammar' ? 'violet' : 'amber'}>{l.section}</Badge>
-                  <span className="text-xs text-slate-400">{new Date(l.created_at).toLocaleDateString()}</span>
+          {logs.map((l) => {
+            const isDue = l.next_review && new Date(l.next_review) <= new Date()
+            return (
+              <div key={l.id} className={`rounded-2xl glass p-4 card-glow flex items-start justify-between gap-3 ${isDue ? 'ring-1 ring-rose-500/40' : ''}`}>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                    <Badge color={l.section === 'Vocabulary' ? 'emerald' : l.section === 'Grammar' ? 'violet' : 'amber'}>{l.section}</Badge>
+                    <span className="text-xs text-slate-400">{new Date(l.created_at).toLocaleDateString()}</span>
+                    {isDue && <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-600/20 text-rose-300">due</span>}
+                  </div>
+                  <p className="font-semibold text-slate-100">{l.mistake}</p>
+                  {l.cause && <p className="text-sm text-rose-300 mt-1">Cause: {l.cause}</p>}
+                  {l.fix && <p className="text-sm text-emerald-300 mt-1">Fix: {l.fix}</p>}
                 </div>
-                <p className="font-semibold text-slate-100">{l.mistake}</p>
-                {l.cause && <p className="text-sm text-rose-300 mt-1">Cause: {l.cause}</p>}
-                {l.fix && <p className="text-sm text-emerald-300 mt-1">Fix: {l.fix}</p>}
+                <div className="flex flex-col items-end gap-2 shrink-0">
+                  <button onClick={() => markReview(l)} className="text-xs px-2.5 py-1 rounded-lg bg-violet-600/20 text-violet-300 hover:bg-violet-600/30 transition">Review +{srs[Math.min((l.review_count || 0) + 1, srs.length - 1)]}d</button>
+                  <button onClick={() => remove(l.id)} className="text-xs text-slate-500 hover:text-rose-400">Delete</button>
+                </div>
               </div>
-              <button onClick={() => remove(l.id)} className="text-xs text-slate-500 hover:text-rose-400 shrink-0">Delete</button>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
@@ -1238,6 +1317,8 @@ function App() {
   const [active, setActive] = useState('dashboard')
   const [mobileOpen, setMobileOpen] = useState(false)
   const [streak, setStreak] = useState(0)
+  const nextExam = nextJLPTDate()
+  const daysToExam = daysToJLPT(nextExam)
 
   const dictionary = useMemo(() => [
     ...kanjiLessons.map((k) => ({ word: k.char, reading: `${k.on} · ${k.kun}`, meaning: k.meaning, image: k.emoji, type: 'Kanji' })),
@@ -1284,13 +1365,13 @@ function App() {
   useEffect(() => { document.documentElement.classList.add('dark') }, [])
 
   const content = {
-    dashboard: <Dashboard streak={streak} setActive={setActive} />,
+    dashboard: <Dashboard streak={streak} daysToExam={daysToExam} nextExam={nextExam} setActive={setActive} />,
     lessons: <Lessons />,
     drills: <Drills />,
     anki: <Anki />,
     reading: <ReadingView />,
     ai: <AiTutor context={active} />,
-    plan: <StudyPlan />,
+    plan: <StudyPlan daysToExam={daysToExam} />,
     resources: <Resources />,
     errors: <ErrorLog />,
   }
@@ -1315,7 +1396,7 @@ function App() {
     <div className="min-h-screen bg-bun-900 text-slate-100 flex">
       <Sidebar active={active} setActive={setActive} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} streak={streak} />
       <main className="flex-1 min-w-0 flex flex-col">
-        <Header active={active} setMobileOpen={setMobileOpen} streak={streak} user={user} onSignOut={signOut} isSupabaseConfigured={isSupabaseConfigured} />
+        <Header active={active} setMobileOpen={setMobileOpen} streak={streak} daysToExam={daysToExam} user={user} onSignOut={signOut} isSupabaseConfigured={isSupabaseConfigured} />
         <div className="flex-1 p-4 sm:p-8 overflow-y-auto">
           <div className="max-w-6xl mx-auto animate-fade-in">
             {content[active]}

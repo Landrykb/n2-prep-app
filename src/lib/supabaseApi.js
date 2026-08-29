@@ -24,7 +24,7 @@ export async function getErrorLogs(userId) {
     .from('error_logs')
     .select('*')
     .eq('user_id', userId)
-    .order('created_at', { ascending: false })
+    .order('next_review', { ascending: true })
   if (error) {
     console.error('getErrorLogs error:', error)
     return []
@@ -32,15 +32,51 @@ export async function getErrorLogs(userId) {
   return data || []
 }
 
-export async function addErrorLog(userId, log) {
-  if (!supabase || !userId) return null
+export async function getDueErrorLogs(userId) {
+  if (!supabase || !userId) return []
   const { data, error } = await supabase
     .from('error_logs')
-    .insert({ user_id: userId, ...log })
+    .select('*')
+    .eq('user_id', userId)
+    .lte('next_review', new Date().toISOString())
+    .order('next_review', { ascending: true })
+  if (error) {
+    console.error('getDueErrorLogs error:', error)
+    return []
+  }
+  return data || []
+}
+
+const srsIntervals = [1, 1, 2, 4, 7, 14, 30]
+
+export async function addErrorLog(userId, log) {
+  if (!supabase || !userId) return null
+  const payload = {
+    user_id: userId,
+    review_count: 0,
+    next_review: new Date(Date.now() + 86400000).toISOString(),
+    ...log,
+  }
+  const { data, error } = await supabase
+    .from('error_logs')
+    .insert(payload)
     .select()
     .single()
   if (error) console.error('addErrorLog error:', error)
   return data
+}
+
+export async function reviewErrorLog(userId, id, currentCount) {
+  if (!supabase || !userId || !id) return
+  const next = currentCount + 1
+  const days = srsIntervals[Math.min(next, srsIntervals.length - 1)]
+  const nextReview = new Date(Date.now() + days * 86400000).toISOString()
+  const { error } = await supabase
+    .from('error_logs')
+    .update({ review_count: next, next_review: nextReview })
+    .eq('id', id)
+    .eq('user_id', userId)
+  if (error) console.error('reviewErrorLog error:', error)
 }
 
 export async function deleteErrorLog(userId, id) {
