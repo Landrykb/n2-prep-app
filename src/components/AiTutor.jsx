@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { useAuth } from '../hooks/useAuth.js'
 import { supabase } from '../lib/supabaseClient.js'
+import RichText from './RichText.jsx'
 import { Send, Loader2, Sparkles, Lightbulb, HelpCircle, BookOpen, RotateCcw } from 'lucide-react'
 
 const MODES = {
@@ -138,7 +139,7 @@ export default function AiTutor() {
                       : 'bg-bun-700/60 text-slate-200 rounded-tl-sm'
                   }`}
                 >
-                  {msg.content}
+                  {msg.role === 'user' ? msg.content : <RichText text={msg.content} />}
                 </div>
                 {msg.sources && msg.sources.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-2">

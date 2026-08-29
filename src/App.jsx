@@ -26,6 +26,8 @@ import {
   Loader2,
 } from 'lucide-react'
 import { useAuth } from './hooks/useAuth.js'
+import { useKanjiModal } from './hooks/useKanjiModal.js'
+import { findStudyItem } from './lib/findStudyItem.js'
 import AuthModal from './components/AuthModal.jsx'
 import AiTutor from './components/AiTutor.jsx'
 import Skeleton, { SkeletonText } from './components/Skeleton.jsx'
@@ -60,6 +62,7 @@ const ModeContext = createContext('beginner')
 
 function Furigana({ text, glossary = [] }) {
   const mode = useContext(ModeContext)
+  const { open } = useKanjiModal()
   const all = useMemo(() => [...commonWords, ...glossary], [glossary])
   if (mode === 'mastery' || all.length === 0) return <span className="leading-loose">{text}</span>
   const sorted = [...all].sort((a, b) => b.word.length - a.word.length)
@@ -97,18 +100,29 @@ function Furigana({ text, glossary = [] }) {
         p.type === 't' ? (
           <span key={i}>{p.text}</span>
         ) : (
-          <span
-            key={i}
-            className="group relative inline-block cursor-help border-b border-dashed border-violet-500/40"
-          >
-            {p.word}
-            <span className="absolute -top-16 left-1/2 -translate-x-1/2 bg-bun-800 border border-violet-500/30 rounded-lg px-3 py-2 text-xs text-slate-200 opacity-0 group-hover:opacity-100 transition pointer-events-none z-20 shadow-xl whitespace-nowrap">
-              <span className="block text-cyan-300 font-medium text-sm">{p.reading}</span>
-              <span className="block text-slate-300">{p.meaning}</span>
-            </span>
-          </span>
+          <FuriganaWord key={i} p={p} onOpen={open} />
         )
       )}
+    </span>
+  )
+}
+
+function FuriganaWord({ p, onOpen }) {
+  const found = p.reading ? findStudyItem(p.word) : null
+  const handle = (e) => {
+    e.stopPropagation()
+    if (found) onOpen(found)
+  }
+  return (
+    <span
+      onClick={handle}
+      className={`group relative inline-block border-b border-dashed border-violet-500/40 ${found ? 'cursor-pointer hover:text-violet-300' : 'cursor-help'}`}
+    >
+      {p.word}
+      <span className="absolute -top-16 left-1/2 -translate-x-1/2 bg-bun-800 border border-violet-500/30 rounded-lg px-3 py-2 text-xs text-slate-200 opacity-0 group-hover:opacity-100 transition pointer-events-none z-20 shadow-xl whitespace-nowrap">
+        <span className="block text-cyan-300 font-medium text-sm">{p.reading}</span>
+        <span className="block text-slate-300">{p.meaning}</span>
+      </span>
     </span>
   )
 }
@@ -117,6 +131,7 @@ function SelectionPopup({ dictionary }) {
   const [selected, setSelected] = useState(null)
   const [pos, setPos] = useState({ x: 0, y: 0 })
   const popupRef = useRef(null)
+  const { open } = useKanjiModal()
 
   useEffect(() => {
     const handle = (e) => {
@@ -174,6 +189,17 @@ function SelectionPopup({ dictionary }) {
           <span className="text-slate-500">Select a single word, kanji, or phrase from the lessons.</span>
         </p>
       )}
+      {(() => {
+        const found = findStudyItem(selected.match?.word || selected.text)
+        return found ? (
+          <button
+            onClick={() => { open(found); setSelected(null) }}
+            className="mt-3 w-full py-2 rounded-xl bg-violet-600/20 hover:bg-violet-600/30 text-violet-200 text-sm font-medium transition"
+          >
+            Open visual breakdown
+          </button>
+        ) : null
+      })()}
     </div>
   )
 }

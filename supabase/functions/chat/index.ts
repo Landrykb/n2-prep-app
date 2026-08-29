@@ -96,7 +96,7 @@ serve(async (req: Request) => {
       const { data: chunks, error: rpcError } = await supabaseClient.rpc('match_n2_chunks', {
         query_embedding: embedding,
         match_threshold: 0.45,
-        match_count: 6,
+        match_count: 4,
       })
 
       if (rpcError) {
@@ -133,8 +133,8 @@ serve(async (req: Request) => {
       body: JSON.stringify({
         model: chatModel,
         messages,
-        temperature: 0.6,
-        max_tokens: 1024,
+        temperature: 0.5,
+        max_tokens: 768,
       }),
     })
 
