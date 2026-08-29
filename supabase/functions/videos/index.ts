@@ -1,19 +1,18 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-serve(async (req: Request) => {
+Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
     const { q } = await req.json()
-    if (!q || typeof q !== 'string') {
+    const query = typeof q === 'string' ? q.trim() : ''
+    if (!query) {
       return new Response(JSON.stringify({ error: 'Missing q' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
@@ -26,7 +25,7 @@ serve(async (req: Request) => {
     url.searchParams.set('part', 'snippet')
     url.searchParams.set('type', 'video')
     url.searchParams.set('maxResults', '3')
-    url.searchParams.set('q', q)
+    url.searchParams.set('q', query)
     url.searchParams.set('key', key)
 
     const res = await fetch(url.toString())
@@ -37,13 +36,15 @@ serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: data?.error?.message || 'YouTube search failed' }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    const videos = (data.items || []).map((item: any) => ({
-      id: item.id?.videoId,
-      title: item.snippet?.title,
-      channel: item.snippet?.channelTitle,
-      embed: `https://www.youtube-nocookie.com/embed/${item.id?.videoId}?modestbranding=1&rel=0&iv_load_policy=3`,
-      thumb: item.snippet?.thumbnails?.medium?.url || item.snippet?.thumbnails?.default?.url,
-    }))
+    const videos = (data.items || [])
+      .filter((item: any) => item?.id?.videoId && item?.snippet)
+      .map((item: any) => ({
+        id: item.id.videoId,
+        title: item.snippet.title,
+        channel: item.snippet.channelTitle,
+        embed: `https://www.youtube-nocookie.com/embed/${item.id.videoId}?modestbranding=1&rel=0&iv_load_policy=3`,
+        thumb: item.snippet.thumbnails?.medium?.url || item.snippet.thumbnails?.default?.url,
+      }))
 
     return new Response(JSON.stringify({ videos }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (err) {
