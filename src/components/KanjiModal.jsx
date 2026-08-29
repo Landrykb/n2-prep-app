@@ -1,4 +1,5 @@
-import { X, Brain, Eye, BookOpen } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { X, Brain, Eye, BookOpen, Play, Search } from 'lucide-react'
 import TtsButton from './TtsButton.jsx'
 
 function Glossary({ items }) {
@@ -9,6 +10,74 @@ function Glossary({ items }) {
           {g.word} · {g.reading}
         </span>
       ))}
+    </div>
+  )
+}
+
+function RadicalStory({ radicals, title }) {
+  const [step, setStep] = useState(0)
+
+  useEffect(() => {
+    if (radicals.length <= 1) return
+    const id = setInterval(() => {
+      setStep((s) => (s < radicals.length - 1 ? s + 1 : 0))
+    }, 1200)
+    return () => clearInterval(id)
+  }, [radicals])
+
+  return (
+    <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4">
+      <h4 className="text-xs uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2"><BookOpen size={14} /> Component story</h4>
+      <div className="flex items-center justify-center gap-2 sm:gap-4">
+        {radicals.map((r, i) => (
+          <div
+            key={i}
+            className={`text-center transition-all duration-500 ${i <= step ? 'opacity-100 scale-100' : 'opacity-35 scale-90'}`}
+          >
+            <div className="text-4xl sm:text-5xl mb-1 transition-transform duration-500" style={{ transform: i === step ? 'translateY(-4px)' : 'none' }}>
+              {r.icon}
+            </div>
+            <p className="text-xs font-bold text-white">{r.part}</p>
+            <p className="text-[10px] text-slate-400">{r.name}</p>
+          </div>
+        ))}
+      </div>
+      <p className="text-center text-xs text-slate-400 mt-4">
+        {step + 1} / {radicals.length}: <span className="text-slate-200">{radicals[step]?.name}</span> builds into <span className="text-violet-300">{title}</span>
+      </p>
+    </div>
+  )
+}
+
+function VideoBox({ keyword, type }) {
+  const query = `${keyword} ${type === 'Grammar' ? 'JLPT N2 grammar' : type === 'Vocab' ? 'JLPT N2 vocabulary' : 'JLPT N2 kanji'}`
+  const youtube = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`
+  const ammo = `https://www.youtube.com/c/JapaneseAmmowithMisa/search?query=${encodeURIComponent(keyword)}`
+
+  return (
+    <div className="rounded-xl bg-gradient-to-r from-rose-900/20 to-violet-900/20 border border-rose-500/20 p-4">
+      <h4 className="text-xs uppercase tracking-wider text-rose-300 mb-3 flex items-center gap-2"><Play size={14} /> Learn with real videos</h4>
+      <p className="text-sm text-slate-300 mb-3">
+        Watching a real teacher explain <span className="text-violet-300 font-medium">{keyword}</span> in a lesson or real-life clip makes it stick.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <a
+          href={youtube}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-medium transition"
+        >
+          <Play size={16} /> YouTube search
+        </a>
+        <a
+          href={ammo}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-slate-200 text-sm font-medium transition"
+        >
+          <Search size={16} /> Japanese Ammo
+        </a>
+      </div>
     </div>
   )
 }
@@ -28,6 +97,7 @@ export default function KanjiModal({ item, onClose }) {
   const form = item.form || ''
   const nuance = item.nuance || ''
   const collocation = item.collocation || ''
+  const videoUrl = item.video || null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-bun-900/90 p-4 sm:p-6" onClick={onClose}>
@@ -67,28 +137,20 @@ export default function KanjiModal({ item, onClose }) {
             </div>
           )}
 
-          {item.doodle && (
-            <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4 flex items-center gap-4">
-              <span className="text-4xl" aria-label="drawing">{item.doodle}</span>
-              <p className="text-xs text-slate-500">Visual scene drawing</p>
-            </div>
-          )}
+          {radicals.length > 0 && <RadicalStory radicals={radicals} title={title} />}
 
-          {radicals.length > 0 && (
-            <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4">
-              <h4 className="text-xs uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2"><BookOpen size={14} /> Components</h4>
-              <div className="grid sm:grid-cols-2 gap-3">
-                {radicals.map((r, i) => (
-                  <div key={i} className="flex items-center gap-3 bg-bun-800/60 rounded-lg p-3">
-                    <span className="text-2xl">{r.icon}</span>
-                    <div>
-                      <p className="text-sm font-bold text-white">{r.part} · {r.name}</p>
-                      <p className="text-xs text-slate-400">Component {i + 1}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+          {videoUrl ? (
+            <div className="rounded-xl overflow-hidden border border-bun-600/30">
+              <iframe
+                className="w-full aspect-video"
+                src={videoUrl}
+                title={`${title} video`}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
             </div>
+          ) : (
+            <VideoBox keyword={title} type={type} />
           )}
 
           {story && (
