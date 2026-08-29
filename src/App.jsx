@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react'
 import {
   LayoutDashboard,
   BookOpen,
@@ -19,7 +19,6 @@ import {
   Search,
   Layers,
   Library,
-  Download,
   ExternalLink,
   User,
   LogOut,
@@ -38,6 +37,7 @@ import AiTutor from './components/AiTutor.jsx'
 import ChatBubble from './components/ChatBubble.jsx'
 import TtsButton from './components/TtsButton.jsx'
 import Skeleton, { SkeletonText } from './components/Skeleton.jsx'
+const Anki = lazy(() => import('./components/Anki.jsx'))
 import { userKey } from './lib/userKey.js'
 import { getErrorLogs, addErrorLog, reviewErrorLog, deleteErrorLog, getUserProgress, setUserProgress } from './lib/supabaseApi.js'
 import {
@@ -49,7 +49,6 @@ import {
   vocabLessons,
   passages,
   questions,
-  ankiCards,
   commonWords,
 } from './data.js'
 
@@ -839,91 +838,6 @@ function Drills() {
   )
 }
 
-function Anki() {
-  const [queue, setQueue] = useState([...ankiCards])
-  const [index, setIndex] = useState(0)
-  const [flipped, setFlipped] = useState(false)
-  const [done, setDone] = useState(0)
-
-  const current = queue[index]
-
-  const rate = (again) => {
-    if (again) {
-      setQueue((q) => [...q, current])
-    } else {
-      setDone((d) => d + 1)
-    }
-    setFlipped(false)
-    if (index + 1 >= queue.length) {
-      if (!again) setQueue((q) => q.filter((_, i) => i !== index))
-      else setIndex((x) => x + 1)
-    } else {
-      setIndex((x) => x + 1)
-    }
-  }
-
-  const exportCSV = () => {
-    const rows = ankiCards.map((c) => ({ front: c.front, back: c.back, tag: c.tag }))
-    const csv = ['front,back,tags', ...rows.map((r) => `${r.front},${r.back},${r.tag}`)].join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'n2-anki-cards.csv'
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  if (!current) {
-    return (
-      <div className="max-w-2xl mx-auto text-center py-12">
-        <div className="w-20 h-20 mx-auto rounded-full bg-bun-700 flex items-center justify-center text-4xl mb-6">🎉</div>
-        <h2 className="text-2xl font-bold text-white mb-2">Session done</h2>
-        <p className="text-slate-300 mb-6">Reviewed {done} cards. The cards will keep cycling until you mark them good.</p>
-        <button onClick={exportCSV} className="px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-medium transition"><Download size={16} className="inline mr-2" /> Export CSV for Anki</button>
-      </div>
-    )
-  }
-
-  return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">Anki Cards</h2>
-        <div className="flex gap-2">
-          <a href="https://apps.ankiweb.net/" target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-lg text-sm bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-slate-200 flex items-center gap-1"><ExternalLink size={14} /> Anki</a>
-          <button onClick={exportCSV} className="px-3 py-1.5 rounded-lg text-sm bg-violet-600 hover:bg-violet-500 text-white flex items-center gap-1"><Download size={14} /> CSV</button>
-        </div>
-      </div>
-
-      <div className="h-2 w-full rounded-full bg-bun-700 overflow-hidden"><div className="h-full bg-gradient-to-r from-violet-500 to-cyan-500" style={{ width: ((done / ankiCards.length) * 100) + '%' }} /></div>
-
-      <div className="rounded-3xl glass p-8 sm:p-12 card-glow text-center min-h-[360px] flex flex-col items-center justify-center">
-        <div className={`w-24 h-24 rounded-2xl bg-gradient-to-br ${current.tag === 'Kanji' ? 'from-amber-500 to-orange-600' : current.tag === 'Grammar' ? 'from-violet-500 to-fuchsia-600' : current.tag === 'Vocab' ? 'from-cyan-500 to-blue-600' : 'from-emerald-500 to-teal-600'} flex items-center justify-center text-4xl shadow-xl mb-6`}>
-          {current.image}
-        </div>
-        <p className="text-sm text-slate-400 mb-2 uppercase tracking-wide">{current.tag}</p>
-        <h3 className="text-4xl font-bold text-white mb-6">{current.front}</h3>
-        {flipped && (
-          <div className="w-full animate-fade-in border-t border-bun-600/30 pt-6">
-            <p className="text-2xl text-slate-200 font-medium">{current.back}</p>
-          </div>
-        )}
-      </div>
-
-      {!flipped ? (
-        <button onClick={() => setFlipped(true)} className="w-full py-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-medium transition">Show answer</button>
-      ) : (
-        <div className="grid grid-cols-4 gap-2">
-          <button onClick={() => rate(true)} className="py-2.5 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-200 text-sm font-medium hover:bg-rose-500/30 transition">Again</button>
-          <button onClick={() => rate(false)} className="py-2.5 rounded-xl bg-orange-500/20 border border-orange-500/40 text-orange-200 text-sm font-medium hover:bg-orange-500/30 transition">Hard</button>
-          <button onClick={() => rate(false)} className="py-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 text-sm font-medium hover:bg-emerald-500/30 transition">Good</button>
-          <button onClick={() => rate(false)} className="py-2.5 rounded-xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-200 text-sm font-medium hover:bg-cyan-500/30 transition">Easy</button>
-        </div>
-      )}
-    </div>
-  )
-}
-
 const resourceIcon = {
   Web: '🌐',
   Video: '▶️',
@@ -1519,7 +1433,6 @@ function App() {
     ...kanjiLessons.map((k) => ({ word: k.char, reading: `${k.on} · ${k.kun}`, meaning: k.meaning, image: k.emoji, type: 'Kanji' })),
     ...vocabLessons.map((v) => ({ word: v.word, reading: v.reading, meaning: v.meaning, image: v.image, type: 'Vocab' })),
     ...grammarLessons.map((g) => ({ word: g.pattern.replace(/^〜/, ''), reading: g.form, meaning: g.meaning, image: g.image, type: 'Grammar' })),
-    ...ankiCards.map((a) => ({ word: a.front, reading: a.back.split(' — ')[0] || '', meaning: a.back.split(' — ')[1] || a.back, image: a.image, type: a.tag })),
     ...passages.flatMap((p) => p.glossary.map((g) => ({ word: g.word, reading: g.reading, meaning: g.meaning, image: g.image, type: 'Reading' }))),
     ...commonWords.map((c) => ({ word: c.word, reading: c.reading, meaning: c.meaning, image: '📘', type: 'Common' })),
   ], [])
@@ -1563,7 +1476,11 @@ function App() {
     dashboard: <Dashboard streak={streak} daysToExam={daysToExam} nextExam={nextExam} setActive={setActive} />,
     lessons: <Lessons />,
     drills: <Drills />,
-    anki: <Anki />,
+    anki: (
+      <Suspense fallback={<div className="p-8 text-slate-400 flex items-center gap-2"><Loader2 size={20} className="animate-spin" /> Loading Anki deck…</div>}>
+        <Anki />
+      </Suspense>
+    ),
     reading: <ReadingView />,
     ai: <AiTutor context={active} />,
     plan: <StudyPlan daysToExam={daysToExam} />,

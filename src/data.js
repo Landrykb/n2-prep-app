@@ -1,7 +1,5 @@
 // Built-in N2 study content — accurate patterns, kanji, vocab, readings, and Anki cards.
-// Vocabulary deck: OpenJLPT (CC BY-SA 4.0) — https://github.com/evanclan/OpenJLPT
-
-import ankiVocab from './data/ankiVocab.json'
+// Anki deck is loaded on demand from /data/ankiVocab.json (OpenJLPT, CC BY-SA 4.0).
 
 export const scores = [
   { id: 'lang', name: 'Language Knowledge (Vocabulary/Grammar)', raw: '12 / 60', pct: 20, cutoff: '19 / 60', status: 'failed', target: '65% – 70%', color: 'rose' },
@@ -482,12 +480,6 @@ export const questions = [
     { label: 'にしては', correct: true }, { label: 'からして', correct: false }, { label: 'からといって', correct: false }, { label: 'だけに', correct: false } ],
     explanation: 'にしては = “considering / for a ~” — expresses surprise relative to a standard.', hint: 'A small athlete lifting big weights.' },
 ]
-
-// ------------------------------------------------------------------
-// ANKI PRE-MADE CARDS — N2 + N3 + N4 + N5 foundation (4,871 items)
-// Sourced from OpenJLPT (CC BY-SA 4.0) and does not assume prior level knowledge.
-// ------------------------------------------------------------------
-export const ankiCards = ankiVocab
 
 // ------------------------------------------------------------------
 // COMMON WORDS DICTIONARY — for global double-click / lookup coverage
