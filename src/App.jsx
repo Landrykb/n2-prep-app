@@ -25,6 +25,7 @@ import {
   Bot,
   Loader2,
   Calendar,
+  Play,
 } from 'lucide-react'
 import { useAuth } from './hooks/useAuth.js'
 import { useKanjiModal } from './hooks/useKanjiModal.js'
@@ -59,6 +60,7 @@ const nav = [
   { id: 'ai', label: 'AI Tutor', icon: Bot },
   { id: 'plan', label: 'Study Plan', icon: Map },
   { id: 'resources', label: 'Resources', icon: Library },
+  { id: 'videos', label: 'Videos', icon: Play },
   { id: 'errors', label: 'Error Log', icon: AlertCircle },
 ]
 
@@ -641,8 +643,14 @@ function Drills() {
         const raw = localStorage.getItem(userKey(user, 'daily'))
         d = raw ? JSON.parse(raw) : null
       }
-      if (d?.date === today) setDaily(d)
-      else if (user) await setUserProgress(user.id, { daily })
+      if (d?.date === today) {
+        setDaily(d)
+        setScore(d.score || 0)
+        setIndex(d.index || 0)
+        setAnswered(d.answered || false)
+        setSelected(d.selected ?? null)
+        setFinished(d.completed || false)
+      } else if (user) await setUserProgress(user.id, { daily })
     }
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -667,11 +675,13 @@ function Drills() {
 
   const handleSelect = (i) => {
     if (answered) return
+    const isCorrect = question.options[i].correct
+    const nextScore = isCorrect ? score + 1 : score
     setSelected(i)
     setAnswered(true)
-    if (question.options[i].correct) {
-      setScore((s) => s + 1)
-    } else if (user) {
+    setScore(nextScore)
+    setDaily((d) => ({ ...d, index, selected: i, answered: true, score: nextScore, completed: false }))
+    if (!isCorrect && user) {
       const correct = question.options.find((o) => o.correct)
       addErrorLog(user.id, {
         section: question.type,
@@ -683,10 +693,16 @@ function Drills() {
   }
 
   const next = () => {
-    if (index + 1 >= pool.length) {
+    const nextIndex = index + 1
+    if (nextIndex >= pool.length) {
       setFinished(true)
-      if (mode === 'daily') setDaily((d) => ({ ...d, completed: true, score }))
-    } else { setIndex((x) => x + 1); setSelected(null); setAnswered(false) }
+      if (mode === 'daily') setDaily((d) => ({ ...d, completed: true, score, selected: null, answered: false }))
+    } else {
+      setIndex(nextIndex)
+      setSelected(null)
+      setAnswered(false)
+      setDaily((d) => ({ ...d, index: nextIndex, selected: null, answered: false }))
+    }
   }
 
   const restart = () => {
@@ -694,7 +710,7 @@ function Drills() {
       const today = new Date().toDateString()
       const shuffled = [...questions].map((_, i) => i).sort(() => Math.random() - 0.5)
       const picked = shuffled.slice(0, Math.min(20, questions.length))
-      setDaily({ date: today, indices: picked, completed: false, score: 0 })
+      setDaily({ date: today, indices: picked, completed: false, score: 0, index: 0, selected: null, answered: false })
     }
     setIndex(0); setSelected(null); setAnswered(false); setScore(0); setFinished(false)
   }
@@ -1160,6 +1176,77 @@ function StudyPlan({ daysToExam }) {
   )
 }
 
+function Videos() {
+  const { isSupabaseConfigured } = useAuth()
+  const [videos, setVideos] = useState([])
+  const [loading, setLoading] = useState(!isSupabaseConfigured)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!supabase || !isSupabaseConfigured) return
+    let cancelled = false
+    const queries = ['JLPT N2 grammar', 'JLPT N2 vocabulary', 'JLPT N2 kanji']
+    const fetchAll = async () => {
+      try {
+        const all = []
+        for (const q of queries) {
+          const { data, error } = await supabase.functions.invoke('videos', { body: { q } })
+          if (error) throw error
+          all.push(...(data?.videos || []))
+        }
+        const unique = all.filter((v, i, a) => a.findIndex((x) => x.id === v.id) === i)
+        if (!cancelled) setVideos(unique)
+      } catch (err) {
+        if (!cancelled) setError(err.message || 'Could not load videos.')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    fetchAll()
+    return () => { cancelled = true }
+  }, [isSupabaseConfigured])
+
+  if (!isSupabaseConfigured) {
+    return (
+      <div className="max-w-2xl mx-auto text-center py-20">
+        <p className="text-slate-400">Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to see videos.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-white">N2 Video Dojo</h2>
+        <p className="text-sm text-slate-400 mt-1">Real teachers explaining JLPT N2 grammar, vocabulary, and kanji. If you have a free YouTube Data API key, these update automatically.</p>
+      </div>
+      {loading && (
+        <div className="flex items-center gap-2 text-slate-400">
+          <Loader2 size={20} className="animate-spin" /> Finding the best N2 videos…
+        </div>
+      )}
+      {error && <p className="text-rose-300">{error}</p>}
+      <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">
+        {videos.map((v) => (
+          <div key={v.id} className="rounded-2xl glass p-4 card-glow">
+            <div className="aspect-video rounded-xl overflow-hidden border border-bun-600/30 mb-3">
+              <iframe
+                className="w-full h-full"
+                src={v.embed}
+                title={v.title}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+            <h3 className="font-semibold text-white text-sm line-clamp-2">{v.title}</h3>
+            <p className="text-[10px] text-slate-400 mt-1">{v.channel}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function ErrorLog() {
   const { user, isSupabaseConfigured } = useAuth()
   const [logs, setLogs] = useState([])
@@ -1373,6 +1460,7 @@ function App() {
     ai: <AiTutor context={active} />,
     plan: <StudyPlan daysToExam={daysToExam} />,
     resources: <Resources />,
+    videos: <Videos />,
     errors: <ErrorLog />,
   }
 
