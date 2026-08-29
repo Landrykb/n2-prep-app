@@ -213,7 +213,7 @@ export default function Anki() {
   const progressPct = queue.length ? Math.min(100, Math.round((index / queue.length) * 100)) : 100
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto space-y-6 pb-28 sm:pb-24">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-2xl font-bold text-white">Anki Cards</h2>
         <div className="flex gap-2">
