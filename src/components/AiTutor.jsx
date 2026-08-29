@@ -66,7 +66,6 @@ export default function AiTutor({ context = '', compact = false }) {
 
   const runQuick = (action) => {
     setMode(action.mode)
-    setInput(action.prompt)
     send(action.prompt)
   }
 
@@ -191,10 +190,6 @@ export default function AiTutor({ context = '', compact = false }) {
           </button>
         </form>
       </div>
-
-      <p className="text-center text-xs text-slate-500">
-        Answers are grounded in the N2 study library and your error log using OpenRouter + Supabase vector search.
-      </p>
     </div>
   )
 }
