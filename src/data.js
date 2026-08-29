@@ -1,4 +1,7 @@
 // Built-in N2 study content — accurate patterns, kanji, vocab, readings, and Anki cards.
+// Vocabulary deck: OpenJLPT (CC BY-SA 4.0) — https://github.com/evanclan/OpenJLPT
+
+import ankiVocab from './data/ankiVocab.json'
 
 export const scores = [
   { id: 'lang', name: 'Language Knowledge (Vocabulary/Grammar)', raw: '12 / 60', pct: 20, cutoff: '19 / 60', status: 'failed', target: '65% – 70%', color: 'rose' },
@@ -481,30 +484,10 @@ export const questions = [
 ]
 
 // ------------------------------------------------------------------
-// ANKI PRE-MADE CARDS
+// ANKI PRE-MADE CARDS — N2 + N3 + N4 + N5 foundation (4,871 items)
+// Sourced from OpenJLPT (CC BY-SA 4.0) and does not assume prior level knowledge.
 // ------------------------------------------------------------------
-export const ankiCards = [
-  { id: 1, front: '終日', back: 'しゅうじつ — all day long', tag: 'Vocab', image: '🌞' },
-  { id: 2, front: '延期', back: 'えんき — postponement', tag: 'Vocab', image: '🗓️' },
-  { id: 3, front: '集中', back: 'しゅうちゅう — concentration', tag: 'Vocab', image: '🎯' },
-  { id: 4, front: '解決', back: 'かいけつ — solution', tag: 'Vocab', image: '🔓' },
-  { id: 5, front: '計画', back: 'けいかく — plan', tag: 'Vocab', image: '🗺️' },
-  { id: 6, front: '責任', back: 'せきにん — responsibility', tag: 'Vocab', image: '⚖️' },
-  { id: 7, front: '録', back: 'ろく — record', tag: 'Kanji', image: '⛓️' },
-  { id: 8, front: '延', back: 'えん — prolong / extend', tag: 'Kanji', image: '🐍' },
-  { id: 9, front: '務', back: 'む/つと(める) — duty / serve', tag: 'Kanji', image: '⚔️' },
-  { id: 10, front: '〜わけにはいかない', back: 'Cannot ~ (moral / social)', tag: 'Grammar', image: '🚫' },
-  { id: 11, front: '〜ざるを得ない', back: 'Have no choice but to ~', tag: 'Grammar', image: '⛓️' },
-  { id: 12, front: '〜からといって', back: 'Just because ~ (doesn’t mean)', tag: 'Grammar', image: '🔁' },
-  { id: 13, front: '〜にしては', back: 'Considering ~', tag: 'Grammar', image: '📊' },
-  { id: 14, front: '〜べきだ', back: 'Should ~', tag: 'Grammar', image: '🧭' },
-  { id: 15, front: '〜どころではない', back: 'Not the time/place for ~', tag: 'Grammar', image: '⏰' },
-  { id: 16, front: '企業', back: 'きぎょう — company / enterprise', tag: 'Reading', image: '🏢' },
-  { id: 17, front: '専門家', back: 'せんもんか — expert', tag: 'Reading', image: '👨‍🔬' },
-  { id: 18, front: '持続可能', back: 'じぞくかのう — sustainable', tag: 'Reading', image: '♻️' },
-  { id: 19, front: '不可欠', back: 'ふかけつ — indispensable', tag: 'Reading', image: '🔒' },
-  { id: 20, front: '出所', back: 'しゅっしょ — source / origin', tag: 'Reading', image: '📍' },
-]
+export const ankiCards = ankiVocab
 
 // ------------------------------------------------------------------
 // COMMON WORDS DICTIONARY — for global double-click / lookup coverage
