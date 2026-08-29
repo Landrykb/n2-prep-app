@@ -878,9 +878,20 @@ function Resources() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {list.map((r) => (
               <div key={r.name} className="rounded-2xl glass p-5 card-glow hover:border-violet-500/30 transition">
+                {r.video && (
+                  <div className="aspect-video w-full rounded-xl overflow-hidden border border-bun-600/30 mb-4">
+                    <iframe
+                      className="w-full h-full"
+                      src={r.video}
+                      title={r.name}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  </div>
+                )}
                 <div className="flex items-start justify-between mb-3">
                   <div className="w-10 h-10 rounded-xl bg-bun-700 flex items-center justify-center text-lg">
-                    {resourceIcon[cat] || '�'}
+                    {resourceIcon[cat] || '📚'}
                   </div>
                   {r.url && (
                     <a href={r.url} target="_blank" rel="noreferrer" className="p-2 rounded-lg bg-violet-600/20 text-violet-300 hover:bg-violet-600/30 transition">

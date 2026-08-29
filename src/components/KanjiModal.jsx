@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { X, Brain, Eye, BookOpen, Play, Search } from 'lucide-react'
+import { X, Brain, Eye, BookOpen, Play, Search, Loader2, AlertCircle } from 'lucide-react'
+import { supabase } from '../lib/supabaseClient.js'
 import TtsButton from './TtsButton.jsx'
 
 function Glossary({ items }) {
@@ -49,35 +50,96 @@ function RadicalStory({ radicals, title }) {
   )
 }
 
-function VideoBox({ keyword, type }) {
+function FallbackLinks({ keyword, type }) {
   const query = `${keyword} ${type === 'Grammar' ? 'JLPT N2 grammar' : type === 'Vocab' ? 'JLPT N2 vocabulary' : 'JLPT N2 kanji'}`
   const youtube = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`
-  const ammo = `https://www.youtube.com/c/JapaneseAmmowithMisa/search?query=${encodeURIComponent(keyword)}`
+  return (
+    <div className="flex flex-wrap gap-2 mt-4">
+      <a
+        href={youtube}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-medium transition"
+      >
+        <Search size={16} /> YouTube search
+      </a>
+    </div>
+  )
+}
+
+function VideoBox({ keyword, type }) {
+  const [videos, setVideos] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!supabase) return
+    const query = `${keyword} ${type === 'Grammar' ? 'JLPT N2 grammar' : type === 'Vocab' ? 'JLPT N2 vocabulary' : 'JLPT N2 kanji'}`
+    let cancelled = false
+    const search = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('videos', { body: { q: query } })
+        if (cancelled) return
+        if (error) throw error
+        setVideos(data?.videos || [])
+      } catch (err) {
+        if (!cancelled) setError(err.message || 'Could not load videos.')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    search()
+    return () => { cancelled = true }
+  }, [keyword, type])
 
   return (
     <div className="rounded-xl bg-gradient-to-r from-rose-900/20 to-violet-900/20 border border-rose-500/20 p-4">
       <h4 className="text-xs uppercase tracking-wider text-rose-300 mb-3 flex items-center gap-2"><Play size={14} /> Learn with real videos</h4>
-      <p className="text-sm text-slate-300 mb-3">
+      <p className="text-sm text-slate-300 mb-4">
         Watching a real teacher explain <span className="text-violet-300 font-medium">{keyword}</span> in a lesson or real-life clip makes it stick.
       </p>
-      <div className="flex flex-wrap gap-2">
-        <a
-          href={youtube}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-medium transition"
-        >
-          <Play size={16} /> YouTube search
-        </a>
-        <a
-          href={ammo}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-slate-200 text-sm font-medium transition"
-        >
-          <Search size={16} /> Japanese Ammo
-        </a>
-      </div>
+
+      {loading && (
+        <div className="flex items-center gap-2 text-sm text-slate-400">
+          <Loader2 size={18} className="animate-spin" /> Searching YouTube…
+        </div>
+      )}
+
+      {error && (
+        <div className="text-sm text-rose-300 bg-rose-900/20 rounded-lg p-3">
+          <div className="flex items-start gap-2"><AlertCircle size={16} className="shrink-0 mt-0.5" /><span>{error}</span></div>
+          <FallbackLinks keyword={keyword} type={type} />
+        </div>
+      )}
+
+      {!loading && !error && videos.length > 0 && (
+        <div className="space-y-4">
+          {videos.map((v) => (
+            <div key={v.id} className="rounded-xl overflow-hidden border border-bun-600/30 bg-bun-900">
+              <div className="aspect-video w-full">
+                <iframe
+                  className="w-full h-full"
+                  src={v.embed}
+                  title={v.title}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+              <div className="p-3">
+                <p className="text-xs font-bold text-slate-100 line-clamp-2">{v.title}</p>
+                <p className="text-[10px] text-slate-400 mt-1">{v.channel}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!loading && !error && videos.length === 0 && (
+        <div className="text-sm text-slate-400">
+          No teaching videos found.
+          <FallbackLinks keyword={keyword} type={type} />
+        </div>
+      )}
     </div>
   )
 }
@@ -150,7 +212,7 @@ export default function KanjiModal({ item, onClose }) {
               />
             </div>
           ) : (
-            <VideoBox keyword={title} type={type} />
+            <VideoBox key={title} keyword={title} type={type} />
           )}
 
           {story && (
