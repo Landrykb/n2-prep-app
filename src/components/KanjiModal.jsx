@@ -101,17 +101,26 @@ function VideoBox({ keyword, type }) {
   const [videos, setVideos] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [isDirectMatch, setIsDirectMatch] = useState(false)
 
   useEffect(() => {
     if (!supabase) return
-    const query = `JLPT N2 ${keyword}`
+    const query = type === 'Grammar'
+      ? `${keyword.replace(/^〜/, '')} 文法 使い方 JLPT N2`
+      : type === 'Vocab'
+      ? `${keyword} 単語 意味 JLPT N2`
+      : `${keyword} 漢字 読み方 JLPT N2`
     let cancelled = false
     const search = async () => {
       try {
         const { data, error } = await supabase.functions.invoke('videos', { body: { q: query } })
         if (cancelled) return
         if (error) throw error
-        setVideos(data?.videos || [])
+        const all = data?.videos || []
+        const cleanKeyword = keyword.replace(/^〜/, '').toLowerCase()
+        const relevant = all.filter((v) => v.title.toLowerCase().includes(cleanKeyword) || v.channel.toLowerCase().includes(cleanKeyword))
+        setVideos(relevant.length ? relevant : all)
+        setIsDirectMatch(relevant.length > 0)
       } catch (err) {
         if (!cancelled) setError(err.message || 'Could not load videos.')
       } finally {
@@ -144,6 +153,9 @@ function VideoBox({ keyword, type }) {
 
       {!loading && !error && videos.length > 0 && (
         <div className="space-y-4">
+          {!isDirectMatch && (
+            <p className="text-xs text-amber-300 bg-amber-900/20 rounded-lg p-2">No direct lesson found for <span className="font-medium">{keyword}</span>. These are the closest matches YouTube returned.</p>
+          )}
           {videos.map((v) => (
             <div key={v.id} className="rounded-xl overflow-hidden border border-bun-600/30 bg-bun-900">
               <div className="aspect-video w-full">

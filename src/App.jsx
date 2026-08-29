@@ -1221,19 +1221,30 @@ function Videos() {
   const [error, setError] = useState('')
   const [playing, setPlaying] = useState(null)
 
-  const display = videos.length ? videos : FALLBACK_VIDEOS
+  const byCategory = useMemo(() => {
+    const groups = {}
+    videos.forEach((v) => {
+      const c = v.category || 'Other'
+      groups[c] = [...(groups[c] || []), v]
+    })
+    return groups
+  }, [videos])
 
   useEffect(() => {
     if (!supabase || !isSupabaseConfigured) return
     let cancelled = false
-    const queries = ['JLPT N2 grammar', 'JLPT N2 vocabulary', 'JLPT N2 kanji']
+    const queries = [
+      { q: 'JLPT N2 grammar', category: 'Grammar' },
+      { q: 'JLPT N2 vocabulary', category: 'Vocabulary' },
+      { q: 'JLPT N2 kanji', category: 'Kanji' },
+    ]
     const fetchAll = async () => {
       try {
         const all = []
-        for (const q of queries) {
+        for (const { q, category } of queries) {
           const { data, error } = await supabase.functions.invoke('videos', { body: { q } })
           if (error) throw error
-          all.push(...(data?.videos || []))
+          all.push(...(data?.videos || []).map((v) => ({ ...v, category })))
         }
         const unique = all.filter((v, i, a) => a.findIndex((x) => x.id === v.id) === i)
         if (!cancelled) setVideos(unique)
@@ -1255,8 +1266,29 @@ function Videos() {
     )
   }
 
+  const renderCard = (v) => (
+    <button
+      key={v.id}
+      onClick={() => setPlaying(v)}
+      className="text-left rounded-2xl glass p-4 card-glow hover:border-violet-500/40 transition group"
+    >
+      <div className="aspect-video rounded-xl overflow-hidden border border-bun-600/30 mb-3 relative bg-bun-800">
+        {v.thumb ? (
+          <img src={v.thumb} alt="" className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none' }} />
+        ) : null}
+        <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition">
+          <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur flex items-center justify-center text-white">
+            <Play size={28} className="ml-1" />
+          </div>
+        </div>
+      </div>
+      <h3 className="font-semibold text-white text-sm line-clamp-2">{v.title}</h3>
+      <p className="text-[10px] text-slate-400 mt-1">{v.channel}</p>
+    </button>
+  )
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
         <h2 className="text-2xl font-bold text-white">N2 Video Dojo</h2>
         <p className="text-sm text-slate-400 mt-1">Click any video to open a focused player. Use the fullscreen button inside the player to go full screen.</p>
@@ -1268,32 +1300,30 @@ function Videos() {
       )}
       {error && <p className="text-rose-300">{error}</p>}
       {!loading && !error && videos.length === 0 && (
-        <p className="text-amber-300 text-sm bg-amber-900/20 rounded-xl p-4">
-          No videos came back from YouTube. The fallback below is shown while you check that the YouTube Data API is enabled.
-        </p>
+        <div className="space-y-6">
+          <p className="text-amber-300 text-sm bg-amber-900/20 rounded-xl p-4">
+            YouTube search came back empty. The curated fallback below is shown while you check the YouTube Data API.
+          </p>
+          <h3 className="text-lg font-bold text-white">Featured N2 videos</h3>
+          <div className="grid md:grid-cols-2 gap-6">
+            {FALLBACK_VIDEOS.map(renderCard)}
+          </div>
+        </div>
       )}
-      <div className="grid md:grid-cols-2 gap-6">
-        {display.map((v) => (
-          <button
-            key={v.id}
-            onClick={() => setPlaying(v)}
-            className="text-left rounded-2xl glass p-4 card-glow hover:border-violet-500/40 transition group"
-          >
-            <div className="aspect-video rounded-xl overflow-hidden border border-bun-600/30 mb-3 relative bg-bun-800">
-              {v.thumb ? (
-                <img src={v.thumb} alt="" className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none' }} />
-              ) : null}
-              <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition">
-                <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur flex items-center justify-center text-white">
-                  <Play size={28} className="ml-1" />
-                </div>
+      {!loading && !error && videos.length > 0 && (
+        <div className="space-y-8">
+          {Object.entries(byCategory).map(([cat, list]) => (
+            <div key={cat}>
+              <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                <Badge color={cat === 'Grammar' ? 'violet' : cat === 'Vocabulary' ? 'emerald' : cat === 'Kanji' ? 'amber' : 'slate'}>{cat}</Badge>
+              </h3>
+              <div className="grid md:grid-cols-2 gap-6">
+                {list.map(renderCard)}
               </div>
             </div>
-            <h3 className="font-semibold text-white text-sm line-clamp-2">{v.title}</h3>
-            <p className="text-[10px] text-slate-400 mt-1">{v.channel}</p>
-          </button>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
       {playing && <VideoModal video={playing} onClose={() => setPlaying(null)} />}
     </div>
   )
