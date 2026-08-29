@@ -38,7 +38,7 @@ serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    const { message, history = [], mode = 'ask' } = await req.json()
+    const { message, history = [], mode = 'ask', context = '' } = await req.json()
     if (!message || typeof message !== 'string') {
       return new Response(JSON.stringify({ error: 'Missing message' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
@@ -47,7 +47,8 @@ serve(async (req: Request) => {
     const referer = Deno.env.get('APP_URL') ?? 'https://jpn2easy.vercel.app'
     const chatModel = Deno.env.get('OPENROUTER_CHAT_MODEL') ?? 'openrouter/free'
 
-    let systemPrompt = N2_PERSONA
+    const contextBlock = context ? `\n\nThe user is currently on the ${context} page. Try to relate your answer to that area when it helps.` : ''
+    let systemPrompt = N2_PERSONA + contextBlock
     let sources: any[] = []
 
     if (mode === 'review') {

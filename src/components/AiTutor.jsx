@@ -13,10 +13,11 @@ const MODES = {
 const QUICK_ACTIONS = [
   { label: 'Explain a pattern', prompt: 'Explain the difference between 〜わけがない and 〜わけではない with examples.', mode: 'ask', icon: Lightbulb },
   { label: 'Quiz me', prompt: 'Create one JLPT N2 multiple-choice question for me.', mode: 'quiz', icon: HelpCircle },
+  { label: 'Past question', prompt: 'Generate one JLPT N2 past-style multiple-choice question. Do not reveal the answer. After I answer, explain each option.', mode: 'quiz', icon: BookOpen },
   { label: 'Review errors', prompt: 'Review my recent errors and recommend what to study next.', mode: 'review', icon: BookOpen },
 ]
 
-export default function AiTutor() {
+export default function AiTutor({ context = '' }) {
   const { isSupabaseConfigured } = useAuth()
   const [messages, setMessages] = useState([
     { role: 'assistant', content: 'I am your N2 tutor. Ask me anything, or pick a quick action below.\n\nI will explain the rule, give a Japanese example, and then ask a short follow-up to check your understanding.' },
@@ -49,9 +50,9 @@ export default function AiTutor() {
     }
 
     try {
-      const history = messages.filter((msg) => msg.role !== 'system' && msg.role !== 'assistant' ? true : true).slice(-12)
+      const history = messages.filter((msg) => msg.role === 'user' || msg.role === 'assistant').slice(-12).map(({ role, content }) => ({ role, content }))
       const { data, error } = await supabase.functions.invoke('chat', {
-        body: { message: text, history, mode },
+        body: { message: text, history, mode, context },
       })
       if (error) throw error
       setMessages((m) => [...m, { role: 'assistant', content: data.answer || 'No response.', sources: data.sources || [] }])

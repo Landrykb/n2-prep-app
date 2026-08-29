@@ -1,4 +1,5 @@
 import { X, Brain, Eye, BookOpen } from 'lucide-react'
+import TtsButton from './TtsButton.jsx'
 
 function Glossary({ items }) {
   return (
@@ -44,9 +45,12 @@ export default function KanjiModal({ item, onClose }) {
               <h2 className="text-5xl sm:text-6xl font-bold text-white leading-none">{title}</h2>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg bg-bun-700 text-slate-300 hover:text-white">
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            <TtsButton text={title} />
+            <button onClick={onClose} className="p-2 rounded-lg bg-bun-700 text-slate-300 hover:text-white">
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         <div className="space-y-5">
@@ -109,7 +113,10 @@ export default function KanjiModal({ item, onClose }) {
 
           {example && (
             <div className="rounded-xl bg-gradient-to-r from-violet-900/30 to-fuchsia-900/30 border border-violet-500/20 p-4">
-              <h4 className="text-xs uppercase tracking-wider text-violet-300 mb-2">Example</h4>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-xs uppercase tracking-wider text-violet-300">Example</h4>
+                <TtsButton text={example} className="scale-90" />
+              </div>
               <p className="text-lg text-slate-100 leading-loose font-medium">{example}</p>
               {exampleGlossary.length > 0 && <Glossary items={exampleGlossary} />}
             </div>

@@ -49,21 +49,18 @@ export const readingTips = [
 ]
 
 export const resources = [
-  { name: 'Anki', use: 'Free spaced-repetition flashcards (SRS)', category: 'SRS', url: 'https://apps.ankiweb.net/' },
-  { name: 'Bunpro', use: 'Grammar SRS with active output practice', category: 'SRS' },
-  { name: 'Yomitan (Yomichan)', use: 'Browser hover dictionary → one-click Anki', category: 'SRS' },
-  { name: 'iKnow!', use: 'JLPT N2 Core courses for sight/listening recall', category: 'SRS' },
-  { name: 'JLPT Sensei N2 Grammar', use: 'Categorized N2 grammar list', category: 'Web' },
-  { name: 'Imabi', use: 'Deep English-based grammar analysis', category: 'Web' },
-  { name: 'Nihongo Net N2', use: 'あ→わ grammar index', category: 'Web' },
-  { name: 'MLC', use: 'Free N2 grammar & vocab PDF worksheets', category: 'Web' },
-  { name: 'Shin Kanzen Master N2', use: 'Grammar & Reading precision', category: 'Textbook' },
-  { name: 'Nihongo Sou Matome N2', use: 'Vocabulary & Kanji exposure', category: 'Textbook' },
-  { name: 'Quick Mastery of JLPT N2', use: 'Fast-paced diagnostic drills', category: 'Textbook' },
-  { name: 'NHK News Web Easy', use: 'Warm-up reading at simplified news', category: 'Reading' },
-  { name: 'Nihongo Speed Reading Challenge 100', use: 'Tracking-speed & skim training', category: 'Reading' },
-  { name: 'Todai Japanese', use: 'Daily native article reader with dictionary', category: 'Reading' },
-  { name: 'Official JLPT Sample Materials', use: 'Authentic practice sets', category: 'Mock' },
+  { name: 'JLPT Sensei N2 Grammar', use: 'Categorized N2 grammar list with examples', category: 'Web', url: 'https://jlptsensei.com/jlpt-n2-grammar-list/' },
+  { name: 'Imabi', use: 'Deep English-based grammar analysis', category: 'Web', url: 'https://imabi.net/' },
+  { name: 'Maggie Sensei N2', use: 'Natural Japanese explanations and quizzes', category: 'Web', url: 'https://maggiesensei.com/' },
+  { name: 'Tofugu Grammar', use: 'Articles on tricky Japanese grammar points', category: 'Web', url: 'https://www.tofugu.com/japanese-grammar/' },
+  { name: 'Jisho', use: 'Free dictionary, kanji lookup, and radicals', category: 'Web', url: 'https://jisho.org/' },
+  { name: 'Nihongo no Mori (N2)', use: 'Native teacher grammar & reading videos', category: 'Video', url: 'https://www.youtube.com/@nihongonomori' },
+  { name: 'Japanese Ammo with Misa', use: 'Friendly grammar and JLPT strategy videos', category: 'Video', url: 'https://www.youtube.com/@JapaneseAmmowithMisa' },
+  { name: 'Nihongo Con Teppei', use: 'Daily N3-N2 listening podcasts for free', category: 'Video', url: 'https://www.youtube.com/@teppeisn2' },
+  { name: 'NHK News Web Easy', use: 'Simplified Japanese news for reading warm-up', category: 'Reading', url: 'https://www3.nhk.or.jp/news/easy/' },
+  { name: 'Todai Japanese', use: 'Daily native article reader with dictionary', category: 'Reading', url: 'https://www.todaii.com/' },
+  { name: 'Official JLPT Sample Materials', use: 'Authentic practice sets from the test maker', category: 'Mock', url: 'https://www.jlpt.jp/e/samples/sampleindex.html' },
+  { name: 'JLPT N2 Practice Questions', use: 'Free online past-style drills and mock tests', category: 'Mock', url: 'https://www.jlpt-n5-n1.com/jlpt-n2-practice-tests/' },
 ]
 
 // Helper to create a small vocabulary row for example sentences.

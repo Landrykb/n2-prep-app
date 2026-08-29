@@ -1,0 +1,42 @@
+import { useState } from 'react'
+import AiTutor from './AiTutor.jsx'
+import { MessageCircle, X, Bot } from 'lucide-react'
+
+export default function ChatBubble({ context }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="fixed bottom-6 right-6 z-40 flex items-center gap-2 px-4 py-3 rounded-full bg-violet-600 hover:bg-violet-500 text-white font-medium shadow-lg shadow-violet-600/30 transition hover:-translate-y-1"
+      >
+        <Bot size={20} />
+        <span className="hidden sm:inline text-sm">Ask JPN2easy</span>
+      </button>
+
+      {open && (
+        <div className="fixed inset-0 z-40 sm:left-auto sm:w-[480px]" onClick={() => setOpen(false)}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="absolute inset-0 sm:inset-y-0 sm:right-0 sm:w-full bg-bun-900/95 sm:bg-bun-900 border-l border-bun-600/30 flex flex-col"
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-bun-600/30 bg-bun-800/50">
+              <div className="flex items-center gap-2 text-violet-200">
+                <MessageCircle size={18} />
+                <span className="font-bold text-sm">N2 AI Tutor</span>
+                <span className="text-xs text-slate-400">· {context || 'general'}</span>
+              </div>
+              <button onClick={() => setOpen(false)} className="p-2 rounded-lg bg-bun-700 text-slate-300 hover:text-white">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <AiTutor context={context} />
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}

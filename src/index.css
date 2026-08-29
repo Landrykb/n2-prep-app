@@ -30,7 +30,7 @@ body {
   color: #fff;
 }
 
-/* Bunpro-ish glass utilities */
+/* Glass card utilities */
 .glass {
   @apply bg-bun-800/60 backdrop-blur border border-bun-600/40;
 }

@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useRef, useState, createContext } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   LayoutDashboard,
   BookOpen,
@@ -30,6 +30,8 @@ import { useKanjiModal } from './hooks/useKanjiModal.js'
 import { findStudyItem } from './lib/findStudyItem.js'
 import AuthModal from './components/AuthModal.jsx'
 import AiTutor from './components/AiTutor.jsx'
+import ChatBubble from './components/ChatBubble.jsx'
+import TtsButton from './components/TtsButton.jsx'
 import Skeleton, { SkeletonText } from './components/Skeleton.jsx'
 import { userKey } from './lib/userKey.js'
 import { getErrorLogs, addErrorLog, deleteErrorLog, getUserProgress, setUserProgress } from './lib/supabaseApi.js'
@@ -58,13 +60,10 @@ const nav = [
   { id: 'errors', label: 'Error Log', icon: AlertCircle },
 ]
 
-const ModeContext = createContext('beginner')
-
 function Furigana({ text, glossary = [] }) {
-  const mode = useContext(ModeContext)
   const { open } = useKanjiModal()
   const all = useMemo(() => [...commonWords, ...glossary], [glossary])
-  if (mode === 'mastery' || all.length === 0) return <span className="leading-loose">{text}</span>
+  if (all.length === 0) return <span className="leading-loose">{text}</span>
   const sorted = [...all].sort((a, b) => b.word.length - a.word.length)
   const parts = []
   let rest = text
@@ -169,7 +168,8 @@ function SelectionPopup({ dictionary }) {
       className="fixed z-50 -translate-x-1/2 -translate-y-full bg-bun-800 border border-violet-500/40 rounded-2xl shadow-2xl p-4 min-w-[220px] max-w-[320px]"
       style={{ left: pos.x, top: pos.y - 8 }}
     >
-      <div className="text-right">
+      <div className="flex items-center justify-between mb-2">
+        <TtsButton text={selected.text} />
         <button onClick={() => setSelected(null)} className="text-xs text-slate-500 hover:text-slate-300">Close</button>
       </div>
       {selected.match ? (
@@ -219,7 +219,7 @@ function Badge({ children, color = 'violet' }) {
   )
 }
 
-function Header({ active, setMobileOpen, streak, mode, setMode, user, onSignOut, isSupabaseConfigured }) {
+function Header({ active, setMobileOpen, streak, user, onSignOut, isSupabaseConfigured }) {
   return (
     <header className="sticky top-0 z-10 bg-bun-900/80 backdrop-blur border-b border-bun-600/30 px-4 sm:px-8 py-4 flex items-center justify-between">
       <button onClick={() => setMobileOpen(true)} className="lg:hidden p-2 rounded-lg bg-bun-700 text-slate-200">
@@ -235,16 +235,9 @@ function Header({ active, setMobileOpen, streak, mode, setMode, user, onSignOut,
           <Flame size={16} className="text-orange-400" />
           <span className="text-sm font-bold text-orange-200">{streak}</span>
         </div>
-        <div className="hidden sm:flex p-1 rounded-xl bg-bun-700/60 border border-bun-600/40">
-          {['beginner', 'mastery'].map((m) => (
-            <button
-              key={m}
-              onClick={() => setMode(m)}
-              className={`px-3 py-1 rounded-lg text-xs font-medium transition capitalize ${mode === m ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-white'}`}
-            >
-              {m}
-            </button>
-          ))}
+        <div className="hidden sm:flex items-center gap-2 text-xs text-slate-300">
+          <span className="text-violet-300 font-medium">JPN2easy</span>
+          <span className="text-slate-500">· N2 Prep</span>
         </div>
         {isSupabaseConfigured && (
           <div className="flex items-center gap-2">
@@ -281,8 +274,8 @@ function Sidebar({ active, setActive, mobileOpen, setMobileOpen, streak }) {
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-lg shadow-lg">🦝</div>
             <div>
-              <h1 className="font-bold text-lg leading-tight">N2 Path</h1>
-              <p className="text-xs text-slate-400">Bunpro-style mastery</p>
+              <h1 className="font-bold text-lg leading-tight">JPN2easy</h1>
+              <p className="text-xs text-slate-400">AI N2 Prep &middot; Free forever</p>
             </div>
           </div>
         </div>
@@ -392,7 +385,7 @@ function Dashboard({ streak, setActive }) {
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {resources.slice(0, 4).map((r) => (
             <div key={r.name} className="rounded-2xl glass p-4 card-glow hover:border-violet-500/30 transition cursor-pointer">
-              <div className="w-10 h-10 rounded-xl bg-bun-700 flex items-center justify-center text-lg mb-3">{r.category === 'SRS' ? '⚡' : '📚'}</div>
+              <div className="w-10 h-10 rounded-xl bg-bun-700 flex items-center justify-center text-lg mb-3">{resourceIcon[r.category] || '📚'}</div>
               <p className="font-semibold text-white text-sm">{r.name}</p>
               <p className="text-xs text-slate-400 mt-1">{r.use}</p>
             </div>
@@ -860,14 +853,18 @@ function Anki() {
   )
 }
 
+const resourceIcon = {
+  Web: '🌐',
+  Video: '▶️',
+  Reading: '📰',
+  Mock: '📝',
+}
+
 function Resources() {
-  const byCategory = {
-    SRS: resources.filter((r) => r.category === 'SRS'),
-    Web: resources.filter((r) => r.category === 'Web'),
-    Textbook: resources.filter((r) => r.category === 'Textbook'),
-    Reading: resources.filter((r) => r.category === 'Reading'),
-    Mock: resources.filter((r) => r.category === 'Mock'),
-  }
+  const byCategory = resources.reduce((acc, r) => {
+    acc[r.category] = [...(acc[r.category] || []), r]
+    return acc
+  }, {})
 
   return (
     <div className="space-y-6">
@@ -880,7 +877,7 @@ function Resources() {
               <div key={r.name} className="rounded-2xl glass p-5 card-glow hover:border-violet-500/30 transition">
                 <div className="flex items-start justify-between mb-3">
                   <div className="w-10 h-10 rounded-xl bg-bun-700 flex items-center justify-center text-lg">
-                    {cat === 'SRS' ? '⚡' : cat === 'Web' ? '🌐' : cat === 'Textbook' ? '📖' : cat === 'Reading' ? '📰' : '📝'}
+                    {resourceIcon[cat] || '�'}
                   </div>
                   {r.url && (
                     <a href={r.url} target="_blank" rel="noreferrer" className="p-2 rounded-lg bg-violet-600/20 text-violet-300 hover:bg-violet-600/30 transition">
@@ -1227,7 +1224,6 @@ function App() {
   const [active, setActive] = useState('dashboard')
   const [mobileOpen, setMobileOpen] = useState(false)
   const [streak, setStreak] = useState(0)
-  const [mode, setMode] = useState('beginner')
 
   const dictionary = useMemo(() => [
     ...kanjiLessons.map((k) => ({ word: k.char, reading: `${k.on} · ${k.kun}`, meaning: k.meaning, image: k.emoji, type: 'Kanji' })),
@@ -1279,7 +1275,7 @@ function App() {
     drills: <Drills />,
     anki: <Anki />,
     reading: <ReadingView />,
-    ai: <AiTutor />,
+    ai: <AiTutor context={active} />,
     plan: <StudyPlan />,
     resources: <Resources />,
     errors: <ErrorLog />,
@@ -1302,20 +1298,19 @@ function App() {
   }
 
   return (
-    <ModeContext.Provider value={mode}>
-      <div className="min-h-screen bg-bun-900 text-slate-100 flex">
-        <Sidebar active={active} setActive={setActive} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} streak={streak} />
-        <main className="flex-1 min-w-0 flex flex-col">
-          <Header active={active} setMobileOpen={setMobileOpen} streak={streak} mode={mode} setMode={setMode} user={user} onSignOut={signOut} isSupabaseConfigured={isSupabaseConfigured} />
-          <div className="flex-1 p-4 sm:p-8 overflow-y-auto">
-            <div className="max-w-6xl mx-auto animate-fade-in">
-              {content[active]}
-            </div>
+    <div className="min-h-screen bg-bun-900 text-slate-100 flex">
+      <Sidebar active={active} setActive={setActive} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} streak={streak} />
+      <main className="flex-1 min-w-0 flex flex-col">
+        <Header active={active} setMobileOpen={setMobileOpen} streak={streak} user={user} onSignOut={signOut} isSupabaseConfigured={isSupabaseConfigured} />
+        <div className="flex-1 p-4 sm:p-8 overflow-y-auto">
+          <div className="max-w-6xl mx-auto animate-fade-in">
+            {content[active]}
           </div>
-        </main>
-        <SelectionPopup dictionary={dictionary} />
-      </div>
-    </ModeContext.Provider>
+        </div>
+      </main>
+      <SelectionPopup dictionary={dictionary} />
+      <ChatBubble context={active} />
+    </div>
   )
 }
 
