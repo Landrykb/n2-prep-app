@@ -683,14 +683,25 @@ function Drills() {
     setAnswered(true)
     setScore(nextScore)
     setDaily((d) => ({ ...d, index, selected: i, answered: true, score: nextScore, completed: false }))
-    if (!isCorrect && user) {
+    if (!isCorrect) {
       const correct = question.options.find((o) => o.correct)
-      addErrorLog(user.id, {
+      const entry = {
         section: question.type,
         mistake: question.target ? `${question.target} — ${question.prompt}` : question.prompt,
         cause: `Chose: ${question.options[i].label}`,
         fix: `Correct: ${correct?.label || ''}${question.explanation ? `. ${question.explanation}` : ''}`.trim(),
-      })
+        created_at: new Date().toISOString(),
+        review_count: 0,
+        next_review: (() => { const t = new Date(); t.setDate(t.getDate() + 1); return t.toISOString() })(),
+      }
+      if (user) {
+        addErrorLog(user.id, entry)
+      } else {
+        const raw = localStorage.getItem(userKey(user, 'error-log'))
+        const logs = raw ? JSON.parse(raw) : []
+        logs.unshift({ id: Date.now(), ...entry })
+        localStorage.setItem(userKey(user, 'error-log'), JSON.stringify(logs))
+      }
     }
   }
 
@@ -705,6 +716,12 @@ function Drills() {
       setAnswered(false)
       setDaily((d) => ({ ...d, index: nextIndex, selected: null, answered: false }))
     }
+  }
+
+  const tryAgain = () => {
+    setSelected(null)
+    setAnswered(false)
+    setDaily((d) => ({ ...d, selected: null, answered: false }))
   }
 
   const restart = () => {
@@ -806,7 +823,16 @@ function Drills() {
             <p className="text-sm text-slate-400 mt-2">{question.hint}</p>
           </div>
         )}
-        {answered && <div className="text-right"><button onClick={next} className="px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-medium transition">{index + 1 === pool.length ? 'Finish' : 'Next'}</button></div>}
+        {answered && (
+          <div className="flex items-center justify-between">
+            {!question.options[selected].correct && (
+              <button onClick={tryAgain} className="px-6 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-slate-200 font-medium transition flex items-center gap-2">
+                <RotateCcw size={16} /> Try again
+              </button>
+            )}
+            <button onClick={next} className="ml-auto px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-medium transition">{index + 1 === pool.length ? 'Finish' : 'Next'}</button>
+          </div>
+        )}
       </div>
       <p className="text-center text-sm text-slate-500">Score: {score} / {index + (answered ? 1 : 0)}</p>
     </div>
