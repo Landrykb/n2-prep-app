@@ -152,7 +152,7 @@ export const kanjiLessons = [
 // ------------------------------------------------------------------
 export const grammarLessons = [
   { pattern: '〜わけがない', form: 'V-plain / i-adj / na-adj+な / N+の + わけがない', meaning: 'There is no way ~ / It is impossible that ~', meaningFr: 'Il est impossible que ~',
-    image: '🙅', doodle: '🚪🔒❌', gradient: 'from-rose-500 to-pink-600',
+    image: '🙅', doodle: '🚪�❌', gradient: 'from-rose-500 to-pink-600',
     scene: 'A locked gate has a big "NO WAY" sign. The speaker says the idea is completely impossible.',
     sceneFr: 'Une porte verrouillée avec un grand panneau "PAS MOYEN". L\'orateur dit que l\'idée est totalement impossible.',
     nuance: 'Strong denial based on logic or the speaker’s judgment.',
@@ -274,7 +274,7 @@ export const vocabLessons = [
     example: '集中して勉強する必要がある。',
     exampleGlossary: [ g('集中','しゅうちゅう','concentration'), g('勉強','べんきょう','study'), g('必要','ひつよう','need'), g('ある','','is') ],
   },
-  { word: '解決', reading: 'かいけつ', meaning: 'solution / settlement', meaningFr: 'solution / règlement', image: '🔓', doodle: '💧🔒➡️🔓', gradient: 'from-blue-400 to-indigo-500',
+  { word: '解決', reading: 'かいけつ', meaning: 'solution / settlement', meaningFr: 'solution / règlement', image: '✅', doodle: '💧❓➡️✅', gradient: 'from-blue-400 to-indigo-500',
     story: 'Water cuts through the knot. The problem opens up like a lock being opened.',
     storyFr: 'L\'eau coupe le nœud. Le problème s\'ouvre comme un cadenas qu\'on déverrouille.',
     collocation: '問題を解決する',
