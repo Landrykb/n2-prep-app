@@ -16,14 +16,10 @@ serve(async (req: Request) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization') ?? ''
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      {
-        global: { headers: { Authorization: authHeader } },
-        auth: { persistSession: false },
-      }
+      { auth: { persistSession: false } }
     )
 
     const { data: rows, error: rowsError } = await supabaseAdmin
@@ -37,7 +33,10 @@ serve(async (req: Request) => {
     }
 
     if (!rows || rows.length === 0) {
-      return new Response(JSON.stringify({ indexed: 0 }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      return new Response(
+        JSON.stringify({ indexed: 0, message: 'No rows with null embedding found. Make sure supabase/seed.sql was run.' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     const openrouterKey = Deno.env.get('OPENROUTER_API_KEY') ?? ''
