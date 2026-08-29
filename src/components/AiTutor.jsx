@@ -17,7 +17,7 @@ const QUICK_ACTIONS = [
   { label: 'Review errors', prompt: 'Review my recent errors and recommend what to study next.', mode: 'review', icon: BookOpen },
 ]
 
-export default function AiTutor({ context = '' }) {
+export default function AiTutor({ context = '', compact = false }) {
   const { isSupabaseConfigured } = useAuth()
   const [messages, setMessages] = useState([
     { role: 'assistant', content: 'I am your N2 tutor. Ask me anything, or pick a quick action below.\n\nI will explain the rule, give a Japanese example, and then ask a short follow-up to check your understanding.' },
@@ -77,7 +77,7 @@ export default function AiTutor({ context = '' }) {
   const currentMode = MODES[mode]
 
   return (
-    <div className="max-w-4xl mx-auto space-y-5">
+    <div className={compact ? 'h-full flex flex-col space-y-3' : 'max-w-4xl mx-auto space-y-5'}>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <currentMode.icon className="text-violet-400" size={24} />
@@ -128,7 +128,7 @@ export default function AiTutor({ context = '' }) {
         </div>
       )}
 
-      <div className="rounded-3xl glass p-4 card-glow h-[min(60vh,560px)] flex flex-col">
+      <div className={compact ? 'flex-1 min-h-0 overflow-hidden rounded-3xl glass p-4 card-glow flex flex-col' : 'rounded-3xl glass p-4 card-glow h-[min(60vh,560px)] flex flex-col'}>
         <div className="flex-1 overflow-y-auto space-y-4 p-2">
           {messages.map((msg, i) => (
             <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>

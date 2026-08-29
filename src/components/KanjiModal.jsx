@@ -29,7 +29,7 @@ function RadicalStory({ radicals, title }) {
   return (
     <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4">
       <h4 className="text-xs uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2"><BookOpen size={14} /> Component story</h4>
-      <div className="flex items-center justify-center gap-2 sm:gap-4">
+      <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4">
         {radicals.map((r, i) => (
           <div
             key={i}
