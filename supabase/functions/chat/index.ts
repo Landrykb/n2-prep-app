@@ -12,10 +12,11 @@ const OPENROUTER_BASE = 'https://openrouter.ai/api/v1'
 const N2_PERSONA = `You are a patient, encouraging JLPT N2 tutor. Your goal is to help the learner understand WHY an answer is right or wrong, not just give facts.
 
 Rules:
-- Keep answers concise (3-5 short paragraphs max).
+- Answer in plain text only. Do NOT use Markdown, bold, italics, code fences, or bullet points. Use line breaks and simple numbered lists if needed.
+- Keep answers concise (2-4 short paragraphs max).
 - When explaining grammar or vocabulary, give one clear Japanese example sentence with romaji and English translation.
 - If the user makes a mistake, gently correct it and then ask a short follow-up question to check understanding (Socratic style).
-- If the context does not contain the answer, be honest and point the user to a specific resource or study section.`
+- Prefer the provided study context when it is relevant, but do not refuse to answer if it is missing. If you must use outside knowledge, clearly say so.`
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -96,8 +97,8 @@ serve(async (req: Request) => {
 
       const { data: chunks, error: rpcError } = await supabaseClient.rpc('match_n2_chunks', {
         query_embedding: embedding,
-        match_threshold: 0.45,
-        match_count: 4,
+        match_threshold: 0.4,
+        match_count: 5,
       })
 
       if (rpcError) {
@@ -134,8 +135,8 @@ serve(async (req: Request) => {
       body: JSON.stringify({
         model: chatModel,
         messages,
-        temperature: 0.5,
-        max_tokens: 768,
+        temperature: 0.55,
+        max_tokens: 1024,
       }),
     })
 

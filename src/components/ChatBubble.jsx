@@ -19,7 +19,7 @@ export default function ChatBubble({ context }) {
         <div className="fixed inset-0 z-40" onClick={() => setOpen(false)}>
           <div
             onClick={(e) => e.stopPropagation()}
-            className="absolute inset-x-0 bottom-0 h-[88vh] rounded-t-3xl sm:rounded-none sm:inset-y-0 sm:right-0 sm:left-auto sm:w-[480px] sm:h-auto bg-bun-900/95 sm:bg-bun-900 border-t sm:border-t-0 sm:border-l border-bun-600/30 flex flex-col">
+            className="absolute inset-x-0 bottom-0 h-[85vh] max-h-[720px] rounded-t-3xl sm:rounded-none sm:inset-y-0 sm:right-0 sm:left-auto sm:w-[min(480px,100vw)] sm:h-auto sm:max-h-none bg-bun-900/95 sm:bg-bun-900 border-t sm:border-t-0 sm:border-l border-bun-600/30 flex flex-col pb-[env(safe-area-inset-bottom)]">
             <div className="flex items-center justify-between px-4 py-3 border-b border-bun-600/30 bg-bun-800/50">
               <div className="flex items-center gap-2 text-violet-200">
                 <MessageCircle size={18} />

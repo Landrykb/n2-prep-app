@@ -10,7 +10,8 @@ export default function TtsButton({ text, className = '' }) {
     if (!available || !text) return
     window.speechSynthesis.cancel()
     const u = new SpeechSynthesisUtterance(text)
-    u.lang = 'ja-JP'
+    const hasJapanese = /[\u3000-\u303F\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF\u3400-\u4DBF]/.test(text)
+    u.lang = hasJapanese ? 'ja-JP' : 'en-US'
     u.onend = () => setSpeaking(false)
     u.onerror = () => setSpeaking(false)
     setSpeaking(true)
