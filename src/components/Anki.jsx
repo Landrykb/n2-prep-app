@@ -21,7 +21,9 @@ const loadProgress = () => {
         p.lastDate = t
         p.newToday = 0
       }
-      return { due: {}, count: {}, lastDate: t, newToday: 0, newLimit: 20, ...p }
+      const newLimit = Math.max(1, Math.min(100, Number(p.newLimit) || 20))
+      const newToday = (p.lastDate !== t) ? 0 : Math.max(0, Math.min(newLimit, Number(p.newToday) || 0))
+      return { due: p.due || {}, count: p.count || {}, lastDate: t, newToday, newLimit }
     }
   } catch {}
   return { due: {}, count: {}, lastDate: today(), newToday: 0, newLimit: 20 }

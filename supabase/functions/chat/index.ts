@@ -23,6 +23,10 @@ serve(async (req: Request) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+  }
+
   try {
     const authHeader = req.headers.get('Authorization') ?? ''
     const supabaseClient = createClient(
@@ -40,8 +44,17 @@ serve(async (req: Request) => {
     }
 
     const { message, history = [], mode = 'ask', context = '' } = await req.json()
-    if (!message || typeof message !== 'string') {
-      return new Response(JSON.stringify({ error: 'Missing message' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    if (!message || typeof message !== 'string' || message.length > 2000) {
+      return new Response(JSON.stringify({ error: 'Invalid message' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+    if (typeof context !== 'string' || context.length > 120) {
+      return new Response(JSON.stringify({ error: 'Invalid context' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+    if (!['ask', 'quiz', 'review'].includes(mode)) {
+      return new Response(JSON.stringify({ error: 'Invalid mode' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+    if (!Array.isArray(history) || history.length > 20 || history.some((m: any) => !m || !['user', 'assistant'].includes(m.role) || typeof m.content !== 'string' || m.content.length > 2000)) {
+      return new Response(JSON.stringify({ error: 'Invalid history' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
     const openrouterKey = Deno.env.get('OPENROUTER_API_KEY') ?? ''
