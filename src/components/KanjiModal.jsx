@@ -31,11 +31,9 @@ const meaningEmoji = {
 const kanjiEmoji = Object.fromEntries(kanjiLessons.map((k) => [k.char, k.emoji]))
 
 function generateDoodle(item) {
-  if (item.doodle) return item.doodle
-  if (item.image) return item.image
-  if (item.emoji) return item.emoji
+  if (item?.doodle) return item.doodle
   const emojis = []
-  if (item.meaning) {
+  if (item?.meaning) {
     const words = item.meaning.split(/[^a-zA-Z]+/).filter(Boolean)
     for (const w of words) {
       const e = meaningEmoji[w.toLowerCase()]
@@ -44,8 +42,8 @@ function generateDoodle(item) {
     }
   }
   if (emojis.length > 0) return emojis.join('')
-  if (item.radicals?.length) return item.radicals.map((r) => r.icon).join('')
-  const target = item.word || item.char || ''
+  if (item?.radicals?.length) return item.radicals.map((r) => r.icon).join('')
+  const target = item?.word || item?.char || ''
   const parts = []
   for (const ch of target) {
     const e = kanjiEmoji[ch]
@@ -175,7 +173,6 @@ function VideoBox({ keyword, type }) {
   const [videos, setVideos] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [isDirectMatch, setIsDirectMatch] = useState(false)
 
   useEffect(() => {
     if (!supabase) return
@@ -193,8 +190,7 @@ function VideoBox({ keyword, type }) {
         const all = data?.videos || []
         const cleanKeyword = keyword.replace(/^〜/, '').toLowerCase()
         const relevant = all.filter((v) => v.title.toLowerCase().includes(cleanKeyword) || v.channel.toLowerCase().includes(cleanKeyword))
-        setVideos(relevant.length ? relevant : all)
-        setIsDirectMatch(relevant.length > 0)
+        setVideos(relevant)
       } catch (err) {
         if (!cancelled) setError(err.message || 'Could not load videos.')
       } finally {
@@ -227,9 +223,6 @@ function VideoBox({ keyword, type }) {
 
       {!loading && !error && videos.length > 0 && (
         <div className="space-y-4">
-          {!isDirectMatch && (
-            <p className="text-xs text-amber-300 bg-amber-900/20 rounded-lg p-2">No direct lesson found for <span className="font-medium">{keyword}</span>. These are the closest matches YouTube returned.</p>
-          )}
           {videos.map((v) => (
             <div key={v.id} className="rounded-xl overflow-hidden border border-bun-600/30 bg-bun-900">
               <div className="aspect-video w-full">

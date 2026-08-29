@@ -150,11 +150,10 @@ function SelectionPopup({ dictionary }) {
         setSelected(null)
         return
       }
-      const sortedDict = [...dictionary].sort((a, b) => b.word.length - a.word.length)
       const match =
-        sortedDict.find((d) => d.word === text) ||
-        sortedDict.find((d) => text.includes(d.word)) ||
-        sortedDict.find((d) => d.word.includes(text)) ||
+        dictionary.find((d) => d.word === text) ||
+        dictionary.find((d) => text.includes(d.word)) ||
+        dictionary.find((d) => d.word.includes(text)) ||
         null
       const range = selection.getRangeAt(0)
       const rect = range.getBoundingClientRect()
@@ -1433,16 +1432,30 @@ function App() {
   const [active, setActive] = useState('dashboard')
   const [mobileOpen, setMobileOpen] = useState(false)
   const [streak, setStreak] = useState(0)
+  const [ankiCards, setAnkiCards] = useState([])
   const nextExam = nextJLPTDate()
   const daysToExam = daysToJLPT(nextExam)
 
-  const dictionary = useMemo(() => [
-    ...kanjiLessons.map((k) => ({ word: k.char, reading: `${k.on} · ${k.kun}`, meaning: k.meaning, image: k.emoji, type: 'Kanji' })),
-    ...vocabLessons.map((v) => ({ word: v.word, reading: v.reading, meaning: v.meaning, image: v.image, type: 'Vocab' })),
-    ...grammarLessons.map((g) => ({ word: g.pattern.replace(/^〜/, ''), reading: g.form, meaning: g.meaning, image: g.image, type: 'Grammar' })),
-    ...passages.flatMap((p) => p.glossary.map((g) => ({ word: g.word, reading: g.reading, meaning: g.meaning, image: g.image, type: 'Reading' }))),
-    ...commonWords.map((c) => ({ word: c.word, reading: c.reading, meaning: c.meaning, image: '📘', type: 'Common' })),
-  ], [])
+  useEffect(() => {
+    fetch('/data/ankiVocab.json')
+      .then((r) => r.json())
+      .then((data) => setAnkiCards(data))
+      .catch(() => setAnkiCards([]))
+  }, [])
+
+  const dictionary = useMemo(() => {
+    const anki = ankiCards.map((c) => ({ word: c.front, reading: c.back.split(' — ')[0] || '', meaning: c.back.split(' — ')[1] || c.back, image: c.image, type: c.tag }))
+    const all = [
+      ...kanjiLessons.map((k) => ({ word: k.char, reading: `${k.on} · ${k.kun}`, meaning: k.meaning, image: k.emoji, type: 'Kanji' })),
+      ...vocabLessons.map((v) => ({ word: v.word, reading: v.reading, meaning: v.meaning, image: v.image, type: 'Vocab' })),
+      ...grammarLessons.map((g) => ({ word: g.pattern.replace(/^〜/, ''), reading: g.form, meaning: g.meaning, image: g.image, type: 'Grammar' })),
+      ...passages.flatMap((p) => p.glossary.map((g) => ({ word: g.word, reading: g.reading, meaning: g.meaning, image: g.image, type: 'Reading' }))),
+      ...commonWords.map((c) => ({ word: c.word, reading: c.reading, meaning: c.meaning, image: '📘', type: 'Common' })),
+      ...anki,
+    ]
+    all.sort((a, b) => b.word.length - a.word.length)
+    return all
+  }, [ankiCards])
 
   useEffect(() => {
     let cancelled = false
