@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:anki": "node scripts/build-anki.mjs",
     "lint": "oxlint",
     "preview": "vite preview"
   },

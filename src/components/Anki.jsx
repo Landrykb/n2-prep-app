@@ -47,6 +47,7 @@ export default function Anki() {
 
   const [progress, setProgress] = useState(loadProgress())
   const [mode, setMode] = useState('due')
+  const [level, setLevel] = useState('all')
   const [shuffle, setShuffle] = useState(false)
   const [search, setSearch] = useState('')
   const [newLimit, setNewLimit] = useState(progress.newLimit || 20)
@@ -80,6 +81,7 @@ export default function Anki() {
     const t = today()
     const term = search.trim().toLowerCase()
     const base = cards.filter((c) => {
+      if (level !== 'all' && c.level !== level) return false
       if (term && !c.front.toLowerCase().includes(term) && !c.back.toLowerCase().includes(term)) return false
       const due = progress.due[c.id]
       const isDue = due && due <= t
@@ -98,17 +100,20 @@ export default function Anki() {
   useEffect(() => {
     refreshQueue()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cards, mode, shuffle, search, newLimit])
+  }, [cards, mode, level, shuffle, search, newLimit])
 
   const current = queue[index]
 
   const stats = useMemo(() => {
     const t = today()
-    const due = cards.filter((c) => progress.due[c.id] && progress.due[c.id] <= t).length
-    const newCount = cards.filter((c) => !progress.due[c.id]).length
+    const filtered = level === 'all' ? cards : cards.filter((c) => c.level === level)
+    const due = filtered.filter((c) => progress.due[c.id] && progress.due[c.id] <= t).length
+    const newCount = filtered.filter((c) => !progress.due[c.id]).length
     const learned = Object.keys(progress.count).filter((id) => (progress.count[id] || 0) > 0).length
-    return { total: cards.length, due, new: newCount, learned, newToday: progress.newToday }
-  }, [cards, progress])
+    const byLevel = { N5: 0, N4: 0, N3: 0, N2: 0, N1: 0 }
+    for (const c of cards) byLevel[c.level] = (byLevel[c.level] || 0) + 1
+    return { total: filtered.length, due, new: newCount, learned, newToday: progress.newToday, byLevel }
+  }, [cards, progress, level])
 
   const rate = (quality) => {
     if (!current) return
@@ -175,7 +180,7 @@ export default function Anki() {
     return (
       <div className="max-w-2xl mx-auto text-center py-20 text-slate-400">
         <Loader2 size={24} className="animate-spin mx-auto mb-4" />
-        <p>Loading 4,871-card deck…</p>
+        <p>Loading 8,334-card deck…</p>
       </div>
     )
   }
@@ -226,6 +231,14 @@ export default function Anki() {
             <option value="new">New only</option>
             <option value="all">All cards</option>
           </select>
+          <select value={level} onChange={(e) => setLevel(e.target.value)} className="bg-bun-900 border border-bun-600/40 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-violet-500">
+            <option value="all">All levels</option>
+            <option value="N5">N5</option>
+            <option value="N4">N4</option>
+            <option value="N3">N3</option>
+            <option value="N2">N2</option>
+            <option value="N1">N1</option>
+          </select>
           <button onClick={() => setShuffle((s) => !s)} className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 border transition ${shuffle ? 'bg-violet-600 border-violet-500 text-white' : 'bg-bun-900 border-bun-600/40 text-slate-300 hover:bg-bun-700'}`}><Shuffle size={14} /> {shuffle ? 'On' : 'Off'}</button>
           <div className="relative flex-1 min-w-[140px]">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
@@ -247,6 +260,13 @@ export default function Anki() {
           <Stat label="New today" value={`${stats.newToday} / ${newLimit}`} />
           <Stat label="Learned" value={stats.learned} />
         </div>
+        <div className="grid grid-cols-5 gap-3">
+          <Stat label="N5" value={stats.byLevel.N5} />
+          <Stat label="N4" value={stats.byLevel.N4} />
+          <Stat label="N3" value={stats.byLevel.N3} />
+          <Stat label="N2" value={stats.byLevel.N2} />
+          <Stat label="N1" value={stats.byLevel.N1} />
+        </div>
 
         <div className="h-2 w-full rounded-full bg-bun-700 overflow-hidden">
           <div className="h-full bg-gradient-to-r from-violet-500 to-cyan-500 transition-all" style={{ width: `${progressPct}%` }} />
@@ -255,10 +275,10 @@ export default function Anki() {
       </div>
 
       <div className="rounded-3xl glass p-8 sm:p-12 card-glow text-center min-h-[360px] flex flex-col items-center justify-center">
-        <div className={`w-24 h-24 rounded-2xl bg-gradient-to-br ${current.tag === 'Kanji' ? 'from-amber-500 to-orange-600' : current.tag === 'Grammar' ? 'from-violet-500 to-fuchsia-600' : current.tag === 'Vocab' ? 'from-cyan-500 to-blue-600' : 'from-emerald-500 to-teal-600'} flex items-center justify-center text-4xl shadow-xl mb-6`}>
+        <div className={`w-24 h-24 rounded-2xl bg-gradient-to-br ${current.level === 'N1' ? 'from-rose-500 to-red-600' : current.level === 'N2' ? 'from-orange-500 to-amber-600' : current.level === 'N3' ? 'from-yellow-500 to-amber-600' : current.level === 'N4' ? 'from-emerald-500 to-teal-600' : 'from-cyan-500 to-blue-600'} flex items-center justify-center text-4xl shadow-xl mb-6`}>
           {current.image}
         </div>
-        <p className="text-sm text-slate-400 mb-2 uppercase tracking-wide">{current.tag}</p>
+        <p className="text-sm text-slate-400 mb-2 uppercase tracking-wide">{current.tag} · {current.level}</p>
         <h3 className="text-4xl font-bold text-white mb-6">{current.front}</h3>
         {flipped && (
           <div className="w-full animate-fade-in border-t border-bun-600/30 pt-6">
