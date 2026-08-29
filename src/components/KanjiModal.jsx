@@ -2,65 +2,26 @@ import { useEffect, useState, useMemo } from 'react'
 import { X, Brain, Eye, BookOpen, Play, Search, Loader2, AlertCircle } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient.js'
 import TtsButton from './TtsButton.jsx'
-import { kanjiLessons } from '../data.js'
+const DOODLE_DATA_URL = '/data/doodleData.json'
 
-const meaningEmoji = {
-  // core
-  time: '⏰', day: '🌞', night: '🌙', morning: '🌅', evening: '🌇', today: '📅', yesterday: '⏮️', tomorrow: '⏭️',
-  person: '👤', people: '👥', man: '👨', woman: '👩', child: '👶', friend: '🤝', family: '�‍👩‍👧', money: '�💰', work: '💼',
-  study: '📚', book: '📖', read: '📖', write: '✍️', learn: '🧠', teach: '🧑‍�', school: '🏫', student: '👩‍🎓', teacher: '👨‍🏫',
-  eat: '�🍽️', drink: '🥤', food: '🍱', meal: '🍽️', hungry: '😋', thirsty: '🥛', cook: '�‍🍳', restaurant: '🍽️',
-  go: '�🚶', come: '➡️', leave: '🚪', arrive: '📍', travel: '✈️', run: '🏃', walk: '🚶', drive: '🚗', fly: '✈️', ride: '🚲',
-  // feelings
-  happy: '😊', sad: '😢', angry: '😠', love: '❤️', hate: '💔', like: '👍', dislike: '👎', enjoy: '🎉', fun: '🎉', funny: '😂',
-  bored: '😴', tired: '😴', sleepy: '😪', nervous: '😰', calm: '🧘', worried: '😟', afraid: '😱', scared: '😱', brave: '🦁',
-  surprised: '😲', excited: '🤩', relaxed: '🛁', lonely: '🧍', shy: '�', proud: '🦚', embarrassed: '😳', relaxed: '😌',
-  // adjectives
-  good: '✅', bad: '❌', great: '⭐', nice: '✨', fine: '�', terrible: '🤮', wonderful: '🌈', amazing: '🌟',
-  big: '🏔️', small: '�', large: '🏔️', tiny: '🤏', huge: '🐳', long: '📏', short: '🤏', tall: '🏙️', short: '🦔',
-  high: '🏔️', low: '�️', deep: '🌊', shallow: '🛁', wide: '🌉', narrow: '📏', thick: '📚', thin: '📄',
-  new: '🆕', old: '📜', young: '👶', ancient: '🏛️', modern: '🏙️', fast: '⚡', slow: '🐢', quick: '⚡', rapid: '⚡',
-  hot: '🔥', cold: '❄️', warm: '☕', cool: '🍃', dry: '🏜️', wet: '💧', clean: '🧼', dirty: '�', clear: '🪟', cloudy: '☁️',
-  bright: '💡', dark: '🌑', light: '�', heavy: '�️', soft: '🧸', hard: '🪨', smooth: '🧊', rough: '�',
-  sweet: '🍯', bitter: '🍋', salty: '🧂', sour: '🍋', spicy: '�️', delicious: '😋', tasty: '😋',
-  // qualities
-  difficult: '⛰️', hard: '⛰️', tough: '🪨', easy: '🍃', simple: '🍃', complicated: '🧩', complex: '🧬',
-  important: '⭐', necessary: '⭕', needed: '⭕', possible: '✅', impossible: '🚫', available: '�', ready: '⏳', busy: '🏃', free: '🕊️',
-  interesting: '�', bored: '😴', beautiful: '💐', pretty: '�', ugly: '🤢', cute: '🐱', cool: '😎', strange: '🤔', weird: '👽',
-  safe: '🛡️', dangerous: '⚠️', right: '✅', correct: '✅', wrong: '❌', true: '✅', false: '❌', real: '�', fake: '🎭',
-  rich: '💎', poor: '🪙', expensive: '💸', cheap: '🏷️', comfortable: '�️', uncomfortable: '🪨', quiet: '🤫', loud: '📢',
-  kind: '❤️', rude: '�', friendly: '🤝', polite: '🙇', popular: '🌟', famous: '🏆', lucky: '🍀', unlucky: '�️', honest: '🤝', dishonest: '�',
-  healthy: '💚', sick: '🤒', strong: '💪', weak: '🦴', full: '📛', empty: '🕳️', enough: '✅', extra: '➕', special: '�', normal: '🔹',
-  // nature
-  water: '�', fire: '🔥', earth: '🌍', air: '💨', sun: '☀️', moon: '🌙', star: '⭐', sky: '🌌', cloud: '☁️', rain: '🌧️', snow: '❄️', wind: '💨', storm: '⛈️', rainbow: '🌈', thunder: '🌩️',
-  mountain: '⛰️', river: '🌊', sea: '🌊', lake: '🏞️', ocean: '🌊', forest: '🌲', flower: '🌸', tree: '🌳', grass: '🌱', leaf: '🍃', root: '🌱', branch: '🌿', garden: '�', island: '🏝️',
-  // animals
-  animal: '🐾', bird: '�', dog: '🐕', cat: '🐈', horse: '🐴', cow: '🐄', pig: '🐖', chicken: '🐔', fish: '�', insect: '🐛', butterfly: '🦋', bee: '🐝', ant: '�', spider: '🕷️', snake: '🐍', frog: '�', turtle: '🐢', rabbit: '🐇', mouse: '🐁', monkey: '🐒', lion: '🦁', tiger: '🐅', bear: '�', elephant: '🐘', giraffe: '🦒', zebra: '🦓', wolf: '�', fox: '🦊', deer: '🦌', shark: '🦈', whale: '🐋', dolphin: '🐬',
-  // food
-  fruit: '🍎', vegetable: '🥦', meat: '🥩', bread: '🍞', rice: '🍚', noodle: '🍜', sushi: '🍣', tempura: '🍤', soup: '🍲', salad: '🥗', egg: '🥚', cake: '🍰', chocolate: '🍫', sugar: '🍬', salt: '🧂', tea: '🍵', coffee: '☕', milk: '🥛', juice: '🧃', apple: '🍎', orange: '🍊', banana: '🍌', grape: '🍇', cherry: '�', strawberry: '🍓', lemon: '🍋', watermelon: '🍉',
-  // places / transport
-  place: '📍', home: '🏠', house: '🏠', room: '🚪', door: '🚪', window: '�', table: '🪑', chair: '🪑', bed: '�️', kitchen: '🍳', bathroom: '🛁', toilet: '�', garden: '🌷', city: '🏙️', country: '🗾', world: '🌍', hospital: '🏥', bank: '🏦', post: '📮', shop: '🏪', store: '🏪', market: '🛒', park: '🌳', station: '🚉', airport: '🛫', bridge: '🌉', building: '🏢', castle: '🏰', temple: '⛩️', church: '⛪',
-  car: '🚗', train: '�', bus: '🚌', bicycle: '�', motorcycle: '🏍️', truck: '🚚', taxi: '🚕', ship: '🚢', boat: '🚤', plane: '✈️',
-  // objects
-  phone: '�', computer: '💻', internet: '🌐', email: '📧', letter: '✉️', message: '💬', paper: '📄', pen: '🖊️', pencil: '✏️', book: '📖', bag: '🎒', box: '📦', bottle: '�', cup: '☕', glass: '🥛', plate: '�️', spoon: '🥄', fork: '🍴', knife: '🔪', watch: '⌚', clock: '🕰️', key: '🗝️', umbrella: '☂️', bag: '�', wallet: '👛', camera: '📷', gift: '🎁', balloon: '🎈', flag: '�', map: '🗺️',
-  // abstract
-  number: '🔢', many: '🔢', few: '🤏', all: '�', nothing: '0️⃣', something: '1️⃣', everything: '🌌', part: '➗', half: '½', side: '⏸️', center: '⏺️',
-  question: '❓', answer: '✅', problem: '⚠️', idea: '💡', thought: '💭', story: '📖', news: '📰', weather: '🌤️', test: '📝', exam: '📝', game: '🎮', sport: '⚽', music: '🎵', song: '🎶', movie: '🎬', picture: '🖼️', art: '🎨', color: '🎨', name: '🏷️', word: '💬', sentence: '📝', language: '🗣️', voice: '🗣️', sound: '🔊', noise: '📢',
-  // actions
-  begin: '▶️', start: '▶️', finish: '🔚', end: '🔚', stop: '🛑', continue: '⏭️', return: '�', repeat: '🔁', change: '🔄', choose: '👉', decide: '⚖️', find: '🔍', search: '🔍', look: '👀', watch: '👁️', listen: '👂', hear: '👂', speak: '🗣️', say: '🗣️', talk: '💬', tell: '🗣️', ask: '❓', call: '�', meet: '🤝', join: '➕', add: '➕', remove: '➖', delete: '🗑️', cut: '✂️', break: '💔', fix: '🛠️', repair: '🔧', build: '🏗️', create: '🎨', make: '🔨', do: '✅', use: '🛠️', try: '💪', practice: '🎯', study: '📚', play: '🎮', rest: '🛋️', sleep: '�', wake: '⏰', stand: '🧍', sit: '🪑', lie: '🛌', fall: '🍂', rise: '☀️', grow: '🌱', die: '⚰️', live: '💚', born: '👶', kill: '💀', save: '💾', send: '📤', receive: '📥', bring: '➡️', carry: '📦', send: '�', buy: '🛒', sell: '🏷️', pay: '💳', earn: '💵', spend: '💸', borrow: '🤝', lend: '🤝', steal: '🦹', give: '🎁', take: '✋', hold: '🤲', grab: '🖐️', throw: '🥏', catch: '🧤', hit: '👊', push: '🤚', pull: '⤵️', open: '�', close: '📁', turn: '🔄', move: '🚚', shake: '👋', touch: '👆', feel: '✋', lift: '🏋️', raise: '⬆️', lower: '⬇️',
-  // time / position
-  morning: '🌅', afternoon: '🌞', evening: '🌇', night: '🌃', midnight: '🕛', noon: '🕛', dawn: '🌅', dusk: '🌆', now: '⏰', then: '⏳', soon: '⏩', later: '⏳', before: '⏮️', after: '⏭️', during: '⏳', while: '⏳', until: '⏳', since: '⏳', ago: '⏪', early: '🐦', late: '🕰️',
-  here: '📍', there: '👉', everywhere: '🌐', somewhere: '❓', nowhere: '🚫', up: '⬆️', down: '⬇️', left: '⬅️', right: '➡️', front: '�', back: '🔙', side: '⏸️', middle: '⏺️', center: '⏺️', top: '🔝', bottom: '⬇️', inside: '📦', outside: '🚪', between: '↔️', among: '👥', through: '➡️', across: '↔️', along: '➡️', around: '🔄', over: '⬆️', under: '⬇️', behind: '�', beyond: '➡️', near: '📍', far: '🛣️', close: '📍', away: '➡️', together: '�', apart: '↔️',
-  // frequency
-  always: '♾️', never: '🚫', often: '🔁', sometimes: '🎲', usually: '📅', rarely: '🪙', seldom: '🪙', again: '🔁', once: '1️⃣', twice: '2️⃣', daily: '📅', weekly: '📆', monthly: '📅', yearly: '📅', every: '♾️',
-  // logic
-  if: '❓', because: '💡', so: '➡️', although: '🤷', though: '🤷', while: '⏳', unless: '🚫', whether: '❓', either: '↔️', neither: '🚫', both: '👥', each: '1️⃣', another: '➕', other: '↔️', such: '👇', same: '👯', similar: '≈', like: '👍', unlike: '👎', as: '↔️', than: '⚖️', about: '💬', against: '🥊', except: '➖', including: '➕', plus: '➕', minus: '➖', times: '✖️', divided: '➗', equal: '🟰'
+function useDoodleData() {
+  const [data, setData] = useState(null)
+  useEffect(() => {
+    let cancelled = false
+    fetch(DOODLE_DATA_URL)
+      .then((r) => r.json())
+      .then((d) => { if (!cancelled) setData(d) })
+      .catch(() => { if (!cancelled) setData(null) })
+    return () => { cancelled = true }
+  }, [])
+  return data
 }
 
-const kanjiEmoji = Object.fromEntries(kanjiLessons.map((k) => [k.char, k.emoji]))
-
-function generateDoodle(item) {
+function generateDoodle(item, data) {
   if (item?.doodle) return item.doodle
+  if (!data) return '✨'
+
+  const { meaningEmoji, kanjiEmoji } = data
   const emojis = []
   if (item?.meaning) {
     const words = item.meaning.split(/[^a-zA-Z]+/).filter(Boolean)
@@ -71,7 +32,9 @@ function generateDoodle(item) {
     }
   }
   if (emojis.length > 0) return emojis.join('')
+
   if (item?.radicals?.length) return item.radicals.map((r) => r.icon).join('')
+
   const target = item?.word || item?.char || ''
   const parts = []
   for (const ch of target) {
@@ -83,24 +46,24 @@ function generateDoodle(item) {
   return '✨'
 }
 
-function useDoodle(item) {
+function useDoodle(item, data) {
   const key = useMemo(() => {
     const id = item?._key || item?.word || item?.pattern || item?.char || item?.front || ''
     return id ? `n2:mnemonic:${id}` : ''
   }, [item])
 
   const doodle = useMemo(() => {
-    // Built-in doodle from data.js is the source of truth and should override any old localStorage copy.
     if (item?.doodle) return item.doodle
-    if (!key) return '✨✨'
+    if (!data || !key) return '✨✨'
     const saved = localStorage.getItem(key)
-    const base = saved || generateDoodle(item) || '✨'
+    const base = saved || generateDoodle(item, data) || '✨'
     const parts = Array.from(base)
     return parts.length < 2 ? base + '✨' : base
-  }, [key, item])
+  }, [key, item, data])
 
   useEffect(() => {
     if (!key) return
+    if (doodle === '✨' || doodle === '✨✨') return
     if (localStorage.getItem(key) !== doodle) localStorage.setItem(key, doodle)
   }, [key, doodle])
 
@@ -286,7 +249,8 @@ function VideoBox({ keyword, type }) {
 }
 
 export default function KanjiModal({ item, onClose }) {
-  const doodle = useDoodle(item)
+  const doodleData = useDoodleData()
+  const doodle = useDoodle(item, doodleData)
 
   if (!item) return null
 
