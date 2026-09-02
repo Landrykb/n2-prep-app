@@ -12,25 +12,26 @@ function urlBase64ToUint8Array(base64String) {
   return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)))
 }
 
+function getNotificationPermission() {
+  if (typeof window === 'undefined' || typeof Notification === 'undefined') return 'default'
+  return Notification.permission
+}
+
 export function usePush() {
   const { user } = useAuth()
-  const [supported, setSupported] = useState(false)
+  const [supported] = useState(() => typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window && !!publicKey)
   const [subscribed, setSubscribed] = useState(false)
-  const [permission, setPermission] = useState(Notification?.permission || 'default')
+  const [permission, setPermission] = useState(getNotificationPermission())
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    const ok = 'serviceWorker' in navigator && 'PushManager' in window && !!publicKey
-    setSupported(ok)
-    if (!ok) return
+    if (typeof window === 'undefined' || !supported) return
     navigator.serviceWorker.ready.then((reg) => {
       reg.pushManager.getSubscription().then((sub) => setSubscribed(!!sub))
     })
-    setPermission(Notification.permission)
-  }, [])
+  }, [supported])
 
   const requestPermission = async () => {
-    if (!('Notification' in window)) return 'denied'
+    if (typeof window === 'undefined' || !('Notification' in window)) return 'denied'
     const p = await Notification.requestPermission()
     setPermission(p)
     return p
