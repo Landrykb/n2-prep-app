@@ -19,6 +19,8 @@ dist-ssr
 
 # Supabase
 .supabase
+supabase/.temp
+supabase/config.toml
 
 # Editor directories and files
 .vscode/*

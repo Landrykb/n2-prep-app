@@ -1,9 +1,11 @@
-const CACHE_NAME = 'jpn2easy-v1'
+const CACHE_NAME = 'jpn2easy-v2'
 const PRECACHE = ['/', '/index.html', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE)).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll(PRECACHE))
+      .then(() => self.skipWaiting())
   )
 })
 
@@ -16,22 +18,46 @@ self.addEventListener('activate', (event) => {
   )
 })
 
+async function networkFirst(request, cache) {
+  try {
+    const networkResponse = await fetch(request)
+    if (networkResponse && networkResponse.status === 200) {
+      cache.put(request, networkResponse.clone())
+    }
+    return networkResponse
+  } catch {
+    const cached = await cache.match(request)
+    if (cached) return cached
+    throw new Error('Network error and no cache for ' + request.url)
+  }
+}
+
+async function cacheFirst(request, cache) {
+  const cached = await cache.match(request)
+  if (cached) return cached
+  const networkResponse = await fetch(request)
+  if (networkResponse && networkResponse.status === 200) {
+    cache.put(request, networkResponse.clone())
+  }
+  return networkResponse
+}
+
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return
-  if (event.request.url.startsWith('https://')) {
-    event.respondWith(
-      caches.match(event.request).then((cached) => {
-        if (cached) return cached
-        return fetch(event.request)
-          .then((res) => {
-            const clone = res.clone()
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone))
-            return res
-          })
-          .catch(() => caches.match('/index.html'))
-      })
-    )
-  }
+  const url = new URL(event.request.url)
+  if (url.origin !== self.location.origin) return
+
+  const isHtml = url.pathname === '/' || url.pathname.endsWith('.html')
+  const isManifest = url.pathname.endsWith('.webmanifest')
+  const isIcon = url.pathname.match(/\/(icon|favicon|apple-touch-icon)/)
+
+  event.respondWith(
+    caches.open(CACHE_NAME).then((cache) => {
+      if (isHtml || isManifest) return networkFirst(event.request, cache)
+      if (isIcon || url.pathname.startsWith('/assets/') || url.pathname.startsWith('/data/')) return cacheFirst(event.request, cache)
+      return networkFirst(event.request, cache)
+    })
+  )
 })
 
 self.addEventListener('push', (event) => {
