@@ -23,7 +23,7 @@ export default function ChatBubble({ context }) {
             <div className="flex items-center justify-between px-4 py-3 border-b border-bun-600/30 bg-bun-800/50">
               <div className="flex items-center gap-2 text-violet-200">
                 <MessageCircle size={18} />
-                <span className="font-bold text-sm">N2 AI Tutor</span>
+                <span className="font-bold text-sm">JPN2easy AI Tutor</span>
                 <span className="text-xs text-slate-400">· {context || 'general'}</span>
               </div>
               <button onClick={() => setOpen(false)} className="p-2 rounded-lg bg-bun-700 text-slate-300 hover:text-white">

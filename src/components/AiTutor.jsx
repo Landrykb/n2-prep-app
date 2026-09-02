@@ -3,21 +3,23 @@ import { useAuth } from '../hooks/useAuth.js'
 import { supabase } from '../lib/supabaseClient.js'
 import RichText from './RichText.jsx'
 import TtsButton from './TtsButton.jsx'
-import { Send, Loader2, Sparkles, Lightbulb, HelpCircle, BookOpen, RotateCcw, Copy, Check, Trash2 } from 'lucide-react'
+import { Send, Loader2, Sparkles, HelpCircle, BookOpen, RotateCcw, Copy, Check, Trash2 } from 'lucide-react'
 
 const MODES = {
-  ask: { label: 'Ask', icon: Sparkles, desc: 'Ask any N2 question' },
-  quiz: { label: 'Quiz', icon: HelpCircle, desc: 'Generate a practice question' },
-  review: { label: 'Review', icon: BookOpen, desc: 'Analyze your error log' },
+  ask: { label: 'Ask', icon: Sparkles, desc: 'Ask anything' },
+  quiz: { label: 'Quiz', icon: HelpCircle, desc: 'Get a practice question' },
+  review: { label: 'Review', icon: BookOpen, desc: 'Review my error log' },
 }
 
 const QUICK_ACTIONS = [
-  { label: 'Explain a pattern', prompt: 'Explain the difference between 〜わけがない and 〜わけではない with examples.', mode: 'ask', icon: Lightbulb },
-  { label: 'Quiz me', prompt: 'Create one JLPT N2 multiple-choice question for me.', mode: 'quiz', icon: HelpCircle },
-  { label: 'Past question', prompt: 'Generate one JLPT N2 past-style multiple-choice question. Do not reveal the answer. After I answer, explain each option.', mode: 'quiz', icon: BookOpen },
-  { label: 'Review errors', prompt: 'Review my recent errors and recommend what to study next.', mode: 'review', icon: BookOpen },
-  { label: 'Make a sentence', prompt: 'Give me one useful JLPT N2 example sentence and explain the grammar in it.', mode: 'ask', icon: BookOpen },
-  { label: 'Study plan', prompt: 'Based on my error log, suggest a focused 7-day study plan.', mode: 'review', icon: Lightbulb },
+  { label: 'Explain N2 grammar', prompt: 'Explain the difference between 〜わけがない and 〜わけではない with a Japanese example.', mode: 'ask' },
+  { label: 'Explain BJT keigo', prompt: 'What is the difference between 尊敬語 and 謙譲語? Give a workplace example.', mode: 'ask' },
+  { label: 'N2 vocab', prompt: 'Teach one high-value N2 business word and how to use it.', mode: 'ask' },
+  { label: 'Quiz me N2', prompt: 'Give me one JLPT N2 multiple-choice question. Do not reveal the answer yet.', mode: 'quiz' },
+  { label: 'BJT question', prompt: 'Give me one BJT business Japanese multiple-choice question. Do not reveal the answer yet.', mode: 'quiz' },
+  { label: 'Review errors', prompt: 'Review my recent errors and recommend the next 3 things to study.', mode: 'review' },
+  { label: '7-day plan', prompt: 'Based on my recent activity, suggest a focused 7-day study plan.', mode: 'review' },
+  { label: 'Kanji story', prompt: 'Pick one N2 kanji and tell me a mnemonic story to remember it.', mode: 'ask' },
 ]
 
 export default function AiTutor({ context = '', compact = false }) {
@@ -31,7 +33,11 @@ export default function AiTutor({ context = '', compact = false }) {
         return JSON.parse(raw).map((m) => ({ ...m, pending: false }))
       }
     } catch {}
-    return [{ role: 'assistant', content: 'I am your N2 tutor. Ask me anything, or pick a quick action below.\n\nI will explain the rule, give a Japanese example, and then ask a short follow-up to check your understanding.', pending: false }]
+    return [{
+      role: 'assistant',
+      content: 'Hi! I am your JPN2easy AI tutor. I can help with JLPT N2, BJT business Japanese, kanji, grammar, reading, listening, or study strategy.\n\nType a question below or tap a quick topic to get started.',
+      pending: false,
+    }]
   })
   const [input, setInput] = useState('')
   const [mode, setMode] = useState('ask')
@@ -65,14 +71,14 @@ export default function AiTutor({ context = '', compact = false }) {
     setDisplayed('')
     let i = 0
     const id = setInterval(() => {
-      i += 2
+      i += 3
       if (i > full.length) i = full.length
       setDisplayed(full.slice(0, i))
       if (i >= full.length) {
         clearInterval(id)
         setMessages((m) => m.map((x, idx) => (idx === m.length - 1 ? { ...x, pending: false } : x)))
       }
-    }, 8)
+    }, 6)
     return () => clearInterval(id)
   }, [messages])
 
@@ -142,68 +148,68 @@ export default function AiTutor({ context = '', compact = false }) {
     }
   }
 
+  useEffect(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`
+  }, [input])
+
   const currentMode = MODES[mode]
 
   return (
-    <div className={compact ? 'h-full flex flex-col space-y-3' : 'max-w-4xl mx-auto space-y-5'}>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className={compact ? 'h-full flex flex-col space-y-3' : 'max-w-4xl mx-auto space-y-4'}>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <currentMode.icon className="text-violet-400" size={24} />
+          <currentMode.icon className="text-violet-400" size={22} />
           <div>
-            <h2 className="text-2xl font-bold text-white leading-tight">{currentMode.label} — N2 AI Tutor</h2>
-            <p className="text-xs text-slate-400">{currentMode.desc}</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-white leading-tight">JPN2easy AI Tutor</h2>
+            <p className="text-xs text-slate-400">N2 · BJT · Kanji · Grammar · Listening · Study strategy</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center flex-wrap gap-2">
           {Object.entries(MODES).map(([k, m]) => {
             const Icon = m.icon
             return (
               <button
                 key={k}
                 onClick={() => setMode(k)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition ${
                   mode === k ? 'bg-violet-600 text-white' : 'bg-bun-800 text-slate-400 hover:text-white border border-bun-600/40'
                 }`}
               >
-                <Icon size={14} /> {m.label}
+                <Icon size={12} /> {m.label}
               </button>
             )
           })}
-          <button onClick={clearChat} title="Clear chat" className="p-1.5 rounded-lg bg-bun-800 text-slate-400 hover:text-rose-300 border border-bun-600/40">
-            <Trash2 size={14} />
+          <button onClick={clearChat} title="Clear chat" className="p-1.5 rounded-full bg-bun-800 text-slate-400 hover:text-rose-300 border border-bun-600/40">
+            <Trash2 size={12} />
           </button>
         </div>
       </div>
 
       {messages.length === 1 && (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {QUICK_ACTIONS.map((a) => {
-            const Icon = a.icon
-            return (
-              <button
-                key={a.label}
-                onClick={() => runQuick(a)}
-                className="text-left rounded-2xl glass p-4 card-glow hover:border-violet-500/40 transition group"
-              >
-                <div className="w-9 h-9 rounded-xl bg-bun-700 flex items-center justify-center text-violet-300 mb-3 group-hover:scale-105 transition">
-                  <Icon size={18} />
-                </div>
-                <p className="font-semibold text-white text-sm">{a.label}</p>
-                <p className="text-xs text-slate-400 mt-1">{a.prompt}</p>
-              </button>
-            )
-          })}
+        <div className="flex flex-wrap gap-2">
+          {QUICK_ACTIONS.map((a) => (
+            <button
+              key={a.label}
+              onClick={() => runQuick(a)}
+              className="px-3 py-1.5 rounded-full bg-bun-800 border border-bun-600/40 text-xs text-slate-300 hover:text-white hover:border-violet-500/40 transition"
+            >
+              {a.label}
+            </button>
+          ))}
         </div>
       )}
 
-      <div className={compact ? 'flex-1 min-h-0 overflow-hidden rounded-3xl glass p-4 card-glow flex flex-col' : 'rounded-3xl glass p-4 card-glow h-[min(60vh,560px)] flex flex-col'}>
-        <div className="flex-1 overflow-y-auto space-y-4 p-2">
+      <div className={compact ? 'flex-1 min-h-0 overflow-hidden rounded-2xl glass p-3 card-glow flex flex-col' : 'rounded-2xl glass p-3 card-glow h-[min(65vh,620px)] flex flex-col'}>
+        <div className="flex-1 overflow-y-auto space-y-3 p-2">
           {messages.map((msg, i) => {
             const isLast = i === messages.length - 1
             const isStreaming = isLast && msg.role === 'assistant' && msg.pending
             return (
               <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className="max-w-[88%] sm:max-w-[80%] w-full">
+                <div className="max-w-[92%] sm:max-w-[85%] w-full">
                   <div
                     className={`rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
                       msg.role === 'user'
@@ -215,22 +221,22 @@ export default function AiTutor({ context = '', compact = false }) {
                     {isStreaming && <span className="inline-block w-2 h-4 ml-1 align-middle bg-violet-400 animate-pulse" />}
                   </div>
                   {msg.role === 'assistant' && !msg.pending && (
-                    <div className="mt-1.5 flex items-center gap-1">
+                    <div className="mt-1 flex items-center gap-1">
                       <TtsButton text={msg.content} className="p-1.5 rounded-lg bg-bun-800/50 hover:bg-bun-700 text-slate-400 hover:text-violet-300" />
                       <button onClick={() => copy(msg.content, i)} className="p-1.5 rounded-lg bg-bun-800/50 hover:bg-bun-700 text-slate-400 hover:text-violet-300" title="Copy">
-                        {copied === i ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                        {copied === i ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
                       </button>
                       <button onClick={() => regenerate(i)} className="p-1.5 rounded-lg bg-bun-800/50 hover:bg-bun-700 text-slate-400 hover:text-violet-300" title="Regenerate">
-                        <RotateCcw size={14} />
+                        <RotateCcw size={13} />
                       </button>
                     </div>
                   )}
                   {msg.sources && msg.sources.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-2">
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
                       {msg.sources.map((s, j) => (
                         <span
                           key={j}
-                          className="text-[10px] px-2 py-1 rounded-full bg-bun-800 border border-bun-600/30 text-slate-400 truncate max-w-[160px]"
+                          className="text-[10px] px-2 py-0.5 rounded-full bg-bun-800 border border-bun-600/30 text-slate-400 truncate max-w-[150px]"
                           title={s.content}
                         >
                           {s.source}
@@ -252,7 +258,7 @@ export default function AiTutor({ context = '', compact = false }) {
           <div ref={bottomRef} />
         </div>
 
-        <div className="mt-4 flex gap-2 items-end">
+        <div className="mt-3 flex gap-2 items-end border-t border-bun-600/20 pt-3">
           <textarea
             ref={textareaRef}
             value={input}
@@ -261,10 +267,10 @@ export default function AiTutor({ context = '', compact = false }) {
             rows={1}
             placeholder={
               mode === 'quiz'
-                ? 'Ask for a question or answer the one shown above…'
+                ? 'Ask for a question or answer the one above…'
                 : mode === 'review'
                 ? 'Review my error log and tell me what to study…'
-                : 'e.g. Explain 〜わけにはいかない vs 〜ざるを得ない'
+                : 'Ask about N2, BJT, grammar, kanji, or study strategy…'
             }
             disabled={loading}
             className="flex-1 rounded-xl bg-bun-900 border border-bun-600/40 px-4 py-3 text-slate-100 placeholder-slate-500 focus:border-violet-500 focus:outline-none resize-none overflow-hidden min-h-[48px] max-h-[160px]"
