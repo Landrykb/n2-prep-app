@@ -158,19 +158,17 @@ export default function AiTutor({ context = '', compact = false }) {
         </div>
       </div>
 
-      {messages.length === 1 && (
-        <div className="flex flex-wrap gap-2">
-          {QUICK_ACTIONS.map((a) => (
-            <button
-              key={a.label}
-              onClick={() => runQuick(a)}
-              className="px-3 py-1.5 rounded-full bg-bun-800 border border-bun-600/40 text-xs text-slate-300 hover:text-white hover:border-violet-500/40 transition"
-            >
-              {a.label}
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="flex flex-wrap gap-2">
+        {QUICK_ACTIONS.map((a) => (
+          <button
+            key={a.label}
+            onClick={() => runQuick(a)}
+            className="px-3 py-1.5 rounded-full bg-bun-800 border border-bun-600/40 text-xs text-slate-300 hover:text-white hover:border-violet-500/40 transition"
+          >
+            {a.label}
+          </button>
+        ))}
+      </div>
 
       <div className={compact ? 'flex-1 min-h-0 overflow-hidden rounded-2xl glass p-3 card-glow flex flex-col' : 'rounded-2xl glass p-3 card-glow h-[min(65vh,620px)] flex flex-col'}>
         <div className="flex-1 overflow-y-auto space-y-3 p-2">
