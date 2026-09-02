@@ -287,6 +287,7 @@ export default function BJT() {
               <h3 className="text-lg font-bold text-white">{bjtPassages[passageIdx].title}</h3>
               <p className="text-xs text-slate-400">{bjtPassages[passageIdx].level} · target time {bjtPassages[passageIdx].time} min</p>
             </div>
+            <p className="text-xs text-slate-500">Real BJT passages come with Japanese questions and answer choices. Use this as reading practice.</p>
             <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-5 leading-loose text-slate-100">
               <KanjiTapText text={bjtPassages[passageIdx].text} />
             </div>
@@ -309,6 +310,7 @@ export default function BJT() {
               <h3 className="text-lg font-bold text-white">{bjtListening[listenIdx].title}</h3>
               <p className="text-xs text-slate-400">{bjtListening[listenIdx].level} · read the script, then answer</p>
             </div>
+          <p className="text-xs text-slate-500">Real BJT listening gives you audio only; the transcript here is for study. The questions and choices are in Japanese, just like the test.</p>
             <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-5 leading-loose text-slate-100">
               <KanjiTapText text={bjtListening[listenIdx].script} />
             </div>
