@@ -269,10 +269,11 @@ export default function KanjiModal({ item, onClose }) {
   const videoUrl = item.video || null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-bun-900/90 p-3 sm:p-6" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-bun-900/90 p-3 sm:p-6 overflow-hidden" onClick={onClose}>
       <div
-        className="w-full max-w-2xl max-h-[85dvh] overflow-y-auto rounded-2xl sm:rounded-3xl glass p-4 sm:p-8 card-glow"
+        className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl sm:rounded-3xl glass p-4 sm:p-8 card-glow my-4 sm:my-8"
         onClick={(e) => e.stopPropagation()}
+        style={{ maxHeight: '85dvh' }}
       >
         <div className="flex items-start justify-between mb-4 sm:mb-6">
           <div className="flex items-center gap-3">

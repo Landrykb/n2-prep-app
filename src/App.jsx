@@ -147,7 +147,10 @@ function SelectionPopup({ dictionary }) {
 
   useEffect(() => {
     const handle = (e) => {
-      if (e?.target && popupRef.current && popupRef.current.contains(e.target)) return
+      if (e?.target) {
+        if (popupRef.current && popupRef.current.contains(e.target)) return
+        if (e.target.closest?.('[role="button"], button, a')) return
+      }
       const selection = window.getSelection()
       if (!selection || selection.isCollapsed) {
         setSelected(null)

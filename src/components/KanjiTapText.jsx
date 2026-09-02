@@ -1,5 +1,5 @@
 import { useKanjiModal } from '../hooks/useKanjiModal.js'
-import { studyItemByKey } from '../lib/findStudyItem.js'
+import { studyItemByKey, findStudyItem } from '../lib/findStudyItem.js'
 
 function isCJK(char) {
   const cp = char.codePointAt(0)
@@ -11,6 +11,21 @@ function isCJK(char) {
   )
 }
 
+function makeItem(char) {
+  const exact = studyItemByKey.get(char) || findStudyItem(char)
+  if (exact) return exact
+  return {
+    _type: 'Kanji',
+    _key: char,
+    char,
+    word: char,
+    title: char,
+    meaning: '',
+    image: '🦝',
+    story: 'Visual breakdown not in the deck yet, but you can try the video search.',
+  }
+}
+
 export default function KanjiTapText({ text, className = '' }) {
   const { open } = useKanjiModal()
   const chars = Array.from(text)
@@ -19,17 +34,22 @@ export default function KanjiTapText({ text, className = '' }) {
     <span className={`leading-relaxed ${className}`}>
       {chars.map((char, i) => {
         if (!isCJK(char)) return <span key={i}>{char}</span>
-        const item = studyItemByKey.get(char)
-        if (!item) return <span key={i}>{char}</span>
+        const item = makeItem(char)
+        const click = (e) => {
+          e.stopPropagation()
+          if (e.cancelable) e.preventDefault()
+          open(item)
+        }
         return (
           <span
             key={i}
-            onClick={(e) => { e.stopPropagation(); open(item) }}
+            onClick={click}
+            onTouchEnd={click}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(item) } }}
             role="button"
             tabIndex={0}
             className="cursor-pointer border-b border-dashed border-violet-500/40 hover:text-violet-300 transition touch-manipulation"
-            title={item.meaning}
+            title={item.meaning || 'Tap for visual breakdown'}
           >
             {char}
           </span>
