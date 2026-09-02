@@ -121,6 +121,7 @@ export default function BJT() {
   const [levelFilter, setLevelFilter] = useState('all')
   const [passageIdx, setPassageIdx] = useState(0)
   const [listenIdx, setListenIdx] = useState(0)
+  const [drillSeed, setDrillSeed] = useState(0)
 
   const drillPool = useMemo(() => {
     const targetIdx = bjtLevels.indexOf(target)
@@ -129,7 +130,7 @@ export default function BJT() {
     return bjtDailyQuestions.filter((q) => allowed.includes(q.level))
   }, [target])
 
-  const [daily, setDaily] = useState(() => drillPool.sort(() => Math.random() - 0.5).slice(0, 5))
+  const daily = useMemo(() => [...drillPool].sort(() => Math.random() - 0.5).slice(0, 5), [drillPool, drillSeed])
 
   const filteredVocab = useMemo(() => {
     if (levelFilter === 'all') return bjtVocab
@@ -147,9 +148,7 @@ export default function BJT() {
     { id: 'resources', label: 'Resources', icon: ExternalLink },
   ]
 
-  const newDrill = () => {
-    setDaily([...drillPool].sort(() => Math.random() - 0.5).slice(0, 5))
-  }
+  const newDrill = () => setDrillSeed((s) => s + 1)
 
   return (
     <div className="space-y-6">
@@ -184,7 +183,7 @@ export default function BJT() {
             <h3 className="text-lg font-bold text-white">Daily BJT drill</h3>
             <div className="flex items-center gap-2">
               <label className="text-xs text-slate-400">Target level:</label>
-              <select value={target} onChange={(e) => { setTarget(e.target.value); setDaily([]) }} className="bg-bun-900 border border-bun-600/40 rounded-lg px-2 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-violet-500">
+              <select value={target} onChange={(e) => setTarget(e.target.value)} className="bg-bun-900 border border-bun-600/40 rounded-lg px-2 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-violet-500">
                 <option value="all">Mixed</option>
                 {bjtLevels.map((l) => <option key={l} value={l}>{l}</option>)}
               </select>
@@ -192,7 +191,7 @@ export default function BJT() {
             </div>
           </div>
           <p className="text-sm text-slate-400">5 random questions up to {target === 'all' ? 'mixed levels' : target}. N2 business items are labeled where relevant.</p>
-          {daily.length > 0 ? <MiniQuiz questions={daily} /> : <p className="text-sm text-slate-500">Select a target and press “New set”.</p>}
+          <MiniQuiz key={daily.map((q) => q.id).join(',')} questions={daily} />
         </section>
       )}
 
@@ -291,7 +290,7 @@ export default function BJT() {
             <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-5 leading-loose text-slate-100">
               <KanjiTapText text={bjtPassages[passageIdx].text} />
             </div>
-            <MiniQuiz questions={bjtPassages[passageIdx].questions} />
+            <MiniQuiz key={passageIdx} questions={bjtPassages[passageIdx].questions} />
           </div>
         </section>
       )}
@@ -313,7 +312,7 @@ export default function BJT() {
             <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-5 leading-loose text-slate-100">
               <KanjiTapText text={bjtListening[listenIdx].script} />
             </div>
-            <MiniQuiz questions={bjtListening[listenIdx].questions} />
+            <MiniQuiz key={listenIdx} questions={bjtListening[listenIdx].questions} />
           </div>
         </section>
       )}
