@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useAuth } from '../hooks/useAuth.js'
 import { getUserProgress, setUserProgress } from '../lib/supabaseApi.js'
+import KanjiTapText from './KanjiTapText.jsx'
 import { Download, ExternalLink, Loader2, RotateCcw, Search, Settings, Shuffle, CheckCircle2, XCircle } from 'lucide-react'
 
 const SRS = [1, 3, 7, 14, 30, 90, 180]
@@ -311,10 +312,10 @@ export default function Anki() {
           {current.image}
         </div>
         <p className="text-sm text-slate-400 mb-2 uppercase tracking-wide">{current.tag} · {current.level}</p>
-        <h3 className="text-4xl font-bold text-white mb-6">{current.front}</h3>
+        <h3 className="text-4xl font-bold text-white mb-6"><KanjiTapText text={current.front} className="font-bold" /></h3>
         {flipped && (
           <div className="w-full animate-fade-in border-t border-bun-600/30 pt-6">
-            <p className="text-2xl text-slate-200 font-medium">{current.back}</p>
+            <p className="text-2xl text-slate-200 font-medium"><KanjiTapText text={current.back} className="text-slate-200" /></p>
           </div>
         )}
       </div>

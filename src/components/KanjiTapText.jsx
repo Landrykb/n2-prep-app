@@ -31,7 +31,7 @@ export default function KanjiTapText({ text, className = '' }) {
   const chars = Array.from(text)
 
   return (
-    <span className={`leading-relaxed ${className}`}>
+    <span className={`leading-relaxed whitespace-pre-wrap ${className}`}>
       {chars.map((char, i) => {
         if (!isCJK(char)) return <span key={i}>{char}</span>
         const item = makeItem(char)

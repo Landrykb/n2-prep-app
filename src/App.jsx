@@ -35,10 +35,11 @@ import { daysToJLPT, nextJLPTDate } from './lib/nextJLPT.js'
 import AuthModal from './components/AuthModal.jsx'
 import AiTutor from './components/AiTutor.jsx'
 import ChatBubble from './components/ChatBubble.jsx'
+import Dashboard from './components/Dashboard.jsx'
 import KanjiTapText from './components/KanjiTapText.jsx'
 import TtsButton from './components/TtsButton.jsx'
 import Skeleton, { SkeletonText } from './components/Skeleton.jsx'
-import NotificationCard from './components/NotificationCard.jsx'
+
 const Anki = lazy(() => import('./components/Anki.jsx'))
 import { userKey } from './lib/userKey.js'
 import { getErrorLogs, addErrorLog, reviewErrorLog, deleteErrorLog, getUserProgress, setUserProgress } from './lib/supabaseApi.js'
@@ -328,110 +329,6 @@ function Sidebar({ active, setActive, mobileOpen, setMobileOpen, streak }) {
   )
 }
 
-function Dashboard({ streak, daysToExam, nextExam, setActive }) {
-  const dateLabel = nextExam?.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-  const focus = daysToExam > 120 ? 'foundation' : daysToExam > 60 ? 'patterns' : daysToExam > 30 ? 'speed' : 'sprint'
-  const focusText = {
-    foundation: 'You have time. Build vocabulary + kanji recognition first.',
-    patterns: 'Focus on grammar patterns and reading strategy.',
-    speed: 'Pick up the pace. Drill past questions and review errors.',
-    sprint: 'Final sprint. Mock tests, error log, and weak points only.',
-  }[focus]
-
-  return (
-    <div className="space-y-8">
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 border border-violet-500/20 p-6 sm:p-10 card-glow">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-violet-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
-        <div className="relative">
-          <div className="flex items-center gap-2 mb-3">
-            <Calendar size={18} className="text-violet-300" />
-            <Badge color="emerald">{daysToExam} days to JLPT · {dateLabel}</Badge>
-          </div>
-          <h2 className="text-3xl sm:text-4xl font-bold text-white mb-3">Crack the N2 pass wall.</h2>
-          <p className="max-w-2xl text-slate-300 leading-relaxed mb-6">
-            {focusText} Every day matters. Use the drills, the AI tutor, and the error log to stay on track.
-          </p>
-          <div className="flex flex-wrap gap-4">
-            <button onClick={() => setActive('plan')} className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-medium transition shadow-lg shadow-violet-600/25">View Plan</button>
-            <button onClick={() => setActive('drills')} className="px-5 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-slate-200 font-medium transition">Start Drill</button>
-          </div>
-        </div>
-      </section>
-
-      <section className="grid lg:grid-cols-2 gap-6">
-        <div className="rounded-2xl glass p-6 card-glow">
-          <h3 className="text-lg font-bold text-white mb-4">Your Progress</h3>
-          <p className="text-slate-300 text-sm leading-relaxed mb-4">
-            {daysToExam} days left until the next exam. Stay consistent, and the streak will carry you.
-          </p>
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-orange-500/20 text-orange-300 flex items-center justify-center text-xl">🔥</div>
-            <div>
-              <p className="text-2xl font-bold text-white">{streak}</p>
-              <p className="text-xs text-slate-400">day streak</p>
-            </div>
-            <div className="w-px h-10 bg-bun-600/40" />
-            <div className="w-12 h-12 rounded-xl bg-violet-500/20 text-violet-300 flex items-center justify-center text-xl">🎯</div>
-            <div>
-              <p className="text-2xl font-bold text-white">{daysToExam}</p>
-              <p className="text-xs text-slate-400">days to JLPT</p>
-            </div>
-          </div>
-          <div className="mt-5 flex gap-3">
-            <button onClick={() => setActive('drills')} className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition">Start daily drill</button>
-            <button onClick={() => setActive('errors')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-slate-200 text-sm font-medium transition">Review errors</button>
-          </div>
-        </div>
-        <div className="rounded-2xl glass p-6 card-glow">
-          <h3 className="text-lg font-bold text-white mb-4">Daily Goal</h3>
-          <ul className="space-y-3 text-sm">
-            <li className="flex items-center gap-3 text-slate-300"><div className="w-4 h-4 rounded-full border border-slate-500" /> 25 SRS cards reviewed</li>
-            <li className="flex items-center gap-3 text-slate-300"><div className="w-4 h-4 rounded-full border border-slate-500" /> 1 grammar pattern mastered</li>
-            <li className="flex items-center gap-3 text-slate-300"><div className="w-4 h-4 rounded-full border border-slate-500" /> 1 daily reading passage</li>
-            <li className="flex items-center gap-3 text-slate-300"><div className="w-4 h-4 rounded-full border border-slate-500" /> Log 3 errors</li>
-          </ul>
-          <p className="text-xs text-slate-400 mt-5">{streak} day streak · check these off as you go</p>
-        </div>
-        <NotificationCard />
-      </section>
-
-      <section>
-        <h3 className="text-xl font-bold text-white mb-4">Stage Roadmap</h3>
-        <div className="grid sm:grid-cols-2 gap-4">
-          {plan.map((p, i) => (
-            <div key={i} className="rounded-2xl glass p-5 card-glow relative overflow-hidden">
-              <div className={`absolute top-0 left-0 w-1.5 h-full ${p.stage === 1 ? 'bg-gradient-to-b from-cyan-400 to-blue-500' : 'bg-gradient-to-b from-violet-400 to-fuchsia-500'}`} />
-              <div className="ml-4">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Stage {p.stage}</span>
-                <h4 className="text-lg font-bold text-white mt-1">{p.phase}</h4>
-                <p className="text-sm text-slate-400 mt-1 mb-3">{p.focus}</p>
-                <ul className="space-y-1.5">
-                  {p.actions.slice(0, 3).map((a, j) => (
-                    <li key={j} className="text-sm text-slate-300 flex items-start gap-2"><ChevronRight size={14} className="mt-1 text-violet-400 shrink-0" />{a}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section>
-        <h3 className="text-xl font-bold text-white mb-4">Recommended Resources</h3>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {resources.slice(0, 4).map((r) => (
-            <div key={r.name} className="rounded-2xl glass p-4 card-glow hover:border-violet-500/30 transition cursor-pointer">
-              <div className="w-10 h-10 rounded-xl bg-bun-700 flex items-center justify-center text-lg mb-3">{resourceIcon[r.category] || '📚'}</div>
-              <p className="font-semibold text-white text-sm">{r.name}</p>
-              <p className="text-xs text-slate-400 mt-1">{r.use}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-    </div>
-  )
-}
-
 function Lessons() {
   const [mode, setMode] = useState('kanji')
   const [activeItem, setActiveItem] = useState(null)
@@ -515,13 +412,13 @@ function KanjiDetail({ item, showBack, setShowBack }) {
 
           <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-5 mb-4">
             <h3 className="text-sm font-bold text-violet-300 mb-2 flex items-center gap-2"><Brain size={16} /> Visual Story</h3>
-            <p className="text-slate-300 leading-relaxed">{item.story}</p>
+            <KanjiTapText text={item.story} className="text-slate-300" />
           </div>
 
           {item.storyFr && (
             <div className="rounded-xl bg-bun-700/30 border border-bun-600/20 p-4 mb-6">
               <h3 className="text-sm font-bold text-cyan-300 mb-2">Histoire (FR)</h3>
-              <p className="text-slate-300 leading-relaxed text-sm">{item.storyFr}</p>
+              <KanjiTapText text={item.storyFr} className="text-slate-300 text-sm" />
             </div>
           )}
 
@@ -561,13 +458,13 @@ function GrammarDetail({ item, showBack, setShowBack }) {
 
           <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-5 mb-4">
             <h3 className="text-sm font-bold text-cyan-300 mb-2 flex items-center gap-2"><Eye size={16} /> Visual Scenario</h3>
-            <p className="text-slate-300 leading-relaxed">{item.scene}</p>
+            <KanjiTapText text={item.scene} className="text-slate-300" />
           </div>
 
           {item.sceneFr && (
             <div className="rounded-xl bg-bun-700/30 border border-bun-600/20 p-4 mb-6">
               <h3 className="text-sm font-bold text-cyan-300 mb-2">Scénario (FR)</h3>
-              <p className="text-slate-300 leading-relaxed text-sm">{item.sceneFr}</p>
+              <KanjiTapText text={item.sceneFr} className="text-slate-300 text-sm" />
             </div>
           )}
 
@@ -606,17 +503,17 @@ function VocabDetail({ item, showBack, setShowBack }) {
 
           <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-5 mb-4">
             <h3 className="text-sm font-bold text-violet-300 mb-2 flex items-center gap-2"><Brain size={16} /> Memory Image</h3>
-            <p className="text-slate-300 leading-relaxed">{item.story}</p>
+            <KanjiTapText text={item.story} className="text-slate-300" />
           </div>
 
           {item.storyFr && (
             <div className="rounded-xl bg-bun-700/30 border border-bun-600/20 p-4 mb-6">
               <h3 className="text-sm font-bold text-cyan-300 mb-2">Image mémorielle (FR)</h3>
-              <p className="text-slate-300 leading-relaxed text-sm">{item.storyFr}</p>
+              <KanjiTapText text={item.storyFr} className="text-slate-300 text-sm" />
             </div>
           )}
 
-          <p className="text-sm text-slate-400 mb-2">Collocation: <span className="text-slate-200">{item.collocation}</span></p>
+          <p className="text-sm text-slate-400 mb-2">Collocation: <KanjiTapText text={item.collocation} className="text-slate-200" /></p>
           <button onClick={() => setShowBack((s) => !s)} className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition">{showBack ? 'Hide example' : 'Show example sentence'}</button>
           {showBack && (
             <div className="mt-4 rounded-xl bg-gradient-to-r from-emerald-900/30 to-teal-900/30 border border-emerald-500/20 p-4 animate-fade-in">
@@ -817,7 +714,10 @@ function Drills() {
       <div className="h-2 w-full rounded-full bg-bun-700 overflow-hidden"><div className="h-full bg-gradient-to-r from-violet-500 to-cyan-500 transition-all" style={{ width: ((index + (answered ? 1 : 0)) / pool.length) * 100 + '%' }} /></div>
       <div className="rounded-3xl glass p-6 sm:p-8 card-glow">
         <div className='flex items-center justify-between mb-4'><span className='text-sm text-slate-400'>{question.type} · {question.format}</span><span className='text-sm text-slate-400'>{mode === 'daily' ? 'Daily 10 · ' : ''}{index + 1} / {pool.length}</span></div>
-        <div className="rounded-2xl bg-bun-700/40 border border-bun-600/20 p-5 mb-6"><p className="text-lg text-slate-100 leading-relaxed">{question.prompt}</p>{question.target && <p className="text-sm text-violet-300 mt-3">Target: 「{question.target}」</p>}</div>
+        <div className="rounded-2xl bg-bun-700/40 border border-bun-600/20 p-5 mb-6">
+          <KanjiTapText text={question.prompt} className="text-lg text-slate-100" />
+          {question.target && <p className="text-sm text-violet-300 mt-3">Target: 「<KanjiTapText text={question.target} className="text-violet-300" />」</p>}
+        </div>
         <div className="grid sm:grid-cols-2 gap-3 mb-6">
           {question.options.map((opt, i) => {
             const show = answered, correct = opt.correct, chosen = selected === i
@@ -826,7 +726,7 @@ function Drills() {
             else cls += 'bg-bun-700/50 border-bun-600/30 hover:border-violet-500/50 hover:bg-bun-700'
             return (
               <button key={i} onClick={() => handleSelect(i)} disabled={answered} className={cls}>
-                <span className="text-slate-500 mr-2">{String.fromCharCode(65 + i)}.</span>{opt.label}
+                <span className="text-slate-500 mr-2">{String.fromCharCode(65 + i)}.</span><KanjiTapText text={opt.label} className="text-slate-100" />
                 {show && correct && <CheckCircle2 size={16} className="inline ml-auto text-emerald-400 float-right" />}
                 {show && chosen && !correct && <XCircle size={16} className="inline ml-auto text-rose-400 float-right" />}
               </button>
@@ -839,8 +739,8 @@ function Drills() {
               {question.options[selected].correct ? <CheckCircle2 size={18} className="text-emerald-400" /> : <XCircle size={18} className="text-rose-400" />}
               <span className="font-bold text-white">{question.options[selected].correct ? 'Correct' : 'Not quite'}</span>
             </div>
-            <p className="text-slate-300 leading-relaxed">{question.explanation}</p>
-            <p className="text-sm text-slate-400 mt-2">{question.hint}</p>
+            <KanjiTapText text={question.explanation} className="text-slate-300" />
+            <p className="text-sm text-slate-400 mt-2"><KanjiTapText text={question.hint} className="text-slate-400" /></p>
           </div>
         )}
         {answered && (
@@ -1039,7 +939,7 @@ function ReadingView() {
                       }`
                       return (
                         <button key={oi} onClick={() => !show && toggleAnswer(qi, oi)} disabled={show} className={cls}>
-                          <span className="text-slate-500 mr-2">{String.fromCharCode(65 + oi)}.</span>{opt.label}
+                          <span className="text-slate-500 mr-2">{String.fromCharCode(65 + oi)}.</span><KanjiTapText text={opt.label} className="text-slate-100" />
                           {show && opt.correct && <CheckCircle2 size={14} className="inline ml-auto text-emerald-400 float-right" />}
                           {show && chosen && !opt.correct && <XCircle size={14} className="inline ml-auto text-rose-400 float-right" />}
                         </button>
@@ -1427,9 +1327,9 @@ function ErrorLog() {
                     <span className="text-xs text-slate-400">{new Date(l.created_at).toLocaleDateString()}</span>
                     {isDue && <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-600/20 text-rose-300">due</span>}
                   </div>
-                  <p className="font-semibold text-slate-100">{l.mistake}</p>
-                  {l.cause && <p className="text-sm text-rose-300 mt-1">Cause: {l.cause}</p>}
-                  {l.fix && <p className="text-sm text-emerald-300 mt-1">Fix: {l.fix}</p>}
+                  <p className="font-semibold text-slate-100"><KanjiTapText text={l.mistake} className="text-slate-100 font-semibold" /></p>
+                  {l.cause && <p className="text-sm text-rose-300 mt-1">Cause: <KanjiTapText text={l.cause} className="text-rose-300" /></p>}
+                  {l.fix && <p className="text-sm text-emerald-300 mt-1">Fix: <KanjiTapText text={l.fix} className="text-emerald-300" /></p>}
                 </div>
                 <div className="flex flex-col items-end gap-2 shrink-0">
                   <button onClick={() => markReview(l)} title={`Mark as reviewed; next review in ${days} ${days === 1 ? 'day' : 'days'}`} className="text-xs px-2.5 py-1 rounded-lg bg-violet-600/20 text-violet-300 hover:bg-violet-600/30 transition">Mark reviewed · next in {days}d</button>

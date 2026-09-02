@@ -9,11 +9,10 @@ export function nextJLPTDate(now = new Date()) {
   const today = new Date(now)
   today.setHours(0, 0, 0, 0)
   const year = today.getFullYear()
+  // Applications for the December session have closed; the next practical deadline is July.
   const candidates = [
     firstSunday(year, 6),
-    firstSunday(year, 11),
     firstSunday(year + 1, 6),
-    firstSunday(year + 1, 11),
   ].filter((d) => d > today)
   candidates.sort((a, b) => a - b)
   return candidates[0]

@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { X, Brain, Eye, BookOpen, Play, Search, Loader2, AlertCircle } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient.js'
 import TtsButton from './TtsButton.jsx'
+import KanjiTapText from './KanjiTapText.jsx'
 const DOODLE_DATA_URL = '/data/doodleData.json'
 
 function useDoodleData() {
@@ -271,9 +272,9 @@ export default function KanjiModal({ item, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-bun-900/90 p-3 sm:p-6 overflow-hidden" onClick={onClose}>
       <div
-        className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl sm:rounded-3xl glass p-4 sm:p-8 card-glow my-4 sm:my-8"
+        className="w-full max-w-2xl max-h-[80vh] overflow-y-auto rounded-2xl sm:rounded-3xl glass p-4 sm:p-8 card-glow my-4 sm:my-8"
         onClick={(e) => e.stopPropagation()}
-        style={{ maxHeight: '85dvh' }}
+        style={{ maxHeight: '80dvh' }}
       >
         <div className="flex items-start justify-between mb-4 sm:mb-6">
           <div className="flex items-center gap-3">
@@ -282,7 +283,7 @@ export default function KanjiModal({ item, onClose }) {
             </div>
             <div className="min-w-0">
               <p className="text-xs uppercase tracking-wider text-slate-400">{type}</p>
-              <h2 className="text-3xl sm:text-5xl font-bold text-white leading-tight break-words">{title}</h2>
+              <h2 className="text-3xl sm:text-5xl font-bold text-white leading-tight break-all">{title}</h2>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -305,7 +306,7 @@ export default function KanjiModal({ item, onClose }) {
           {form && (
             <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4">
               <h4 className="text-xs uppercase tracking-wider text-slate-400 mb-1">Form</h4>
-              <p className="text-slate-200 text-sm font-medium">{form}</p>
+              <KanjiTapText text={form} className="text-slate-200 text-sm font-medium" />
             </div>
           )}
 
@@ -328,20 +329,20 @@ export default function KanjiModal({ item, onClose }) {
           {story && (
             <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4">
               <h4 className="text-xs uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-2"><Brain size={14} /> Memory Story</h4>
-              <p className="text-slate-200 leading-relaxed text-sm">{story}</p>
+              <KanjiTapText text={story} className="text-slate-200 text-sm" />
             </div>
           )}
 
           {nuance && (
             <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4">
               <h4 className="text-xs uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-2"><Eye size={14} /> Nuance</h4>
-              <p className="text-slate-200 leading-relaxed text-sm">{nuance}</p>
+              <KanjiTapText text={nuance} className="text-slate-200 text-sm" />
             </div>
           )}
 
           {collocation && (
             <p className="text-sm text-slate-300">
-              <span className="text-slate-500">Collocation:</span> {collocation}
+              <span className="text-slate-500">Collocation:</span> <KanjiTapText text={collocation} className="text-slate-300" />
             </p>
           )}
 
@@ -351,7 +352,7 @@ export default function KanjiModal({ item, onClose }) {
                 <h4 className="text-xs uppercase tracking-wider text-violet-300">Example</h4>
                 <TtsButton text={example} className="scale-90" />
               </div>
-              <p className="text-lg text-slate-100 leading-loose font-medium">{example}</p>
+              <KanjiTapText text={example} className="text-lg text-slate-100 font-medium" />
               {exampleGlossary.length > 0 && <Glossary items={exampleGlossary} />}
             </div>
           )}
