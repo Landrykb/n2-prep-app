@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Building2, Headphones, BookOpen, Award, ExternalLink, CheckCircle2, XCircle, Brain, Dumbbell, Play, Layers } from 'lucide-react'
+import { Building2, Headphones, BookOpen, Award, ExternalLink, Brain, Dumbbell, Play, Layers } from 'lucide-react'
 import {
   bjtScoreMapping,
   bjtLevels,
@@ -12,7 +12,9 @@ import {
   bjtStrategy,
 } from '../data/bjt.js'
 import { supabase } from '../lib/supabaseClient.js'
+import TtsButton from './TtsButton.jsx'
 import KanjiTapText from './KanjiTapText.jsx'
+import MiniQuiz from './MiniQuiz.jsx'
 
 function colorClass(color) {
   const map = {
@@ -24,48 +26,6 @@ function colorClass(color) {
     slate: 'bg-slate-500/15 text-slate-300 border-slate-500/30',
   }
   return map[color] || map.slate
-}
-
-function MiniQuiz({ questions }) {
-  const [selected, setSelected] = useState(Array(questions.length).fill(null))
-  const [show, setShow] = useState(Array(questions.length).fill(false))
-
-  const choose = (qi, oi) => {
-    setSelected((s) => s.map((v, i) => (i === qi ? oi : v)))
-    setShow((s) => s.map((v, i) => (i === qi ? true : v)))
-  }
-
-  const score = useMemo(() => questions.reduce((acc, q, i) => acc + (selected[i] !== null && q.options[selected[i]].correct ? 1 : 0), 0), [questions, selected])
-
-  return (
-    <div className="space-y-4">
-      <p className="text-sm text-slate-400">Score: {score} / {questions.length}</p>
-      {questions.map((q, qi) => (
-        <div key={qi} className="rounded-2xl glass p-4 card-glow">
-          <p className="text-slate-200 font-medium mb-3">{qi + 1}. {q.prompt}</p>
-          {q.level && <span className="text-[10px] px-2 py-0.5 rounded bg-bun-700 text-slate-400 mb-2 inline-block">{q.level}</span>}
-          <div className="grid gap-2">
-            {q.options.map((opt, oi) => {
-              const isCorrect = opt.correct
-              const isChosen = selected[qi] === oi
-              const isRevealed = show[qi]
-              const cls = [
-                'w-full text-left px-4 py-3 rounded-xl border transition flex items-center gap-2',
-                isRevealed && isCorrect ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-200' : isRevealed && isChosen ? 'bg-rose-500/15 border-rose-500/50 text-rose-200' : 'bg-bun-700/40 border-bun-600/30 text-slate-200 hover:bg-bun-700/60',
-              ].join(' ')
-              return (
-                <button key={oi} onClick={() => choose(qi, oi)} disabled={isRevealed} className={cls}>
-                  {isRevealed && isCorrect ? <CheckCircle2 size={16} className="shrink-0" /> : isRevealed && isChosen ? <XCircle size={16} className="shrink-0" /> : <span className="text-slate-500 shrink-0">{String.fromCharCode(65 + oi)}.</span>}
-                  {opt.label}
-                </button>
-              )
-            })}
-          </div>
-          {show[qi] && <p className="text-sm text-slate-400 mt-3 bg-bun-900/40 rounded-lg p-3"><KanjiTapText text={q.explanation} className="text-slate-400" /></p>}
-        </div>
-      ))}
-    </div>
-  )
 }
 
 function BjtVideoBox({ query }) {
@@ -121,6 +81,7 @@ export default function BJT() {
   const [levelFilter, setLevelFilter] = useState('all')
   const [passageIdx, setPassageIdx] = useState(0)
   const [listenIdx, setListenIdx] = useState(0)
+  const [showTranscript, setShowTranscript] = useState(false)
   const [drillSeed, setDrillSeed] = useState(0)
 
   const drillPool = useMemo(() => {
@@ -306,14 +267,24 @@ export default function BJT() {
             ))}
           </div>
           <div className="rounded-2xl glass p-5 card-glow space-y-4">
-            <div>
-              <h3 className="text-lg font-bold text-white">{bjtListening[listenIdx].title}</h3>
-              <p className="text-xs text-slate-400">{bjtListening[listenIdx].level} · read the script, then answer</p>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-bold text-white">{bjtListening[listenIdx].title}</h3>
+                <p className="text-xs text-slate-400">{bjtListening[listenIdx].level} · listen first, then answer</p>
+              </div>
             </div>
-          <p className="text-xs text-slate-500">Real BJT listening gives you audio only; the transcript here is for study. The questions and choices are in Japanese, just like the test.</p>
-            <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-5 leading-loose text-slate-100">
-              <KanjiTapText text={bjtListening[listenIdx].script} />
-            </div>
+          <p className="text-xs text-slate-500">本番のBJTは音声のみです。ここでは、まず音声を聞いてから日本語の質問に答えてください。原稿は確認用です。</p>
+          <div className="flex flex-wrap gap-2">
+            <TtsButton text={bjtListening[listenIdx].script} className="px-3 py-1.5 text-sm font-medium" />
+            <button onClick={() => setShowTranscript((s) => !s)} className="px-3 py-1.5 rounded-lg bg-bun-700 text-slate-300 hover:bg-bun-600 text-xs font-medium">
+              {showTranscript ? 'Hide transcript' : 'Show transcript'}
+            </button>
+          </div>
+            {showTranscript && (
+              <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-5 leading-loose text-slate-100">
+                <KanjiTapText text={bjtListening[listenIdx].script} />
+              </div>
+            )}
             <MiniQuiz key={listenIdx} questions={bjtListening[listenIdx].questions} />
           </div>
         </section>
