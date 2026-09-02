@@ -3,13 +3,7 @@ import { useAuth } from '../hooks/useAuth.js'
 import { supabase } from '../lib/supabaseClient.js'
 import RichText from './RichText.jsx'
 import TtsButton from './TtsButton.jsx'
-import { Send, Loader2, Sparkles, HelpCircle, BookOpen, RotateCcw, Copy, Check, Trash2 } from 'lucide-react'
-
-const MODES = {
-  ask: { label: 'Ask', icon: Sparkles, desc: 'Ask anything' },
-  quiz: { label: 'Quiz', icon: HelpCircle, desc: 'Get a practice question' },
-  review: { label: 'Review', icon: BookOpen, desc: 'Review my error log' },
-}
+import { Send, Loader2, Sparkles, RotateCcw, Copy, Check } from 'lucide-react'
 
 const QUICK_ACTIONS = [
   { label: 'Explain N2 grammar', prompt: 'Explain the difference between 〜わけがない and 〜わけではない with a Japanese example.', mode: 'ask' },
@@ -20,6 +14,8 @@ const QUICK_ACTIONS = [
   { label: 'Review errors', prompt: 'Review my recent errors and recommend the next 3 things to study.', mode: 'review' },
   { label: '7-day plan', prompt: 'Based on my recent activity, suggest a focused 7-day study plan.', mode: 'review' },
   { label: 'Kanji story', prompt: 'Pick one N2 kanji and tell me a mnemonic story to remember it.', mode: 'ask' },
+  { label: 'Listening tip', prompt: 'Give me one tip for improving JLPT N2 listening and a short example sentence.', mode: 'ask' },
+  { label: 'Make a sentence', prompt: 'Give me one useful N2 example sentence and explain the grammar in it.', mode: 'ask' },
 ]
 
 export default function AiTutor({ context = '', compact = false }) {
@@ -121,9 +117,6 @@ export default function AiTutor({ context = '', compact = false }) {
     send(action.prompt)
   }
 
-  const clearChat = () => {
-    setMessages([{ role: 'assistant', content: 'Chat cleared. What should we focus on?', pending: false }])
-  }
 
   const copy = async (text, i) => {
     try {
@@ -155,36 +148,13 @@ export default function AiTutor({ context = '', compact = false }) {
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`
   }, [input])
 
-  const currentMode = MODES[mode]
-
   return (
     <div className={compact ? 'h-full flex flex-col space-y-3' : 'max-w-4xl mx-auto space-y-4'}>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <currentMode.icon className="text-violet-400" size={22} />
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-white leading-tight">JPN2easy AI Tutor</h2>
-            <p className="text-xs text-slate-400">N2 · BJT · Kanji · Grammar · Listening · Study strategy</p>
-          </div>
-        </div>
-        <div className="flex items-center flex-wrap gap-2">
-          {Object.entries(MODES).map(([k, m]) => {
-            const Icon = m.icon
-            return (
-              <button
-                key={k}
-                onClick={() => setMode(k)}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition ${
-                  mode === k ? 'bg-violet-600 text-white' : 'bg-bun-800 text-slate-400 hover:text-white border border-bun-600/40'
-                }`}
-              >
-                <Icon size={12} /> {m.label}
-              </button>
-            )
-          })}
-          <button onClick={clearChat} title="Clear chat" className="p-1.5 rounded-full bg-bun-800 text-slate-400 hover:text-rose-300 border border-bun-600/40">
-            <Trash2 size={12} />
-          </button>
+      <div className="flex items-center gap-3">
+        <Sparkles className="text-violet-400" size={22} />
+        <div>
+          <h2 className="text-xl sm:text-2xl font-bold text-white leading-tight">JPN2easy AI Tutor</h2>
+          <p className="text-xs text-slate-400">N2 · BJT · Kanji · Grammar · Listening · Study strategy</p>
         </div>
       </div>
 
