@@ -101,7 +101,7 @@ function DoodleStory({ doodle }) {
         {parts.map((c, i) => (
           <div
             key={i}
-            className={`text-4xl sm:text-5xl transition-all duration-500 ${i === step ? 'opacity-100 scale-125 -translate-y-2' : 'opacity-40 scale-90'}`}
+            className={`text-3xl sm:text-5xl transition-all duration-500 ${i === step ? 'opacity-100 scale-125 -translate-y-2' : 'opacity-40 scale-90'}`}
           >
             {c}
           </div>
@@ -132,7 +132,7 @@ function RadicalStory({ radicals, title }) {
             key={i}
             className={`text-center transition-all duration-500 ${i <= step ? 'opacity-100 scale-100' : 'opacity-35 scale-90'}`}
           >
-            <div className="text-4xl sm:text-5xl mb-1 transition-transform duration-500" style={{ transform: i === step ? 'translateY(-4px)' : 'none' }}>
+            <div className="text-3xl sm:text-5xl mb-1 transition-transform duration-500" style={{ transform: i === step ? 'translateY(-4px)' : 'none' }}>
               {r.icon}
             </div>
             <p className="text-xs font-bold text-white">{r.part}</p>
@@ -269,19 +269,19 @@ export default function KanjiModal({ item, onClose }) {
   const videoUrl = item.video || null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-bun-900/90 p-4 sm:p-6" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-bun-900/90 p-3 sm:p-6" onClick={onClose}>
       <div
-        className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl glass p-6 sm:p-8 card-glow"
+        className="w-full max-w-2xl max-h-[85dvh] overflow-y-auto rounded-2xl sm:rounded-3xl glass p-4 sm:p-8 card-glow"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between mb-6">
+        <div className="flex items-start justify-between mb-4 sm:mb-6">
           <div className="flex items-center gap-3">
-            <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br ${item.gradient || 'from-violet-500 to-fuchsia-500'} flex items-center justify-center text-4xl sm:text-5xl shadow-xl`}>
+            <div className={`w-12 h-12 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl bg-gradient-to-br ${item.gradient || 'from-violet-500 to-fuchsia-500'} flex items-center justify-center text-3xl sm:text-5xl shadow-xl`}>
               {image}
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-xs uppercase tracking-wider text-slate-400">{type}</p>
-              <h2 className="text-5xl sm:text-6xl font-bold text-white leading-none">{title}</h2>
+              <h2 className="text-3xl sm:text-5xl font-bold text-white leading-tight break-words">{title}</h2>
             </div>
           </div>
           <div className="flex items-center gap-2">

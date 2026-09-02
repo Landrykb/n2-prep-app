@@ -8,8 +8,10 @@ export const studyItems = [
   ...commonWords.map((c) => ({ ...c, _key: c.word, _type: 'Common' })),
 ].sort((a, b) => b._key.length - a._key.length)
 
+export const studyItemByKey = new Map(studyItems.map((i) => [i._key, i]))
+
 export function findStudyItem(word) {
   if (!word) return null
   const clean = word.trim()
-  return studyItems.find((i) => i._key === clean) || studyItems.find((i) => clean.startsWith(i._key)) || null
+  return studyItemByKey.get(clean) || studyItems.find((i) => clean.startsWith(i._key)) || null
 }

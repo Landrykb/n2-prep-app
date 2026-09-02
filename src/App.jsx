@@ -35,6 +35,7 @@ import { daysToJLPT, nextJLPTDate } from './lib/nextJLPT.js'
 import AuthModal from './components/AuthModal.jsx'
 import AiTutor from './components/AiTutor.jsx'
 import ChatBubble from './components/ChatBubble.jsx'
+import KanjiTapText from './components/KanjiTapText.jsx'
 import TtsButton from './components/TtsButton.jsx'
 import Skeleton, { SkeletonText } from './components/Skeleton.jsx'
 import NotificationCard from './components/NotificationCard.jsx'
@@ -103,7 +104,7 @@ function Furigana({ text, glossary = [] }) {
     <span className="leading-loose">
       {parts.map((p, i) =>
         p.type === 't' ? (
-          <span key={i}>{p.text}</span>
+          <KanjiTapText key={i} text={p.text} />
         ) : (
           <FuriganaWord key={i} p={p} onOpen={open} />
         )

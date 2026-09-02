@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useKanjiModal } from '../hooks/useKanjiModal.js'
 import { studyItems } from '../lib/findStudyItem.js'
+import KanjiTapText from './KanjiTapText.jsx'
 
 export default function RichText({ text }) {
   const { open } = useKanjiModal()
@@ -41,7 +42,7 @@ export default function RichText({ text }) {
     <span className="leading-relaxed whitespace-pre-wrap">
       {parts.map((p, i) =>
         p.type === 'text' ? (
-          <span key={i}>{p.text}</span>
+          <KanjiTapText key={i} text={p.text} />
         ) : (
           <span
             key={i}
