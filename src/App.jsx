@@ -37,6 +37,7 @@ import AiTutor from './components/AiTutor.jsx'
 import ChatBubble from './components/ChatBubble.jsx'
 import TtsButton from './components/TtsButton.jsx'
 import Skeleton, { SkeletonText } from './components/Skeleton.jsx'
+import NotificationCard from './components/NotificationCard.jsx'
 const Anki = lazy(() => import('./components/Anki.jsx'))
 import { userKey } from './lib/userKey.js'
 import { getErrorLogs, addErrorLog, reviewErrorLog, deleteErrorLog, getUserProgress, setUserProgress } from './lib/supabaseApi.js'
@@ -112,15 +113,21 @@ function Furigana({ text, glossary = [] }) {
 }
 
 function FuriganaWord({ p, onOpen }) {
-  const found = p.reading ? findStudyItem(p.word) : null
+  const found = findStudyItem(p.word)
   const handle = (e) => {
     e.stopPropagation()
     if (found) onOpen(found)
   }
+  const keyHandle = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handle(e) }
+  }
   return (
     <span
       onClick={handle}
-      className={`group relative inline-block border-b border-dashed border-violet-500/40 ${found ? 'cursor-pointer hover:text-violet-300' : 'cursor-help'}`}
+      onKeyDown={keyHandle}
+      role={found ? 'button' : undefined}
+      tabIndex={found ? 0 : -1}
+      className={`group relative inline-block border-b border-dashed border-violet-500/40 touch-manipulation ${found ? 'cursor-pointer hover:text-violet-300' : 'cursor-help'}`}
     >
       {p.word}
       <span className="absolute -top-16 left-1/2 -translate-x-1/2 bg-bun-800 border border-violet-500/30 rounded-lg px-3 py-2 text-xs text-slate-200 opacity-0 group-hover:opacity-100 transition pointer-events-none z-20 shadow-xl whitespace-nowrap">
@@ -139,7 +146,7 @@ function SelectionPopup({ dictionary }) {
 
   useEffect(() => {
     const handle = (e) => {
-      if (popupRef.current && popupRef.current.contains(e.target)) return
+      if (e?.target && popupRef.current && popupRef.current.contains(e.target)) return
       const selection = window.getSelection()
       if (!selection || selection.isCollapsed) {
         setSelected(null)
@@ -161,7 +168,12 @@ function SelectionPopup({ dictionary }) {
       setSelected({ text, match })
     }
     document.addEventListener('mouseup', handle)
-    return () => document.removeEventListener('mouseup', handle)
+    const touchEnd = (e) => setTimeout(() => handle(e), 80)
+    document.addEventListener('touchend', touchEnd)
+    return () => {
+      document.removeEventListener('mouseup', handle)
+      document.removeEventListener('touchend', touchEnd)
+    }
   }, [dictionary])
 
   if (!selected) return null
@@ -376,6 +388,7 @@ function Dashboard({ streak, daysToExam, nextExam, setActive }) {
           </ul>
           <p className="text-xs text-slate-400 mt-5">{streak} day streak · check these off as you go</p>
         </div>
+        <NotificationCard />
       </section>
 
       <section>
@@ -1434,7 +1447,7 @@ function App() {
   const [streak, setStreak] = useState(0)
   const [ankiCards, setAnkiCards] = useState([])
   const nextExam = nextJLPTDate()
-  const daysToExam = daysToJLPT(nextExam)
+  const daysToExam = daysToJLPT()
 
   useEffect(() => {
     fetch('/data/ankiVocab.json')

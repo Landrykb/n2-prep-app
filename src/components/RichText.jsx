@@ -46,7 +46,10 @@ export default function RichText({ text }) {
           <span
             key={i}
             onClick={(e) => { e.stopPropagation(); open(p.item) }}
-            className="cursor-pointer border-b border-dashed border-violet-500/40 hover:text-violet-300 transition"
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(p.item) } }}
+            role="button"
+            tabIndex={0}
+            className="cursor-pointer border-b border-dashed border-violet-500/40 hover:text-violet-300 transition touch-manipulation"
             title={p.item.meaning}
           >
             {p.item._key}

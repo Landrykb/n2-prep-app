@@ -1,4 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
+import { useAuth } from '../hooks/useAuth.js'
+import { getUserProgress, setUserProgress } from '../lib/supabaseApi.js'
 import { Download, ExternalLink, Loader2, RotateCcw, Search, Settings, Shuffle, CheckCircle2, XCircle } from 'lucide-react'
 
 const SRS = [1, 3, 7, 14, 30, 90, 180]
@@ -57,6 +59,7 @@ export default function Anki() {
   const [queue, setQueue] = useState([])
   const [index, setIndex] = useState(0)
   const [flipped, setFlipped] = useState(false)
+  const { user } = useAuth()
 
   useEffect(() => {
     let cancelled = false
@@ -77,6 +80,26 @@ export default function Anki() {
       })
     return () => { cancelled = true }
   }, [])
+
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+    getUserProgress(user.id).then((data) => {
+      if (cancelled || !data?.anki) return
+      const p = data.anki
+      const t = today()
+      const fresh = {
+        due: p.due || {},
+        count: p.count || {},
+        lastDate: t,
+        newToday: p.lastDate === t ? Math.max(0, Number(p.newToday) || 0) : 0,
+        newLimit: Math.max(1, Math.min(100, Number(p.newLimit) || 20)),
+      }
+      setProgress(fresh)
+      setNewLimit(fresh.newLimit)
+    })
+    return () => { cancelled = true }
+  }, [user])
 
   const refreshQueue = () => {
     if (!cards.length) return
@@ -148,6 +171,7 @@ export default function Anki() {
 
     setProgress(next)
     saveProgress(next)
+    if (user) setUserProgress(user.id, { anki: next })
     setFlipped(false)
 
     if (quality === 0) {
@@ -163,6 +187,7 @@ export default function Anki() {
       const fresh = { due: {}, count: {}, lastDate: today(), newToday: 0, newLimit }
       setProgress(fresh)
       saveProgress(fresh)
+      if (user) setUserProgress(user.id, { anki: fresh })
     }
   }
 
@@ -251,7 +276,12 @@ export default function Anki() {
             <input type="number" min={1} max={100} value={newLimit} onChange={(e) => {
               const n = Math.max(1, Math.min(100, Number(e.target.value)))
               setNewLimit(n)
-              setProgress((p) => { const next = { ...p, newLimit: n }; saveProgress(next); return next })
+              setProgress((p) => {
+                const next = { ...p, newLimit: n }
+                saveProgress(next)
+                if (user) setUserProgress(user.id, { anki: next })
+                return next
+              })
             }} className="w-16 bg-bun-900 border border-bun-600/40 rounded-lg px-2 py-1.5 text-center text-slate-200 focus:outline-none focus:border-violet-500" />
           </div>
         </div>

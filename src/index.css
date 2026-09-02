@@ -35,6 +35,11 @@ body {
   @apply bg-bun-800/60 backdrop-blur border border-bun-600/40;
 }
 
+.touch-manipulation {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
 .card-glow {
   box-shadow:
     0 0 0 1px rgba(139, 92, 246, 0.12),

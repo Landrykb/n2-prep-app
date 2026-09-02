@@ -9,13 +9,31 @@ export async function getUserProgress(userId) {
   return data
 }
 
-export async function setUserProgress(userId, { streak, daily }) {
+export async function setUserProgress(userId, { streak, daily, anki }) {
   if (!supabase || !userId) return
   const payload = { user_id: userId, updated_at: new Date().toISOString() }
   if (streak !== undefined) payload.streak = streak
   if (daily !== undefined) payload.daily = daily
+  if (anki !== undefined) payload.anki = anki
   const { error } = await supabase.from('user_progress').upsert(payload, { onConflict: 'user_id' })
   if (error) console.error('setUserProgress error:', error)
+}
+
+export async function savePushSubscription(userId, subscription) {
+  if (!supabase || !userId || !subscription?.endpoint) return
+  const { error } = await supabase.from('push_subscriptions').upsert({
+    user_id: userId,
+    endpoint: subscription.endpoint,
+    keys: subscription.keys,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'user_id,endpoint' })
+  if (error) console.error('savePushSubscription error:', error)
+}
+
+export async function deletePushSubscription(userId, endpoint) {
+  if (!supabase || !userId || !endpoint) return
+  const { error } = await supabase.from('push_subscriptions').delete().eq('user_id', userId).eq('endpoint', endpoint)
+  if (error) console.error('deletePushSubscription error:', error)
 }
 
 export async function getErrorLogs(userId) {
