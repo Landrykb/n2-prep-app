@@ -28,6 +28,7 @@ import {
   Play,
   Building2,
   Headphones,
+  Zap,
 } from 'lucide-react'
 import { useAuth } from './hooks/useAuth.js'
 import { useKanjiModal } from './hooks/useKanjiModal.js'
@@ -40,6 +41,7 @@ import ChatBubble from './components/ChatBubble.jsx'
 import Dashboard from './components/Dashboard.jsx'
 import BJT from './components/BJT.jsx'
 import N2Listening from './components/N2Listening.jsx'
+import SpeedCards from './components/SpeedCards.jsx'
 import KanjiTapText from './components/KanjiTapText.jsx'
 import TtsButton from './components/TtsButton.jsx'
 import Skeleton, { SkeletonText } from './components/Skeleton.jsx'
@@ -64,6 +66,7 @@ const nav = [
   { id: 'lessons', label: 'Memory Lessons', icon: BookOpen },
   { id: 'drills', label: 'Drills', icon: Dumbbell },
   { id: 'anki', label: 'Anki Cards', icon: Layers },
+  { id: 'speed', label: 'Speed Cards', icon: Zap },
   { id: 'reading', label: 'Daily Reading', icon: Eye },
   { id: 'ai', label: 'AI Tutor', icon: Bot },
   { id: 'plan', label: 'Study Plan', icon: Map },
@@ -1424,6 +1427,7 @@ function App() {
         <Anki />
       </Suspense>
     ),
+    speed: <SpeedCards />,
     reading: <ReadingView />,
     ai: <AiTutor context={active} />,
     plan: <StudyPlan daysToExam={daysToExam} />,
