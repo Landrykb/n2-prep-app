@@ -3,6 +3,7 @@ import { X, Brain, Eye, BookOpen, Play, Search, Loader2, AlertCircle } from 'luc
 import { supabase } from '../lib/supabaseClient.js'
 import TtsButton from './TtsButton.jsx'
 import KanjiTapText from './KanjiTapText.jsx'
+import { kanjiReadings } from '../lib/kanjiReadings.js'
 const DOODLE_DATA_URL = '/data/doodleData.json'
 
 function useDoodleData() {
@@ -257,9 +258,13 @@ export default function KanjiModal({ item, onClose }) {
 
   const type = item.type || item._type || (item.char ? 'Kanji' : item.pattern ? 'Grammar' : item.word ? 'Vocab' : 'Common')
   const title = item.char || item.pattern || item.word || item.front || item._key || 'Detail'
-  const subtitle = item.reading || item.on || ''
+  const fallback = kanjiReadings[item.char || item.word || title] || { on: '', kun: '' }
+  const on = item.on || fallback.on || ''
+  const kun = item.kun || fallback.kun || ''
+  const subtitle = item.reading || (on && kun ? `${on} · ${kun}` : on || kun || '')
   const meaning = item.meaning || ''
-  const image = item.image || item.emoji || '🦝'
+  const topIcon = item.image || item.emoji || (doodle ? Array.from(doodle)[0] : '') || '🦝'
+  const image = topIcon
   const story = item.story || item.scene || item.mnemonic || ''
   const example = item.example || ''
   const exampleGlossary = item.exampleGlossary || []
