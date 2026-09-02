@@ -1,5 +1,6 @@
 import { useKanjiModal } from '../hooks/useKanjiModal.js'
 import { studyItemByKey, findStudyItem } from '../lib/findStudyItem.js'
+import { kanjiReadings } from '../lib/kanjiReadings.js'
 
 function isCJK(char) {
   const cp = char.codePointAt(0)
@@ -14,12 +15,15 @@ function isCJK(char) {
 function makeItem(char) {
   const exact = studyItemByKey.get(char) || findStudyItem(char)
   if (exact) return exact
+  const fallback = kanjiReadings[char] || { on: '', kun: '' }
   return {
     _type: 'Kanji',
     _key: char,
     char,
     word: char,
     title: char,
+    on: fallback.on,
+    kun: fallback.kun,
     meaning: '',
     image: '🦝',
     story: 'Visual breakdown not in the deck yet, but you can try the video search.',
