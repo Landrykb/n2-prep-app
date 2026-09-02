@@ -26,6 +26,7 @@ import {
   Loader2,
   Calendar,
   Play,
+  Building2,
 } from 'lucide-react'
 import { useAuth } from './hooks/useAuth.js'
 import { useKanjiModal } from './hooks/useKanjiModal.js'
@@ -36,6 +37,7 @@ import AuthModal from './components/AuthModal.jsx'
 import AiTutor from './components/AiTutor.jsx'
 import ChatBubble from './components/ChatBubble.jsx'
 import Dashboard from './components/Dashboard.jsx'
+import BJT from './components/BJT.jsx'
 import KanjiTapText from './components/KanjiTapText.jsx'
 import TtsButton from './components/TtsButton.jsx'
 import Skeleton, { SkeletonText } from './components/Skeleton.jsx'
@@ -65,6 +67,7 @@ const nav = [
   { id: 'plan', label: 'Study Plan', icon: Map },
   { id: 'resources', label: 'Resources', icon: Library },
   { id: 'videos', label: 'Videos', icon: Play },
+  { id: 'bjt', label: 'BJT', icon: Building2 },
   { id: 'errors', label: 'Error Log', icon: AlertCircle },
 ]
 
@@ -1423,6 +1426,7 @@ function App() {
     plan: <StudyPlan daysToExam={daysToExam} />,
     resources: <Resources />,
     videos: <Videos />,
+    bjt: <BJT />,
     errors: <ErrorLog />,
   }
 
