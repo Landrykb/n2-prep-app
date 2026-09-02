@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Calendar, Flame, Target, Layers, BookOpen, Brain, Bot, AlertCircle, ChevronRight } from 'lucide-react'
+import { Calendar, Flame, Target, Layers, BookOpen, Brain, Bot, AlertCircle, ChevronRight, Building2 } from 'lucide-react'
 import NotificationCard from './NotificationCard.jsx'
 
 const actions = [
@@ -7,6 +7,7 @@ const actions = [
   { id: 'lessons', label: 'Grammar pattern', icon: Brain, amount: '1', color: 'cyan', desc: 'Master one N2 point' },
   { id: 'reading', label: 'Reading passage', icon: BookOpen, amount: '1', color: 'emerald', desc: 'Train parsing speed' },
   { id: 'ai', label: 'Ask the AI tutor', icon: Bot, amount: '', color: 'fuchsia', desc: 'Explain a weak point' },
+  { id: 'bjt', label: 'BJT drill', icon: Building2, amount: '5', color: 'amber', desc: 'Business Japanese practice' },
   { id: 'errors', label: 'Review errors', icon: AlertCircle, amount: '3', color: 'rose', desc: 'Clear due mistakes' },
 ]
 
