@@ -14,6 +14,15 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Slightly smaller base scale on phones so cards/icons/text have real
+   breathing room instead of feeling zoomed-in and pressed against the
+   screen edges. Desktop keeps the full 16px scale. */
+@media (max-width: 480px) {
+  html {
+    font-size: 93.75%;
+  }
+}
+
 body {
   margin: 0;
   min-height: 100vh;
