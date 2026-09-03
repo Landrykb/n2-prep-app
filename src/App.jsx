@@ -1589,8 +1589,8 @@ function App() {
             canGoBack={canGoBack}
           />
         </div>
-        <div className="flex-1 px-5 py-5 sm:px-7 sm:py-6 lg:px-10 lg:py-8 overflow-y-auto swipe-area inset-x-safe pb-28 lg:pb-8">
-          <div className="max-w-5xl mx-auto animate-fade-in">
+        <div className="flex-1 px-6 py-6 sm:px-10 sm:py-8 lg:px-14 lg:py-10 overflow-y-auto swipe-area inset-x-safe pb-28 lg:pb-8">
+          <div className="max-w-4xl mx-auto animate-fade-in">
             <Suspense
               fallback={
                 <div className="p-8 text-slate-400 flex items-center gap-2">

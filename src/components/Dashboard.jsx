@@ -62,9 +62,9 @@ export default function Dashboard({ streak, daysToExam, nextExam, setActive }) {
   const progress = Math.round((completed / 4) * 100)
 
   return (
-    <div className="space-y-6 sm:space-y-8">
+    <div className="space-y-8 sm:space-y-10">
       {/* Top: exam + streak */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 border border-violet-500/20 p-5 sm:p-8 card-glow">
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 border border-violet-500/20 p-6 sm:p-9 card-glow">
         <div className="absolute top-0 right-0 w-64 h-64 bg-violet-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
         <div className="relative">
           <div className="flex items-center gap-2 mb-2">
@@ -100,15 +100,15 @@ export default function Dashboard({ streak, daysToExam, nextExam, setActive }) {
 
       {/* Today's practical actions */}
       <section>
-        <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Flame size={18} className="text-orange-400" /> Do today</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <h2 className="text-lg font-bold text-white mb-5 flex items-center gap-2"><Flame size={18} className="text-orange-400" /> Do today</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {actions.map((a) => {
             const Icon = a.icon
             return (
               <button
                 key={a.id}
                 onClick={() => setActive(a.id)}
-                className={`text-left rounded-2xl glass p-4 card-glow border transition hover:border-violet-500/30 group`}
+                className={`text-left rounded-2xl glass p-5 card-glow border transition hover:border-violet-500/30 group`}
               >
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 border ${ACTION_STYLE[a.color] || ACTION_STYLE.violet}`}>
                   <Icon size={20} />

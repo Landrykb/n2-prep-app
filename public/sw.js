@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jpn2easy-v2'
+const CACHE_NAME = 'jpn2easy-v3'
 const PRECACHE = ['/', '/index.html', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png']
 
 self.addEventListener('install', (event) => {
