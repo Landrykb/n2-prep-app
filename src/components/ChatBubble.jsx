@@ -12,7 +12,7 @@ export default function ChatBubble({ context }) {
       <button
         onClick={() => setOpen(true)}
         aria-label="Open the JPN2easy AI tutor"
-        className="fixed bottom-6 right-6 z-40 flex items-center gap-2 px-4 py-3 rounded-full bg-violet-600 hover:bg-violet-500 text-white font-medium shadow-lg shadow-violet-600/30 transition hover:-translate-y-1"
+        className="fixed z-40 flex items-center gap-2 px-4 py-3 rounded-full bg-violet-600 hover:bg-violet-500 text-white font-medium shadow-lg shadow-violet-600/30 transition hover:-translate-y-1 right-4 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] lg:right-6 lg:bottom-6"
       >
         <Bot size={20} />
         <span className="hidden sm:inline text-sm">Ask JPN2easy</span>

@@ -36,6 +36,7 @@ import { useKanjiModal } from './hooks/useKanjiModal.js'
 import { supabase } from './lib/supabaseClient.js'
 import { findStudyItem } from './lib/findStudyItem.js'
 import { localDictionary, loadDictionary, lookup } from './lib/dictionary.js'
+import { KANJI_LEVELS, loadKanjiLevel } from './lib/kanjiData.js'
 import { useHashRoute } from './hooks/useHashRoute.js'
 import { useSwipeNav } from './hooks/useSwipeNav.js'
 import { daysToJLPT, nextJLPTDate } from './lib/nextJLPT.js'
@@ -397,8 +398,24 @@ function Lessons() {
   const [mode, setMode] = useState('kanji')
   const [activeItem, setActiveItem] = useState(null)
   const [showBack, setShowBack] = useState(false)
+  const [kanjiLevel, setKanjiLevel] = useState('N2')
+  const [kanjiByLevel, setKanjiByLevel] = useState({})
+  const [kanjiLoading, setKanjiLoading] = useState(false)
 
-  const list = mode === 'kanji' ? kanjiLessons : mode === 'grammar' ? grammarLessons : vocabLessons
+  useEffect(() => {
+    if (mode !== 'kanji' || kanjiByLevel[kanjiLevel]) return
+    let cancelled = false
+    setKanjiLoading(true)
+    loadKanjiLevel(kanjiLevel).then((rows) => {
+      if (cancelled) return
+      setKanjiByLevel((cur) => ({ ...cur, [kanjiLevel]: rows }))
+      setKanjiLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [mode, kanjiLevel, kanjiByLevel])
+
+  const kanjiList = kanjiByLevel[kanjiLevel] || []
+  const list = mode === 'kanji' ? kanjiList : mode === 'grammar' ? grammarLessons : vocabLessons
 
   return (
     <div className="space-y-6">
@@ -416,6 +433,28 @@ function Lessons() {
           ))}
         </div>
       </div>
+
+      {mode === 'kanji' && !activeItem && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-500">Level:</span>
+          <div className="flex flex-wrap gap-1.5">
+            {KANJI_LEVELS.map((lv) => (
+              <button
+                key={lv}
+                onClick={() => setKanjiLevel(lv)}
+                aria-pressed={kanjiLevel === lv}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium border transition ${
+                  kanjiLevel === lv ? 'bg-violet-600 text-white border-violet-500' : 'bg-bun-800 text-slate-400 border-bun-600/40 hover:text-white'
+                }`}
+              >
+                {lv}
+              </button>
+            ))}
+          </div>
+          {kanjiLoading && <Loader2 size={14} className="animate-spin text-slate-500" />}
+          {!kanjiLoading && <span className="text-xs text-slate-500">{kanjiList.length} kanji</span>}
+        </div>
+      )}
 
       {activeItem ? (
         <div className="animate-slide-up">
@@ -486,13 +525,28 @@ function KanjiDetail({ item, showBack, setShowBack }) {
             </div>
           )}
 
-          <button onClick={() => setShowBack((s) => !s)} className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition">{showBack ? 'Hide example' : 'Show example sentence'}</button>
-          {showBack && (
-            <div className="mt-4 rounded-xl bg-gradient-to-r from-violet-900/30 to-fuchsia-900/30 border border-violet-500/20 p-4 animate-fade-in">
-              <div className="text-slate-100 font-medium text-lg leading-loose mb-2">
-                <Furigana text={item.example} glossary={item.exampleGlossary} />
+          {item.example ? (
+            <>
+              <button onClick={() => setShowBack((s) => !s)} className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition">{showBack ? 'Hide example' : 'Show example sentence'}</button>
+              {showBack && (
+                <div className="mt-4 rounded-xl bg-gradient-to-r from-violet-900/30 to-fuchsia-900/30 border border-violet-500/20 p-4 animate-fade-in">
+                  <div className="text-slate-100 font-medium text-lg leading-loose mb-2">
+                    <Furigana text={item.example} glossary={item.exampleGlossary} />
+                  </div>
+                  <p className="text-sm text-slate-400">Hover or click any word for reading and meaning.</p>
+                </div>
+              )}
+            </>
+          ) : item.examples?.length > 0 && (
+            <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4">
+              <h3 className="text-sm font-bold text-violet-300 mb-3">Real words using {item.char}</h3>
+              <div className="flex flex-wrap gap-2">
+                {item.examples.map((w, i) => (
+                  <span key={i} className="text-sm px-3 py-1.5 rounded-full bg-bun-700/60 border border-bun-600/30 text-slate-200">
+                    {w.word}{w.reading && <span className="text-slate-400"> ({w.reading})</span>} <span className="text-slate-500">· {w.meaning}</span>
+                  </span>
+                ))}
               </div>
-              <p className="text-sm text-slate-400">Hover or click any word for reading and meaning.</p>
             </div>
           )}
         </div>
@@ -1535,8 +1589,8 @@ function App() {
             canGoBack={canGoBack}
           />
         </div>
-        <div className="flex-1 p-4 sm:p-8 overflow-y-auto swipe-area inset-x-safe pb-24 lg:pb-8">
-          <div className="max-w-6xl mx-auto animate-fade-in">
+        <div className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto swipe-area inset-x-safe pb-24 lg:pb-8">
+          <div className="max-w-5xl mx-auto animate-fade-in">
             <Suspense
               fallback={
                 <div className="p-8 text-slate-400 flex items-center gap-2">

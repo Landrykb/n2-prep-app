@@ -1,0 +1,30 @@
+{
+  "levels": {
+    "N5": {
+      "count": 103,
+      "file": "/data/kanji/N5.json",
+      "bytes": 72435
+    },
+    "N4": {
+      "count": 186,
+      "file": "/data/kanji/N4.json",
+      "bytes": 142275
+    },
+    "N3": {
+      "count": 516,
+      "file": "/data/kanji/N3.json",
+      "bytes": 403888
+    },
+    "N2": {
+      "count": 277,
+      "file": "/data/kanji/N2.json",
+      "bytes": 213811
+    },
+    "N1": {
+      "count": 1054,
+      "file": "/data/kanji/N1.json",
+      "bytes": 689427
+    }
+  },
+  "attribution": "Readings and meanings: KANJIDIC2 (EDRDG, CC BY-SA 3.0). Decomposition: KanjiVG (CC BY-SA 3.0). Example words: OpenJLPT (CC BY-SA 4.0)."
+}

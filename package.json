@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "build:anki": "node scripts/build-anki.mjs",
+    "build:kanji": "node scripts/build-kanji.mjs",
     "lint": "oxlint",
     "validate": "node scripts/validate-data.mjs",
     "preview": "vite preview"
