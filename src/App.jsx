@@ -30,9 +30,12 @@ import {
   Headphones,
   Zap,
   ChevronLeft,
+  Baseline,
 } from 'lucide-react'
 import { useAuth } from './hooks/useAuth.js'
 import { useKanjiModal } from './hooks/useKanjiModal.js'
+import { useFurigana } from './hooks/useFurigana.js'
+import { cleanReading } from './lib/furigana.js'
 import { supabase } from './lib/supabaseClient.js'
 import { findStudyItem } from './lib/findStudyItem.js'
 import { localDictionary, loadDictionary, lookup } from './lib/dictionary.js'
@@ -135,6 +138,7 @@ function Furigana({ text, glossary = [] }) {
 }
 
 function FuriganaWord({ p, onOpen }) {
+  const { enabled: furiganaOn } = useFurigana()
   const found = findStudyItem(p.word)
   const handle = (e) => {
     e.stopPropagation()
@@ -151,7 +155,14 @@ function FuriganaWord({ p, onOpen }) {
       tabIndex={found ? 0 : -1}
       className={`group relative inline-block border-b border-dashed border-violet-500/40 touch-manipulation ${found ? 'cursor-pointer hover:text-violet-300' : 'cursor-help'}`}
     >
-      {p.word}
+      {furiganaOn ? (
+        <ruby>
+          {p.word}
+          <rt className="text-[0.6em] font-normal text-violet-300 select-none">{cleanReading(p.reading)}</rt>
+        </ruby>
+      ) : (
+        p.word
+      )}
       <span className="absolute -top-16 left-1/2 -translate-x-1/2 bg-bun-800 border border-violet-500/30 rounded-lg px-3 py-2 text-xs text-slate-200 opacity-0 group-hover:opacity-100 transition pointer-events-none z-20 shadow-xl whitespace-nowrap">
         <span className="block text-cyan-300 font-medium text-sm">{p.reading}</span>
         <span className="block text-slate-300">{p.meaning}</span>
@@ -257,8 +268,9 @@ function Badge({ children, color = 'violet' }) {
 }
 
 function Header({ active, setMobileOpen, streak, daysToExam, user, onSignOut, isSupabaseConfigured, onBack, canGoBack }) {
+  const { enabled: furiganaOn, toggle: toggleFurigana } = useFurigana()
   return (
-    <header className="border-b border-bun-600/30 px-6 sm:px-10 py-3 flex items-center justify-between gap-2">
+    <header className="border-b border-bun-600/30 page-gutter py-3 flex items-center justify-between gap-2">
       <div className="flex items-center gap-2 min-w-0">
         <button
           onClick={() => setMobileOpen(true)}
@@ -278,8 +290,19 @@ function Header({ active, setMobileOpen, streak, daysToExam, user, onSignOut, is
         </button>
         <h2 className="text-lg font-semibold hidden sm:block truncate">{nav.find((n) => n.id === active)?.label}</h2>
       </div>
-      <div className="flex items-center gap-4">
-        <div className="text-right hidden sm:block">
+      <div className="flex items-center gap-2 sm:gap-4">
+        <button
+          onClick={toggleFurigana}
+          aria-pressed={furiganaOn}
+          title={furiganaOn ? 'Furigana on — tap to hide readings' : 'Furigana off — tap to show readings above kanji'}
+          className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full border text-xs sm:text-sm font-medium transition ${
+            furiganaOn ? 'bg-violet-600/20 border-violet-500/50 text-violet-200' : 'bg-bun-700/50 border-bun-600/30 text-slate-300 hover:text-white'
+          }`}
+        >
+          <Baseline size={16} />
+          <span className="hidden sm:inline">ふりがな</span>
+        </button>
+        <div className="text-right hidden lg:block">
           <p className="text-sm font-medium text-slate-100">N2 Candidate</p>
           <p className="text-xs text-slate-400">Next mock in 2 days</p>
         </div>
@@ -1589,8 +1612,8 @@ function App() {
             canGoBack={canGoBack}
           />
         </div>
-        <div className="flex-1 page-gutter py-6 sm:py-8 lg:py-10 overflow-y-auto swipe-area pb-28 lg:pb-8">
-          <div className="max-w-4xl mx-auto animate-fade-in">
+        <div className="flex-1 page-gutter py-5 sm:py-6 lg:py-8 overflow-y-auto swipe-area pb-28 lg:pb-8">
+          <div className="max-w-6xl mx-auto animate-fade-in">
             <Suspense
               fallback={
                 <div className="p-8 text-slate-400 flex items-center gap-2">

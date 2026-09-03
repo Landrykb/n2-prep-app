@@ -4,13 +4,16 @@ import './index.css'
 import App from './App.jsx'
 import { AuthProvider } from './contexts/AuthContext.jsx'
 import { KanjiModalProvider } from './contexts/KanjiModalContext.jsx'
+import { FuriganaProvider } from './contexts/FuriganaContext.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <AuthProvider>
-      <KanjiModalProvider>
-        <App />
-      </KanjiModalProvider>
+      <FuriganaProvider>
+        <KanjiModalProvider>
+          <App />
+        </KanjiModalProvider>
+      </FuriganaProvider>
     </AuthProvider>
   </StrictMode>,
 )

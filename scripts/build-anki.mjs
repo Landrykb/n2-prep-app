@@ -1,6 +1,7 @@
 import { writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
+import { MEANING_OVERRIDES } from './vocab-overrides.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const levels = ['n5', 'n4', 'n3', 'n2', 'n1']
@@ -12,7 +13,12 @@ for (const level of levels) {
   if (!res.ok) throw new Error(`Failed to fetch ${level}: ${res.status}`)
   const data = await res.json()
   for (const item of data) {
-    const meaning = (item.meanings || []).join(', ')
+    // The upstream OpenJLPT deck has a handful of mistranslated / misleadingly
+    // ordered glosses (e.g. 潜る listed as "to drive"). vocab-overrides.mjs
+    // documents and corrects the ones we've found so a re-fetch doesn't
+    // reintroduce them.
+    const override = MEANING_OVERRIDES[item.word]?.[item.reading]
+    const meaning = override || (item.meanings || []).join(', ')
     const reading = item.reading || ''
     const back = reading ? `${item.word} (${reading}) — ${meaning}` : `${item.word} — ${meaning}`
     cards.push({
