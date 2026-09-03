@@ -1,15 +1,30 @@
 import { useState } from 'react'
-import { Calendar, Flame, Target, Layers, BookOpen, Brain, Bot, AlertCircle, ChevronRight, Building2 } from 'lucide-react'
+import { Calendar, Flame, Target, Layers, BookOpen, Brain, Bot, AlertCircle, ChevronRight, Building2, Zap, Headphones } from 'lucide-react'
 import NotificationCard from './NotificationCard.jsx'
 
 const actions = [
   { id: 'anki', label: 'SRS cards', icon: Layers, amount: '25', color: 'violet', desc: 'Review due + new cards' },
+  { id: 'speed', label: 'Speed drill', icon: Zap, amount: '20', color: 'sky', desc: 'Fast recognition practice' },
   { id: 'lessons', label: 'Grammar pattern', icon: Brain, amount: '1', color: 'cyan', desc: 'Master one N2 point' },
   { id: 'reading', label: 'Reading passage', icon: BookOpen, amount: '1', color: 'emerald', desc: 'Train parsing speed' },
+  { id: 'n2listening', label: 'Listening', icon: Headphones, amount: '1', color: 'teal', desc: 'Audio then questions' },
   { id: 'ai', label: 'Ask the AI tutor', icon: Bot, amount: '', color: 'fuchsia', desc: 'Explain a weak point' },
   { id: 'bjt', label: 'BJT drill', icon: Building2, amount: '5', color: 'amber', desc: 'Business Japanese practice' },
   { id: 'errors', label: 'Review errors', icon: AlertCircle, amount: '3', color: 'rose', desc: 'Clear due mistakes' },
 ]
+
+// Full-literal classes so Tailwind can see them and every action colour resolves
+// (the previous inline map was missing `amber`, which left the BJT card unstyled).
+const ACTION_STYLE = {
+  violet: 'bg-violet-500/10 text-violet-300 border-violet-500/20',
+  sky: 'bg-sky-500/10 text-sky-300 border-sky-500/20',
+  cyan: 'bg-cyan-500/10 text-cyan-300 border-cyan-500/20',
+  emerald: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20',
+  teal: 'bg-teal-500/10 text-teal-300 border-teal-500/20',
+  fuchsia: 'bg-fuchsia-500/10 text-fuchsia-300 border-fuchsia-500/20',
+  amber: 'bg-amber-500/10 text-amber-300 border-amber-500/20',
+  rose: 'bg-rose-500/10 text-rose-300 border-rose-500/20',
+}
 
 const focusText = {
   foundation: 'You have time. Build vocabulary + kanji recognition first.',
@@ -18,12 +33,30 @@ const focusText = {
   sprint: 'Final sprint. Mock tests, error log, and weak points only.',
 }
 
+const HABITS_KEY = 'n2:daily-habits'
+const EMPTY_HABITS = { srs: false, grammar: false, reading: false, errors: false }
+
+/** Habits are stored with the day they were ticked so they reset each morning. */
+function readHabits() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(HABITS_KEY))
+    if (saved?.day === new Date().toDateString()) return { ...EMPTY_HABITS, ...saved.checked }
+  } catch { /* ignore malformed storage */ }
+  return EMPTY_HABITS
+}
+
 export default function Dashboard({ streak, daysToExam, nextExam, setActive }) {
-  const [checked, setChecked] = useState({ srs: false, grammar: false, reading: false, errors: false })
+  const [checked, setChecked] = useState(readHabits)
   const dateLabel = nextExam?.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
   const focus = daysToExam > 120 ? 'foundation' : daysToExam > 60 ? 'patterns' : daysToExam > 30 ? 'speed' : 'sprint'
 
-  const toggle = (key) => setChecked((c) => ({ ...c, [key]: !c[key] }))
+  const toggle = (key) => setChecked((c) => {
+    const next = { ...c, [key]: !c[key] }
+    try {
+      localStorage.setItem(HABITS_KEY, JSON.stringify({ day: new Date().toDateString(), checked: next }))
+    } catch { /* storage unavailable — habits just won't persist */ }
+    return next
+  })
 
   const completed = Object.values(checked).filter(Boolean).length
   const progress = Math.round((completed / 4) * 100)
@@ -71,20 +104,13 @@ export default function Dashboard({ streak, daysToExam, nextExam, setActive }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {actions.map((a) => {
             const Icon = a.icon
-            const colorMap = {
-              violet: 'bg-violet-500/10 text-violet-300 border-violet-500/20',
-              cyan: 'bg-cyan-500/10 text-cyan-300 border-cyan-500/20',
-              emerald: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20',
-              fuchsia: 'bg-fuchsia-500/10 text-fuchsia-300 border-fuchsia-500/20',
-              rose: 'bg-rose-500/10 text-rose-300 border-rose-500/20',
-            }
             return (
               <button
                 key={a.id}
                 onClick={() => setActive(a.id)}
                 className={`text-left rounded-2xl glass p-4 card-glow border transition hover:border-violet-500/30 group`}
               >
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${colorMap[a.color]}`}>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 border ${ACTION_STYLE[a.color] || ACTION_STYLE.violet}`}>
                   <Icon size={20} />
                 </div>
                 <div className="flex items-baseline gap-2 mb-1">
@@ -117,6 +143,8 @@ export default function Dashboard({ streak, daysToExam, nextExam, setActive }) {
               <button
                 key={h.key}
                 onClick={() => toggle(h.key)}
+                role="checkbox"
+                aria-checked={isChecked}
                 className={`w-full flex items-center gap-3 p-3 rounded-xl border transition text-left ${isChecked ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-bun-700/40 border-bun-600/30 hover:bg-bun-700/60'}`}
               >
                 <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${isChecked ? 'bg-emerald-500 border-emerald-500' : 'border-slate-500'}`}>

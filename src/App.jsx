@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react'
 import {
   LayoutDashboard,
   BookOpen,
@@ -29,24 +29,31 @@ import {
   Building2,
   Headphones,
   Zap,
+  ChevronLeft,
 } from 'lucide-react'
 import { useAuth } from './hooks/useAuth.js'
 import { useKanjiModal } from './hooks/useKanjiModal.js'
 import { supabase } from './lib/supabaseClient.js'
 import { findStudyItem } from './lib/findStudyItem.js'
+import { localDictionary, loadDictionary, lookup } from './lib/dictionary.js'
+import { useHashRoute } from './hooks/useHashRoute.js'
+import { useSwipeNav } from './hooks/useSwipeNav.js'
 import { daysToJLPT, nextJLPTDate } from './lib/nextJLPT.js'
 import AuthModal from './components/AuthModal.jsx'
-import AiTutor from './components/AiTutor.jsx'
 import ChatBubble from './components/ChatBubble.jsx'
 import Dashboard from './components/Dashboard.jsx'
-import BJT from './components/BJT.jsx'
-import N2Listening from './components/N2Listening.jsx'
-import SpeedCards from './components/SpeedCards.jsx'
 import KanjiTapText from './components/KanjiTapText.jsx'
 import TtsButton from './components/TtsButton.jsx'
 import Skeleton, { SkeletonText } from './components/Skeleton.jsx'
 
+// Heavy, tab-scoped views are split out so the initial bundle only carries the
+// shell, the dashboard, and the shared text/lookup helpers.
 const Anki = lazy(() => import('./components/Anki.jsx'))
+const AiTutor = lazy(() => import('./components/AiTutor.jsx'))
+const BJT = lazy(() => import('./components/BJT.jsx'))
+const N2Listening = lazy(() => import('./components/N2Listening.jsx'))
+const SpeedCards = lazy(() => import('./components/SpeedCards.jsx'))
+const DictionaryView = lazy(() => import('./components/DictionaryView.jsx'))
 import { userKey } from './lib/userKey.js'
 import { getErrorLogs, addErrorLog, reviewErrorLog, deleteErrorLog, getUserProgress, setUserProgress } from './lib/supabaseApi.js'
 import {
@@ -67,6 +74,7 @@ const nav = [
   { id: 'drills', label: 'Drills', icon: Dumbbell },
   { id: 'anki', label: 'Anki Cards', icon: Layers },
   { id: 'speed', label: 'Speed Cards', icon: Zap },
+  { id: 'dictionary', label: 'Dictionary', icon: Search },
   { id: 'reading', label: 'Daily Reading', icon: Eye },
   { id: 'ai', label: 'AI Tutor', icon: Bot },
   { id: 'plan', label: 'Study Plan', icon: Map },
@@ -76,6 +84,8 @@ const nav = [
   { id: 'bjt', label: 'BJT', icon: Building2 },
   { id: 'errors', label: 'Error Log', icon: AlertCircle },
 ]
+
+const navIds = nav.map((n) => n.id)
 
 function Furigana({ text, glossary = [] }) {
   const { open } = useKanjiModal()
@@ -171,11 +181,7 @@ function SelectionPopup({ dictionary }) {
         setSelected(null)
         return
       }
-      const match =
-        dictionary.find((d) => d.word === text) ||
-        dictionary.find((d) => text.includes(d.word)) ||
-        dictionary.find((d) => d.word.includes(text)) ||
-        null
+      const match = lookup(dictionary, text)
       const range = selection.getRangeAt(0)
       const rect = range.getBoundingClientRect()
       setPos({ x: rect.left + rect.width / 2, y: rect.top })
@@ -249,13 +255,28 @@ function Badge({ children, color = 'violet' }) {
   )
 }
 
-function Header({ active, setMobileOpen, streak, daysToExam, user, onSignOut, isSupabaseConfigured }) {
+function Header({ active, setMobileOpen, streak, daysToExam, user, onSignOut, isSupabaseConfigured, onBack, canGoBack }) {
   return (
-    <header className="sticky top-0 z-10 bg-bun-900/80 backdrop-blur border-b border-bun-600/30 px-4 sm:px-8 py-4 flex items-center justify-between">
-      <button onClick={() => setMobileOpen(true)} className="lg:hidden p-2 rounded-lg bg-bun-700 text-slate-200">
-        <Menu size={20} />
-      </button>
-      <h2 className="text-lg font-semibold hidden sm:block">{nav.find((n) => n.id === active)?.label}</h2>
+    <header className="border-b border-bun-600/30 px-4 sm:px-8 py-3 flex items-center justify-between gap-2">
+      <div className="flex items-center gap-2 min-w-0">
+        <button
+          onClick={() => setMobileOpen(true)}
+          aria-label="Open navigation menu"
+          className="lg:hidden p-2.5 rounded-lg bg-bun-700 text-slate-200 min-w-[42px] min-h-[42px] flex items-center justify-center"
+        >
+          <Menu size={20} />
+        </button>
+        <button
+          onClick={onBack}
+          disabled={!canGoBack}
+          aria-label="Go back"
+          title="Go back"
+          className="p-2.5 rounded-lg bg-bun-700 text-slate-200 min-w-[42px] min-h-[42px] flex items-center justify-center disabled:opacity-35 disabled:cursor-not-allowed hover:bg-bun-600 transition"
+        >
+          <ChevronLeft size={20} />
+        </button>
+        <h2 className="text-lg font-semibold hidden sm:block truncate">{nav.find((n) => n.id === active)?.label}</h2>
+      </div>
       <div className="flex items-center gap-4">
         <div className="text-right hidden sm:block">
           <p className="text-sm font-medium text-slate-100">N2 Candidate</p>
@@ -278,7 +299,8 @@ function Header({ active, setMobileOpen, streak, daysToExam, user, onSignOut, is
             {user && (
               <button
                 onClick={onSignOut}
-                className="p-2 rounded-lg bg-bun-700 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 transition"
+                aria-label="Sign out"
+                className="p-2.5 rounded-lg bg-bun-700 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 transition min-w-[42px] min-h-[42px] flex items-center justify-center"
                 title="Sign out"
               >
                 <LogOut size={18} />
@@ -299,7 +321,7 @@ function Header({ active, setMobileOpen, streak, daysToExam, user, onSignOut, is
 function Sidebar({ active, setActive, mobileOpen, setMobileOpen, streak }) {
   return (
     <>
-      <aside className={`fixed z-30 top-0 left-0 h-full w-64 bg-bun-800 border-r border-bun-600/30 transform transition-transform lg:translate-x-0 lg:static flex flex-col ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className={`fixed z-40 top-0 left-0 h-full w-64 bg-bun-800 border-r border-bun-600/30 transform transition-transform lg:translate-x-0 lg:static flex flex-col pt-safe pb-safe ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-6 shrink-0">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-lg shadow-lg">🦝</div>
@@ -316,6 +338,7 @@ function Sidebar({ active, setActive, mobileOpen, setMobileOpen, streak }) {
               <button
                 key={n.id}
                 onClick={() => { setActive(n.id); setMobileOpen(false) }}
+                aria-current={active === n.id ? 'page' : undefined}
                 className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-medium transition ${active === n.id ? 'bg-violet-500/15 text-violet-200 border border-violet-500/30' : 'text-slate-400 hover:text-slate-100 hover:bg-bun-700/60'}`}
               >
                 <Icon size={18} /> {n.label}
@@ -335,6 +358,38 @@ function Sidebar({ active, setActive, mobileOpen, setMobileOpen, streak }) {
       </aside>
       {mobileOpen && <div onClick={() => setMobileOpen(false)} className="fixed inset-0 bg-black/50 z-20 lg:hidden" />}
     </>
+  )
+}
+
+// The handful of sections that deserve one-tap access on a phone.
+const quickNav = ['dashboard', 'anki', 'speed', 'dictionary', 'ai']
+
+/** Fixed bottom tab bar so the PWA always has visible navigation on mobile. */
+function BottomNav({ active, setActive }) {
+  const items = quickNav.map((id) => nav.find((n) => n.id === id)).filter(Boolean)
+  return (
+    <nav
+      aria-label="Quick navigation"
+      className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-bun-800/95 backdrop-blur border-t border-bun-600/30 pb-safe inset-x-safe"
+    >
+      <div className="flex items-stretch justify-around">
+        {items.map((n) => {
+          const Icon = n.icon
+          const isActive = active === n.id
+          return (
+            <button
+              key={n.id}
+              onClick={() => setActive(n.id)}
+              aria-current={isActive ? 'page' : undefined}
+              className={`flex-1 flex flex-col items-center gap-0.5 py-2 min-h-[56px] justify-center transition ${isActive ? 'text-violet-300' : 'text-slate-400'}`}
+            >
+              <Icon size={20} />
+              <span className="text-[10px] font-medium leading-none">{n.label.split(' ')[0]}</span>
+            </button>
+          )
+        })}
+      </div>
+    </nav>
   )
 }
 
@@ -1004,7 +1059,7 @@ function ReadingView() {
 }
 
 function StudyPlan({ daysToExam }) {
-  const activeStage = daysToExam > 120 ? 1 : daysToExam > 60 ? 2 : 2
+  const activeStage = daysToExam > 120 ? 1 : daysToExam > 60 ? 2 : 3
   const weekFocus = daysToExam > 120
     ? 'Learn 20 new kanji/vocab + 5 grammar patterns per week. Do not worry about speed yet.'
     : daysToExam > 90
@@ -1355,33 +1410,18 @@ function ErrorLog() {
 
 function App() {
   const { user, loading, isSupabaseConfigured, signOut } = useAuth()
-  const [active, setActive] = useState('dashboard')
+  const [active, setActive, { back, canGoBack }] = useHashRoute('dashboard', navIds)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [streak, setStreak] = useState(0)
-  const [ankiCards, setAnkiCards] = useState([])
+  const [dictionary, setDictionary] = useState(localDictionary)
   const nextExam = nextJLPTDate()
   const daysToExam = daysToJLPT()
 
   useEffect(() => {
-    fetch('/data/ankiVocab.json')
-      .then((r) => r.json())
-      .then((data) => setAnkiCards(data))
-      .catch(() => setAnkiCards([]))
+    let cancelled = false
+    loadDictionary().then((dict) => { if (!cancelled) setDictionary(dict) })
+    return () => { cancelled = true }
   }, [])
-
-  const dictionary = useMemo(() => {
-    const anki = ankiCards.map((c) => ({ word: c.front, reading: c.back.split(' — ')[0] || '', meaning: c.back.split(' — ')[1] || c.back, image: c.image, type: c.tag }))
-    const all = [
-      ...kanjiLessons.map((k) => ({ word: k.char, reading: `${k.on} · ${k.kun}`, meaning: k.meaning, image: k.emoji, type: 'Kanji' })),
-      ...vocabLessons.map((v) => ({ word: v.word, reading: v.reading, meaning: v.meaning, image: v.image, type: 'Vocab' })),
-      ...grammarLessons.map((g) => ({ word: g.pattern.replace(/^〜/, ''), reading: g.form, meaning: g.meaning, image: g.image, type: 'Grammar' })),
-      ...passages.flatMap((p) => p.glossary.map((g) => ({ word: g.word, reading: g.reading, meaning: g.meaning, image: g.image, type: 'Reading' }))),
-      ...commonWords.map((c) => ({ word: c.word, reading: c.reading, meaning: c.meaning, image: '📘', type: 'Common' })),
-      ...anki,
-    ]
-    all.sort((a, b) => b.word.length - a.word.length)
-    return all
-  }, [ankiCards])
 
   useEffect(() => {
     let cancelled = false
@@ -1418,16 +1458,38 @@ function App() {
 
   useEffect(() => { document.documentElement.classList.add('dark') }, [])
 
+  // Swipe left/right (touch) and Alt+Arrow (desktop) move between sections, so
+  // the installed PWA is navigable without any browser chrome.
+  const step = useCallback((delta) => {
+    const i = navIds.indexOf(active)
+    if (i === -1) return
+    const next = navIds[(i + delta + navIds.length) % navIds.length]
+    setActive(next)
+  }, [active, setActive])
+
+  useSwipeNav({
+    enabled: !mobileOpen,
+    onNext: () => step(1),
+    onPrev: () => step(-1),
+  })
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (!e.altKey || e.metaKey || e.ctrlKey) return
+      if (e.key === 'ArrowRight') { e.preventDefault(); step(1) }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [step])
+
   const content = {
     dashboard: <Dashboard streak={streak} daysToExam={daysToExam} nextExam={nextExam} setActive={setActive} />,
     lessons: <Lessons />,
     drills: <Drills />,
-    anki: (
-      <Suspense fallback={<div className="p-8 text-slate-400 flex items-center gap-2"><Loader2 size={20} className="animate-spin" /> Loading Anki deck…</div>}>
-        <Anki />
-      </Suspense>
-    ),
+    anki: <Anki />,
     speed: <SpeedCards />,
+    dictionary: <DictionaryView />,
     reading: <ReadingView />,
     ai: <AiTutor context={active} />,
     plan: <StudyPlan daysToExam={daysToExam} />,
@@ -1456,15 +1518,38 @@ function App() {
 
   return (
     <div className="min-h-screen bg-bun-900 text-slate-100 flex">
+      {/* Paints the notch strip so the translucent status bar is not a gap. */}
+      <div className="status-bar-scrim lg:hidden" aria-hidden="true" />
       <Sidebar active={active} setActive={setActive} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} streak={streak} />
       <main className="flex-1 min-w-0 flex flex-col">
-        <Header active={active} setMobileOpen={setMobileOpen} streak={streak} daysToExam={daysToExam} user={user} onSignOut={signOut} isSupabaseConfigured={isSupabaseConfigured} />
-        <div className="flex-1 p-4 sm:p-8 overflow-y-auto">
+        <div className="pt-safe bg-bun-900/80 backdrop-blur sticky top-0 z-10">
+          <Header
+            active={active}
+            setMobileOpen={setMobileOpen}
+            streak={streak}
+            daysToExam={daysToExam}
+            user={user}
+            onSignOut={signOut}
+            isSupabaseConfigured={isSupabaseConfigured}
+            onBack={back}
+            canGoBack={canGoBack}
+          />
+        </div>
+        <div className="flex-1 p-4 sm:p-8 overflow-y-auto swipe-area inset-x-safe pb-24 lg:pb-8">
           <div className="max-w-6xl mx-auto animate-fade-in">
-            {content[active]}
+            <Suspense
+              fallback={
+                <div className="p-8 text-slate-400 flex items-center gap-2">
+                  <Loader2 size={20} className="animate-spin" /> Loading…
+                </div>
+              }
+            >
+              {content[active]}
+            </Suspense>
           </div>
         </div>
       </main>
+      <BottomNav active={active} setActive={setActive} />
       <SelectionPopup dictionary={dictionary} />
       <ChatBubble context={active} />
     </div>

@@ -12,6 +12,7 @@ import {
   bjtStrategy,
 } from '../data/bjt.js'
 import { supabase } from '../lib/supabaseClient.js'
+import { shuffleWithSeed } from '../lib/shuffle.js'
 import TtsButton from './TtsButton.jsx'
 import KanjiTapText from './KanjiTapText.jsx'
 import MiniQuiz from './MiniQuiz.jsx'
@@ -85,13 +86,17 @@ export default function BJT() {
   const [drillSeed, setDrillSeed] = useState(0)
 
   const drillPool = useMemo(() => {
-    const targetIdx = bjtLevels.indexOf(target)
-    const allowed = bjtLevels.slice(0, targetIdx + 1)
     if (target === 'all') return bjtDailyQuestions
+    // bjtLevels runs J1 (hardest) → J5 (easiest). Targeting a level means you
+    // should also be solid on everything easier than it, so include this level
+    // and all levels below it.
+    const targetIdx = bjtLevels.indexOf(target)
+    const allowed = bjtLevels.slice(targetIdx)
     return bjtDailyQuestions.filter((q) => allowed.includes(q.level))
   }, [target])
 
-  const daily = useMemo(() => [...drillPool].sort(() => Math.random() - 0.5).slice(0, 5), [drillPool, drillSeed])
+  // Seeded shuffle keeps render pure while still reshuffling on "New set".
+  const daily = useMemo(() => shuffleWithSeed(drillPool, drillSeed).slice(0, 5), [drillPool, drillSeed])
 
   const filteredVocab = useMemo(() => {
     if (levelFilter === 'all') return bjtVocab

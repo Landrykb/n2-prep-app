@@ -8,6 +8,7 @@
     "build": "vite build",
     "build:anki": "node scripts/build-anki.mjs",
     "lint": "oxlint",
+    "validate": "node scripts/validate-data.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

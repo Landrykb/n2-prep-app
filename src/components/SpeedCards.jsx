@@ -1,342 +1,371 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { studyItems } from '../lib/findStudyItem.js'
-import { bjtVocab } from '../data/bjt.js'
-import { Zap, Clock, Flame, Play, RotateCcw, CheckCircle2, Trophy } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { localDictionary, loadDictionary, quizPool, LEVELS } from '../lib/dictionary.js'
+import { loadStats, saveStats, recordResult, weightedSample, weakCount } from '../lib/speedStats.js'
+import { Zap, Clock, Flame, Play, RotateCcw, Trophy, Target, Loader2 } from 'lucide-react'
 
-const MODES = [
-  { id: 'mixed', label: 'Mixed', icon: Zap },
-  { id: 'kanji', label: 'Kanji', icon: Trophy },
-  { id: 'vocab', label: 'Vocab', icon: Flame },
-  { id: 'grammar', label: 'Grammar', icon: CheckCircle2 },
-  { id: 'bjt', label: 'BJT', icon: Flame },
+const TIMES = [3, 5, 8, 12]
+const ROUND_SIZE = 20
+const TYPES = [
+  { id: 'all', label: 'Everything', types: null },
+  { id: 'vocab', label: 'Vocab', types: ['Vocab', 'Common', 'Reading'] },
+  { id: 'kanji', label: 'Kanji', types: ['Kanji'] },
+  { id: 'grammar', label: 'Grammar', types: ['Grammar'] },
+  { id: 'bjt', label: 'BJT', types: ['BJT'] },
 ]
 
-const TIMES = [3, 4, 5, 6, 8, 10]
-const ROUNDS = 25
+const keyOf = (entry) => `${entry.word}|${entry.reading}`
+const firstSense = (meaning) => (meaning || '').split(/[,;/]/)[0].trim()
 
-const allItems = [
-  ...studyItems,
-  ...bjtVocab.map((v) => ({ ...v, _key: v.word, _type: 'BJT' })),
-]
+/** Build a question with unique distractors that are never equal to the answer. */
+function buildQuestion(entry, pool) {
+  const canAskReading = entry.reading && entry.reading !== entry.word && !/[·\s]/.test(entry.reading)
+  const askReading = canAskReading && Math.random() > 0.5
 
-function getPrompt(item) {
-  return item._key || item.word || item.pattern || item.char || ''
-}
+  const answer = askReading ? entry.reading : firstSense(entry.meaning)
+  if (!answer) return null
 
-function getMeanings(item) {
-  return (item.meaning || item.meaningFr || item.scene || '').toString().split(/[,;/]/).map((s) => s.trim()).filter(Boolean)
-}
-
-function getPrimaryMeaning(item) {
-  return getMeanings(item)[0] || '—'
-}
-
-function getReading(item) {
-  if (item._type === 'Kanji') {
-    const on = item.on || ''
-    const kun = item.kun || ''
-    return on ? on.split(/[,・]/)[0] : (kun ? kun.split(/[,・]/)[0] : '')
+  const seen = new Set([answer])
+  const options = []
+  // Sample distractors randomly from the pool, skipping duplicates/answer matches.
+  for (let guard = 0; guard < 200 && options.length < 3; guard++) {
+    const cand = pool[(Math.random() * pool.length) | 0]
+    if (!cand || cand === entry) continue
+    const value = askReading ? cand.reading : firstSense(cand.meaning)
+    if (!value || seen.has(value)) continue
+    seen.add(value)
+    options.push(value)
   }
-  return item.reading || item.on || ''
-}
+  if (options.length < 3) return null
 
-function buildQuestion(item, pool) {
-  const hasReading = ['Kanji', 'Vocab', 'Common', 'Glossary', 'BJT'].includes(item._type) && getReading(item)
-  const askReading = hasReading && Math.random() > 0.55
-
-  const prompt = getPrompt(item)
-  if (askReading) {
-    const answer = getReading(item)
-    const distractors = pool
-      .filter((p) => p !== item)
-      .map((p) => getReading(p))
-      .filter((r) => r && r !== answer)
-    const options = [...new Set(distractors)].slice(0, 3)
-    while (options.length < 3) options.push(distractors[options.length % distractors.length] || answer)
-    const all = [answer, ...options].sort(() => Math.random() - 0.5)
-    return { prompt, type: 'reading', answer, options: all, item }
+  return {
+    key: keyOf(entry),
+    prompt: entry.word,
+    hint: askReading ? 'Reading' : 'Meaning',
+    level: entry.level,
+    answer,
+    options: [answer, ...options].sort(() => Math.random() - 0.5),
+    entry,
   }
-
-  const answer = getPrimaryMeaning(item)
-  const distractors = pool
-    .filter((p) => p !== item)
-    .map((p) => getPrimaryMeaning(p))
-    .filter((m) => m && m !== answer)
-  const options = [...new Set(distractors)].slice(0, 3)
-  while (options.length < 3) options.push(options[0] || answer)
-  const all = [answer, ...options].sort(() => Math.random() - 0.5)
-  return { prompt, type: 'meaning', answer, options: all, item }
-}
-
-function shuffle(arr) {
-  return [...arr].sort(() => Math.random() - 0.5)
 }
 
 export default function SpeedCards() {
-  const [mode, setMode] = useState('mixed')
+  const [dict, setDict] = useState(localDictionary)
+  const [loading, setLoading] = useState(true)
+  const [levels, setLevels] = useState(['N2'])
+  const [typeId, setTypeId] = useState('all')
   const [timeLimit, setTimeLimit] = useState(5)
-  const [started, setStarted] = useState(false)
-  const [gameOver, setGameOver] = useState(false)
+
+  const [phase, setPhase] = useState('setup') // setup | playing | done
   const [cards, setCards] = useState([])
   const [index, setIndex] = useState(0)
   const [timeLeft, setTimeLeft] = useState(timeLimit)
-  const [feedback, setFeedback] = useState(null) // 'correct' | 'wrong' | null
+  const [picked, setPicked] = useState(null)
+  const [feedback, setFeedback] = useState(null) // correct | wrong
+
   const [streak, setStreak] = useState(0)
-  const [bestStreak, setBestStreak] = useState(0)
+  const [best, setBest] = useState(0)
   const [correct, setCorrect] = useState(0)
-  const [wrong, setWrong] = useState(0)
-  const [wrongItems, setWrongItems] = useState([])
+  const [missed, setMissed] = useState([])
+
+  const initialStats = useMemo(() => loadStats(), [])
+  const statsRef = useRef(initialStats)
+  const [weak, setWeak] = useState(() => weakCount(initialStats))
   const [highScore, setHighScore] = useState(() => Number(localStorage.getItem('n2:speed-high') || 0))
 
+  useEffect(() => {
+    let cancelled = false
+    loadDictionary().then((d) => {
+      if (cancelled) return
+      setDict(d)
+      setLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [])
+
   const pool = useMemo(() => {
-    if (mode === 'mixed') return allItems
-    if (mode === 'bjt') return allItems.filter((i) => i._type === 'BJT')
-    return allItems.filter((i) => i._type.toLowerCase() === mode)
-  }, [mode])
+    const types = TYPES.find((t) => t.id === typeId)?.types
+    // Kanji/Grammar/BJT only exist in the hand-written content, so ignore JLPT
+    // level filtering for them (their level tags use a different scale).
+    const useLevels = types && types.some((t) => t !== 'Vocab' && t !== 'Common' && t !== 'Reading') ? null : levels
+    return quizPool(dict, { levels: useLevels, types })
+  }, [dict, levels, typeId])
+
+  const toggleLevel = (lv) => {
+    setLevels((cur) => (cur.includes(lv) ? (cur.length === 1 ? cur : cur.filter((l) => l !== lv)) : [...cur, lv]))
+  }
 
   const start = () => {
-    const base = shuffle(pool).slice(0, ROUNDS)
-    const questions = base.map((item) => buildQuestion(item, pool))
-    setCards(questions)
+    const sample = weightedSample(pool, ROUND_SIZE * 2, statsRef.current, keyOf)
+    const built = []
+    for (const entry of sample) {
+      if (built.length >= ROUND_SIZE) break
+      const q = buildQuestion(entry, pool)
+      if (q) built.push(q)
+    }
+    if (!built.length) return
+    setCards(built)
     setIndex(0)
     setCorrect(0)
-    setWrong(0)
     setStreak(0)
-    setBestStreak(0)
-    setWrongItems([])
+    setBest(0)
+    setMissed([])
+    setPicked(null)
     setFeedback(null)
     setTimeLeft(timeLimit)
-    setStarted(true)
-    setGameOver(false)
+    setPhase('playing')
   }
 
   const current = cards[index]
+  const score = correct * 10 + Math.max(0, best - 2) * 5
 
-  const finish = useCallback(() => {
-    setStarted(false)
-    setGameOver(true)
-    const score = correct * 10 + Math.max(0, bestStreak - 3) * 5
-    if (score > highScore) {
-      setHighScore(score)
-      localStorage.setItem('n2:speed-high', score.toString())
-    }
-  }, [correct, bestStreak, highScore])
+  const finish = useCallback((finalCorrect, finalBest) => {
+    saveStats(statsRef.current)
+    setWeak(weakCount(statsRef.current))
+    const final = finalCorrect * 10 + Math.max(0, finalBest - 2) * 5
+    setHighScore((hs) => {
+      if (final > hs) {
+        localStorage.setItem('n2:speed-high', String(final))
+        return final
+      }
+      return hs
+    })
+    setPhase('done')
+  }, [])
 
-  const next = useCallback((newCards, newIndex) => {
-    const idx = newIndex ?? index + 1
-    if (idx >= newCards.length) {
-      finish()
+  const advance = useCallback((nextCards, nextIndex, finalCorrect, finalBest) => {
+    if (nextIndex >= nextCards.length) {
+      finish(finalCorrect, finalBest)
       return
     }
-    setIndex(idx)
-    setCards(newCards)
+    setCards(nextCards)
+    setIndex(nextIndex)
+    setPicked(null)
     setFeedback(null)
     setTimeLeft(timeLimit)
-  }, [finish, index, timeLimit])
+  }, [finish, timeLimit])
 
-  const handleTimeout = useCallback(() => {
-    if (feedback) return
-    const ci = wrongItems.findIndex((w) => w.prompt === current.prompt)
-    const updatedWrong = [...wrongItems]
-    if (ci === -1) updatedWrong.push({ ...current, misses: 1 })
-    else updatedWrong[ci].misses = (updatedWrong[ci].misses || 0) + 1
-    setWrongItems(updatedWrong)
-    setWrong((w) => w + 1)
-    setStreak(0)
-    setFeedback('wrong')
-    setTimeout(() => next(cards), 900)
-  }, [feedback, current, wrongItems, cards, next])
+  const resolve = useCallback((option) => {
+    if (!current || feedback) return
+    const isCorrect = option === current.answer
+    recordResult(statsRef.current, current.key, isCorrect)
 
+    setPicked(option)
+    setFeedback(isCorrect ? 'correct' : 'wrong')
+
+    const nextCorrect = isCorrect ? correct + 1 : correct
+    const nextStreak = isCorrect ? streak + 1 : 0
+    const nextBest = Math.max(best, nextStreak)
+    setCorrect(nextCorrect)
+    setStreak(nextStreak)
+    setBest(nextBest)
+
+    let nextCards = cards
+    if (!isCorrect) {
+      setMissed((m) => (m.some((x) => x.key === current.key) ? m : [...m, current]))
+      // Requeue the missed card a few positions later so it is retried in-round.
+      const at = Math.min(index + 3, cards.length)
+      nextCards = [...cards.slice(0, at), current, ...cards.slice(at)]
+    }
+
+    const delay = isCorrect ? 550 : 1000
+    setTimeout(() => advance(nextCards, index + 1, nextCorrect, nextBest), delay)
+  }, [current, feedback, correct, streak, best, cards, index, advance])
+
+  // Countdown; a timeout counts as a miss.
   useEffect(() => {
-    if (!started || gameOver || !current || feedback) return
-    const timer = setInterval(() => {
+    if (phase !== 'playing' || !current || feedback) return
+    const id = setInterval(() => {
       setTimeLeft((t) => {
-        if (t <= 0.1) {
-          handleTimeout()
-          return 0
-        }
-        return +(t - 0.1).toFixed(2)
+        const next = +(t - 0.1).toFixed(1)
+        if (next <= 0) { resolve('\u0000__timeout__'); return 0 }
+        return next
       })
     }, 100)
-    return () => clearInterval(timer)
-  }, [started, gameOver, current, feedback, handleTimeout])
+    return () => clearInterval(id)
+  }, [phase, current, feedback, resolve])
 
-  const choose = (option) => {
-    if (feedback || !current) return
-    const isCorrect = option === current.answer
-    if (isCorrect) {
-      setCorrect((c) => c + 1)
-      setStreak((s) => {
-        const ns = s + 1
-        if (ns > bestStreak) setBestStreak(ns)
-        return ns
-      })
-      setFeedback('correct')
-      setTimeout(() => next(cards), 600)
-    } else {
-      const wrongIndex = wrongItems.findIndex((w) => w.prompt === current.prompt)
-      const updatedWrong = [...wrongItems]
-      if (wrongIndex === -1) updatedWrong.push({ ...current, misses: 1 })
-      else updatedWrong[wrongIndex].misses = (updatedWrong[wrongIndex].misses || 0) + 1
-      setWrongItems(updatedWrong)
-      setWrong((w) => w + 1)
-      setStreak(0)
-      setFeedback('wrong')
-
-      // Re-insert missed card two cards ahead to repeat it
-      const reinsert = { ...current, answer: current.answer }
-      const pos = Math.min(index + 3, cards.length)
-      const newCards = [...cards.slice(0, pos), reinsert, ...cards.slice(pos)]
-      setTimeout(() => next(newCards, index + 1), 1100)
-    }
-  }
-
-  const progress = timeLimit ? ((timeLeft / timeLimit) * 100) : 0
-  const score = correct * 10 + Math.max(0, bestStreak - 3) * 5
+  const pct = timeLimit ? Math.max(0, (timeLeft / timeLimit) * 100) : 0
+  const urgent = timeLeft <= timeLimit * 0.3
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">
-      <div className="flex items-center justify-between gap-3">
+      <header className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Zap className="text-violet-400" size={26} />
+          <Zap className="text-violet-400 shrink-0" size={26} />
           <div>
-            <h2 className="text-2xl font-bold text-white">Speed Cards</h2>
-            <p className="text-xs text-slate-400">Blitz through kanji, vocab and grammar</p>
+            <h2 className="text-2xl font-bold text-white leading-tight">Speed Cards</h2>
+            <p className="text-xs text-slate-400">Recognition drills that adapt to your misses</p>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 text-amber-300 text-sm font-medium">
-          <Trophy size={16} /> {highScore}
+        <div className="text-right shrink-0">
+          <p className="flex items-center justify-end gap-1.5 text-amber-300 text-sm font-semibold"><Trophy size={15} /> {highScore}</p>
+          {weak > 0 && <p className="text-[11px] text-rose-300">{weak} weak {weak === 1 ? 'item' : 'items'}</p>}
         </div>
-      </div>
+      </header>
 
-      {!started && !gameOver && (
-        <div className="rounded-2xl glass p-6 card-glow space-y-6 text-center">
+      {phase === 'setup' && (
+        <div className="rounded-2xl glass p-5 sm:p-6 card-glow space-y-6">
           <div>
-            <p className="text-sm text-slate-300 mb-4">Choose a mode and timer, then tap as fast as you can.</p>
-            <div className="flex flex-wrap justify-center gap-2 mb-4">
-              {MODES.map((m) => {
-                const Icon = m.icon
-                return (
-                  <button
-                    key={m.id}
-                    onClick={() => setMode(m.id)}
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition ${
-                      mode === m.id ? 'bg-violet-600 text-white' : 'bg-bun-800 text-slate-300 hover:text-white border border-bun-600/40'
-                    }`}
-                  >
-                    <Icon size={16} /> {m.label}
-                  </button>
-                )
-              })}
+            <p className="text-xs uppercase tracking-wider text-slate-400 mb-2">Deck</p>
+            <div className="flex flex-wrap gap-2">
+              {TYPES.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setTypeId(t.id)}
+                  aria-pressed={typeId === t.id}
+                  className={`px-3.5 py-2 rounded-full text-sm font-medium transition ${typeId === t.id ? 'bg-violet-600 text-white' : 'bg-bun-800 text-slate-300 hover:text-white border border-bun-600/40'}`}
+                >
+                  {t.label}
+                </button>
+              ))}
             </div>
-            <div className="flex flex-wrap justify-center gap-2 mb-2">
+          </div>
+
+          <div>
+            <p className="text-xs uppercase tracking-wider text-slate-400 mb-2">JLPT level</p>
+            <div className="flex flex-wrap gap-2">
+              {LEVELS.map((lv) => (
+                <button
+                  key={lv}
+                  onClick={() => toggleLevel(lv)}
+                  aria-pressed={levels.includes(lv)}
+                  className={`px-3.5 py-2 rounded-full text-sm font-medium transition ${levels.includes(lv) ? 'bg-cyan-600 text-white' : 'bg-bun-800 text-slate-300 hover:text-white border border-bun-600/40'}`}
+                >
+                  {lv}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs uppercase tracking-wider text-slate-400 mb-2">Seconds per card</p>
+            <div className="flex flex-wrap gap-2">
               {TIMES.map((t) => (
                 <button
                   key={t}
                   onClick={() => setTimeLimit(t)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition ${
-                    timeLimit === t ? 'bg-cyan-600 text-white' : 'bg-bun-800 text-slate-300 border border-bun-600/40'
-                  }`}
+                  aria-pressed={timeLimit === t}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium transition ${timeLimit === t ? 'bg-cyan-600 text-white' : 'bg-bun-800 text-slate-300 border border-bun-600/40'}`}
                 >
                   <Clock size={14} /> {t}s
                 </button>
               ))}
             </div>
           </div>
-          <button onClick={start} className="inline-flex items-center gap-2 px-8 py-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold transition animate-pop">
-            <Play size={20} /> Start Blitz
-          </button>
+
+          <div className="flex items-center justify-between gap-3 pt-1">
+            <p className="text-xs text-slate-400 flex items-center gap-1.5">
+              {loading ? <><Loader2 size={13} className="animate-spin" /> loading deck…</> : <><Target size={13} /> {pool.length.toLocaleString()} cards available</>}
+            </p>
+            <button
+              onClick={start}
+              disabled={pool.length < 4}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-bold transition"
+            >
+              <Play size={18} /> Start
+            </button>
+          </div>
+          {pool.length > 0 && pool.length < 4 && <p className="text-xs text-rose-300">Not enough cards in this selection — pick another deck or level.</p>}
         </div>
       )}
 
-      {started && current && (
-        <div className={`rounded-2xl glass p-6 card-glow space-y-5 text-center ${feedback === 'wrong' ? 'animate-shake' : ''} ${feedback === 'correct' ? 'animate-pop' : ''}`}>
+      {phase === 'playing' && current && (
+        <div className={`rounded-2xl glass p-5 sm:p-6 card-glow space-y-5 ${feedback === 'wrong' ? 'animate-shake' : ''} ${feedback === 'correct' ? 'animate-pop' : ''}`}>
           <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-400">{index + 1}/{cards.length}</span>
-            <span className="flex items-center gap-1 text-amber-300 font-medium"><Flame size={14} /> {streak}</span>
-            <span className="text-emerald-300 font-medium">{correct} ✓</span>
+            <span className="text-slate-400">{index + 1} / {cards.length}</span>
+            <span className="flex items-center gap-1 text-amber-300 font-semibold"><Flame size={14} /> {streak}</span>
+            <span className="text-emerald-300 font-semibold">{score}</span>
           </div>
 
-          <div className="h-2 w-full bg-bun-900 rounded-full overflow-hidden">
+          <div className="h-2 w-full bg-bun-900 rounded-full overflow-hidden" role="timer" aria-label="Time remaining">
             <div
-              className="h-full bg-gradient-to-r from-violet-500 to-cyan-400 transition-all"
-              style={{ width: `${progress}%` }}
+              className={`h-full rounded-full transition-[width] duration-100 ease-linear ${urgent ? 'bg-rose-500' : 'bg-gradient-to-r from-violet-500 to-cyan-400'}`}
+              style={{ width: `${pct}%` }}
             />
           </div>
 
-          <div className="animate-slide-up">
-            <p className="text-xs uppercase tracking-wider text-slate-400 mb-2">{current.type === 'reading' ? 'Reading' : 'Meaning'}</p>
-            <h3 className="text-5xl sm:text-7xl font-bold text-white mb-2 break-all">{current.prompt}</h3>
-            {current.item._type === 'Kanji' && current.type === 'reading' && (
-              <p className="text-xs text-slate-500">Choose the <span className="text-cyan-300">on</span> or <span className="text-cyan-300">kun</span> reading</p>
-            )}
+          <div className="text-center animate-slide-up py-2">
+            <p className="text-[11px] uppercase tracking-wider text-slate-400 mb-1">
+              {current.hint}{current.level ? ` · ${current.level}` : ''}
+            </p>
+            <h3 className="text-5xl sm:text-6xl font-bold text-white break-all leading-tight">{current.prompt}</h3>
           </div>
 
-          <div className="grid gap-3">
+          <div className="grid gap-2.5">
             {current.options.map((opt, i) => {
+              const revealed = feedback !== null
               const isAnswer = opt === current.answer
-              const selected = feedback !== null
-              const base = 'w-full text-left px-4 py-4 rounded-xl border-2 font-medium transition flex items-center gap-2'
-              const state = selected
-                ? isAnswer
-                  ? 'bg-emerald-500/20 border-emerald-500 text-emerald-200 animate-pulse-glow'
-                  : 'bg-bun-800 border-bun-600/40 text-slate-400 opacity-60'
-                : 'bg-bun-800 border-bun-600/40 text-slate-200 hover:border-violet-500/60 hover:bg-bun-700'
+              const isPicked = opt === picked
+              let state = 'bg-bun-800 border-bun-600/40 text-slate-200 hover:border-violet-500/60 hover:bg-bun-700'
+              if (revealed && isAnswer) state = 'bg-emerald-500/20 border-emerald-500 text-emerald-100 animate-pulse-glow'
+              else if (revealed && isPicked) state = 'bg-rose-500/20 border-rose-500 text-rose-100'
+              else if (revealed) state = 'bg-bun-800 border-bun-600/30 text-slate-500'
               return (
                 <button
-                  key={i}
-                  onClick={() => choose(opt)}
-                  disabled={selected}
-                  className={`${base} ${state}`}
+                  key={`${current.key}-${i}`}
+                  onClick={() => resolve(opt)}
+                  disabled={revealed}
+                  className={`w-full text-left px-4 py-3.5 rounded-xl border-2 font-medium transition flex items-center gap-2.5 min-h-[52px] ${state}`}
                 >
-                  <span className="text-slate-500 text-sm">{String.fromCharCode(65 + i)}.</span>
-                  {opt}
+                  <span className="text-xs text-slate-500 shrink-0">{String.fromCharCode(65 + i)}</span>
+                  <span className="break-words">{opt}</span>
                 </button>
               )
             })}
           </div>
+
+          {feedback === 'wrong' && (
+            <p className="text-center text-sm text-slate-300 animate-slide-up">
+              <span className="text-white font-semibold">{current.prompt}</span>
+              {current.entry.reading && current.entry.reading !== current.prompt && <span className="text-cyan-300"> ({current.entry.reading})</span>}
+              {' — '}{current.entry.meaning}
+            </p>
+          )}
         </div>
       )}
 
-      {gameOver && (
-        <div className="rounded-2xl glass p-6 card-glow space-y-5 text-center">
-          <h3 className="text-2xl font-bold text-white">Round Complete</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="rounded-xl bg-bun-800 p-3">
-              <p className="text-xs text-slate-400">Score</p>
-              <p className="text-2xl font-bold text-violet-300">{score}</p>
-            </div>
-            <div className="rounded-xl bg-bun-800 p-3">
-              <p className="text-xs text-slate-400">Correct</p>
-              <p className="text-2xl font-bold text-emerald-300">{correct}</p>
-            </div>
-            <div className="rounded-xl bg-bun-800 p-3">
-              <p className="text-xs text-slate-400">Wrong / Missed</p>
-              <p className="text-2xl font-bold text-rose-300">{wrong}</p>
-            </div>
-            <div className="rounded-xl bg-bun-800 p-3">
-              <p className="text-xs text-slate-400">Best Streak</p>
-              <p className="text-2xl font-bold text-amber-300">{bestStreak}</p>
-            </div>
+      {phase === 'done' && (
+        <div className="rounded-2xl glass p-5 sm:p-6 card-glow space-y-5 animate-slide-up">
+          <h3 className="text-2xl font-bold text-white text-center">Round complete</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center">
+            {[
+              { label: 'Score', value: score, cls: 'text-violet-300' },
+              { label: 'Correct', value: `${correct}/${cards.length}`, cls: 'text-emerald-300' },
+              { label: 'Missed', value: missed.length, cls: 'text-rose-300' },
+              { label: 'Best streak', value: best, cls: 'text-amber-300' },
+            ].map((s) => (
+              <div key={s.label} className="rounded-xl bg-bun-800 p-3">
+                <p className="text-[11px] text-slate-400">{s.label}</p>
+                <p className={`text-xl font-bold ${s.cls}`}>{s.value}</p>
+              </div>
+            ))}
           </div>
 
-          {wrongItems.length > 0 && (
-            <div className="text-left space-y-2">
-              <p className="text-sm text-slate-300 font-medium">Items to review:</p>
-              <div className="max-h-48 overflow-y-auto rounded-xl bg-bun-900 p-3 space-y-2 text-sm">
-                {wrongItems.map((w, i) => (
-                  <div key={i} className="flex items-center justify-between border-b border-bun-700/40 pb-1 last:border-0">
-                    <span className="text-white font-medium">{w.prompt}</span>
-                    <span className="text-slate-400">{w.answer}</span>
-                  </div>
+          {missed.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-slate-300">Review these — they will come back sooner:</p>
+              <ul className="max-h-56 overflow-y-auto rounded-xl bg-bun-900/70 divide-y divide-bun-700/40">
+                {missed.map((m) => (
+                  <li key={m.key} className="flex items-baseline justify-between gap-3 px-3 py-2 text-sm">
+                    <span className="text-white font-semibold shrink-0">{m.prompt}</span>
+                    <span className="text-slate-400 text-right">
+                      {m.entry.reading && m.entry.reading !== m.prompt && <span className="text-cyan-300">{m.entry.reading} · </span>}
+                      {m.entry.meaning}
+                    </span>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
           )}
 
-          <button onClick={start} className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold transition">
-            <RotateCcw size={18} /> Play Again
-          </button>
+          <div className="flex flex-wrap gap-2 justify-center">
+            <button onClick={start} className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold transition">
+              <RotateCcw size={17} /> Play again
+            </button>
+            <button onClick={() => setPhase('setup')} className="px-6 py-3 rounded-xl bg-bun-800 border border-bun-600/40 text-slate-300 hover:text-white font-medium transition">
+              Change deck
+            </button>
+          </div>
         </div>
       )}
     </div>

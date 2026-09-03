@@ -73,7 +73,7 @@ const g = (word, reading, meaning) => ({ word, reading, meaning })
 // KANJI LESSONS
 // ------------------------------------------------------------------
 export const kanjiLessons = [
-  { char: '録', meaning: 'record', meaningFr: 'enregistrement', on: 'ろく', kun: 'と(る)', word: '記録（きろく）',
+  { char: '録', meaning: 'record', meaningFr: 'enregistrement', on: 'ろく', kun: '', word: '記録（きろく）',
     emoji: '⛓️', doodle: '🔧⛓️🪨', gradient: 'from-amber-500 to-orange-600',
     radicals: [ { part: '金', name: 'metal', icon: '🔧' }, { part: '录', name: 'carving / lines', icon: '🪨' } ],
     story: 'A worker uses metal tools to carve lines into stone. The lines stay forever, so this is a record.',
@@ -152,7 +152,7 @@ export const kanjiLessons = [
 // ------------------------------------------------------------------
 export const grammarLessons = [
   { pattern: '〜わけがない', form: 'V-plain / i-adj / na-adj+な / N+の + わけがない', meaning: 'There is no way ~ / It is impossible that ~', meaningFr: 'Il est impossible que ~',
-    image: '🙅', doodle: '🚪�❌', gradient: 'from-rose-500 to-pink-600',
+    image: '🙅', doodle: '🚪🚫❌', gradient: 'from-rose-500 to-pink-600',
     scene: 'A locked gate has a big "NO WAY" sign. The speaker says the idea is completely impossible.',
     sceneFr: 'Une porte verrouillée avec un grand panneau "PAS MOYEN". L\'orateur dit que l\'idée est totalement impossible.',
     nuance: 'Strong denial based on logic or the speaker’s judgment.',
@@ -467,7 +467,7 @@ export const questions = [
   { id: 16, type: 'Grammar', format: 'structure', prompt: 'こんなに安いのだから、本物＿＿＿。', target: null, options: [
     { label: 'わけがない', correct: true }, { label: 'わけではない', correct: false }, { label: 'わけだ', correct: false }, { label: 'わけにはいかない', correct: false } ],
     explanation: 'わけがない = “there is no way / it is impossible.”', hint: 'A locked gate saying “no way.”' },
-  { id: 17, type: 'Grammar', format: 'structure', prompt: '試験は受かったものの、点數はよくなかった。', target: null, options: [
+  { id: 17, type: 'Grammar', format: 'structure', prompt: '試験は受かったものの、点数はよくなかった。', target: null, options: [
     { label: 'からといって', correct: false }, { label: 'ものの', correct: true }, { label: 'にしては', correct: false }, { label: 'ざるを得ない', correct: false } ],
     explanation: 'ものの = “although / but.”', hint: 'Reach the top, but the descent remains.' },
   { id: 18, type: 'Grammar', format: 'structure', prompt: '一人で行けないことはないが、危険だ。', target: null, options: [
@@ -520,7 +520,7 @@ export const commonWords = [
   g('一方', 'いっぽう', 'on the other hand'),
   g('政策', 'せいさく', 'policy'),
   g('見直し', 'みなおし', 'review'),
-  g('急がれる', 'せがれる', 'to be pressed / urgent'),
+  g('急がれる', 'いそがれる', 'to be pressed / urged'),
   g('再生可能', 'さいせいかのう', 'renewable'),
   g('比率', 'ひりつ', 'ratio'),
   g('高める', 'たかめる', 'to raise'),
