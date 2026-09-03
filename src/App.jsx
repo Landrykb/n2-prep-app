@@ -258,7 +258,7 @@ function Badge({ children, color = 'violet' }) {
 
 function Header({ active, setMobileOpen, streak, daysToExam, user, onSignOut, isSupabaseConfigured, onBack, canGoBack }) {
   return (
-    <header className="border-b border-bun-600/30 px-4 sm:px-8 py-3 flex items-center justify-between gap-2">
+    <header className="border-b border-bun-600/30 px-6 sm:px-10 py-3 flex items-center justify-between gap-2">
       <div className="flex items-center gap-2 min-w-0">
         <button
           onClick={() => setMobileOpen(true)}
@@ -1589,7 +1589,7 @@ function App() {
             canGoBack={canGoBack}
           />
         </div>
-        <div className="flex-1 px-6 py-6 sm:px-10 sm:py-8 lg:px-14 lg:py-10 overflow-y-auto swipe-area inset-x-safe pb-28 lg:pb-8">
+        <div className="flex-1 page-gutter py-6 sm:py-8 lg:py-10 overflow-y-auto swipe-area pb-28 lg:pb-8">
           <div className="max-w-4xl mx-auto animate-fade-in">
             <Suspense
               fallback={

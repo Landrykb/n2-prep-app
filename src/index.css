@@ -23,6 +23,28 @@ html {
   }
 }
 
+/* Page gutter that guarantees a real margin from the screen edge and also
+   respects notched-device safe areas. The 2rem/2.5rem/3.5rem values are
+   the minimum; if the safe-area inset is larger, it wins. */
+.page-gutter {
+  padding-left: max(env(safe-area-inset-left, 0px), 2rem);
+  padding-right: max(env(safe-area-inset-right, 0px), 2rem);
+}
+
+@media (min-width: 640px) {
+  .page-gutter {
+    padding-left: max(env(safe-area-inset-left, 0px), 2.5rem);
+    padding-right: max(env(safe-area-inset-right, 0px), 2.5rem);
+  }
+}
+
+@media (min-width: 1024px) {
+  .page-gutter {
+    padding-left: max(env(safe-area-inset-left, 0px), 3.5rem);
+    padding-right: max(env(safe-area-inset-right, 0px), 3.5rem);
+  }
+}
+
 body {
   margin: 0;
   min-height: 100vh;
