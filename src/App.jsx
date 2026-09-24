@@ -31,6 +31,7 @@ import {
   Zap,
   ChevronLeft,
   Baseline,
+  ClipboardCheck,
 } from 'lucide-react'
 import { useAuth } from './hooks/useAuth.js'
 import { useKanjiModal } from './hooks/useKanjiModal.js'
@@ -42,7 +43,7 @@ import { localDictionary, loadDictionary, lookup } from './lib/dictionary.js'
 import { KANJI_LEVELS, loadKanjiLevel } from './lib/kanjiData.js'
 import { useHashRoute } from './hooks/useHashRoute.js'
 import { useSwipeNav } from './hooks/useSwipeNav.js'
-import { daysToJLPT, nextJLPTDate } from './lib/nextJLPT.js'
+import { useExamDate } from './hooks/useExamDate.js'
 import AuthModal from './components/AuthModal.jsx'
 import ChatBubble from './components/ChatBubble.jsx'
 import Dashboard from './components/Dashboard.jsx'
@@ -58,6 +59,7 @@ const BJT = lazy(() => import('./components/BJT.jsx'))
 const N2Listening = lazy(() => import('./components/N2Listening.jsx'))
 const SpeedCards = lazy(() => import('./components/SpeedCards.jsx'))
 const DictionaryView = lazy(() => import('./components/DictionaryView.jsx'))
+const MockExam = lazy(() => import('./components/MockExam.jsx'))
 import { userKey } from './lib/userKey.js'
 import { getErrorLogs, addErrorLog, reviewErrorLog, deleteErrorLog, getUserProgress, setUserProgress } from './lib/supabaseApi.js'
 import {
@@ -76,6 +78,7 @@ const nav = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'lessons', label: 'Memory Lessons', icon: BookOpen },
   { id: 'drills', label: 'Drills', icon: Dumbbell },
+  { id: 'mock', label: 'Mock Exam', icon: ClipboardCheck },
   { id: 'anki', label: 'Anki Cards', icon: Layers },
   { id: 'speed', label: 'Speed Cards', icon: Zap },
   { id: 'dictionary', label: 'Dictionary', icon: Search },
@@ -1491,8 +1494,7 @@ function App() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [streak, setStreak] = useState(0)
   const [dictionary, setDictionary] = useState(localDictionary)
-  const nextExam = nextJLPTDate()
-  const daysToExam = daysToJLPT()
+  const { nextExam, daysToExam, examLabel, setting: examSetting, setSetting: setExamSetting } = useExamDate()
 
   useEffect(() => {
     let cancelled = false
@@ -1561,9 +1563,10 @@ function App() {
   }, [step])
 
   const content = {
-    dashboard: <Dashboard streak={streak} daysToExam={daysToExam} nextExam={nextExam} setActive={setActive} />,
+    dashboard: <Dashboard streak={streak} daysToExam={daysToExam} nextExam={nextExam} examLabel={examLabel} examSetting={examSetting} setExamSetting={setExamSetting} setActive={setActive} />,
     lessons: <Lessons />,
     drills: <Drills />,
+    mock: <MockExam setActive={setActive} />,
     anki: <Anki />,
     speed: <SpeedCards />,
     dictionary: <DictionaryView />,

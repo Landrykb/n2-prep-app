@@ -9,12 +9,14 @@ export async function getUserProgress(userId) {
   return data
 }
 
-export async function setUserProgress(userId, { streak, daily, anki }) {
+export async function setUserProgress(userId, { streak, daily, anki, mocks, settings }) {
   if (!supabase || !userId) return
   const payload = { user_id: userId, updated_at: new Date().toISOString() }
   if (streak !== undefined) payload.streak = streak
   if (daily !== undefined) payload.daily = daily
   if (anki !== undefined) payload.anki = anki
+  if (mocks !== undefined) payload.mocks = mocks
+  if (settings !== undefined) payload.settings = settings
   const { error } = await supabase.from('user_progress').upsert(payload, { onConflict: 'user_id' })
   if (error) console.error('setUserProgress error:', error)
 }

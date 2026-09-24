@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../hooks/useAuth.js'
 import { supabase } from '../lib/supabaseClient.js'
+import { consumeAiPrefill } from '../lib/aiPrefill.js'
 import RichText from './RichText.jsx'
 import TtsButton from './TtsButton.jsx'
 import { Send, Loader2, Sparkles, RotateCcw, Copy, Check } from 'lucide-react'
@@ -140,6 +141,17 @@ export default function AiTutor({ context = '', compact = false }) {
       send(input)
     }
   }
+
+  // One-shot prefill from elsewhere in the app (e.g. "Ask AI to explain" on
+  // the mock exam review). Deferred so send() runs outside the effect body.
+  useEffect(() => {
+    if (compact) return
+    const msg = consumeAiPrefill()
+    if (!msg) return
+    const t = setTimeout(() => send(msg), 0)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [context, compact])
 
   useEffect(() => {
     const el = textareaRef.current

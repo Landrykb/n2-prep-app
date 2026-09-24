@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { Calendar, Flame, Target, Layers, BookOpen, Brain, Bot, AlertCircle, ChevronRight, Building2, Zap, Headphones } from 'lucide-react'
+import { Calendar, Flame, Target, Layers, BookOpen, Brain, Bot, AlertCircle, ChevronRight, Building2, Zap, Headphones, ClipboardCheck, Pencil } from 'lucide-react'
 import NotificationCard from './NotificationCard.jsx'
+import ProgressCard from './ProgressCard.jsx'
 
 const actions = [
+  { id: 'mock', label: 'Mock exam', icon: ClipboardCheck, amount: '1', color: 'indigo', desc: 'Timed JLPT-format test' },
   { id: 'anki', label: 'SRS cards', icon: Layers, amount: '25', color: 'violet', desc: 'Review due + new cards' },
   { id: 'speed', label: 'Speed drill', icon: Zap, amount: '20', color: 'sky', desc: 'Fast recognition practice' },
   { id: 'lessons', label: 'Grammar pattern', icon: Brain, amount: '1', color: 'cyan', desc: 'Master one N2 point' },
@@ -16,6 +18,7 @@ const actions = [
 // Full-literal classes so Tailwind can see them and every action colour resolves
 // (the previous inline map was missing `amber`, which left the BJT card unstyled).
 const ACTION_STYLE = {
+  indigo: 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20',
   violet: 'bg-violet-500/10 text-violet-300 border-violet-500/20',
   sky: 'bg-sky-500/10 text-sky-300 border-sky-500/20',
   cyan: 'bg-cyan-500/10 text-cyan-300 border-cyan-500/20',
@@ -45,8 +48,41 @@ function readHabits() {
   return EMPTY_HABITS
 }
 
-export default function Dashboard({ streak, daysToExam, nextExam, setActive }) {
+function ExamDatePicker({ examSetting, setExamSetting }) {
+  const modes = [
+    { mode: 'july', label: 'July JLPT' },
+    { mode: 'december', label: 'December JLPT' },
+    { mode: 'custom', label: 'Custom' },
+  ]
+  return (
+    <div className="mt-4 rounded-2xl bg-bun-900/60 border border-bun-600/40 p-4 space-y-3">
+      <div className="flex flex-wrap gap-2">
+        {modes.map((m) => (
+          <button
+            key={m.mode}
+            onClick={() => setExamSetting(m.mode === 'custom' ? { mode: 'custom', date: examSetting.date || '' } : { mode: m.mode })}
+            aria-pressed={examSetting.mode === m.mode}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-medium border transition ${examSetting.mode === m.mode ? 'bg-violet-600 text-white border-violet-500' : 'bg-bun-800 text-slate-400 border-bun-600/40 hover:text-white'}`}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+      {examSetting.mode === 'custom' && (
+        <input
+          type="date"
+          value={examSetting.date || ''}
+          onChange={(e) => setExamSetting({ mode: 'custom', date: e.target.value })}
+          className="rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2 text-sm text-slate-100 focus:border-violet-500 focus:outline-none"
+        />
+      )}
+    </div>
+  )
+}
+
+export default function Dashboard({ streak, daysToExam, nextExam, examLabel, examSetting, setExamSetting, setActive }) {
   const [checked, setChecked] = useState(readHabits)
+  const [pickerOpen, setPickerOpen] = useState(false)
   const dateLabel = nextExam?.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
   const focus = daysToExam > 120 ? 'foundation' : daysToExam > 60 ? 'patterns' : daysToExam > 30 ? 'speed' : 'sprint'
 
@@ -69,9 +105,16 @@ export default function Dashboard({ streak, daysToExam, nextExam, setActive }) {
         <div className="relative">
           <div className="flex items-center gap-2 mb-2">
             <Calendar size={16} className="text-violet-300" />
-            <span className="text-xs sm:text-sm font-medium text-emerald-300">{daysToExam} days to July JLPT · {dateLabel}</span>
+            <span className="text-xs sm:text-sm font-medium text-emerald-300">{daysToExam} days to {examLabel} · {dateLabel}</span>
+            <button
+              onClick={() => setPickerOpen((o) => !o)}
+              className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-full bg-bun-800/60 border border-bun-600/40 text-slate-400 hover:text-white transition"
+            >
+              <Pencil size={11} /> Change date
+            </button>
           </div>
-          <h1 className="text-2xl sm:text-4xl font-bold text-white mb-2">July JLPT is in {daysToExam} days.</h1>
+          <h1 className="text-2xl sm:text-4xl font-bold text-white mb-2">{examLabel} is in {daysToExam} days.</h1>
+          {pickerOpen && <ExamDatePicker examSetting={examSetting} setExamSetting={setExamSetting} />}
           <p className="max-w-2xl text-slate-300 leading-relaxed text-sm sm:text-base mb-5">
             {focusText[focus]} Do a little, consistently.
           </p>
@@ -97,6 +140,8 @@ export default function Dashboard({ streak, daysToExam, nextExam, setActive }) {
           <p className="text-xs text-slate-400">{completed}/4 daily habits checked · keep the streak</p>
         </div>
       </section>
+
+      <ProgressCard setActive={setActive} daysToExam={daysToExam} />
 
       {/* Today's practical actions */}
       <section>
