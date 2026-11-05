@@ -472,7 +472,7 @@ export default function SenseiCall() {
           <div className="relative mb-6">
             <span className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping" />
             <span className="relative block">
-              <Mascot agent="koe" size={96} showName={false} label={`${callState.settings.senseiName} — Koe, your sensei, is calling`} />
+              <Mascot agent="koe" size={96} showName={false} motion="bounce" label={`${callState.settings.senseiName} — Koe, your sensei, is calling`} />
             </span>
           </div>
           <p className="text-sm font-semibold tracking-widest text-amber-300 mb-1">呼び出しの時間</p>
