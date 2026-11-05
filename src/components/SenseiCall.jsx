@@ -388,7 +388,7 @@ export default function SenseiCall() {
             </span>
           </div>
           <p className="text-sm font-semibold tracking-widest text-amber-300 mb-1">呼び出しの時間</p>
-          <p className="text-[11px] uppercase tracking-[0.3em] text-slate-500 mb-4">Yobidashi no Jikan — your name is being called</p>
+          <p className="text-[11px] uppercase tracking-[0.3em] text-slate-500 mb-4">Yobidashi no Jikan — you are being summoned</p>
           <h3 className="text-3xl font-bold text-white">{callState.settings.senseiName}</h3>
           <p className="text-slate-300 mt-2">Wants to practice: <span className="text-white font-semibold">{chain[0]?.title}</span></p>
           <p className="text-xs text-slate-500 mt-1">{chain[0]?.domain} · {chain[0]?.level} · {ring.source === 'mini' ? '1 quick exchange' : `${exchangesTotal} short exchanges`} · about {ring.source === 'mini' ? '1' : '3'} minutes</p>
