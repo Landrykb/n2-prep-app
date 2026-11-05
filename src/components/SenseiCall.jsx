@@ -5,8 +5,10 @@ import { addToQueue } from '../lib/queue.js'
 import { todayStr } from '../lib/session.js'
 import {
   loadCallState, saveCallState, ensureToday, pickCallScenes, registerMiss, recordHistory,
-  loadInbox, markInboxDone, fmtTime, MASTERY,
+  loadInbox, markInboxDone, fmtTime, MASTERY, INCOMING_CALL_KEY,
 } from '../lib/calls.js'
+import { useAuth } from '../hooks/useAuth.js'
+import { syncCallWindows } from '../lib/callSync.js'
 import { bestScore, missingPhrases } from './VoiceLoop.jsx'
 import { recordVoiceAttempt, recordCallOutcome } from '../lib/twin.js'
 import Mascot from './Mascot.jsx'
@@ -36,6 +38,11 @@ function freshRingChain(profile, slotIdx) {
 
 export default function SenseiCall() {
   const profile = useMemo(loadProfile, [])
+  const { user } = useAuth()
+  // Honest reach mode (Doc 02 §3.2): signed in = the server scheduler can
+  // ring a closed app by push; signed out = calls ring on this device when
+  // the app opens. The settings copy below says exactly which one applies.
+  const reachMode = user ? 'server' : 'device'
   const [callState, setCallState] = useState(() => {
     const s = ensureToday(loadCallState())
     // A slot left 'ringing' by a closed tab is simply pending again.
@@ -120,6 +127,50 @@ export default function SenseiCall() {
     evaluate()
     const t = setInterval(evaluate, 20000)
     return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ---------- incoming summons from a push tap (server doorbell) ----------
+  // Two arrivals: (a) the app was opened by the notification — the slot is
+  // in the URL hash (?call=<slotId>&date=…&slot=…); (b) the app was already
+  // open — the service worker messaged App.jsx, which stashed the slot in
+  // sessionStorage and routed here. Either way: if that slot is still
+  // pending today, ring for it now (source 'push'). Anything stale or
+  // already handled is ignored — the normal trigger/catch-up logic above
+  // remains the fallback for every other case.
+  const intakeDoneRef = useRef(false)
+  useEffect(() => {
+    if (intakeDoneRef.current) return
+    intakeDoneRef.current = true
+    let ctx = null
+    try {
+      const hash = window.location.hash || ''
+      if (hash.includes('?')) {
+        const q = new URLSearchParams(hash.slice(hash.indexOf('?') + 1))
+        if (q.get('call')) ctx = { date: q.get('date'), slotIdx: Number(q.get('slot')) }
+      }
+      if (!ctx) {
+        const stored = sessionStorage.getItem(INCOMING_CALL_KEY)
+        if (stored) {
+          sessionStorage.removeItem(INCOMING_CALL_KEY)
+          const p = JSON.parse(stored)
+          ctx = { date: p.date || p.slotDate, slotIdx: p.slotIdx }
+        }
+      }
+    } catch { ctx = null }
+    if (!ctx || ctx.date !== todayStr() || !Number.isFinite(ctx.slotIdx)) return
+    if (phaseRef.current !== 'idle') return
+    let s = ensureToday(loadCallState())
+    if (!s.settings.enabled) return
+    const date = todayStr()
+    const d = s.days[date]
+    if (!d || d.stopped) return
+    const slot = d.slots.find((x) => x.idx === ctx.slotIdx)
+    if (!slot || slot.status !== 'pending') return
+    const slots = d.slots.map((x) => (x.idx === slot.idx ? { ...x, status: 'ringing' } : x))
+    s = { ...s, days: { ...s.days, [date]: { ...d, slots } } }
+    updateState(s)
+    startRinging({ source: 'push', slotIdx: slot.idx, chain: freshRingChain(profile, slot.idx) })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -251,6 +302,15 @@ export default function SenseiCall() {
     updateState(s)
     setSavedNote('Saved on this device. Today’s call times were re-planned from the new settings.')
     setTimeout(() => setSavedNote(''), 4000)
+    // Mirror to the server scheduler when signed in (no-op signed out), so
+    // the summons can also reach a closed app — including the enabled flag,
+    // so switching calls off here stops the server too.
+    syncCallWindows(s).then((r) => {
+      if (r === 'synced') {
+        setSavedNote('Saved on this device and synced to your account — calls can reach you even when the app is closed.')
+        setTimeout(() => setSavedNote(''), 5000)
+      }
+    }).catch(() => {})
   }
   const setWindow = (i, key, val) => setSettings((st) => ({ ...st, windows: st.windows.map((w, j) => (j === i ? { ...w, [key]: val } : w)) }))
   const addWindow = () => setSettings((st) => (st.windows.length >= 3 ? st : { ...st, windows: [...st.windows, { start: '21:00', end: '22:00' }] }))
@@ -307,7 +367,9 @@ export default function SenseiCall() {
       <section className="rounded-2xl glass p-5 card-glow space-y-4">
         <h3 className="font-bold text-white">Call settings</h3>
         <label className="flex items-center justify-between gap-3 rounded-xl bg-bun-700/40 border border-bun-600/20 px-4 py-3 cursor-pointer">
-          <span className="text-sm text-slate-200">The Yobidashi is <strong>{settings.enabled ? 'on' : 'off'}</strong><span className="block text-xs text-slate-400 mt-0.5">When on, calls arrive inside your windows below — only while this app can reach you (see the honest note).</span></span>
+          <span className="text-sm text-slate-200">The Yobidashi is <strong>{settings.enabled ? 'on' : 'off'}</strong><span className="block text-xs text-slate-400 mt-0.5">{reachMode === 'server'
+            ? 'When on, calls arrive inside your windows below. You are signed in, so a summons can also reach you while the app is closed — by push, as a doorbell (see the honest note).'
+            : 'When on, calls arrive inside your windows below — on this device, they ring when you open the app. Sign in to let calls reach a closed app too (see the honest note).'}</span></span>
           <button role="switch" aria-checked={settings.enabled} onClick={() => setSettings((st) => ({ ...st, enabled: !st.enabled }))} className={`w-12 h-7 rounded-full shrink-0 transition ${settings.enabled ? 'bg-emerald-500' : 'bg-bun-600'}`}>
             <span className={`block w-5 h-5 rounded-full bg-white shadow transition-transform ${settings.enabled ? 'translate-x-6' : 'translate-x-1'}`} />
           </button>
@@ -347,7 +409,9 @@ export default function SenseiCall() {
         </div>
         <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4 text-xs text-slate-400 leading-relaxed">
           <p className="text-slate-200 font-semibold text-sm mb-1 flex items-center gap-1.5"><Bell size={14} /> The honest note — how a web app “calls” you</p>
-          While this app is closed, it cannot ring your phone like a carrier call. What it <em>can</em> do is send a <strong className="text-slate-200">push notification</strong> (turn those on in the card on the Today page) at your call time — tapping it opens this call screen. While the app is open, the call arrives right here, like the test call above. No real phone number is dialled, and nothing here pretends otherwise.
+          While this app is closed, it cannot ring your phone like a carrier call. What it <em>can</em> do is send a <strong className="text-slate-200">push notification</strong> (turn those on in the card on the Today page) at your call time — tapping it opens this call screen. {reachMode === 'server'
+            ? 'Because you are signed in, your windows are synced to a small server scheduler, so that push can be sent at your call time even while the app is closed; if a summons is ever missed, opening the app offers the call once more.'
+            : 'That only works while you are signed in — signed out, nothing leaves this device, and your call simply rings here the next time you open the app.'} While the app is open, the call arrives right here, like the test call above. No real phone number is dialled, and nothing here pretends otherwise.
         </div>
       </section>
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jpn2easy-v3'
+const CACHE_NAME = 'jpn2easy-v4'
 const PRECACHE = ['/', '/index.html', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png']
 
 self.addEventListener('install', (event) => {
@@ -62,24 +62,59 @@ self.addEventListener('fetch', (event) => {
 
 self.addEventListener('push', (event) => {
   const data = event.data ? event.data.json() : {}
-  const title = data.title || 'Time to study N2!'
+  const isCall = data.kind === 'yobidashi-call'
+  const title = data.title || (isCall ? '呼び出しの時間 — Yobidashi no Jikan' : 'Time to study N2!')
   const options = {
-    body: data.body || 'Keep your streak alive — do a quick drill or review your deck.',
+    body: data.body || (isCall
+      ? 'You are being summoned — a few minutes of spoken Japanese with your sensei.'
+      : 'Keep your streak alive — do a quick drill or review your deck.'),
     icon: '/icon-192.png',
     badge: '/icon-192.png',
-    tag: data.tag || 'study-reminder',
-    data: { url: data.url || '/' },
+    tag: data.tag || (isCall ? 'yobidashi-call' : 'study-reminder'),
+    // The slot context rides along so a tap can open the ringing screen for
+    // THIS slot (see notificationclick + SenseiCall's incoming-call intake).
+    data: {
+      url: data.url || '/',
+      kind: data.kind || null,
+      slotId: data.slotId || null,
+      slotDate: data.slotDate || null,
+      slotIdx: data.slotIdx ?? null,
+    },
+  }
+  // A summons should behave like a call arriving, not a silent badge:
+  // re-alert and stay until the learner answers or dismisses it. Ordinary
+  // reminders keep the default gentle behaviour.
+  if (isCall) {
+    options.renotify = true
+    options.requireInteraction = true
   }
   event.waitUntil(self.registration.showNotification(title, options))
 })
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const url = event.notification.data?.url || '/'
+  const data = event.notification.data || {}
+  const url = data.url || '/'
+  const isCall = data.kind === 'yobidashi-call'
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
-      const client = clients.find((c) => c.url === url && 'focus' in c)
-      if (client) return client.focus()
+      const appClient = clients.find((c) => new URL(c.url).origin === self.location.origin && 'focus' in c)
+      if (appClient) {
+        if (isCall) {
+          // Hand the slot to the running app: App.jsx stashes it and routes
+          // to the Yobidashi screen, which starts the ring for that slot.
+          appClient.postMessage({
+            type: 'yobidashi-call',
+            slotId: data.slotId,
+            slotDate: data.slotDate,
+            slotIdx: data.slotIdx,
+            url,
+          })
+        } else if (new URL(appClient.url).hash !== new URL(url, self.location.origin).hash) {
+          appClient.navigate(url).catch(() => {})
+        }
+        return appClient.focus()
+      }
       if (self.clients.openWindow) return self.clients.openWindow(url)
     })
   )

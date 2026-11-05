@@ -81,11 +81,17 @@ serve(async (req: Request) => {
       userId = user.id
     }
 
-    const { title = 'Time to study N2!', body = 'Keep your streak alive.', url = '/', tag = 'study-reminder', user_id } = await req.json()
+    const { title = 'Time to study N2!', body = 'Keep your streak alive.', url = '/', tag = 'study-reminder', user_id, kind, slotId, slotDate, slotIdx } = await req.json()
     if (providedAdminSecret) userId = user_id ?? userId
     if (typeof title !== 'string' || title.length > 120 || typeof body !== 'string' || body.length > 240) {
       return new Response(JSON.stringify({ error: 'Invalid title or body' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
+    // Optional Yobidashi call context (set by call-scheduler): passed through
+    // to the service worker so a tap can land on the ringing screen for the
+    // exact slot. Absent for ordinary reminders — payload shape unchanged.
+    const callContext = kind === 'yobidashi-call' && typeof slotId === 'string'
+      ? { kind, slotId, slotDate: typeof slotDate === 'string' ? slotDate : null, slotIdx: Number.isFinite(slotIdx) ? slotIdx : null }
+      : null
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -103,7 +109,7 @@ serve(async (req: Request) => {
     }
 
     const server = await getAppServer()
-    const payload = JSON.stringify({ title, body, url, tag })
+    const payload = JSON.stringify({ title, body, url, tag, ...(callContext || {}) })
     let sent = 0
     const failed: string[] = []
 

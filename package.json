@@ -9,6 +9,7 @@
     "build:anki": "node scripts/build-anki.mjs",
     "build:kanji": "node scripts/build-kanji.mjs",
     "lint": "oxlint",
+    "test:phase2": "TZ=UTC node tests/phase2.test.mjs",
     "validate": "node scripts/validate-data.mjs",
     "preview": "vite preview"
   },

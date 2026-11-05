@@ -77,6 +77,7 @@ const CoachLetter = lazy(() => import('./components/CoachLetter.jsx'))
 const PrivacyPolicy = lazy(() => import('./components/PrivacyPolicy.jsx'))
 const Terms = lazy(() => import('./components/Terms.jsx'))
 import { userKey } from './lib/userKey.js'
+import { INCOMING_CALL_KEY } from './lib/calls.js'
 import { getErrorLogs, addErrorLog, reviewErrorLog, deleteErrorLog, getUserProgress, setUserProgress } from './lib/supabaseApi.js'
 import {
   plan,
@@ -1559,6 +1560,24 @@ function App() {
   }, [user])
 
   useEffect(() => { document.documentElement.classList.add('dark') }, [])
+
+  // A tapped Yobidashi push while the app is already open: the service
+  // worker messages us the slot (public/sw.js notificationclick). Stash it
+  // for SenseiCall's intake and route to the call screen — the push is a
+  // doorbell; the ring itself happens there (Doc 02 §3.2).
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return undefined
+    const onMessage = (e) => {
+      const d = e.data || {}
+      if (d.type !== 'yobidashi-call') return
+      try {
+        sessionStorage.setItem(INCOMING_CALL_KEY, JSON.stringify({ date: d.slotDate, slotIdx: d.slotIdx, slotId: d.slotId, at: Date.now() }))
+      } catch { /* ignore */ }
+      setActive('sensei')
+    }
+    navigator.serviceWorker.addEventListener('message', onMessage)
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage)
+  }, [setActive])
 
   // Swipe left/right (touch) and Alt+Arrow (desktop) move between sections, so
   // the installed PWA is navigable without any browser chrome.

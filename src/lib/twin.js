@@ -1,6 +1,8 @@
 // THE LEARNER TWIN (Doc 04) — a structured, growing model of the learner,
-// stored locally at jpn:twin:v1 (the cloud mirror is Doc 04 §3, Phase 2+;
-// this module is the local source of truth today).
+// stored locally at jpn:twin:v1. This module is the local source of truth;
+// the cloud mirror (learner_twin table, Doc 04 §3) is synced by
+// twinSync.js whenever the learner is signed in — local stays authoritative
+// offline and wins any tie (see twinMerge.js).
 //
 // What the Twin holds: section levels + trend (from diagnosis history —
 // scores are written ONLY by diagnosis code), the error fingerprint
@@ -109,9 +111,18 @@ export function loadTwin() {
   } catch { return emptyTwin() }
 }
 
+// Subscribers notified after every save (twinSync.js registers the cloud
+// push here — kept as a registry so this module never imports sync code).
+const twinSaveListeners = new Set()
+export function onTwinSaved(fn) {
+  twinSaveListeners.add(fn)
+  return () => twinSaveListeners.delete(fn)
+}
+
 export function saveTwin(twin) {
   const next = { ...twin, updatedAt: new Date().toISOString() }
   try { localStorage.setItem(TWIN_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+  for (const fn of twinSaveListeners) { try { fn(next) } catch { /* a listener must never break a save */ } }
   return next
 }
 

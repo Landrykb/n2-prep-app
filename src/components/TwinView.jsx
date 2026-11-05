@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Download, Trash2, Mail, ChevronRight, X } from 'lucide-react'
 import { brand } from '../lib/brand.js'
 import {
@@ -11,6 +11,7 @@ import { SECTION_KEYS } from '../lib/levels.js'
 import Mascot from './Mascot.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { downloadAllLocalData, wipeAllLocalData, requestServerAccountDeletion } from '../lib/accountDeletion.js'
+import { getTwinSyncState, subscribeTwinSync, TWIN_SYNC_EVENT } from '../lib/twinSync.js'
 
 // THE TWIN VIEW — "What your fleet knows about you" (Doc 06 §4, Doc 10 §3).
 // The Twin is VISIBLE on purpose: a learner who can inspect what the app
@@ -41,6 +42,16 @@ function Section({ title, children, hint }) {
 
 export default function TwinView({ setActive }) {
   const [twin, setTwin] = useState(() => refreshTwin())
+  // Quiet sync state (Doc 04 §3): signed out, the Twin lives on this
+  // device only; signed in, it mirrors to the learner's account. Shown as
+  // one plain line under the header — never a badge, never a nag.
+  const [syncState, setSyncState] = useState(() => getTwinSyncState())
+  useEffect(() => subscribeTwinSync(setSyncState), [])
+  useEffect(() => {
+    const onSynced = () => setTwin(refreshTwin())
+    window.addEventListener(TWIN_SYNC_EVENT, onSynced)
+    return () => window.removeEventListener(TWIN_SYNC_EVENT, onSynced)
+  }, [])
   const { user, signOut } = useAuth()
   const [delStep, setDelStep] = useState('idle') // idle | confirm | working | done
   const [delAgreed, setDelAgreed] = useState(false)
@@ -99,6 +110,13 @@ export default function TwinView({ setActive }) {
       <div>
         <h2 className="text-2xl font-bold text-white">What Your Fleet Knows About You</h2>
         <p className="text-sm text-slate-400 mt-1">{brand.name} keeps a model of your Japanese — your Twin — so every session is built for you, not for an average learner. It lives on this device, it is yours to inspect, correct, export or delete. <span className="text-slate-300">{brand.tagline}.</span></p>
+        <p className="text-xs text-slate-500 mt-1.5">Fleet memory: {syncState === 'local-only'
+          ? 'this device only'
+          : syncState === 'synced'
+            ? 'synced to your account'
+            : syncState === 'syncing'
+              ? 'syncing to your account…'
+              : 'on this device — sync will retry'}</p>
       </div>
 
       {/* Fleet line-up (Doc 06 §3: the line-up belongs here and on the letter) */}
