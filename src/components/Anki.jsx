@@ -116,13 +116,13 @@ function MigrationCard({ cards, progress }) {
 
   return (
     <div className="rounded-2xl glass p-5 card-glow space-y-3 text-left">
-      <h3 className="font-bold text-white flex items-center gap-2"><Layers size={17} className="text-violet-300" /> One queue, everywhere</h3>
+      <h3 className="font-bold text-white flex items-center gap-2"><Layers size={17} className="text-[#FF8A75]" /> One queue, everywhere</h3>
       {migration ? (
         <p className="text-sm text-emerald-300 flex items-start gap-2"><CheckCircle2 size={16} className="shrink-0 mt-0.5" /> Moved on {new Date(migration.doneAt).toLocaleDateString()}: {migration.imported} known words now live in the Today queue with their learning preserved. This tab keeps working exactly as before — nothing was deleted.</p>
       ) : (
         <>
           <p className="text-sm text-slate-300">The rest of the app now reviews everything in <strong className="text-white">one queue</strong> with the newer FSRS scheduler. You have <strong className="text-white">{learnedIds.length} learned word{learnedIds.length === 1 ? '' : 's'}</strong> in this tab’s older system. Moving them is one tap, it downloads a backup of this progress <em>first</em>, and it never deletes anything here.</p>
-          <button onClick={doMigration} disabled={!learnedIds.length || !cards.length} className="px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white text-sm font-semibold">Move My Progress To The New System</button>
+          <button onClick={doMigration} disabled={!learnedIds.length || !cards.length} className="px-4 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] disabled:opacity-40 text-white text-sm font-semibold">Move My Progress To The New System</button>
           {!learnedIds.length && <p className="text-xs text-slate-500">Nothing to move yet — words become “learned” here after their first good review.</p>}
         </>
       )}
@@ -371,7 +371,7 @@ export default function Anki() {
         <h2 className="text-2xl font-bold text-white mb-2">Session done</h2>
         <p className="text-slate-300">{summary}</p>
         <div className="flex flex-wrap items-center justify-center gap-3">
-          <button onClick={() => setMode('due')} className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition">Study due</button>
+          <button onClick={() => setMode('due')} className="px-5 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-medium transition">Study due</button>
           <button onClick={() => setMode('all')} className="px-5 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-slate-200 text-sm font-medium transition">Study all</button>
           <button onClick={exportCSV} className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition"><Download size={16} className="inline mr-2" /> Export CSV</button>
         </div>
@@ -389,7 +389,7 @@ export default function Anki() {
         <h2 className="text-2xl font-bold text-white">Anki Cards</h2>
         <div className="flex gap-2">
           <a href="https://apps.ankiweb.net/" target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-lg text-sm bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-slate-200 flex items-center gap-1"><ExternalLink size={14} /> Anki</a>
-          <button onClick={exportCSV} className="px-3 py-1.5 rounded-lg text-sm bg-violet-600 hover:bg-violet-500 text-white flex items-center gap-1"><Download size={14} /> CSV</button>
+          <button onClick={exportCSV} className="px-3 py-1.5 rounded-lg text-sm bg-[#FF6B57] hover:bg-[#FF7F6E] text-white flex items-center gap-1"><Download size={14} /> CSV</button>
           <button onClick={resetProgress} className="px-3 py-1.5 rounded-lg text-sm bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 flex items-center gap-1"><RotateCcw size={14} /> Reset</button>
         </div>
       </div>
@@ -397,12 +397,12 @@ export default function Anki() {
       <div className="rounded-2xl glass p-4 space-y-4">
         <div className="flex flex-wrap items-center gap-3">
           <Settings size={16} className="text-slate-500" />
-          <select value={mode} onChange={(e) => setMode(e.target.value)} className="bg-bun-900 border border-bun-600/40 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-violet-500">
+          <select value={mode} onChange={(e) => setMode(e.target.value)} className="bg-bun-900 border border-bun-600/40 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF6B57]">
             <option value="due">Due + new today</option>
             <option value="new">New only</option>
             <option value="all">All cards</option>
           </select>
-          <select value={level} onChange={(e) => setLevel(e.target.value)} className="bg-bun-900 border border-bun-600/40 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-violet-500">
+          <select value={level} onChange={(e) => setLevel(e.target.value)} className="bg-bun-900 border border-bun-600/40 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF6B57]">
             <option value="all">All levels</option>
             <option value="N5">N5</option>
             <option value="N4">N4</option>
@@ -410,10 +410,10 @@ export default function Anki() {
             <option value="N2">N2</option>
             <option value="N1">N1</option>
           </select>
-          <button onClick={() => setShuffle((s) => !s)} className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 border transition ${shuffle ? 'bg-violet-600 border-violet-500 text-white' : 'bg-bun-900 border-bun-600/40 text-slate-300 hover:bg-bun-700'}`}><Shuffle size={14} /> {shuffle ? 'On' : 'Off'}</button>
+          <button onClick={() => setShuffle((s) => !s)} className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 border transition ${shuffle ? 'bg-[#FF6B57] border-[#FF6B57] text-white' : 'bg-bun-900 border-bun-600/40 text-slate-300 hover:bg-bun-700'}`}><Shuffle size={14} /> {shuffle ? 'On' : 'Off'}</button>
           <div className="relative flex-1 min-w-[140px]">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…" className="w-full bg-bun-900 border border-bun-600/40 rounded-lg pl-8 pr-3 py-1.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-violet-500" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…" className="w-full bg-bun-900 border border-bun-600/40 rounded-lg pl-8 pr-3 py-1.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#FF6B57]" />
           </div>
           <div className="flex items-center gap-2 text-sm text-slate-400">
             <span>New/day</span>
@@ -426,7 +426,7 @@ export default function Anki() {
                 if (user) setUserProgress(user.id, { anki: next })
                 return next
               })
-            }} className="w-16 bg-bun-900 border border-bun-600/40 rounded-lg px-2 py-1.5 text-center text-slate-200 focus:outline-none focus:border-violet-500" />
+            }} className="w-16 bg-bun-900 border border-bun-600/40 rounded-lg px-2 py-1.5 text-center text-slate-200 focus:outline-none focus:border-[#FF6B57]" />
           </div>
         </div>
 
@@ -445,7 +445,7 @@ export default function Anki() {
         </div>
 
         <div className="h-2 w-full rounded-full bg-bun-700 overflow-hidden">
-          <div className="h-full bg-gradient-to-r from-violet-500 to-cyan-500 transition-all" style={{ width: `${progressPct}%` }} />
+          <div className="h-full bg-gradient-to-r from-[#71368A] to-cyan-500 transition-all" style={{ width: `${progressPct}%` }} />
         </div>
         <p className="text-xs text-slate-500 text-right">{index} / {queue.length} in this session</p>
       </div>
@@ -464,7 +464,7 @@ export default function Anki() {
       </div>
 
       {!flipped ? (
-        <button onClick={() => setFlipped(true)} className="w-full py-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-medium transition">Show answer</button>
+        <button onClick={() => setFlipped(true)} className="w-full py-3 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-medium transition">Show answer</button>
       ) : (
         <div className="grid grid-cols-4 gap-2">
           <button onClick={() => rate(0)} className="py-2.5 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-200 text-sm font-medium hover:bg-rose-500/30 transition flex items-center justify-center gap-1"><XCircle size={14} /> Again</button>

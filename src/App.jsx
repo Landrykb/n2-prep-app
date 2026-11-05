@@ -53,6 +53,7 @@ import { useHashRoute } from './hooks/useHashRoute.js'
 import { useSwipeNav } from './hooks/useSwipeNav.js'
 import { useExamDate } from './hooks/useExamDate.js'
 import AuthModal from './components/AuthModal.jsx'
+import Mascot from './components/Mascot.jsx'
 import ChatBubble from './components/ChatBubble.jsx'
 import TodayHome from './components/TodayHome.jsx'
 import KanjiTapText from './components/KanjiTapText.jsx'
@@ -186,17 +187,17 @@ function FuriganaWord({ p, onOpen }) {
       onKeyDown={keyHandle}
       role={found ? 'button' : undefined}
       tabIndex={found ? 0 : -1}
-      className={`group relative inline-block border-b border-dashed border-violet-500/40 touch-manipulation ${found ? 'cursor-pointer hover:text-violet-300' : 'cursor-help'}`}
+      className={`group relative inline-block border-b border-dashed border-[#FF6B57]/40 touch-manipulation ${found ? 'cursor-pointer hover:text-[#FF8A75]' : 'cursor-help'}`}
     >
       {furiganaOn ? (
         <ruby>
           {p.word}
-          <rt className="text-[0.6em] font-normal text-violet-300 select-none">{cleanReading(p.reading)}</rt>
+          <rt className="text-[0.6em] font-normal text-[#FF8A75] select-none">{cleanReading(p.reading)}</rt>
         </ruby>
       ) : (
         p.word
       )}
-      <span className="absolute -top-16 left-1/2 -translate-x-1/2 bg-bun-800 border border-violet-500/30 rounded-lg px-3 py-2 text-xs text-slate-200 opacity-0 group-hover:opacity-100 transition pointer-events-none z-20 shadow-xl whitespace-nowrap">
+      <span className="absolute -top-16 left-1/2 -translate-x-1/2 bg-bun-800 border border-[#FF6B57]/30 rounded-lg px-3 py-2 text-xs text-slate-200 opacity-0 group-hover:opacity-100 transition pointer-events-none z-20 shadow-xl whitespace-nowrap">
         <span className="block text-cyan-300 font-medium text-sm">{p.reading}</span>
         <span className="block text-slate-300">{p.meaning}</span>
       </span>
@@ -247,7 +248,7 @@ function SelectionPopup({ dictionary, onNeedDictionary }) {
   return (
     <div
       ref={popupRef}
-      className="fixed z-50 -translate-x-1/2 -translate-y-full bg-bun-800 border border-violet-500/40 rounded-2xl shadow-2xl p-4 min-w-[220px] max-w-[320px]"
+      className="fixed z-50 -translate-x-1/2 -translate-y-full bg-bun-800 border border-[#FF6B57]/40 rounded-2xl shadow-2xl p-4 min-w-[220px] max-w-[320px]"
       style={{ left: pos.x, top: pos.y - 8 }}
     >
       <div className="flex items-center justify-between mb-2">
@@ -276,7 +277,7 @@ function SelectionPopup({ dictionary, onNeedDictionary }) {
         return found ? (
           <button
             onClick={() => { open(found); setSelected(null) }}
-            className="mt-3 w-full py-2 rounded-xl bg-violet-600/20 hover:bg-violet-600/30 text-violet-200 text-sm font-medium transition"
+            className="mt-3 w-full py-2 rounded-xl bg-[#FF6B57]/20 hover:bg-[#FF6B57]/30 text-[#FFA08D] text-sm font-medium transition"
           >
             Open visual breakdown
           </button>
@@ -286,16 +287,16 @@ function SelectionPopup({ dictionary, onNeedDictionary }) {
   )
 }
 
-function Badge({ children, color = 'violet' }) {
+function Badge({ children, color = 'plum' }) {
   const map = {
     rose: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
     emerald: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
     amber: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-    violet: 'bg-violet-500/15 text-violet-300 border-violet-500/30',
+    plum: 'bg-[#71368A]/25 text-[#C39BD3] border-[#71368A]/50',
     cyan: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
   }
   return (
-    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${map[color] || map.violet}`}>
+    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${map[color] || map.plum}`}>
       {children}
     </span>
   )
@@ -356,7 +357,7 @@ function Header({ active, setMobileOpen, daysToExam, user, onSignOut, isSupabase
           aria-pressed={furiganaOn}
           title={furiganaOn ? 'Furigana on — tap to hide readings' : 'Furigana off — tap to show readings above kanji'}
           className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full border text-xs sm:text-sm font-medium transition ${
-            furiganaOn ? 'bg-violet-600/20 border-violet-500/50 text-violet-200' : 'bg-bun-700/50 border-bun-600/30 text-slate-300 hover:text-white'
+            furiganaOn ? 'bg-[#FF6B57]/20 border-[#FF6B57]/50 text-[#FFA08D]' : 'bg-bun-700/50 border-bun-600/30 text-slate-300 hover:text-white'
           }`}
         >
           <Baseline size={16} />
@@ -372,7 +373,7 @@ function Header({ active, setMobileOpen, daysToExam, user, onSignOut, isSupabase
           </>)}
         </div>
         <div className="hidden sm:flex items-center gap-2 text-xs text-slate-300">
-          <Calendar size={14} className="text-violet-300" />
+          <Calendar size={14} className="text-[#FF8A75]" />
           <span className="font-medium">{daysToExam} days to JLPT</span>
         </div>
         {isSupabaseConfigured && (
@@ -394,7 +395,7 @@ function Header({ active, setMobileOpen, daysToExam, user, onSignOut, isSupabase
           </div>
         )}
         {!isSupabaseConfigured && (
-          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-cyan-500 to-violet-500 flex items-center justify-center text-sm font-bold shadow-md" title="Yonde">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-cyan-500 to-[#71368A] flex items-center justify-center text-sm font-bold shadow-md" title="Yonde">
             よ
           </div>
         )}
@@ -409,7 +410,7 @@ function Sidebar({ active, setActive, mobileOpen, setMobileOpen }) {
       <aside className={`fixed z-40 top-0 left-0 h-full w-64 bg-bun-800 border-r border-bun-600/30 transform transition-transform lg:translate-x-0 lg:static flex flex-col pt-safe pb-safe ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-6 shrink-0">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-lg shadow-lg">🦝</div>
+            <Mascot agent="koe" size={40} mood="happy" showName={false} />
             <div>
               <h1 className="font-bold text-lg leading-tight">{brand.name}</h1>
               <p className="text-xs text-slate-400">{brand.tagline}</p>
@@ -427,7 +428,7 @@ function Sidebar({ active, setActive, mobileOpen, setMobileOpen }) {
                 key={n.id}
                 onClick={() => { setActive(n.id); setMobileOpen(false) }}
                 aria-current={active === n.id ? 'page' : undefined}
-                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-medium transition ${active === n.id ? 'bg-violet-500/15 text-violet-200 border border-violet-500/30' : 'text-slate-400 hover:text-slate-100 hover:bg-bun-700/60'}`}
+                className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-medium transition ${active === n.id ? 'bg-[#FF6B57]/15 text-[#FFA08D] border border-[#FF6B57]/30' : 'text-slate-400 hover:text-slate-100 hover:bg-bun-700/60'}`}
               >
                 <Icon size={18} /> {n.label}
               </button>
@@ -470,7 +471,7 @@ function BottomNav({ active, setActive, onMenu }) {
               key={n.id}
               onClick={() => setActive(n.id)}
               aria-current={isActive ? 'page' : undefined}
-              className={`flex-1 flex flex-col items-center gap-0.5 py-2 min-h-[56px] justify-center transition ${isActive ? 'text-violet-300' : 'text-slate-400'}`}
+              className={`flex-1 flex flex-col items-center gap-0.5 py-2 min-h-[56px] justify-center transition ${isActive ? 'text-[#FF8A75]' : 'text-slate-400'}`}
             >
               <Icon size={20} />
               <span className="text-[10px] font-medium leading-none">{n.short || n.label.split(' ')[0]}</span>
@@ -522,7 +523,7 @@ function Lessons() {
             <button
               key={m}
               onClick={() => { setMode(m); setActiveItem(null); setShowBack(false) }}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition capitalize ${mode === m ? 'bg-violet-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition capitalize ${mode === m ? 'bg-[#FF6B57] text-white shadow' : 'text-slate-400 hover:text-white'}`}
             >
               {m} {mode === m && <Sparkles size={12} className="inline ml-1" />}
             </button>
@@ -540,7 +541,7 @@ function Lessons() {
                 onClick={() => setKanjiLevel(lv)}
                 aria-pressed={kanjiLevel === lv}
                 className={`px-2.5 py-1 rounded-full text-xs font-medium border transition ${
-                  kanjiLevel === lv ? 'bg-violet-600 text-white border-violet-500' : 'bg-bun-800 text-slate-400 border-bun-600/40 hover:text-white'
+                  kanjiLevel === lv ? 'bg-[#FF6B57] text-white border-[#FF6B57]' : 'bg-bun-800 text-slate-400 border-bun-600/40 hover:text-white'
                 }`}
               >
                 {lv}
@@ -564,7 +565,7 @@ function Lessons() {
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {list.map((item, i) => (
-            <button key={i} onClick={() => { setActiveItem(item); setShowBack(false) }} className="text-left rounded-2xl glass p-5 card-glow hover:border-violet-500/30 transition group">
+            <button key={i} onClick={() => { setActiveItem(item); setShowBack(false) }} className="text-left rounded-2xl glass p-5 card-glow hover:border-[#FF6B57]/30 transition group">
               <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${item.gradient} flex items-center justify-center text-2xl shadow-lg mb-4 group-hover:scale-105 transition`}>
                 {item.emoji || item.image}
               </div>
@@ -610,7 +611,7 @@ function KanjiDetail({ item, showBack, setShowBack }) {
           </div>
 
           <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-5 mb-4">
-            <h3 className="text-sm font-bold text-violet-300 mb-2 flex items-center gap-2"><Brain size={16} /> Visual Story</h3>
+            <h3 className="text-sm font-bold text-[#FF8A75] mb-2 flex items-center gap-2"><Brain size={16} /> Visual Story</h3>
             <KanjiTapText text={item.story} className="text-slate-300" />
           </div>
 
@@ -623,9 +624,9 @@ function KanjiDetail({ item, showBack, setShowBack }) {
 
           {item.example ? (
             <>
-              <button onClick={() => setShowBack((s) => !s)} className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition">{showBack ? 'Hide Example' : 'Show Example Sentence'}</button>
+              <button onClick={() => setShowBack((s) => !s)} className="px-5 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-medium transition">{showBack ? 'Hide Example' : 'Show Example Sentence'}</button>
               {showBack && (
-                <div className="mt-4 rounded-xl bg-gradient-to-r from-violet-900/30 to-fuchsia-900/30 border border-violet-500/20 p-4 animate-fade-in">
+                <div className="mt-4 rounded-xl bg-gradient-to-r from-[#71368A]/30 to-[#FF6B57]/20 border border-[#FF6B57]/20 p-4 animate-fade-in">
                   <div className="text-slate-100 font-medium text-lg leading-loose mb-2">
                     <Furigana text={item.example} glossary={item.exampleGlossary} />
                   </div>
@@ -635,7 +636,7 @@ function KanjiDetail({ item, showBack, setShowBack }) {
             </>
           ) : item.examples?.length > 0 && (
             <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4">
-              <h3 className="text-sm font-bold text-violet-300 mb-3">Real words using {item.char}</h3>
+              <h3 className="text-sm font-bold text-[#FF8A75] mb-3">Real words using {item.char}</h3>
               <div className="flex flex-wrap gap-2">
                 {item.examples.map((w, i) => (
                   <span key={i} className="text-sm px-3 py-1.5 rounded-full bg-bun-700/60 border border-bun-600/30 text-slate-200">
@@ -658,7 +659,7 @@ function GrammarDetail({ item, showBack, setShowBack }) {
         <div className={`w-32 h-32 shrink-0 rounded-3xl bg-gradient-to-br ${item.gradient} flex items-center justify-center text-5xl shadow-2xl`}>{item.image}</div>
         <div className="flex-1">
           <h2 className="text-3xl font-bold text-white mb-2">{item.pattern}</h2>
-          <Badge color="violet">{item.form}</Badge>
+          <Badge color="plum">{item.form}</Badge>
           <div className="flex flex-wrap items-center gap-2 mt-4 mb-2">
             <p className="text-lg text-slate-200">{item.meaning}</p>
             {item.meaningFr && <span className="text-sm text-slate-500">/ {item.meaningFr}</span>}
@@ -682,7 +683,7 @@ function GrammarDetail({ item, showBack, setShowBack }) {
             </div>
           )}
 
-          <button onClick={() => setShowBack((s) => !s)} className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition">{showBack ? 'Hide Example' : 'Show Example Sentence'}</button>
+          <button onClick={() => setShowBack((s) => !s)} className="px-5 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-medium transition">{showBack ? 'Hide Example' : 'Show Example Sentence'}</button>
           {showBack && (
             <div className="mt-4 rounded-xl bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-500/20 p-4 animate-fade-in">
               <div className="text-slate-100 font-medium text-lg leading-loose mb-2">
@@ -716,7 +717,7 @@ function VocabDetail({ item, showBack, setShowBack }) {
           </div>
 
           <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-5 mb-4">
-            <h3 className="text-sm font-bold text-violet-300 mb-2 flex items-center gap-2"><Brain size={16} /> Memory Image</h3>
+            <h3 className="text-sm font-bold text-[#FF8A75] mb-2 flex items-center gap-2"><Brain size={16} /> Memory Image</h3>
             <KanjiTapText text={item.story} className="text-slate-300" />
           </div>
 
@@ -728,7 +729,7 @@ function VocabDetail({ item, showBack, setShowBack }) {
           )}
 
           <p className="text-sm text-slate-400 mb-2">Collocation: <KanjiTapText text={item.collocation} className="text-slate-200" /></p>
-          <button onClick={() => setShowBack((s) => !s)} className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition">{showBack ? 'Hide Example' : 'Show Example Sentence'}</button>
+          <button onClick={() => setShowBack((s) => !s)} className="px-5 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-medium transition">{showBack ? 'Hide Example' : 'Show Example Sentence'}</button>
           {showBack && (
             <div className="mt-4 rounded-xl bg-gradient-to-r from-emerald-900/30 to-teal-900/30 border border-emerald-500/20 p-4 animate-fade-in">
               <div className="text-slate-100 font-medium text-lg leading-loose mb-2">
@@ -874,7 +875,7 @@ function Drills() {
         <p className='text-lg text-slate-300 mb-6'>{daily.score || 0} / {pool.length} correct · {pct}%</p>
         <div className='h-3 w-64 mx-auto rounded-full bg-bun-700 overflow-hidden mb-8'><div className={`h-full ${pct >= 70 ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: pct + '%' }} /></div>
         <div className='flex justify-center gap-4'>
-          <button onClick={() => { setMode('free'); setFilter('all') }} className='px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-medium transition'>Free Practice</button>
+          <button onClick={() => { setMode('free'); setFilter('all') }} className='px-6 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-medium transition'>Free Practice</button>
         </div>
       </div>
     )
@@ -889,7 +890,7 @@ function Drills() {
         <p className="text-lg text-slate-300 mb-6">{score} / {pool.length} correct · {pct}%</p>
         <div className="h-3 w-64 mx-auto rounded-full bg-bun-700 overflow-hidden mb-8"><div className={`h-full ${pct >= 70 ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: pct + '%' }} /></div>
         <div className="flex justify-center gap-4">
-          <button onClick={restart} className="px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-medium transition"><RotateCcw size={16} className="inline mr-2" /> Retry</button>
+          <button onClick={restart} className="px-6 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-medium transition"><RotateCcw size={16} className="inline mr-2" /> Retry</button>
           {mode === 'free' ? (
             <button onClick={() => setFilter('all')} className='px-6 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-white font-medium transition'>All Questions</button>
           ) : (
@@ -911,7 +912,7 @@ function Drills() {
               <button
                 key={m}
                 onClick={() => setMode(m)}
-                className={`px-3 py-1 rounded-md text-xs font-medium capitalize transition ${mode === m ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                className={`px-3 py-1 rounded-md text-xs font-medium capitalize transition ${mode === m ? 'bg-[#FF6B57] text-white' : 'text-slate-400 hover:text-white'}`}
               >
                 {m}
               </button>
@@ -921,23 +922,23 @@ function Drills() {
         <div className="flex items-center gap-2 text-sm">
           <Filter size={16} className="text-slate-400" />
           {['all', 'vocabulary', 'grammar'].map((f) => (
-            <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1 rounded-lg border transition capitalize ${filter === f ? 'bg-violet-600/20 border-violet-500/50 text-violet-200' : 'bg-bun-700/40 border-bun-600/30 text-slate-400 hover:text-white'}`}>{f}</button>
+            <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1 rounded-lg border transition capitalize ${filter === f ? 'bg-[#FF6B57]/20 border-[#FF6B57]/50 text-[#FFA08D]' : 'bg-bun-700/40 border-bun-600/30 text-slate-400 hover:text-white'}`}>{f}</button>
           ))}
         </div>
       </div>
-      <div className="h-2 w-full rounded-full bg-bun-700 overflow-hidden"><div className="h-full bg-gradient-to-r from-violet-500 to-cyan-500 transition-all" style={{ width: ((index + (answered ? 1 : 0)) / pool.length) * 100 + '%' }} /></div>
+      <div className="h-2 w-full rounded-full bg-bun-700 overflow-hidden"><div className="h-full bg-gradient-to-r from-[#71368A] to-cyan-500 transition-all" style={{ width: ((index + (answered ? 1 : 0)) / pool.length) * 100 + '%' }} /></div>
       <div className="rounded-3xl glass p-6 sm:p-8 card-glow">
         <div className='flex items-center justify-between mb-4'><span className='text-sm text-slate-400'>{question.type} · {question.format}</span><span className='text-sm text-slate-400'>{mode === 'daily' ? 'Daily 10 · ' : ''}{index + 1} / {pool.length}</span></div>
         <div className="rounded-2xl bg-bun-700/40 border border-bun-600/20 p-5 mb-6">
           <KanjiTapText text={question.prompt} className="text-lg text-slate-100" />
-          {question.target && <p className="text-sm text-violet-300 mt-3">Target: 「<KanjiTapText text={question.target} className="text-violet-300" />」</p>}
+          {question.target && <p className="text-sm text-[#FF8A75] mt-3">Target: 「<KanjiTapText text={question.target} className="text-[#FF8A75]" />」</p>}
         </div>
         <div className="grid sm:grid-cols-2 gap-3 mb-6">
           {question.options.map((opt, i) => {
             const show = answered, correct = opt.correct, chosen = selected === i
             let cls = 'w-full text-left px-4 py-3.5 rounded-xl border transition font-medium text-slate-100 '
             if (show) { if (correct) cls += 'bg-emerald-500/15 border-emerald-500/50'; else if (chosen) cls += 'bg-rose-500/15 border-rose-500/50'; else cls += 'bg-bun-700/30 border-bun-600/30 opacity-60' }
-            else cls += 'bg-bun-700/50 border-bun-600/30 hover:border-violet-500/50 hover:bg-bun-700'
+            else cls += 'bg-bun-700/50 border-bun-600/30 hover:border-[#FF6B57]/50 hover:bg-bun-700'
             return (
               <button key={i} onClick={() => handleSelect(i)} disabled={answered} className={cls}>
                 <span className="text-slate-500 mr-2">{String.fromCharCode(65 + i)}.</span><KanjiTapText text={opt.label} className="text-slate-100" />
@@ -948,7 +949,7 @@ function Drills() {
           })}
         </div>
         {answered && (
-          <div className="rounded-2xl bg-gradient-to-r from-violet-900/30 to-fuchsia-900/30 border border-violet-500/20 p-5 mb-6 animate-fade-in">
+          <div className="rounded-2xl bg-gradient-to-r from-[#71368A]/30 to-[#FF6B57]/20 border border-[#FF6B57]/20 p-5 mb-6 animate-fade-in">
             <div className="flex items-center gap-2 mb-2">
               {question.options[selected].correct ? <CheckCircle2 size={18} className="text-emerald-400" /> : <XCircle size={18} className="text-rose-400" />}
               <span className="font-bold text-white">{question.options[selected].correct ? 'Correct' : 'Not quite'}</span>
@@ -964,7 +965,7 @@ function Drills() {
                 <RotateCcw size={16} /> Try again
               </button>
             )}
-            <button onClick={next} className="ml-auto px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-medium transition">{index + 1 === pool.length ? 'Finish' : 'Next'}</button>
+            <button onClick={next} className="ml-auto px-6 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-medium transition">{index + 1 === pool.length ? 'Finish' : 'Next'}</button>
           </div>
         )}
       </div>
@@ -995,7 +996,7 @@ function Resources() {
           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">{cat}</h3>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {list.map((r) => (
-              <div key={r.name} className="rounded-2xl glass p-5 card-glow hover:border-violet-500/30 transition">
+              <div key={r.name} className="rounded-2xl glass p-5 card-glow hover:border-[#FF6B57]/30 transition">
                 {r.video && (
                   <button
                     onClick={() => setPlaying({ title: r.name, channel: r.use, embed: r.video })}
@@ -1014,7 +1015,7 @@ function Resources() {
                     {resourceIcon[cat] || '📚'}
                   </div>
                   {r.url && (
-                    <a href={r.url} target="_blank" rel="noreferrer" className="p-2 rounded-lg bg-violet-600/20 text-violet-300 hover:bg-violet-600/30 transition">
+                    <a href={r.url} target="_blank" rel="noreferrer" className="p-2 rounded-lg bg-[#FF6B57]/20 text-[#FF8A75] hover:bg-[#FF6B57]/30 transition">
                       <ExternalLink size={14} />
                     </a>
                   )}
@@ -1069,7 +1070,7 @@ function ReadingView() {
         <h2 className="text-2xl font-bold text-white">Daily Reading</h2>
         <div className="flex p-1 rounded-xl bg-bun-700/60 border border-bun-600/40">
           {['passages', 'strategy'].map((s) => (
-            <button key={s} onClick={() => setSub(s)} className={`px-4 py-2 rounded-lg text-sm font-medium transition capitalize ${sub === s ? 'bg-violet-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}>{s}</button>
+            <button key={s} onClick={() => setSub(s)} className={`px-4 py-2 rounded-lg text-sm font-medium transition capitalize ${sub === s ? 'bg-[#FF6B57] text-white shadow' : 'text-slate-400 hover:text-white'}`}>{s}</button>
           ))}
         </div>
       </div>
@@ -1082,7 +1083,7 @@ function ReadingView() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Type a kanji, reading, or meaning to see its image..."
-              className="w-full rounded-xl bg-bun-800 border border-bun-600/40 pl-10 pr-4 py-3 text-slate-100 placeholder-slate-500 focus:border-violet-500 focus:outline-none"
+              className="w-full rounded-xl bg-bun-800 border border-bun-600/40 pl-10 pr-4 py-3 text-slate-100 placeholder-slate-500 focus:border-[#FF6B57] focus:outline-none"
             />
             {query && results.length > 0 && (
               <div className="absolute z-20 w-full mt-2 rounded-xl bg-bun-800 border border-bun-600/40 p-3 space-y-2 shadow-2xl">
@@ -1104,7 +1105,7 @@ function ReadingView() {
               <button
                 key={i}
                 onClick={() => { setActive(i); setAnswered([]) }}
-                className={`text-left rounded-2xl p-4 border transition ${active === i ? 'bg-violet-600/15 border-violet-500/40' : 'bg-bun-800/60 border-bun-600/30 hover:border-bun-500/40'}`}
+                className={`text-left rounded-2xl p-4 border transition ${active === i ? 'bg-[#FF6B57]/15 border-[#FF6B57]/40' : 'bg-bun-800/60 border-bun-600/30 hover:border-bun-500/40'}`}
               >
                 <p className="font-semibold text-white text-sm">{p.title}</p>
                 <p className="text-xs text-slate-400 mt-1">{p.level} · {p.time} min</p>
@@ -1120,10 +1121,10 @@ function ReadingView() {
               <Furigana text={passage.text} glossary={passage.glossary} />
             </div>
 
-            <h4 className="text-sm font-bold text-violet-300 mb-3 flex items-center gap-2"><Brain size={16} /> Visual Glossary — click a word to see its image</h4>
+            <h4 className="text-sm font-bold text-[#FF8A75] mb-3 flex items-center gap-2"><Brain size={16} /> Visual Glossary — click a word to see its image</h4>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
               {passage.glossary.map((g, i) => (
-                <div key={i} className="group rounded-xl bg-bun-700/40 border border-bun-600/30 p-4 hover:border-violet-500/40 transition">
+                <div key={i} className="group rounded-xl bg-bun-700/40 border border-bun-600/30 p-4 hover:border-[#FF6B57]/40 transition">
                   <div className="flex items-center gap-3 mb-2">
                     <span className="text-2xl group-hover:scale-110 transition">{g.image}</span>
                     <div>
@@ -1149,7 +1150,7 @@ function ReadingView() {
                       const cls = `w-full text-left px-4 py-2.5 rounded-lg border text-sm transition ${
                         show
                           ? opt.correct ? 'bg-emerald-500/15 border-emerald-500/50' : chosen ? 'bg-rose-500/15 border-rose-500/50' : 'bg-bun-700/30 border-bun-600/30 opacity-60'
-                          : 'bg-bun-700/40 border-bun-600/30 hover:border-violet-500/50 hover:bg-bun-700'
+                          : 'bg-bun-700/40 border-bun-600/30 hover:border-[#FF6B57]/50 hover:bg-bun-700'
                       }`
                       return (
                         <button key={oi} onClick={() => !show && toggleAnswer(qi, oi)} disabled={show} className={cls}>
@@ -1221,7 +1222,7 @@ function StudyPlan({ daysToExam }) {
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-white">JLPT Study Plan</h2>
-      <div className="rounded-3xl glass p-6 card-glow border-l-4 border-violet-500">
+      <div className="rounded-3xl glass p-6 card-glow border-l-4 border-[#FF6B57]">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <p className="text-xs text-slate-400 uppercase tracking-wider">Current focus · {daysToExam} days left</p>
@@ -1235,18 +1236,18 @@ function StudyPlan({ daysToExam }) {
       </div>
       <div className="grid lg:grid-cols-2 gap-5">
         {plan.map((p, i) => (
-          <div key={i} className={`rounded-3xl glass p-6 card-glow relative overflow-hidden ${p.stage === activeStage ? 'ring-2 ring-violet-500/40' : ''}`}>
-            <div className={`absolute top-0 left-0 w-1.5 h-full ${p.stage === 1 ? 'bg-gradient-to-b from-cyan-400 to-blue-500' : 'bg-gradient-to-b from-violet-400 to-fuchsia-500'}`} />
+          <div key={i} className={`rounded-3xl glass p-6 card-glow relative overflow-hidden ${p.stage === activeStage ? 'ring-2 ring-[#FF6B57]/40' : ''}`}>
+            <div className={`absolute top-0 left-0 w-1.5 h-full ${p.stage === 1 ? 'bg-gradient-to-b from-cyan-400 to-blue-500' : 'bg-gradient-to-b from-[#71368A] to-[#FF6B57]'}`} />
             <div className="ml-4">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Stage {p.stage}</span>
-                {p.stage === activeStage && <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-600/20 text-violet-300">active</span>}
+                {p.stage === activeStage && <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#FF6B57]/20 text-[#FF8A75]">active</span>}
               </div>
               <h3 className="text-lg font-bold text-white mt-1">{p.phase}</h3>
               <p className="text-sm text-slate-400 mt-2 mb-4">{p.focus}</p>
               <div className="grid sm:grid-cols-2 gap-3">
                 {p.actions.map((a, j) => (
-                  <div key={j} className="flex items-start gap-2 bg-bun-700/40 rounded-xl p-3 text-sm text-slate-300"><span className="text-violet-400 font-bold shrink-0">{j + 1}.</span>{a}</div>
+                  <div key={j} className="flex items-start gap-2 bg-bun-700/40 rounded-xl p-3 text-sm text-slate-300"><span className="text-[#FF8A75] font-bold shrink-0">{j + 1}.</span>{a}</div>
                 ))}
               </div>
             </div>
@@ -1345,7 +1346,7 @@ function Videos() {
     <button
       key={v.id}
       onClick={() => setPlaying(v)}
-      className="text-left rounded-2xl glass p-4 card-glow hover:border-violet-500/40 transition group"
+      className="text-left rounded-2xl glass p-4 card-glow hover:border-[#FF6B57]/40 transition group"
     >
       <div className="aspect-video rounded-xl overflow-hidden border border-bun-600/30 mb-3 relative bg-bun-800">
         {v.thumb ? (
@@ -1390,7 +1391,7 @@ function Videos() {
           {Object.entries(byCategory).map(([cat, list]) => (
             <div key={cat}>
               <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-                <Badge color={cat === 'Grammar' ? 'violet' : cat === 'Vocabulary' ? 'emerald' : cat === 'Kanji' ? 'amber' : 'slate'}>{cat}</Badge>
+                <Badge color={cat === 'Grammar' ? 'plum' : cat === 'Vocabulary' ? 'emerald' : cat === 'Kanji' ? 'amber' : 'slate'}>{cat}</Badge>
               </h3>
               <div className="grid md:grid-cols-2 gap-6">
                 {list.map(renderCard)}
@@ -1497,23 +1498,23 @@ function ErrorLog() {
       <form onSubmit={add} className="rounded-3xl glass p-6 card-glow space-y-4">
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-1.5">Section</label>
-          <select value={section} onChange={(e) => setSection(e.target.value)} className="w-full rounded-xl bg-bun-900 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 focus:border-violet-500 focus:outline-none">
+          <select value={section} onChange={(e) => setSection(e.target.value)} className="w-full rounded-xl bg-bun-900 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 focus:border-[#FF6B57] focus:outline-none">
             <option>Vocabulary</option><option>Grammar</option><option>Reading</option><option>Listening</option>
           </select>
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-1.5">What did you miss?</label>
-          <input value={mistake} onChange={(e) => setMistake(e.target.value)} placeholder="e.g. 延期 → えんき" className="w-full rounded-xl bg-bun-900 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-violet-500 focus:outline-none" />
+          <input value={mistake} onChange={(e) => setMistake(e.target.value)} placeholder="e.g. 延期 → えんき" className="w-full rounded-xl bg-bun-900 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-[#FF6B57] focus:outline-none" />
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-1.5">Why?</label>
-          <input value={cause} onChange={(e) => setCause(e.target.value)} placeholder="e.g. Confused えんき with えんぎ" className="w-full rounded-xl bg-bun-900 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-violet-500 focus:outline-none" />
+          <input value={cause} onChange={(e) => setCause(e.target.value)} placeholder="e.g. Confused えんき with えんぎ" className="w-full rounded-xl bg-bun-900 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-[#FF6B57] focus:outline-none" />
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-1.5">Fix / rule</label>
-          <input value={fix} onChange={(e) => setFix(e.target.value)} placeholder="e.g. 延 stretches = en, 期 = ki" className="w-full rounded-xl bg-bun-900 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-violet-500 focus:outline-none" />
+          <input value={fix} onChange={(e) => setFix(e.target.value)} placeholder="e.g. 延 stretches = en, 期 = ki" className="w-full rounded-xl bg-bun-900 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-[#FF6B57] focus:outline-none" />
         </div>
-        <button type="submit" disabled={saving} className="px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-60 text-white text-sm font-medium transition flex items-center justify-center gap-2">
+        <button type="submit" disabled={saving} className="px-6 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] disabled:opacity-60 text-white text-sm font-medium transition flex items-center justify-center gap-2">
           {saving ? <Loader2 size={16} className="animate-spin" /> : null}
           Add Entry
         </button>
@@ -1537,7 +1538,7 @@ function ErrorLog() {
               <div key={l.id} className={`rounded-2xl glass p-4 card-glow flex items-start justify-between gap-3 ${isDue ? 'ring-1 ring-rose-500/40' : ''}`}>
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                    <Badge color={l.section === 'Vocabulary' ? 'emerald' : l.section === 'Grammar' ? 'violet' : 'amber'}>{l.section}</Badge>
+                    <Badge color={l.section === 'Vocabulary' ? 'emerald' : l.section === 'Grammar' ? 'plum' : 'amber'}>{l.section}</Badge>
                     <span className="text-xs text-slate-400">{new Date(l.created_at).toLocaleDateString()}</span>
                     {isDue && <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-600/20 text-rose-300">due</span>}
                   </div>
@@ -1546,7 +1547,7 @@ function ErrorLog() {
                   {l.fix && <p className="text-sm text-emerald-300 mt-1">Fix: <KanjiTapText text={l.fix} className="text-emerald-300" /></p>}
                 </div>
                 <div className="flex flex-col items-end gap-2 shrink-0">
-                  <button onClick={() => markReview(l)} title={`Mark as reviewed; next review in ${days} ${days === 1 ? 'day' : 'days'}`} className="text-xs px-2.5 py-1 rounded-lg bg-violet-600/20 text-violet-300 hover:bg-violet-600/30 transition">Mark reviewed · next in {days}d</button>
+                  <button onClick={() => markReview(l)} title={`Mark as reviewed; next review in ${days} ${days === 1 ? 'day' : 'days'}`} className="text-xs px-2.5 py-1 rounded-lg bg-[#FF6B57]/20 text-[#FF8A75] hover:bg-[#FF6B57]/30 transition">Mark reviewed · next in {days}d</button>
                   <button onClick={() => remove(l.id)} className="text-xs text-slate-500 hover:text-rose-400">Delete</button>
                 </div>
               </div>

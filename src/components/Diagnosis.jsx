@@ -185,7 +185,7 @@ export default function Diagnosis({ setActive }) {
   return (
     <div className="space-y-6">
       <div>
-        <div className="flex items-center gap-2 mb-1"><Stethoscope size={20} className="text-violet-400" /><h2 className="text-2xl font-bold text-white">Diagnosis — your language health check</h2></div>
+        <div className="flex items-center gap-2 mb-1"><Stethoscope size={20} className="text-[#FF8A75]" /><h2 className="text-2xl font-bold text-white">Diagnosis — your language health check</h2></div>
         <p className="text-sm text-slate-400">Adaptive: right answers step the questions up a level, wrong answers step down. Then two short listening items and two reading items at your band — the items rotate every run, so a re-check measures growth, not memory. About 10 minutes.</p>
       </div>
 
@@ -194,7 +194,7 @@ export default function Diagnosis({ setActive }) {
           <p className="text-sm text-slate-300">Most learners study blind for months. This check estimates your JLPT section scores — language knowledge, reading, listening, each /60 against the <span className="text-white font-semibold">19/60 survival line</span> — plus a rough BJT band, then prescribes your next two weeks{profile ? ' around the problem you named' : ''}.</p>
           {poolNote && phase === 'intro' && <p className="text-sm text-amber-200 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2">{poolNote}</p>}
           {result && <p className="text-sm text-slate-400">Last check: <span className="text-white font-semibold">{result.jlptEstimate}</span> · total {result.total}/180 · weakest: {result.weakest} · BJT ~{result.bjtScore} ({result.bjtBand}) · {new Date(result.at).toLocaleDateString()}</p>}
-          <button onClick={start} className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold">{result ? 'Re-Run Diagnosis' : 'Start Diagnosis'}</button>
+          <button onClick={start} className="px-5 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold">{result ? 'Re-Run Diagnosis' : 'Start Diagnosis'}</button>
           {result && promise && <PromisePanel promise={promise} />}
           {result && <div className="pt-2"><ProofLadderView diagnosis={result} profile={profile} /></div>}
         </div>
@@ -202,7 +202,7 @@ export default function Diagnosis({ setActive }) {
 
       {phase === 'quiz' && current && (
         <div className="rounded-2xl glass p-6 card-glow space-y-4">
-          <p className="text-xs text-slate-400">Question {step + 1} / {VOCAB_STEPS} · testing at <span className="text-violet-300 font-semibold">{current.level}</span> {current.kind === 'grammar' ? '· grammar' : '· vocabulary'}</p>
+          <p className="text-xs text-slate-400">Question {step + 1} / {VOCAB_STEPS} · testing at <span className="text-[#FF8A75] font-semibold">{current.level}</span> {current.kind === 'grammar' ? '· grammar' : '· vocabulary'}</p>
           <p className="text-lg text-white leading-loose"><KanjiTapText text={current.prompt} /></p>
           <div className="grid gap-2">
             {current.options.map((opt, i) => (
@@ -233,7 +233,7 @@ export default function Diagnosis({ setActive }) {
           </div>
           </>) : (<>
           <p className="text-sm text-slate-300">No listening items could be prepared for this band on this device, so listening is skipped this run — the section score below rests on your language score alone and is marked by its smaller sample.</p>
-          <button onClick={() => setPhase('reading')} className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold">Continue To Reading</button>
+          <button onClick={() => setPhase('reading')} className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold">Continue To Reading</button>
           </>)}
         </div>
         )
@@ -255,7 +255,7 @@ export default function Diagnosis({ setActive }) {
           </div>
           </>) : (<>
           <p className="text-sm text-slate-300">No reading items could be prepared for this band on this device, so reading is skipped this run — the section score below rests on your language score alone and is marked by its smaller sample.</p>
-          <button onClick={() => finish(rCorrect)} className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold">See My Result</button>
+          <button onClick={() => finish(rCorrect)} className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold">See My Result</button>
           </>)}
         </div>
         )
@@ -305,8 +305,8 @@ export default function Diagnosis({ setActive }) {
               </div>
             </div>
             {prescription(result).map((line, i) => (
-              <button key={i} onClick={() => setActive?.(line.tab)} className="w-full text-left flex items-start gap-2 rounded-xl bg-bun-700/40 border border-bun-600/30 p-3 hover:border-violet-500/40 transition">
-                <ChevronRight size={15} className="text-violet-300 mt-0.5 shrink-0" /><span className="text-sm text-slate-200">{line.text}</span>
+              <button key={i} onClick={() => setActive?.(line.tab)} className="w-full text-left flex items-start gap-2 rounded-xl bg-bun-700/40 border border-bun-600/30 p-3 hover:border-[#FF6B57]/40 transition">
+                <ChevronRight size={15} className="text-[#FF8A75] mt-0.5 shrink-0" /><span className="text-sm text-slate-200">{line.text}</span>
               </button>
             ))}
             <button onClick={() => setPhase('intro')} className="px-4 py-2 rounded-lg bg-bun-700 hover:bg-bun-600 text-slate-200 text-xs font-medium flex items-center gap-1.5"><RotateCcw size={13} /> Back / Re-Run Later</button>

@@ -70,7 +70,7 @@ export default function PrivacyPolicy({ setActive }) {
       <div className="flex flex-wrap gap-2 pt-2">
         <button onClick={() => setActive?.('terms')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium">Terms Of Use</button>
         <button onClick={() => setActive?.('twin')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium">Your Fleet — See, Export Or Delete Your Data</button>
-        <button onClick={() => setActive?.('dashboard')} className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold">Back To Today</button>
+        <button onClick={() => setActive?.('dashboard')} className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold">Back To Today</button>
       </div>
     </div>
   )

@@ -12,7 +12,7 @@ export default function ChatBubble({ context }) {
       <button
         onClick={() => setOpen(true)}
         aria-label="Open the Yonde AI tutor"
-        className="fixed z-40 flex items-center gap-2 px-4 py-3 rounded-full bg-violet-600 hover:bg-violet-500 text-white font-medium shadow-lg shadow-violet-600/30 transition hover:-translate-y-1 right-4 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] lg:right-6 lg:bottom-6"
+        className="fixed z-40 flex items-center gap-2 px-4 py-3 rounded-full bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-medium shadow-lg shadow-[#FF6B57]/30 transition hover:-translate-y-1 right-4 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] lg:right-6 lg:bottom-6"
       >
         <Bot size={20} />
         <span className="hidden sm:inline text-sm">Ask Yonde</span>
@@ -24,7 +24,7 @@ export default function ChatBubble({ context }) {
             onClick={(e) => e.stopPropagation()}
             className="absolute inset-x-0 bottom-0 h-[85vh] max-h-[720px] rounded-t-3xl sm:rounded-none sm:inset-y-0 sm:right-0 sm:left-auto sm:w-[min(480px,100vw)] sm:h-auto sm:max-h-none bg-bun-900/95 sm:bg-bun-900 border-t sm:border-t-0 sm:border-l border-bun-600/30 flex flex-col pb-[env(safe-area-inset-bottom)]">
             <div className="flex items-center justify-between px-4 py-3 border-b border-bun-600/30 bg-bun-800/50">
-              <div className="flex items-center gap-2 text-violet-200">
+              <div className="flex items-center gap-2 text-[#FFA08D]">
                 <MessageCircle size={18} />
                 <span className="font-bold text-sm">Yonde AI Tutor</span>
                 <span className="text-xs text-slate-400">· {context || 'general'}</span>

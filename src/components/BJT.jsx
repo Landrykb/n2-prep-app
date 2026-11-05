@@ -22,7 +22,7 @@ function colorClass(color) {
   const map = {
     emerald: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
     cyan: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
-    violet: 'bg-violet-500/15 text-violet-300 border-violet-500/30',
+    plum: 'bg-[#71368A]/25 text-[#C39BD3] border-[#71368A]/50',
     amber: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
     rose: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
     slate: 'bg-slate-500/15 text-slate-300 border-slate-500/30',
@@ -123,7 +123,7 @@ export default function BJT() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <Building2 size={20} className="text-violet-400" />
+            <Building2 size={20} className="text-[#FF8A75]" />
             <h2 className="text-2xl font-bold text-white">BJT + N2 Prep</h2>
           </div>
           <p className="text-sm text-slate-400">Prepare for either BJT or N2. BJT can be taken anytime — use the drills and videos when you feel ready.</p>
@@ -137,7 +137,7 @@ export default function BJT() {
             <button
               key={t.id}
               onClick={() => setActive(t.id)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition whitespace-nowrap ${active === t.id ? 'bg-violet-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition whitespace-nowrap ${active === t.id ? 'bg-[#FF6B57] text-white shadow' : 'text-slate-400 hover:text-white'}`}
             >
               <Icon size={14} /> {t.label}
             </button>
@@ -151,11 +151,11 @@ export default function BJT() {
             <h3 className="text-lg font-bold text-white">Daily BJT drill</h3>
             <div className="flex items-center gap-2">
               <label className="text-xs text-slate-400">Target level:</label>
-              <select value={target} onChange={(e) => setTarget(e.target.value)} className="bg-bun-900 border border-bun-600/40 rounded-lg px-2 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-violet-500">
+              <select value={target} onChange={(e) => setTarget(e.target.value)} className="bg-bun-900 border border-bun-600/40 rounded-lg px-2 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF6B57]">
                 <option value="all">Mixed</option>
                 {bjtLevels.map((l) => <option key={l} value={l}>{l}</option>)}
               </select>
-              <button onClick={newDrill} className="px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium">New set</button>
+              <button onClick={newDrill} className="px-3 py-1.5 rounded-lg bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-xs font-medium">New set</button>
             </div>
           </div>
           <p className="text-sm text-slate-400">5 random questions up to {target === 'all' ? 'mixed levels' : target}. N2 business items are labeled where relevant.</p>
@@ -170,11 +170,11 @@ export default function BJT() {
           <div className="rounded-xl bg-bun-700/40 border border-bun-600/30 p-4">
             <div className="flex items-center gap-2 mb-2">
               <label className="text-sm text-slate-300">Focus on:</label>
-              <select value={target} onChange={(e) => setTarget(e.target.value)} className="bg-bun-900 border border-bun-600/40 rounded-lg px-2 py-1 text-sm text-slate-200 focus:outline-none focus:border-violet-500">
+              <select value={target} onChange={(e) => setTarget(e.target.value)} className="bg-bun-900 border border-bun-600/40 rounded-lg px-2 py-1 text-sm text-slate-200 focus:outline-none focus:border-[#FF6B57]">
                 {bjtLevels.map((l) => <option key={l} value={l}>{l}</option>)}
               </select>
             </div>
-            <p className="text-sm text-slate-200"><span className="font-bold text-violet-300">{target} strategy:</span> {bjtStrategy[target]}</p>
+            <p className="text-sm text-slate-200"><span className="font-bold text-[#FF8A75]">{target} strategy:</span> {bjtStrategy[target]}</p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {bjtScoreMapping.map((m, i) => (
@@ -196,7 +196,7 @@ export default function BJT() {
         <section className="rounded-2xl glass p-5 card-glow space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <h3 className="text-lg font-bold text-white">Business vocabulary</h3>
-            <select value={levelFilter} onChange={(e) => setLevelFilter(e.target.value)} className="bg-bun-900 border border-bun-600/40 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-violet-500">
+            <select value={levelFilter} onChange={(e) => setLevelFilter(e.target.value)} className="bg-bun-900 border border-bun-600/40 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF6B57]">
               <option value="all">All levels</option>
               {bjtLevels.map((l) => <option key={l} value={l}>{l}</option>)}
             </select>
@@ -233,7 +233,7 @@ export default function BJT() {
               {bjtKeigo.map((k, i) => (
                 <tr key={i}>
                   <td className="py-3 pr-4"><KanjiTapText text={k.plain} className="text-white" /></td>
-                  <td className="py-3 pr-4"><KanjiTapText text={k.sonkei} className="text-violet-300" /></td>
+                  <td className="py-3 pr-4"><KanjiTapText text={k.sonkei} className="text-[#FF8A75]" /></td>
                   <td className="py-3 pr-4"><KanjiTapText text={k.kenjou} className="text-emerald-300" /></td>
                   <td className="py-3 text-slate-400">{k.scene}</td>
                 </tr>
@@ -247,7 +247,7 @@ export default function BJT() {
         <section className="space-y-4">
           <div className="flex flex-wrap gap-2">
             {bjtPassages.map((p, i) => (
-              <button key={i} onClick={() => setPassageIdx(i)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${passageIdx === i ? 'bg-violet-600 text-white' : 'bg-bun-700 text-slate-300 hover:bg-bun-600'}`}>
+              <button key={i} onClick={() => setPassageIdx(i)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${passageIdx === i ? 'bg-[#FF6B57] text-white' : 'bg-bun-700 text-slate-300 hover:bg-bun-600'}`}>
                 {p.title} <span className="text-slate-400">· {p.level}</span>
               </button>
             ))}
@@ -270,7 +270,7 @@ export default function BJT() {
         <section className="space-y-4">
           <div className="flex flex-wrap gap-2">
             {bjtListening.map((l, i) => (
-              <button key={i} onClick={() => setListenIdx(i)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${listenIdx === i ? 'bg-violet-600 text-white' : 'bg-bun-700 text-slate-300 hover:bg-bun-600'}`}>
+              <button key={i} onClick={() => setListenIdx(i)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${listenIdx === i ? 'bg-[#FF6B57] text-white' : 'bg-bun-700 text-slate-300 hover:bg-bun-600'}`}>
                 {l.title} <span className="text-slate-400">· {l.level}</span>
               </button>
             ))}
@@ -310,7 +310,7 @@ export default function BJT() {
             <h3 className="text-lg font-bold text-white">More video searches</h3>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {['BJT listening practice', 'business keigo Japanese', 'JLPT N2 business vocabulary', 'BJT J1 reading'].map((q) => (
-                <a key={q} href={`https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`} target="_blank" rel="noreferrer" className="rounded-xl bg-bun-700/40 border border-bun-600/30 p-4 hover:border-violet-500/40 transition flex items-center gap-2 text-sm text-slate-200">
+                <a key={q} href={`https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`} target="_blank" rel="noreferrer" className="rounded-xl bg-bun-700/40 border border-bun-600/30 p-4 hover:border-[#FF6B57]/40 transition flex items-center gap-2 text-sm text-slate-200">
                   <Play size={14} className="text-rose-400" /> {q}
                 </a>
               ))}
@@ -324,7 +324,7 @@ export default function BJT() {
           <h3 className="text-lg font-bold text-white">BJT resources</h3>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {bjtResources.map((r, i) => (
-              <a key={i} href={r.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl bg-bun-700/40 border border-bun-600/30 p-4 hover:border-violet-500/40 transition">
+              <a key={i} href={r.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl bg-bun-700/40 border border-bun-600/30 p-4 hover:border-[#FF6B57]/40 transition">
                 <span className="text-2xl">{r.icon}</span>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-white text-sm">{r.name}</p>

@@ -50,7 +50,7 @@ export default class ErrorBoundary extends Component {
           </p>
           <p className="text-xs text-slate-500">The error was written to a small log on this device. Nothing was sent anywhere. You can share it from Your Fleet → Privacy, Terms And Your Account if it keeps happening.</p>
           <div className="flex justify-center gap-3 pt-2">
-            <button onClick={() => window.location.reload()} className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold">Reload The App</button>
+            <button onClick={() => window.location.reload()} className="px-5 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold">Reload The App</button>
             <button onClick={() => this.setState({ error: null })} className="px-5 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-200 text-sm font-medium">Try This Screen Again</button>
           </div>
         </div>

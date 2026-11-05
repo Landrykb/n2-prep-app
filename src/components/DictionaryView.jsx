@@ -13,7 +13,7 @@ const LEVEL_STYLE = {
   N1: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
 }
 
-const levelClass = (lv) => LEVEL_STYLE[lv] || 'bg-violet-500/15 text-violet-300 border-violet-500/30'
+const levelClass = (lv) => LEVEL_STYLE[lv] || 'bg-[#71368A]/25 text-[#C39BD3] border-[#71368A]/50'
 
 export default function DictionaryView() {
   const [dict, setDict] = useState(localDictionary)
@@ -39,7 +39,7 @@ export default function DictionaryView() {
   return (
     <div className="max-w-3xl mx-auto space-y-5">
       <header className="flex items-center gap-3">
-        <BookOpen className="text-violet-400 shrink-0" size={24} />
+        <BookOpen className="text-[#FF8A75] shrink-0" size={24} />
         <div>
           <h2 className="text-2xl font-bold text-white leading-tight">Dictionary</h2>
           <p className="text-xs text-slate-400">
@@ -58,7 +58,7 @@ export default function DictionaryView() {
             placeholder="e.g. 納期, のうき, or deadline"
             aria-label="Search the dictionary"
             autoComplete="off"
-            className="w-full rounded-xl bg-bun-900 border border-bun-600/40 pl-10 pr-10 py-3 text-slate-100 placeholder-slate-500 focus:border-violet-500 focus:outline-none"
+            className="w-full rounded-xl bg-bun-900 border border-bun-600/40 pl-10 pr-10 py-3 text-slate-100 placeholder-slate-500 focus:border-[#FF6B57] focus:outline-none"
           />
           {query && (
             <button
@@ -121,7 +121,7 @@ export default function DictionaryView() {
                 onClick={() => open({ _type: e.type || 'Vocab', _key: e.word, word: e.word, char: e.word.length === 1 ? e.word : undefined, reading: e.reading, meaning: e.meaning, image: e.image })}
                 aria-label={`Show details for ${e.word}`}
                 title="Visual breakdown"
-                className="p-1.5 rounded-lg bg-bun-800/60 text-slate-400 hover:text-violet-300"
+                className="p-1.5 rounded-lg bg-bun-800/60 text-slate-400 hover:text-[#FF8A75]"
               >
                 <BookOpen size={15} />
               </button>

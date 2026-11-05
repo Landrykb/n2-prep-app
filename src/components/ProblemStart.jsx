@@ -20,10 +20,10 @@ export function OnboardingFlow({ initial, onDone, onClose }) {
   }
 
   return (
-    <div className="rounded-3xl glass p-6 sm:p-8 card-glow space-y-7 border border-violet-500/25">
+    <div className="rounded-3xl glass p-6 sm:p-8 card-glow space-y-7 border border-[#FF6B57]/25">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-violet-300 mb-1"><Compass size={14} /> Start with your problem</p>
+          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#FF8A75] mb-1"><Compass size={14} /> Start with your problem</p>
           <h2 className="text-2xl font-bold text-white">Not features. Your problem first.</h2>
           <p className="text-sm text-slate-400 mt-1">Three questions. Your Today plan, your diagnosis and your scenes are built from these answers — and re-built when they change.</p>
         </div>
@@ -34,7 +34,7 @@ export function OnboardingFlow({ initial, onDone, onClose }) {
         <h3 className="text-sm font-bold text-white">1 · Who are you?</h3>
         <div className="grid gap-2 sm:grid-cols-2">
           {PERSONAS.map((p) => (
-            <button key={p.id} onClick={() => setPersona(p.id)} className={`text-left rounded-xl border p-3 transition ${persona === p.id ? 'bg-violet-600/20 border-violet-500/50' : 'bg-bun-700/40 border-bun-600/30 hover:bg-bun-700/60'}`}>
+            <button key={p.id} onClick={() => setPersona(p.id)} className={`text-left rounded-xl border p-3 transition ${persona === p.id ? 'bg-[#FF6B57]/20 border-[#FF6B57]/50' : 'bg-bun-700/40 border-bun-600/30 hover:bg-bun-700/60'}`}>
               <p className="text-sm font-semibold text-white">{p.label}</p>
               <p className="text-xs text-slate-400 mt-0.5">{p.desc}</p>
             </button>
@@ -69,11 +69,11 @@ export function OnboardingFlow({ initial, onDone, onClose }) {
         </div>
         {proofTarget === 'real-life' && (
           <input value={realLifeGoal} onChange={(e) => setRealLifeGoal(e.target.value)} placeholder="Your height, in your words — e.g. handle immigration alone in June"
-            className="w-full rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 focus:border-violet-500 focus:outline-none" />
+            className="w-full rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 focus:border-[#FF6B57] focus:outline-none" />
         )}
       </section>
 
-      <button onClick={finish} disabled={!complete} className="w-full sm:w-auto px-6 py-3 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-sm transition">
+      <button onClick={finish} disabled={!complete} className="w-full sm:w-auto px-6 py-3 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-sm transition">
         Build my plan from my problem
       </button>
       {!complete && <p className="text-xs text-slate-500 -mt-4">Answer all three — persona, at least one pain, and a proof target.</p>}
@@ -95,10 +95,10 @@ export function ProofLadderView({ diagnosis, profile }) {
       </p>
       <div className="space-y-2">
         {ladder.map((h) => (
-          <div key={h.id} className={`flex items-start gap-3 rounded-xl border p-3 ${h.status === 'reached' ? 'bg-emerald-500/10 border-emerald-500/30' : h.status === 'next' ? 'bg-violet-600/15 border-violet-500/40' : 'bg-bun-700/30 border-bun-600/20 opacity-75'}`}>
-            <span className="mt-0.5 shrink-0">{h.status === 'reached' ? <CheckCircle2 size={17} className="text-emerald-300" /> : h.status === 'next' ? <HeartPulse size={17} className="text-violet-300" /> : <Lock size={15} className="text-slate-500" />}</span>
+          <div key={h.id} className={`flex items-start gap-3 rounded-xl border p-3 ${h.status === 'reached' ? 'bg-emerald-500/10 border-emerald-500/30' : h.status === 'next' ? 'bg-[#FF6B57]/15 border-[#FF6B57]/40' : 'bg-bun-700/30 border-bun-600/20 opacity-75'}`}>
+            <span className="mt-0.5 shrink-0">{h.status === 'reached' ? <CheckCircle2 size={17} className="text-emerald-300" /> : h.status === 'next' ? <HeartPulse size={17} className="text-[#FF8A75]" /> : <Lock size={15} className="text-slate-500" />}</span>
             <div className="min-w-0">
-              <p className="text-sm font-bold text-white">{h.label} {h.status === 'next' && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-violet-600 text-white align-middle">NEXT HEIGHT</span>}{h.status === 'reached' && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-600/60 text-emerald-100 align-middle">REACHED (EST.)</span>}</p>
+              <p className="text-sm font-bold text-white">{h.label} {h.status === 'next' && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-[#FF6B57] text-white align-middle">NEXT HEIGHT</span>}{h.status === 'reached' && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-600/60 text-emerald-100 align-middle">REACHED (EST.)</span>}</p>
               <p className="text-xs text-slate-400">Proof: {h.proof}</p>
               <p className="text-xs text-slate-300">Unlocks: {h.unlocks}</p>
             </div>

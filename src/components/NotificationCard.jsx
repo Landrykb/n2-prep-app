@@ -33,7 +33,7 @@ export default function NotificationCard() {
     <div className="rounded-2xl glass p-5 card-glow space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-violet-500/20 flex items-center justify-center text-violet-300">
+          <div className="w-10 h-10 rounded-xl bg-[#FF6B57]/20 flex items-center justify-center text-[#FF8A75]">
             {subscribed ? <BellRing size={20} /> : <Bell size={20} />}
           </div>
           <div>
@@ -49,7 +49,7 @@ export default function NotificationCard() {
           className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1 ${
             subscribed
               ? 'bg-rose-500/20 text-rose-300 hover:bg-rose-500/30'
-              : 'bg-violet-600 hover:bg-violet-500 text-white'
+              : 'bg-[#FF6B57] hover:bg-[#FF7F6E] text-white'
           } disabled:opacity-50`}
         >
           {loading ? <Loader2 size={14} className="animate-spin" /> : null}

@@ -24,7 +24,7 @@ function MiniBar({ label, value, max = 60 }) {
         <span className="text-slate-300 font-semibold">{value}</span>
       </div>
       <div className="h-1.5 rounded-full bg-bun-700 overflow-hidden">
-        <div className={`h-full rounded-full ${value >= 19 ? 'bg-gradient-to-r from-violet-500 to-cyan-500' : 'bg-rose-500'}`} style={{ width: `${Math.round((value / max) * 100)}%` }} />
+        <div className={`h-full rounded-full ${value >= 19 ? 'bg-gradient-to-r from-[#71368A] to-cyan-500' : 'bg-rose-500'}`} style={{ width: `${Math.round((value / max) * 100)}%` }} />
       </div>
     </div>
   )
@@ -67,10 +67,10 @@ export default function ProgressCard({ setActive, daysToExam }) {
     <section className="rounded-3xl glass p-5 sm:p-6 card-glow">
       <div className="flex items-center justify-between gap-3 mb-4">
         <h2 className="text-lg font-bold text-white flex items-center gap-2">
-          <ClipboardCheck size={18} className="text-indigo-300" /> Mock exam progress
+          <ClipboardCheck size={18} className="text-[#C39BD3]" /> Mock exam progress
         </h2>
         {history === null ? null : last ? (
-          <button onClick={() => setActive('mock')} className="text-xs px-3 py-1.5 rounded-lg bg-violet-600/20 text-violet-300 hover:bg-violet-600/30 transition font-medium">
+          <button onClick={() => setActive('mock')} className="text-xs px-3 py-1.5 rounded-lg bg-[#FF6B57]/20 text-[#FF8A75] hover:bg-[#FF6B57]/30 transition font-medium">
             Take another
           </button>
         ) : null}
@@ -79,7 +79,7 @@ export default function ProgressCard({ setActive, daysToExam }) {
       {history === null ? null : !last ? (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <p className="text-sm text-slate-400">No mock attempts yet — get a predicted JLPT score and find your weak spots.</p>
-          <button onClick={() => setActive('mock')} className="shrink-0 px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition">
+          <button onClick={() => setActive('mock')} className="shrink-0 px-5 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-medium transition">
             Take your first mock exam
           </button>
         </div>
@@ -112,7 +112,7 @@ export default function ProgressCard({ setActive, daysToExam }) {
                 <button
                   key={w.type}
                   onClick={() => PRACTICE_TAB[w.type] && setActive(PRACTICE_TAB[w.type])}
-                  className="px-2.5 py-1 rounded-full bg-bun-700/60 border border-bun-600/40 text-slate-300 hover:text-white hover:border-violet-500/40 transition"
+                  className="px-2.5 py-1 rounded-full bg-bun-700/60 border border-bun-600/40 text-slate-300 hover:text-white hover:border-[#FF6B57]/40 transition"
                 >
                   {w.type} · {w.pct}%
                 </button>

@@ -127,7 +127,7 @@ export default function TwinView({ setActive }) {
       <div className="max-w-2xl mx-auto text-center py-16 space-y-4">
         <h2 className="text-2xl font-bold text-white">Fleet memory deleted</h2>
         <p className="text-sm text-slate-300 max-w-md mx-auto">Your Twin, Saki’s plans and Michi’s letters on this device are gone. Your queue, your problem and your diagnosis are untouched. From your next session, the fleet starts learning you again — that is the whole deal, and it is yours to restart or not.</p>
-        <button onClick={() => setActive?.('dashboard')} className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold">Back To Today</button>
+        <button onClick={() => setActive?.('dashboard')} className="px-5 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold">Back To Today</button>
       </div>
     )
   }
@@ -161,7 +161,7 @@ export default function TwinView({ setActive }) {
               <Mascot agent={m.id} size={38} showName={false} />
               <div>
                 <p className="text-sm font-bold text-white">{m.name} <span className="text-slate-400 font-medium">· {m.kanji}</span></p>
-                <p className="text-xs text-violet-300">{m.role}</p>
+                <p className="text-xs text-[#FF8A75]">{m.role}</p>
                 <p className="text-xs text-slate-400 mt-0.5">{m.job}</p>
               </div>
             </div>
@@ -217,7 +217,7 @@ export default function TwinView({ setActive }) {
             <div key={r.id} className="rounded-xl bg-bun-700/40 border border-bun-600/30 p-3.5">
               <p className="text-sm font-semibold text-white">{METHOD_LABELS[r.id] || r.id}</p>
               <p className="text-xs text-slate-400 mt-1">{r.trials} sessions · {r.proof} proof points{r.proofPerHour !== null ? ` · ~${r.proofPerHour} pts/hour (proxy)` : ''}</p>
-              <p className="text-xs mt-0.5"><span className="text-violet-300">Confidence: {r.confidence}</span></p>
+              <p className="text-xs mt-0.5"><span className="text-[#FF8A75]">Confidence: {r.confidence}</span></p>
             </div>
           ))}
         </div>
@@ -295,7 +295,7 @@ export default function TwinView({ setActive }) {
               {restoreReport.slicesUpdated.length > 0 && <> Updated: {restoreReport.slicesUpdated.map((k) => k.replace('jpn:', '').replace(':v1', '')).join(', ')}.</>}
               {restoreReport.restoredKeys > 0 && <> {restoreReport.restoredKeys} other saved item{restoreReport.restoredKeys === 1 ? '' : 's'} filled in.</>}
             </p>
-            <button onClick={() => window.location.reload()} className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold">Reload To See It Everywhere</button>
+            <button onClick={() => window.location.reload()} className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold">Reload To See It Everywhere</button>
           </div>
         )}
 
@@ -340,7 +340,7 @@ export default function TwinView({ setActive }) {
               {delResult.server === 'not-configured' && 'On the server: this build has no account server connected, so nothing existed there.'}
               {delResult.server === 'pending-server' && 'On the server: the account deletion step could not complete — that part is still being finished on our side. Your data on this device is fully erased; to complete the server deletion, contact us from the Privacy Policy page and we will finish it for you.'}
             </p>
-            <button onClick={() => setActive?.('dashboard')} className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold">Back To Today</button>
+            <button onClick={() => setActive?.('dashboard')} className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold">Back To Today</button>
           </div>
         )}
       </section>

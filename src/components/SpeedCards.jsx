@@ -191,7 +191,7 @@ export default function SpeedCards() {
     <div className="max-w-2xl mx-auto space-y-5">
       <header className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Zap className="text-violet-400 shrink-0" size={26} />
+          <Zap className="text-[#FF8A75] shrink-0" size={26} />
           <div>
             <h2 className="text-2xl font-bold text-white leading-tight">Speed Cards</h2>
             <p className="text-xs text-slate-400">Recognition drills that adapt to your misses</p>
@@ -213,7 +213,7 @@ export default function SpeedCards() {
                   key={t.id}
                   onClick={() => setTypeId(t.id)}
                   aria-pressed={typeId === t.id}
-                  className={`px-3.5 py-2 rounded-full text-sm font-medium transition ${typeId === t.id ? 'bg-violet-600 text-white' : 'bg-bun-800 text-slate-300 hover:text-white border border-bun-600/40'}`}
+                  className={`px-3.5 py-2 rounded-full text-sm font-medium transition ${typeId === t.id ? 'bg-[#FF6B57] text-white' : 'bg-bun-800 text-slate-300 hover:text-white border border-bun-600/40'}`}
                 >
                   {t.label}
                 </button>
@@ -260,7 +260,7 @@ export default function SpeedCards() {
             <button
               onClick={start}
               disabled={pool.length < 4}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-bold transition"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] disabled:opacity-50 text-white font-bold transition"
             >
               <Play size={18} /> Start
             </button>
@@ -279,7 +279,7 @@ export default function SpeedCards() {
 
           <div className="h-2 w-full bg-bun-900 rounded-full overflow-hidden" role="timer" aria-label="Time remaining">
             <div
-              className={`h-full rounded-full transition-[width] duration-100 ease-linear ${urgent ? 'bg-rose-500' : 'bg-gradient-to-r from-violet-500 to-cyan-400'}`}
+              className={`h-full rounded-full transition-[width] duration-100 ease-linear ${urgent ? 'bg-rose-500' : 'bg-gradient-to-r from-[#71368A] to-cyan-400'}`}
               style={{ width: `${pct}%` }}
             />
           </div>
@@ -296,7 +296,7 @@ export default function SpeedCards() {
               const revealed = feedback !== null
               const isAnswer = opt === current.answer
               const isPicked = opt === picked
-              let state = 'bg-bun-800 border-bun-600/40 text-slate-200 hover:border-violet-500/60 hover:bg-bun-700'
+              let state = 'bg-bun-800 border-bun-600/40 text-slate-200 hover:border-[#FF6B57]/60 hover:bg-bun-700'
               if (revealed && isAnswer) state = 'bg-emerald-500/20 border-emerald-500 text-emerald-100 animate-pulse-glow'
               else if (revealed && isPicked) state = 'bg-rose-500/20 border-rose-500 text-rose-100'
               else if (revealed) state = 'bg-bun-800 border-bun-600/30 text-slate-500'
@@ -329,7 +329,7 @@ export default function SpeedCards() {
           <h3 className="text-2xl font-bold text-white text-center">Round complete</h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center">
             {[
-              { label: 'Score', value: score, cls: 'text-violet-300' },
+              { label: 'Score', value: score, cls: 'text-[#FF8A75]' },
               { label: 'Correct', value: `${correct}/${cards.length}`, cls: 'text-emerald-300' },
               { label: 'Missed', value: missed.length, cls: 'text-rose-300' },
               { label: 'Best streak', value: best, cls: 'text-amber-300' },
@@ -359,7 +359,7 @@ export default function SpeedCards() {
           )}
 
           <div className="flex flex-wrap gap-2 justify-center">
-            <button onClick={start} className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold transition">
+            <button onClick={start} className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-bold transition">
               <RotateCcw size={17} /> Play again
             </button>
             <button onClick={() => setPhase('setup')} className="px-6 py-3 rounded-xl bg-bun-800 border border-bun-600/40 text-slate-300 hover:text-white font-medium transition">

@@ -143,7 +143,7 @@ function RadicalStory({ radicals, title }) {
         ))}
       </div>
       <p className="text-center text-xs text-slate-400 mt-4">
-        {step + 1} / {radicals.length}: <span className="text-slate-200">{radicals[step]?.name}</span> builds into <span className="text-violet-300">{title}</span>
+        {step + 1} / {radicals.length}: <span className="text-slate-200">{radicals[step]?.name}</span> builds into <span className="text-[#FF8A75]">{title}</span>
       </p>
     </div>
   )
@@ -199,10 +199,10 @@ function VideoBox({ keyword, type }) {
   }, [keyword, type])
 
   return (
-    <div className="rounded-xl bg-gradient-to-r from-rose-900/20 to-violet-900/20 border border-rose-500/20 p-4">
+    <div className="rounded-xl bg-gradient-to-r from-rose-900/20 to-[#71368A]/20 border border-rose-500/20 p-4">
       <h4 className="text-xs uppercase tracking-wider text-rose-300 mb-3 flex items-center gap-2"><Play size={14} /> Learn with real videos</h4>
       <p className="text-sm text-slate-300 mb-4">
-        Watching a real teacher explain <span className="text-violet-300 font-medium">{keyword}</span> in a lesson or real-life clip makes it stick.
+        Watching a real teacher explain <span className="text-[#FF8A75] font-medium">{keyword}</span> in a lesson or real-life clip makes it stick.
       </p>
 
       {loading && (
@@ -263,7 +263,7 @@ export default function KanjiModal({ item, onClose }) {
   const kun = item.kun || fallback.kun || ''
   const subtitle = item.reading || (on && kun ? `${on} · ${kun}` : on || kun || '')
   const meaning = item.meaning || ''
-  const topIcon = item.image || item.emoji || (doodle ? Array.from(doodle)[0] : '') || '🦝'
+  const topIcon = item.image || item.emoji || (doodle ? Array.from(doodle)[0] : '') || '字'
   const image = topIcon
   const story = item.story || item.scene || item.mnemonic || ''
   const example = item.example || ''
@@ -283,7 +283,7 @@ export default function KanjiModal({ item, onClose }) {
       >
         <div className="flex items-start justify-between mb-4 sm:mb-6">
           <div className="flex items-center gap-3">
-            <div className={`w-12 h-12 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl bg-gradient-to-br ${item.gradient || 'from-violet-500 to-fuchsia-500'} flex items-center justify-center text-3xl sm:text-5xl shadow-xl`}>
+            <div className={`w-12 h-12 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl bg-gradient-to-br ${item.gradient || 'from-[#71368A] to-[#FF6B57]'} flex items-center justify-center text-3xl sm:text-5xl shadow-xl`}>
               {image}
             </div>
             <div className="min-w-0">
@@ -352,9 +352,9 @@ export default function KanjiModal({ item, onClose }) {
           )}
 
           {example && (
-            <div className="rounded-xl bg-gradient-to-r from-violet-900/30 to-fuchsia-900/30 border border-violet-500/20 p-4">
+            <div className="rounded-xl bg-gradient-to-r from-[#71368A]/30 to-[#FF6B57]/20 border border-[#FF6B57]/20 p-4">
               <div className="flex items-center justify-between mb-2">
-                <h4 className="text-xs uppercase tracking-wider text-violet-300">Example</h4>
+                <h4 className="text-xs uppercase tracking-wider text-[#FF8A75]">Example</h4>
                 <TtsButton text={example} className="scale-90" />
               </div>
               <KanjiTapText text={example} className="text-lg text-slate-100 font-medium" />

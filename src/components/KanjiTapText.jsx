@@ -28,7 +28,7 @@ function makeItem(char) {
     on: fallback.on,
     kun: fallback.kun,
     meaning: '',
-    image: '🦝',
+    image: '字',
     story: 'Visual breakdown not in the deck yet, but you can try the video search.',
   }
 }
@@ -76,11 +76,11 @@ export default function KanjiTapText({ text, className = '' }) {
               <ruby
                 key={i}
                 {...tapHandlers(open, item)}
-                className="cursor-pointer border-b border-dashed border-violet-500/40 hover:text-violet-300 transition touch-manipulation"
+                className="cursor-pointer border-b border-dashed border-[#FF6B57]/40 hover:text-[#FF8A75] transition touch-manipulation"
                 title={item.meaning || 'Tap for detail'}
               >
                 {p.text}
-                {p.reading && <rt className="text-[0.6em] font-normal text-violet-300 select-none">{p.reading}</rt>}
+                {p.reading && <rt className="text-[0.6em] font-normal text-[#FF8A75] select-none">{p.reading}</rt>}
               </ruby>
             )
           }
@@ -92,11 +92,11 @@ export default function KanjiTapText({ text, className = '' }) {
             <ruby
               key={i}
               {...tapHandlers(open, item)}
-              className="cursor-pointer border-b border-dashed border-violet-500/40 hover:text-violet-300 transition touch-manipulation"
+              className="cursor-pointer border-b border-dashed border-[#FF6B57]/40 hover:text-[#FF8A75] transition touch-manipulation"
               title={item.meaning || 'Tap for visual breakdown'}
             >
               {char}
-              {reading && <rt className="text-[0.6em] font-normal text-violet-300 select-none">{reading}</rt>}
+              {reading && <rt className="text-[0.6em] font-normal text-[#FF8A75] select-none">{reading}</rt>}
             </ruby>
           )
         })}
@@ -122,7 +122,7 @@ export default function KanjiTapText({ text, className = '' }) {
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(item) } }}
             role="button"
             tabIndex={0}
-            className="cursor-pointer border-b border-dashed border-violet-500/40 hover:text-violet-300 transition touch-manipulation"
+            className="cursor-pointer border-b border-dashed border-[#FF6B57]/40 hover:text-[#FF8A75] transition touch-manipulation"
             title={item.meaning || 'Tap for visual breakdown'}
           >
             {char}

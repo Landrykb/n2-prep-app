@@ -72,7 +72,7 @@ export default function BjtTrainer() {
         <p className="text-sm text-slate-400">This is the real BJT’s hardest format (Part II): you hear an announcement <em>and</em> read a document, and the answer needs both. {TIME_PER_ITEM} seconds per item. Scored 0–800 in bands J5 → J1+; remember the immigration anchors: <span className="text-slate-200">400 = N2 category, 480 = N1 category</span> for Highly Skilled Professional points. Your band at the end is computed from your actual answers — nothing to add up or type in.</p>
         <div className="flex flex-wrap gap-2">
           {bjtTrainerItems.map((it, i) => (
-            <button key={it.id} onClick={() => { setFinishedAll(false); startItem(i) }} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${idx === i && !finishedAll ? 'bg-violet-600 text-white' : 'bg-bun-700 text-slate-300 hover:bg-bun-600'}`}>{it.title} · {it.level}</button>
+            <button key={it.id} onClick={() => { setFinishedAll(false); startItem(i) }} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${idx === i && !finishedAll ? 'bg-[#FF6B57] text-white' : 'bg-bun-700 text-slate-300 hover:bg-bun-600'}`}>{it.title} · {it.level}</button>
           ))}
         </div>
       </div>
@@ -123,7 +123,7 @@ export default function BjtTrainer() {
             })}
           </div>
 
-          <button onClick={next} className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold">{idx + 1 >= bjtTrainerItems.length ? 'Finish And Estimate My Band' : 'Next Item'}</button>
+          <button onClick={next} className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold">{idx + 1 >= bjtTrainerItems.length ? 'Finish And Estimate My Band' : 'Next Item'}</button>
         </div>
       )}
 

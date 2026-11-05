@@ -124,7 +124,7 @@ export default function CoachLetter() {
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <div>
-        <h2 className="text-2xl font-bold text-white flex items-center gap-2"><Mail size={22} className="text-violet-300" /> Your Weekly Letter</h2>
+        <h2 className="text-2xl font-bold text-white flex items-center gap-2"><Mail size={22} className="text-[#FF8A75]" /> Your Weekly Letter</h2>
         <p className="text-sm text-slate-400 mt-1">From Michi, your coach — written from what your fleet actually recorded this week. Every number in it is a real count from your own app, quoted exactly.</p>
       </div>
 
@@ -145,7 +145,7 @@ export default function CoachLetter() {
         <div className="rounded-3xl glass p-6 sm:p-8 card-glow space-y-4 text-center">
           <span className="inline-flex justify-center"><Mascot agent="michi" size={52} /></span>
           <p className="text-sm text-slate-300 max-w-md mx-auto">No letter yet for this week. Michi writes from your real record — sessions, calls kept, checkup movement — and invents nothing. Ask, and this week’s letter is written from what is actually there.</p>
-          <button onClick={writeMine} className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold inline-flex items-center gap-1.5"><PenLine size={15} /> Write This Week’s Letter</button>
+          <button onClick={writeMine} className="px-5 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold inline-flex items-center gap-1.5"><PenLine size={15} /> Write This Week’s Letter</button>
         </div>
       )}
 

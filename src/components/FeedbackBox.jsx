@@ -13,7 +13,7 @@ export default function FeedbackBox({ context = '' }) {
   const [state, setState] = useState(null) // null | 'sending' | 'sent' | 'local'
   return (
     <div className="rounded-2xl glass p-5 card-glow space-y-3">
-      <h3 className="font-bold text-white flex items-center gap-2"><MessageSquare size={16} className="text-violet-300" /> Tell The Fleet</h3>
+      <h3 className="font-bold text-white flex items-center gap-2"><MessageSquare size={16} className="text-[#FF8A75]" /> Tell The Fleet</h3>
       <p className="text-sm text-slate-400">What helped, what confused you, what broke — in your own words. It goes to a human (Landry), not a bot queue.</p>
       <textarea
         value={body}
@@ -26,13 +26,13 @@ export default function FeedbackBox({ context = '' }) {
         <button
           disabled={!body.trim() || state === 'sending'}
           onClick={async () => { setState('sending'); const r = await saveFeedback(body.trim(), context); setState(r.sent ? 'sent' : 'local'); if (r.sent) setBody('') }}
-          className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white text-sm font-semibold flex items-center gap-1.5"
+          className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] disabled:opacity-40 text-white text-sm font-semibold flex items-center gap-1.5"
         ><Send size={14} /> Send Feedback</button>
         {state === 'sent' && <p className="text-sm text-emerald-300">Sent — thank you. It is also kept on this device.</p>}
         {state === 'local' && (
           <p className="text-sm text-amber-200">
             Kept on this device{user ? ' — sending will retry is not automatic; ' : ' (you are signed out, so it cannot reach the inbox directly). '}
-            <a className="underline text-violet-300" href={feedbackMailto(body)}>Email It Instead</a>
+            <a className="underline text-[#FF8A75]" href={feedbackMailto(body)}>Email It Instead</a>
           </p>
         )}
       </div>

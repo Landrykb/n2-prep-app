@@ -190,7 +190,7 @@ export default function AiTutor({ context = '', compact = false }) {
   return (
     <div className={compact ? 'h-full flex flex-col space-y-3' : 'max-w-4xl mx-auto space-y-4'}>
       <div className="flex items-center gap-3">
-        <Sparkles className="text-violet-400" size={22} />
+        <Sparkles className="text-[#FF8A75]" size={22} />
         <div>
           <h2 className="text-xl sm:text-2xl font-bold text-white leading-tight">Yonde AI Tutor</h2>
           <p className="text-xs text-slate-400">N5–N1 & Beyond · BJT · Kanji · Grammar · Listening · Study Strategy</p>
@@ -202,7 +202,7 @@ export default function AiTutor({ context = '', compact = false }) {
           <button
             key={a.label}
             onClick={() => runQuick(a)}
-            className="px-3 py-1.5 rounded-full bg-bun-800 border border-bun-600/40 text-xs text-slate-300 hover:text-white hover:border-violet-500/40 transition"
+            className="px-3 py-1.5 rounded-full bg-bun-800 border border-bun-600/40 text-xs text-slate-300 hover:text-white hover:border-[#FF6B57]/40 transition"
           >
             {a.label}
           </button>
@@ -220,20 +220,20 @@ export default function AiTutor({ context = '', compact = false }) {
                   <div
                     className={`rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
                       msg.role === 'user'
-                        ? 'bg-violet-600 text-white rounded-tr-sm'
+                        ? 'bg-[#FF6B57] text-white rounded-tr-sm'
                         : 'bg-bun-700/60 text-slate-200 rounded-tl-sm'
                     }`}
                   >
                     {msg.role === 'user' ? msg.content : isStreaming ? displayed : <RichText text={msg.content} />}
-                    {isStreaming && <span className="inline-block w-2 h-4 ml-1 align-middle bg-violet-400 animate-pulse" />}
+                    {isStreaming && <span className="inline-block w-2 h-4 ml-1 align-middle bg-[#FF8A75] animate-pulse" />}
                   </div>
                   {msg.role === 'assistant' && !msg.pending && (
                     <div className="mt-1 flex items-center gap-1">
-                      <TtsButton text={msg.content} className="p-1.5 rounded-lg bg-bun-800/50 hover:bg-bun-700 text-slate-400 hover:text-violet-300" />
-                      <button onClick={() => copy(msg.content, i)} className="p-1.5 rounded-lg bg-bun-800/50 hover:bg-bun-700 text-slate-400 hover:text-violet-300" title="Copy">
+                      <TtsButton text={msg.content} className="p-1.5 rounded-lg bg-bun-800/50 hover:bg-bun-700 text-slate-400 hover:text-[#FF8A75]" />
+                      <button onClick={() => copy(msg.content, i)} className="p-1.5 rounded-lg bg-bun-800/50 hover:bg-bun-700 text-slate-400 hover:text-[#FF8A75]" title="Copy">
                         {copied === i ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
                       </button>
-                      <button onClick={() => regenerate(i)} className="p-1.5 rounded-lg bg-bun-800/50 hover:bg-bun-700 text-slate-400 hover:text-violet-300" title="Regenerate">
+                      <button onClick={() => regenerate(i)} className="p-1.5 rounded-lg bg-bun-800/50 hover:bg-bun-700 text-slate-400 hover:text-[#FF8A75]" title="Regenerate">
                         <RotateCcw size={13} />
                       </button>
                       {reported[i]
@@ -285,12 +285,12 @@ export default function AiTutor({ context = '', compact = false }) {
                 : 'Ask about any level, BJT, grammar, kanji, or study strategy…'
             }
             disabled={loading}
-            className="flex-1 rounded-xl bg-bun-900 border border-bun-600/40 px-4 py-3 text-slate-100 placeholder-slate-500 focus:border-violet-500 focus:outline-none resize-none overflow-hidden min-h-[48px] max-h-[160px]"
+            className="flex-1 rounded-xl bg-bun-900 border border-bun-600/40 px-4 py-3 text-slate-100 placeholder-slate-500 focus:border-[#FF6B57] focus:outline-none resize-none overflow-hidden min-h-[48px] max-h-[160px]"
           />
           <button
             onClick={() => send(input)}
             disabled={loading || !input.trim()}
-            className="px-4 py-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-medium transition disabled:opacity-60"
+            className="px-4 py-3 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-medium transition disabled:opacity-60"
           >
             {loading ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
           </button>

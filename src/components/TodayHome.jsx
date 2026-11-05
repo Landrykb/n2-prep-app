@@ -92,16 +92,16 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
   return (
     <div className="space-y-8">
       <section className="space-y-2.5">
-        <button onClick={() => startSession('full')} className="w-full relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-600 to-fuchsia-600 p-6 sm:p-8 text-left shadow-xl hover:from-violet-500 hover:to-fuchsia-500 transition group">
+        <button onClick={() => startSession('full')} className="w-full relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#71368A] to-[#FF6B57] p-6 sm:p-8 text-left shadow-xl hover:from-[#71368A] hover:to-[#FF7F6E] transition group">
           <span className="flex items-center gap-4">
             <span className="w-14 h-14 shrink-0 rounded-2xl bg-white/20 flex items-center justify-center group-hover:scale-105 transition"><Play size={28} className="text-white ml-0.5" /></span>
             <span>
               <span className="block text-2xl sm:text-3xl font-bold text-white">Today — ~{sessionMins} minutes</span>
-              <span className="block text-sm text-violet-100 mt-1">{sessionInProgress ? 'Your session is in progress — it picks up right where you left off. What you already did counts.' : 'One session, no choices: one real scene in your voice, a few of your own cards, one listening bite. You won’t feel like you studied — that’s the point.'}</span>
+              <span className="block text-sm text-[#FFD9D2] mt-1">{sessionInProgress ? 'Your session is in progress — it picks up right where you left off. What you already did counts.' : 'One session, no choices: one real scene in your voice, a few of your own cards, one listening bite. You won’t feel like you studied — that’s the point.'}</span>
             </span>
           </span>
         </button>
-        <button onClick={() => startSession('busy')} className="w-full rounded-2xl bg-bun-800/70 border border-bun-600/40 hover:border-violet-500/40 p-3.5 text-sm text-slate-200 flex items-center justify-center gap-2 transition">
+        <button onClick={() => startSession('busy')} className="w-full rounded-2xl bg-bun-800/70 border border-bun-600/40 hover:border-[#FF6B57]/40 p-3.5 text-sm text-slate-200 flex items-center justify-center gap-2 transition">
           <Coffee size={15} className="text-amber-300" /> Busy day — 3 minutes <span className="text-slate-400">(just the voice scene — a small day still counts)</span>
         </button>
         <button onClick={() => setActive('sensei')} className="w-full rounded-2xl bg-emerald-500/10 border border-emerald-500/25 hover:border-emerald-400/40 p-3.5 text-sm text-slate-200 flex items-center justify-center gap-2 transition">
@@ -122,7 +122,7 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
       {showOnboarding ? (
         <OnboardingFlow initial={profile} onDone={(p) => { setProfile(p); setShowOnboarding(false) }} onClose={profile ? () => setShowOnboarding(false) : undefined} />
       ) : (
-        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 border border-violet-500/20 p-6 sm:p-8 card-glow">
+        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#71368A]/20 to-[#FF6B57]/20 border border-[#FF6B57]/20 p-6 sm:p-8 card-glow">
           <div className="relative space-y-4">
             <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
               <span className="flex items-center gap-1.5 font-medium text-emerald-300"><Calendar size={15} /> {daysToExam} days to {examLabel} · {dateLabel}</span>
@@ -130,7 +130,7 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
               <button onClick={() => setShowOnboarding(true)} className="flex items-center gap-1 px-2 py-1 rounded-full bg-bun-800/60 border border-bun-600/40 text-slate-400 hover:text-white transition"><RefreshCw size={11} /> My problem changed</button>
               {(() => { const m = summariseMetrics(loadMetrics()); return (
                 <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-bun-800/60 border border-bun-600/40 text-slate-300" title="The North Star: minutes of study per proof point earned, from your own finished sessions">
-                  <Target size={12} className="text-violet-300" /> {m.minutesPerProofPoint !== null ? `${m.minutesPerProofPoint} min per proof point · ${m.sessions} session${m.sessions === 1 ? '' : 's'}` : 'Proof pace: not enough data yet — finish a session and it appears here'}
+                  <Target size={12} className="text-[#FF8A75]" /> {m.minutesPerProofPoint !== null ? `${m.minutesPerProofPoint} min per proof point · ${m.sessions} session${m.sessions === 1 ? '' : 's'}` : 'Proof pace: not enough data yet — finish a session and it appears here'}
                 </span>) })()}
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold text-white">Your problem → your plan today</h1>
@@ -138,8 +138,8 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
             {plan.focusNote && <p className="text-xs text-slate-400">Built from: {plan.focusNote}</p>}
             <div className="grid gap-3 sm:grid-cols-2">
               {plan.actions.map((a) => (
-                <button key={`${a.tab}-${a.label}`} onClick={() => setActive(a.tab)} className="text-left rounded-2xl glass p-4 border border-bun-600/30 hover:border-violet-500/40 transition group">
-                  <p className="font-bold text-white text-sm flex items-center justify-between">{a.label} <ChevronRight size={15} className="text-violet-300 group-hover:translate-x-0.5 transition" /></p>
+                <button key={`${a.tab}-${a.label}`} onClick={() => setActive(a.tab)} className="text-left rounded-2xl glass p-4 border border-bun-600/30 hover:border-[#FF6B57]/40 transition group">
+                  <p className="font-bold text-white text-sm flex items-center justify-between">{a.label} <ChevronRight size={15} className="text-[#FF8A75] group-hover:translate-x-0.5 transition" /></p>
                   <p className="text-xs text-slate-400 mt-1">{a.reason}</p>
                 </button>
               ))}
@@ -159,8 +159,8 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
         </section>
       )}
 
-      <button onClick={() => setActive('coach')} className="w-full rounded-2xl bg-bun-800/70 border border-bun-600/40 hover:border-violet-500/40 p-3.5 text-sm text-slate-200 flex items-center justify-center gap-2 transition">
-        <Mail size={15} className="text-violet-300" /> Michi’s Weekly Letter <span className="text-slate-400">— your week, reported honestly, in a letter</span>
+      <button onClick={() => setActive('coach')} className="w-full rounded-2xl bg-bun-800/70 border border-bun-600/40 hover:border-[#FF6B57]/40 p-3.5 text-sm text-slate-200 flex items-center justify-center gap-2 transition">
+        <Mail size={15} className="text-[#FF8A75]" /> Michi’s Weekly Letter <span className="text-slate-400">— your week, reported honestly, in a letter</span>
       </button>
 
       {isComeback && (
@@ -179,12 +179,12 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
 
       <section className="rounded-2xl glass p-5 card-glow space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2"><Layers size={18} className="text-violet-300" /> Today’s session — one queue, capped</h2>
+          <h2 className="text-lg font-bold text-white flex items-center gap-2"><Layers size={18} className="text-[#FF8A75]" /> Today’s session — one queue, capped</h2>
           <span className="text-xs text-slate-400">Due shown: {session.due.length} (cap {MAX_DUE_DISPLAY}) · New: {session.fresh.length} (cap {MAX_NEW}/day) · Total personal cards: {queue.length}</span>
         </div>
         {card ? (
           <div className="space-y-3">
-            <button onClick={() => setFlipped((f) => !f)} className="w-full text-left rounded-2xl bg-bun-700/40 border border-bun-600/30 p-6 min-h-[130px] hover:border-violet-500/40 transition">
+            <button onClick={() => setFlipped((f) => !f)} className="w-full text-left rounded-2xl bg-bun-700/40 border border-bun-600/30 p-6 min-h-[130px] hover:border-[#FF6B57]/40 transition">
               <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-2">{card.fsrs?.reps ? 'Review' : 'New'} · from {card.source}{card.level ? ` · ${card.level}` : ''} · tap to flip</p>
               {!flipped ? <p className="text-lg text-white leading-loose">{card.front}</p> : (
                 <span><span className="block text-lg text-emerald-200 leading-loose">{card.back}</span>{card.note && <span className="block text-xs text-slate-400 mt-2">{card.note}</span>}</span>
@@ -207,7 +207,7 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
           <div className="space-y-3">
             <p className="text-sm text-slate-300">Your personal queue is empty. It fills from <em>your</em> material — mistakes you master in the Voice Loop, and sentences mined from your own documents. Dictionary/Anki study continues in the Anki tab meanwhile.</p>
             <div className="flex flex-wrap gap-2">
-              <button onClick={() => setActive('voice')} className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium flex items-center gap-1.5"><Mic size={15} /> Do one voice scene</button>
+              <button onClick={() => setActive('voice')} className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-medium flex items-center gap-1.5"><Mic size={15} /> Do one voice scene</button>
               <button onClick={() => setActive('mine')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1.5"><Pickaxe size={15} /> Mine a real document</button>
             </div>
           </div>
@@ -225,8 +225,8 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
           { id: 'mine', label: 'Mine your documents', desc: 'Cards from your real emails & letters', icon: Pickaxe },
           { id: 'mock', label: 'Mock Exam', desc: 'Timed, with margin over the pass mark', icon: ClipboardCheck },
         ].map((a) => { const Icon = a.icon; return (
-          <button key={a.id} onClick={() => setActive(a.id)} className="text-left rounded-2xl glass p-5 card-glow border border-bun-600/20 hover:border-violet-500/30 transition group">
-            <Icon size={20} className="text-violet-300 mb-2" />
+          <button key={a.id} onClick={() => setActive(a.id)} className="text-left rounded-2xl glass p-5 card-glow border border-bun-600/20 hover:border-[#FF6B57]/30 transition group">
+            <Icon size={20} className="text-[#FF8A75] mb-2" />
             <p className="font-bold text-white flex items-center justify-between">{a.label} <ChevronRight size={15} className="text-slate-500 group-hover:translate-x-0.5 transition" /></p>
             <p className="text-xs text-slate-400 mt-1">{a.desc}</p>
           </button>

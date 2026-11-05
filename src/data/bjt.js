@@ -1,7 +1,7 @@
 export const bjtScoreMapping = [
   { bjt: 'J1+', score: '600 – 800', jlpt: '≈ N1 / advanced business', color: 'emerald' },
   { bjt: 'J1', score: '530 – 599', jlpt: '≈ N2', color: 'cyan' },
-  { bjt: 'J2', score: '420 – 529', jlpt: '≈ N3', color: 'violet' },
+  { bjt: 'J2', score: '420 – 529', jlpt: '≈ N3', color: 'plum' },
   { bjt: 'J3', score: '320 – 419', jlpt: '≈ N4', color: 'amber' },
   { bjt: 'J4', score: '200 – 319', jlpt: '≈ N5', color: 'rose' },
   { bjt: 'J5', score: '0 – 199', jlpt: 'Beginner', color: 'slate' }

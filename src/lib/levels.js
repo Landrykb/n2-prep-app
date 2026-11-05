@@ -25,7 +25,7 @@ export const JLPT_LEVELS = [
     id: 'N3', order: 2, passMark: 95, sectionMin: 19, sections: ['Language Knowledge /60', 'Reading /60', 'Listening /60'],
     vocabEstimate: '~3,000–3,750', kanjiEstimate: '~650',
     canDo: 'Bridge level: everyday Japanese to a certain degree, near-natural-speed daily conversation.',
-    color: 'violet',
+    color: 'plum',
   },
   {
     id: 'N2', order: 3, passMark: 90, sectionMin: 19, sections: ['Language Knowledge /60', 'Reading /60', 'Listening /60'],
@@ -43,7 +43,7 @@ export const JLPT_LEVELS = [
     id: 'N1+', order: 5, passMark: null, sectionMin: null, sections: ['Beyond the exam: native media, specialist domains, register control'],
     vocabEstimate: '10,000++', kanjiEstimate: '2,000+',
     canDo: 'Beyond N1: fluent professional Japanese — nuance, register, specialist vocabulary in your own field.',
-    color: 'fuchsia',
+    color: 'coral',
   },
 ]
 
@@ -67,7 +67,7 @@ export const BJT_BANDS = [
   { id: 'J5', min: 0, max: 199, jlptApprox: 'Below N5', descriptor: 'Virtually no business communication ability.', hsp: null, color: 'slate' },
   { id: 'J4', min: 200, max: 319, jlptApprox: '≈ N5–N4', descriptor: 'Minimal communication in a limited range of business situations.', hsp: null, color: 'rose' },
   { id: 'J3', min: 320, max: 419, jlptApprox: '≈ N4–N3', descriptor: 'A limited degree of communication in a limited range of situations.', hsp: 'BJT ≥400 counts as the N2 category for Highly Skilled Professional points (10 pts).', color: 'amber' },
-  { id: 'J2', min: 420, max: 529, jlptApprox: '≈ N3–N2', descriptor: 'Appropriate communication in a limited range of business situations.', hsp: 'BJT ≥480 counts as the N1 category for Highly Skilled Professional points (15 pts).', color: 'violet' },
+  { id: 'J2', min: 420, max: 529, jlptApprox: '≈ N3–N2', descriptor: 'Appropriate communication in a limited range of business situations.', hsp: 'BJT ≥480 counts as the N1 category for Highly Skilled Professional points (15 pts).', color: 'plum' },
   { id: 'J1', min: 530, max: 599, jlptApprox: '≈ N2–N1', descriptor: 'Appropriate communication in a wide range of business situations.', hsp: null, color: 'cyan' },
   { id: 'J1+', min: 600, max: 800, jlptApprox: '≈ N1+', descriptor: 'Sufficient communication in any business situation.', hsp: null, color: 'emerald' },
 ]

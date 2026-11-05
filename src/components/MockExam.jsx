@@ -218,7 +218,7 @@ export default function MockExam({ setActive }) {
           <p className="text-xs text-slate-400 uppercase tracking-wider">Paper level {loadDiagnosis() ? '— from your diagnosis, change it if you are training up' : '— run Diagnosis and this starts at your level'}</p>
           <div className="flex flex-wrap gap-2">
             {MOCK_LEVELS.map((l) => (
-              <button key={l} onClick={() => setLevel(l)} className={`px-4 py-2 rounded-xl text-sm font-semibold border transition ${level === l ? 'bg-violet-600 text-white border-violet-500' : 'bg-bun-700/50 text-slate-300 border-bun-600/30 hover:text-white'}`}>{l}</button>
+              <button key={l} onClick={() => setLevel(l)} className={`px-4 py-2 rounded-xl text-sm font-semibold border transition ${level === l ? 'bg-[#FF6B57] text-white border-[#FF6B57]' : 'bg-bun-700/50 text-slate-300 border-bun-600/30 hover:text-white'}`}>{l}</button>
             ))}
           </div>
           {!dict && <p className="text-xs text-slate-500">Loading the level word banks… a paper started now would fall back to the built-in bank and say so on the paper.</p>}
@@ -237,17 +237,17 @@ export default function MockExam({ setActive }) {
         )}
         <div className="grid sm:grid-cols-2 gap-5">
           {Object.entries(MOCK_LENGTHS).map(([key, m]) => (
-            <button key={key} onClick={() => startExam(key)} className="text-left rounded-3xl glass p-6 card-glow hover:border-violet-500/40 transition group">
-              <div className="w-11 h-11 rounded-xl bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 flex items-center justify-center mb-4">
+            <button key={key} onClick={() => startExam(key)} className="text-left rounded-3xl glass p-6 card-glow hover:border-[#FF6B57]/40 transition group">
+              <div className="w-11 h-11 rounded-xl bg-[#71368A]/15 text-[#C39BD3] border border-[#71368A]/30 flex items-center justify-center mb-4">
                 <ClipboardCheck size={22} />
               </div>
               <h3 className="text-lg font-bold text-white mb-1">{m.label}</h3>
               <p className="text-sm text-slate-400 mb-4">{m.desc}</p>
               <ul className="text-xs text-slate-400 space-y-1.5 mb-4">
-                <li className="flex items-center gap-2"><Timer size={12} className="text-violet-300" /> Section A 言語知識・読解 — {m.timeA} min</li>
-                <li className="flex items-center gap-2"><Headphones size={12} className="text-violet-300" /> Section B 聴解 — {m.timeB} min</li>
+                <li className="flex items-center gap-2"><Timer size={12} className="text-[#FF8A75]" /> Section A 言語知識・読解 — {m.timeA} min</li>
+                <li className="flex items-center gap-2"><Headphones size={12} className="text-[#FF8A75]" /> Section B 聴解 — {m.timeB} min</li>
               </ul>
-              <span className="inline-flex items-center gap-1 text-sm font-medium text-violet-300 group-hover:translate-x-0.5 transition">
+              <span className="inline-flex items-center gap-1 text-sm font-medium text-[#FF8A75] group-hover:translate-x-0.5 transition">
                 Start <ChevronRight size={16} />
               </span>
             </button>
@@ -267,7 +267,7 @@ export default function MockExam({ setActive }) {
         <h2 className="text-2xl font-bold text-white mb-2">Section A complete</h2>
         <p className="text-slate-400 mb-8">Take a breath. Section B is 聴解 (listening) — {session.exam.sections[session.sectionIndex + 1].timeMin} minutes. Audio can be replayed in this practice mock.</p>
         <div className="flex justify-center gap-4">
-          <button onClick={startListening} className="px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-medium transition">Start Listening Section</button>
+          <button onClick={startListening} className="px-6 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-medium transition">Start Listening Section</button>
           <button onClick={abandon} className="px-6 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-slate-300 font-medium transition">Abandon</button>
         </div>
       </div>
@@ -298,7 +298,7 @@ export default function MockExam({ setActive }) {
       </div>
 
       <div className="h-2 w-full rounded-full bg-bun-700 overflow-hidden">
-        <div className="h-full bg-gradient-to-r from-violet-500 to-cyan-500 transition-all" style={{ width: `${(answeredCount / flat.length) * 100}%` }} />
+        <div className="h-full bg-gradient-to-r from-[#71368A] to-cyan-500 transition-all" style={{ width: `${(answeredCount / flat.length) * 100}%` }} />
       </div>
 
       {/* question grid */}
@@ -311,9 +311,9 @@ export default function MockExam({ setActive }) {
               key={x.id}
               onClick={() => setSession((s) => ({ ...s, qIndex: i }))}
               className={`w-8 h-8 rounded-lg text-xs font-semibold border transition relative ${
-                i === session.qIndex ? 'bg-violet-600 text-white border-violet-500'
+                i === session.qIndex ? 'bg-[#FF6B57] text-white border-[#FF6B57]'
                 : answered ? 'bg-bun-700 text-slate-200 border-bun-600/40'
-                : 'bg-bun-800 text-slate-500 border-bun-600/30 hover:border-violet-500/40'
+                : 'bg-bun-800 text-slate-500 border-bun-600/30 hover:border-[#FF6B57]/40'
               }`}
             >
               {i + 1}
@@ -325,7 +325,7 @@ export default function MockExam({ setActive }) {
 
       <div className="rounded-3xl glass p-6 sm:p-8 card-glow">
         <div className="flex items-center justify-between mb-1 gap-3">
-          <span className="text-sm font-semibold text-violet-300">{group.name}</span>
+          <span className="text-sm font-semibold text-[#FF8A75]">{group.name}</span>
           <span className="text-xs text-slate-500">{session.qIndex + 1} / {flat.length}</span>
         </div>
         {group.intro && <p lang="ja" className="text-xs text-slate-500 mb-4">{group.intro}</p>}
@@ -351,7 +351,7 @@ export default function MockExam({ setActive }) {
         {/* Plain text during the exam — no furigana or kanji lookup, matching the real test. */}
         <div className="rounded-2xl bg-bun-700/40 border border-bun-600/20 p-5 mb-5">
           <p lang="ja" className="text-lg text-slate-100 leading-relaxed whitespace-pre-wrap">{q.prompt}</p>
-          {q.target && <p lang="ja" className="text-sm text-violet-300 mt-3">Target: 「{q.target}」</p>}
+          {q.target && <p lang="ja" className="text-sm text-[#FF8A75] mt-3">Target: 「{q.target}」</p>}
         </div>
 
         <div className="grid sm:grid-cols-2 gap-3 mb-5">
@@ -362,7 +362,7 @@ export default function MockExam({ setActive }) {
                 key={i}
                 onClick={() => setSession((s) => ({ ...s, answers: { ...s.answers, [q.id]: i } }))}
                 className={`w-full text-left px-4 py-3.5 rounded-xl border transition font-medium ${
-                  chosen ? 'bg-violet-600/20 border-violet-500/60 text-violet-100' : 'bg-bun-700/50 border-bun-600/30 text-slate-100 hover:border-violet-500/50 hover:bg-bun-700'
+                  chosen ? 'bg-[#FF6B57]/20 border-[#FF6B57]/60 text-[#FFD9D2]' : 'bg-bun-700/50 border-bun-600/30 text-slate-100 hover:border-[#FF6B57]/50 hover:bg-bun-700'
                 }`}
               >
                 <span className="text-slate-500 mr-2">{i + 1}.</span><span lang="ja">{opt.label}</span>
@@ -393,7 +393,7 @@ export default function MockExam({ setActive }) {
             >
               Next <ChevronRight size={15} />
             </button>
-            <button onClick={() => setConfirmSubmit(true)} className="px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition">
+            <button onClick={() => setConfirmSubmit(true)} className="px-4 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-medium transition">
               Submit section
             </button>
           </div>
@@ -410,7 +410,7 @@ export default function MockExam({ setActive }) {
                 : 'All questions answered. You cannot return after submitting.'}
             </p>
             <div className="flex gap-3">
-              <button onClick={() => submitSection(false)} className="flex-1 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition">Submit</button>
+              <button onClick={() => submitSection(false)} className="flex-1 px-4 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-medium transition">Submit</button>
               <button onClick={() => setConfirmSubmit(false)} className="flex-1 px-4 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-slate-200 text-sm font-medium transition">Keep Working</button>
             </div>
           </div>
@@ -429,7 +429,7 @@ function ScoreBar({ label, value, max = 60 }) {
         <span className="text-slate-200 font-semibold">{value} / {max}</span>
       </div>
       <div className="h-2.5 rounded-full bg-bun-700 overflow-hidden">
-        <div className={`h-full rounded-full ${value >= 19 ? 'bg-gradient-to-r from-violet-500 to-cyan-500' : 'bg-rose-500'}`} style={{ width: `${pct}%` }} />
+        <div className={`h-full rounded-full ${value >= 19 ? 'bg-gradient-to-r from-[#71368A] to-cyan-500' : 'bg-rose-500'}`} style={{ width: `${pct}%` }} />
       </div>
     </div>
   )
@@ -478,7 +478,7 @@ function ResultsView({ result, setActive, askAi, onRetake }) {
                   <div className={`h-full rounded-full ${w.pct >= 70 ? 'bg-emerald-500' : w.pct >= 40 ? 'bg-amber-500' : 'bg-rose-500'}`} style={{ width: `${w.pct}%` }} />
                 </div>
                 {worst.has(w.type) && PRACTICE_TAB[w.type] && (
-                  <button onClick={() => setActive(PRACTICE_TAB[w.type])} className="shrink-0 text-xs px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-medium transition">
+                  <button onClick={() => setActive(PRACTICE_TAB[w.type])} className="shrink-0 text-xs px-3 py-1.5 rounded-lg bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-medium transition">
                     Practice this
                   </button>
                 )}
@@ -510,7 +510,7 @@ function ResultsView({ result, setActive, askAi, onRetake }) {
                   </details>
                 )}
                 <p className="text-sm text-slate-100 mb-2"><KanjiTapText text={q.prompt} /></p>
-                {q.target && <p className="text-xs text-violet-300 mb-2">Target: 「<KanjiTapText text={q.target} />」</p>}
+                {q.target && <p className="text-xs text-[#FF8A75] mb-2">Target: 「<KanjiTapText text={q.target} />」</p>}
                 <p className="text-xs mb-1">
                   <span className={ok ? 'text-emerald-300' : 'text-rose-300'}>
                     You: {sel !== undefined ? q.options[sel]?.label : '—'}
@@ -519,7 +519,7 @@ function ResultsView({ result, setActive, askAi, onRetake }) {
                 </p>
                 {q.explanation && <p className="text-xs text-slate-400 mb-2"><KanjiTapText text={q.explanation} /></p>}
                 {!ok && (
-                  <button onClick={() => askAi(q, group, sel)} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-violet-600/20 text-violet-300 hover:bg-violet-600/30 transition">
+                  <button onClick={() => askAi(q, group, sel)} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[#FF6B57]/20 text-[#FF8A75] hover:bg-[#FF6B57]/30 transition">
                     <Bot size={13} /> Ask AI to explain
                   </button>
                 )}
@@ -530,7 +530,7 @@ function ResultsView({ result, setActive, askAi, onRetake }) {
       </div>
 
       <div className="flex justify-center gap-4">
-        <button onClick={onRetake} className="px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-medium transition flex items-center gap-2">
+        <button onClick={onRetake} className="px-6 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-medium transition flex items-center gap-2">
           <RotateCcw size={16} /> New mock
         </button>
         <button onClick={() => setActive('dashboard')} className="px-6 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-slate-200 font-medium transition">

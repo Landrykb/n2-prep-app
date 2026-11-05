@@ -83,16 +83,16 @@ setNote(added? `Added ${added} card${added === 1? '': 's'} to your review queue 
 return (
 <div className="space-y-6">
 <div>
-<div className="flex items-center gap-3 mb-1"><Pickaxe size={20} className="text-violet-400" /><h2 className="text-2xl font-bold text-white">Mine your own Japanese</h2><Mascot agent="hori" size={34} /></div>
+<div className="flex items-center gap-3 mb-1"><Pickaxe size={20} className="text-[#FF8A75]" /><h2 className="text-2xl font-bold text-white">Mine your own Japanese</h2><Mascot agent="hori" size={34} /></div>
 <p className="text-xs text-slate-500 mb-1">Hori digs; what Hori finds becomes material Tsuku shapes into your queue.</p>
 <p className="text-sm text-slate-400">Generic textbooks don’t contain your life. Paste a real work email, a school letter, a city-office notice — get i+1 cards (one new word per sentence) from the Japanese you actually have to survive. Processed locally in your browser; nothing is uploaded. Your queue currently holds {queueCount} personal cards.</p>
 </div>
 
 <div className="rounded-2xl glass p-5 card-glow space-y-3">
 <textarea value={text} onChange={(e) => setText(e.target.value)} rows={6} placeholder="Paste Japanese text here — an email, a letter from school, meeting minutes…"
-className="w-full rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 leading-loose focus:border-violet-500 focus:outline-none" />
+className="w-full rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 leading-loose focus:border-[#FF6B57] focus:outline-none" />
 <div className="flex flex-wrap gap-2">
-<button onClick={runMine} disabled={!text.trim()} className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white text-sm font-semibold">Mine This Text</button>
+<button onClick={runMine} disabled={!text.trim()} className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] disabled:opacity-40 text-white text-sm font-semibold">Mine This Text</button>
 <button onClick={() => setText(SAMPLE)} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-200 text-sm">Try a sample city-office notice</button>
 </div>
 {note && <p className="text-sm text-emerald-300 flex items-center gap-2"><CheckCircle2 size={15} /> {note}</p>}
@@ -105,11 +105,11 @@ className="w-full rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2.5 tex
 <button onClick={addSelected} disabled={!selected.size} className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-sm font-semibold flex items-center gap-1.5"><Plus size={15} /> Add {selected.size} to my queue</button>
 </div>
 {mined.map((c, i) => (
-<label key={i} className={`flex items-start gap-3 rounded-2xl border p-4 cursor-pointer transition ${selected.has(i)? 'bg-violet-600/10 border-violet-500/40': 'bg-bun-700/30 border-bun-600/20'}`}>
-<input type="checkbox" checked={selected.has(i)} onChange={() => toggle(i)} className="mt-1 accent-violet-500" />
+<label key={i} className={`flex items-start gap-3 rounded-2xl border p-4 cursor-pointer transition ${selected.has(i)? 'bg-[#FF6B57]/10 border-[#FF6B57]/40': 'bg-bun-700/30 border-bun-600/20'}`}>
+<input type="checkbox" checked={selected.has(i)} onChange={() => toggle(i)} className="mt-1 accent-[#FF6B57]" />
 <span>
 <span className="block text-sm text-slate-100 leading-loose">{c.sentence}</span>
-<span className="block text-xs text-slate-400 mt-1">Target: <span className="text-violet-300 font-semibold">{c.word}</span>{c.reading? `（${c.reading}）`: ''} — {c.meaning} {c.level && <span className="ml-1 px-1.5 py-0.5 rounded bg-bun-700 text-slate-300">{c.level}</span>}</span>
+<span className="block text-xs text-slate-400 mt-1">Target: <span className="text-[#FF8A75] font-semibold">{c.word}</span>{c.reading? `（${c.reading}）`: ''} — {c.meaning} {c.level && <span className="ml-1 px-1.5 py-0.5 rounded bg-bun-700 text-slate-300">{c.level}</span>}</span>
 </span>
 </label>
 ))}

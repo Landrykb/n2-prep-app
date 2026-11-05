@@ -390,15 +390,15 @@ export default function SenseiCall() {
         </label>
         <div className="grid sm:grid-cols-3 gap-3">
           <label className="text-xs text-slate-400 space-y-1.5">Your sensei’s name
-            <input value={settings.senseiName} onChange={(e) => setSettings((st) => ({ ...st, senseiName: e.target.value || 'Sensei' }))} className="w-full rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2 text-sm text-slate-100 focus:border-violet-500 focus:outline-none" />
+            <input value={settings.senseiName} onChange={(e) => setSettings((st) => ({ ...st, senseiName: e.target.value || 'Sensei' }))} className="w-full rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2 text-sm text-slate-100 focus:border-[#FF6B57] focus:outline-none" />
           </label>
           <label className="text-xs text-slate-400 space-y-1.5">Calls per day
-            <select value={settings.callsPerDay} onChange={(e) => setSettings((st) => ({ ...st, callsPerDay: Number(e.target.value) }))} className="w-full rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2 text-sm text-slate-100 focus:border-violet-500 focus:outline-none">
+            <select value={settings.callsPerDay} onChange={(e) => setSettings((st) => ({ ...st, callsPerDay: Number(e.target.value) }))} className="w-full rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2 text-sm text-slate-100 focus:border-[#FF6B57] focus:outline-none">
               {[1, 2, 3].map((n) => <option key={n} value={n}>{n} call{n > 1 ? 's' : ''}</option>)}
             </select>
           </label>
           <label className="text-xs text-slate-400 space-y-1.5">Persistence
-            <select value={settings.persistence} onChange={(e) => setSettings((st) => ({ ...st, persistence: e.target.value }))} className="w-full rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2 text-sm text-slate-100 focus:border-violet-500 focus:outline-none">
+            <select value={settings.persistence} onChange={(e) => setSettings((st) => ({ ...st, persistence: e.target.value }))} className="w-full rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2 text-sm text-slate-100 focus:border-[#FF6B57] focus:outline-none">
               <option value="gentle">Gentle — one callback, ~40 min later</option>
               <option value="standard">Standard — one callback, 20–40 min later</option>
             </select>
@@ -409,16 +409,16 @@ export default function SenseiCall() {
           {settings.windows.map((w, i) => (
             <div key={i} className="flex items-center gap-2">
               <span className="text-xs text-slate-500 w-14">Window {i + 1}</span>
-              <input type="time" value={w.start} onChange={(e) => setWindow(i, 'start', e.target.value)} className="rounded-lg bg-bun-800 border border-bun-600/40 px-2.5 py-1.5 text-sm text-slate-100 focus:border-violet-500 focus:outline-none" />
+              <input type="time" value={w.start} onChange={(e) => setWindow(i, 'start', e.target.value)} className="rounded-lg bg-bun-800 border border-bun-600/40 px-2.5 py-1.5 text-sm text-slate-100 focus:border-[#FF6B57] focus:outline-none" />
               <span className="text-slate-500 text-xs">to</span>
-              <input type="time" value={w.end} onChange={(e) => setWindow(i, 'end', e.target.value)} className="rounded-lg bg-bun-800 border border-bun-600/40 px-2.5 py-1.5 text-sm text-slate-100 focus:border-violet-500 focus:outline-none" />
+              <input type="time" value={w.end} onChange={(e) => setWindow(i, 'end', e.target.value)} className="rounded-lg bg-bun-800 border border-bun-600/40 px-2.5 py-1.5 text-sm text-slate-100 focus:border-[#FF6B57] focus:outline-none" />
               {settings.windows.length > 1 && <button onClick={() => removeWindow(i)} className="text-xs text-slate-500 hover:text-rose-300 px-1">Remove</button>}
             </div>
           ))}
-          {settings.windows.length < 3 && <button onClick={addWindow} className="text-xs text-violet-300 hover:text-violet-200">+ Add a window</button>}
+          {settings.windows.length < 3 && <button onClick={addWindow} className="text-xs text-[#FF8A75] hover:text-[#FFA08D]">+ Add a window</button>}
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={saveSettings} className="px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold">Save settings</button>
+          <button onClick={saveSettings} className="px-4 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold">Save settings</button>
           {savedNote && <span className="text-xs text-emerald-300">{savedNote}</span>}
         </div>
         <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4 text-xs text-slate-400 leading-relaxed">
@@ -508,7 +508,7 @@ export default function SenseiCall() {
               </div>
               <button onClick={hangUp} className="shrink-0 px-4 py-2.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold flex items-center gap-1.5"><PhoneOff size={15} /> Hang up</button>
             </div>
-            <div className="flex gap-1.5">{chain.slice(0, exchangesTotal).map((_, i) => <div key={i} className={`h-1.5 flex-1 rounded-full ${i < results.length ? 'bg-emerald-500' : i === exIdx ? 'bg-violet-500' : 'bg-bun-700'}`} />)}</div>
+            <div className="flex gap-1.5">{chain.slice(0, exchangesTotal).map((_, i) => <div key={i} className={`h-1.5 flex-1 rounded-full ${i < results.length ? 'bg-emerald-500' : i === exIdx ? 'bg-[#FF6B57]' : 'bg-bun-700'}`} />)}</div>
 
             <div className="rounded-2xl bg-bun-700/40 border border-bun-600/20 p-4">
               <p className="text-xs text-slate-400 mb-1">{callState.settings.senseiName} says:</p>
@@ -517,13 +517,13 @@ export default function SenseiCall() {
                 <TtsButton text={scene.partner} />
               </div>
             </div>
-            <p className="text-sm text-slate-200"><span className="text-violet-300 font-semibold">Your turn — say this, your way:</span> {scene.promptEn}</p>
+            <p className="text-sm text-slate-200"><span className="text-[#FF8A75] font-semibold">Your turn — say this, your way:</span> {scene.promptEn}</p>
             {showMicPrompt && <MicPrompt onUseMic={confirmMic} onTypeInstead={() => setShowMicPrompt(false)} />}
             <div className="flex gap-2">
               <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={2} placeholder="Speak with the mic, or type your Japanese here…"
-                className="flex-1 rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 focus:border-violet-500 focus:outline-none" />
+                className="flex-1 rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 focus:border-[#FF6B57] focus:outline-none" />
               <div className="flex flex-col gap-2">
-                <button onClick={requestListening} disabled={!speechSupported || listening} className="px-3 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white text-xs font-medium flex items-center gap-1.5">
+                <button onClick={requestListening} disabled={!speechSupported || listening} className="px-3 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] disabled:opacity-40 text-white text-xs font-medium flex items-center gap-1.5">
                   {listening ? <MicOff size={14} /> : <Mic size={14} />} {listening ? 'Listening…' : 'Speak'}
                 </button>
                 <button onClick={check} disabled={!input.trim()} className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-medium">Say it</button>
@@ -551,7 +551,7 @@ export default function SenseiCall() {
                     {lastAttempt.missing.length > 0 && <p className="text-sm text-amber-200">Missing: {lastAttempt.missing.join('、')}</p>}
                     <p className="text-xs text-slate-400">{scene.commonError}</p>
                     <div className="flex flex-wrap gap-2">
-                      <button onClick={() => setInput('')} className="px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium flex items-center gap-1"><RotateCcw size={13} /> Say it again</button>
+                      <button onClick={() => setInput('')} className="px-3 py-1.5 rounded-lg bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-xs font-medium flex items-center gap-1"><RotateCcw size={13} /> Say it again</button>
                       {current && current.attempts >= 2 && <button onClick={moveOn} className="px-3 py-1.5 rounded-lg bg-bun-700 hover:bg-bun-600 text-slate-200 text-xs font-medium">Move on — it joins my queue</button>}
                     </div>
                   </>
@@ -580,7 +580,7 @@ export default function SenseiCall() {
                 <div className="flex"><TtsButton text={wrap.weakest.scene.model} className="px-3 py-1.5 text-sm" /></div>
               </div>
             )}
-            <button onClick={() => { setPhase('idle'); setRing(null) }} className="px-6 py-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-semibold">Done — back to my day</button>
+            <button onClick={() => { setPhase('idle'); setRing(null) }} className="px-6 py-3 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-semibold">Done — back to my day</button>
             <p className="text-[11px] text-slate-600">That’s the whole requirement for this call slot. Small, kept, finished.</p>
           </div>
         </div>

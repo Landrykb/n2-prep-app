@@ -24,7 +24,7 @@ export default function TtsButton({ text, className = '' }) {
       <button
         onClick={speak}
         title="Read out loud"
-        className={`p-2 rounded-xl bg-bun-700 text-violet-300 hover:bg-violet-600/20 hover:text-violet-200 transition ${className}`}
+        className={`p-2 rounded-xl bg-bun-700 text-[#FF8A75] hover:bg-[#FF6B57]/20 hover:text-[#FFA08D] transition ${className}`}
       >
         {speaking ? <Loader2 size={18} className="animate-spin" /> : <Volume2 size={18} />}
       </button>

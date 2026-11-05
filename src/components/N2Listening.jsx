@@ -23,7 +23,7 @@ export default function N2Listening() {
     <div className="space-y-6">
       <div>
         <div className="flex items-center gap-2 mb-1">
-          <Headphones size={20} className="text-violet-400" />
+          <Headphones size={20} className="text-[#FF8A75]" />
           <h2 className="text-2xl font-bold text-white">Listening — N5 to N1</h2>
         </div>
         <p className="text-sm text-slate-400">JLPT-style listening at every level. Press play, listen, then answer the Japanese questions. The transcript is hidden until you reveal it — the real exam gives you one play and no transcript.</p>
@@ -31,7 +31,7 @@ export default function N2Listening() {
 
       <div className="flex flex-wrap gap-2">
         {LEVELS.map((lv) => (
-          <button key={lv} onClick={() => { setLevel(lv); setActive(0); setShowTranscript(false) }} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${level === lv ? 'bg-violet-600 text-white' : 'bg-bun-700 text-slate-300 hover:bg-bun-600'}`}>
+          <button key={lv} onClick={() => { setLevel(lv); setActive(0); setShowTranscript(false) }} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${level === lv ? 'bg-[#FF6B57] text-white' : 'bg-bun-700 text-slate-300 hover:bg-bun-600'}`}>
             {lv === 'all' ? `All levels (${ALL.length})` : lv}
           </button>
         ))}
@@ -39,7 +39,7 @@ export default function N2Listening() {
 
       <div className="flex flex-wrap gap-2">
         {items.map((l, i) => (
-          <button key={`${l.title}-${i}`} onClick={() => { setActive(i); setShowTranscript(false) }} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${item === l ? 'bg-violet-600 text-white' : 'bg-bun-700 text-slate-300 hover:bg-bun-600'}`}>
+          <button key={`${l.title}-${i}`} onClick={() => { setActive(i); setShowTranscript(false) }} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${item === l ? 'bg-[#FF6B57] text-white' : 'bg-bun-700 text-slate-300 hover:bg-bun-600'}`}>
             {l.title} <span className="text-slate-400">· {l.level}</span>
           </button>
         ))}

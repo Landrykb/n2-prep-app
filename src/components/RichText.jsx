@@ -50,7 +50,7 @@ export default function RichText({ text }) {
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(p.item) } }}
             role="button"
             tabIndex={0}
-            className="cursor-pointer border-b border-dashed border-violet-500/40 hover:text-violet-300 transition touch-manipulation"
+            className="cursor-pointer border-b border-dashed border-[#FF6B57]/40 hover:text-[#FF8A75] transition touch-manipulation"
             title={p.item.meaning}
           >
             {p.item._key}

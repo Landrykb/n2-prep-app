@@ -215,7 +215,7 @@ export default function OneSession({ setActive }) {
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <div className="text-center space-y-2 pt-2">
-        <p className="flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-wider text-violet-300"><Sparkles size={14} /> One Session — that’s the whole day</p>
+        <p className="flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#FF8A75]"><Sparkles size={14} /> One Session — that’s the whole day</p>
         <h2 className="text-2xl sm:text-3xl font-bold text-white">{state.done ? 'Session saved. Day done.' : isBusy ? 'Busy day — just the scene' : 'Press nothing. Just follow along.'}</h2>
         <p className="text-sm text-slate-400 max-w-xl mx-auto">
           {state.step > 0 && !state.done
@@ -233,8 +233,8 @@ export default function OneSession({ setActive }) {
         <div className="flex items-center gap-2">
           {(isBusy ? [0] : [0, 1, 2]).map((s) => (
             <div key={s} className="flex-1">
-              <div className={`h-1.5 rounded-full ${state.step >= s ? 'bg-gradient-to-r from-violet-500 to-cyan-500' : 'bg-bun-700'}`} />
-              <p className={`text-[10px] mt-1.5 text-center ${state.step === s ? 'text-violet-300 font-semibold' : 'text-slate-500'}`}>{STEP_LABELS[s]}</p>
+              <div className={`h-1.5 rounded-full ${state.step >= s ? 'bg-gradient-to-r from-[#71368A] to-cyan-500' : 'bg-bun-700'}`} />
+              <p className={`text-[10px] mt-1.5 text-center ${state.step === s ? 'text-[#FF8A75] font-semibold' : 'text-slate-500'}`}>{STEP_LABELS[s]}</p>
             </div>
           ))}
           <span className="text-xs text-slate-500 shrink-0 pl-2">{Math.floor(elapsedSec / 60)}:{String(elapsedSec % 60).padStart(2, '0')}</span>
@@ -262,12 +262,12 @@ export default function OneSession({ setActive }) {
               <TtsButton text={scene.partner} />
             </div>
           </div>
-          <p className="text-sm text-slate-200"><span className="text-violet-300 font-semibold">Your turn — say this, your way:</span> {scene.promptEn}</p>
+          <p className="text-sm text-slate-200"><span className="text-[#FF8A75] font-semibold">Your turn — say this, your way:</span> {scene.promptEn}</p>
           <div className="flex gap-2">
             <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={2} placeholder="Speak with the mic, or type your Japanese here…"
-              className="flex-1 rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 focus:border-violet-500 focus:outline-none" />
+              className="flex-1 rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 focus:border-[#FF6B57] focus:outline-none" />
             <div className="flex flex-col gap-2">
-              <button onClick={startListening} disabled={!speechSupported || listening} className="px-3 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white text-xs font-medium flex items-center gap-1.5">
+              <button onClick={startListening} disabled={!speechSupported || listening} className="px-3 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] disabled:opacity-40 text-white text-xs font-medium flex items-center gap-1.5">
                 {listening ? <MicOff size={14} /> : <Mic size={14} />} {listening ? 'Listening…' : 'Speak'}
               </button>
               <button onClick={checkScene} disabled={!input.trim()} className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-medium">Check me</button>
@@ -298,7 +298,7 @@ export default function OneSession({ setActive }) {
                   </div>
                   {lastAttempt.missing.length > 0 && <p className="text-sm text-amber-200">Missing: {lastAttempt.missing.join('、')}</p>}
                   <p className="text-xs text-slate-400">{scene.commonError}</p>
-                  <button onClick={() => setInput('')} className="px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium flex items-center gap-1"><RotateCcw size={13} /> Say it again</button>
+                  <button onClick={() => setInput('')} className="px-3 py-1.5 rounded-lg bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-xs font-medium flex items-center gap-1"><RotateCcw size={13} /> Say it again</button>
                 </>
               )}
             </div>
@@ -306,7 +306,7 @@ export default function OneSession({ setActive }) {
           {state.sceneAttempts > 0 && !sceneCleared && <p className="text-xs text-slate-500">Best so far: {state.sceneBest}% — {MASTERY}% is “clean”, and getting closer counts too. The scene stays in your queue either way.</p>}
 
           {sceneCleared && (
-            <button onClick={() => (isBusy ? finish() : advanceTo(1))} className="w-full py-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-semibold flex items-center justify-center gap-2 transition">
+            <button onClick={() => (isBusy ? finish() : advanceTo(1))} className="w-full py-3 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-semibold flex items-center justify-center gap-2 transition">
               {isBusy ? 'Finish my busy-day session' : 'Continue — your cards'} <ChevronRight size={17} />
             </button>
           )}
@@ -328,7 +328,7 @@ export default function OneSession({ setActive }) {
           </div>
           {card ? (
             <div className="space-y-3">
-              <button onClick={() => setFlipped((f) => !f)} className="w-full text-left rounded-2xl bg-bun-700/40 border border-bun-600/30 p-6 min-h-[130px] hover:border-violet-500/40 transition">
+              <button onClick={() => setFlipped((f) => !f)} className="w-full text-left rounded-2xl bg-bun-700/40 border border-bun-600/30 p-6 min-h-[130px] hover:border-[#FF6B57]/40 transition">
                 <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-2">From {card.source}{card.level ? ` · ${card.level}` : ''} · tap to flip</p>
                 {!flipped ? <p className="text-lg text-white leading-loose">{card.front}</p> : (
                   <span><span className="block text-lg text-emerald-200 leading-loose">{card.back}</span>{card.note && <span className="block text-xs text-slate-400 mt-2">{card.note}</span>}</span>
@@ -346,7 +346,7 @@ export default function OneSession({ setActive }) {
           ) : (
             <div className="space-y-3">
               <p className="text-sm text-slate-300">{sessionCards.length ? 'All of today’s cards in this session are done. Nicely paced.' : 'Your queue has nothing waiting right now — your own mistakes and mined sentences will fill it as you use the app. That’s a clear desk, not a gap.'}</p>
-              <button onClick={() => advanceTo(2)} className="w-full py-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-semibold flex items-center justify-center gap-2 transition">Continue — one listening bite <ChevronRight size={17} /></button>
+              <button onClick={() => advanceTo(2)} className="w-full py-3 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-semibold flex items-center justify-center gap-2 transition">Continue — one listening bite <ChevronRight size={17} /></button>
             </div>
           )}
         </section>
@@ -379,7 +379,7 @@ export default function OneSession({ setActive }) {
           {(state.listeningPicked !== null && state.listeningPicked !== undefined) && (
             <div className="space-y-3">
               <p className="text-sm text-slate-300">{biteQuestion.explanation}</p>
-              <button onClick={finish} className="w-full py-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-semibold flex items-center justify-center gap-2 transition">Finish session <ChevronRight size={17} /></button>
+              <button onClick={finish} className="w-full py-3 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-semibold flex items-center justify-center gap-2 transition">Finish session <ChevronRight size={17} /></button>
             </div>
           )}
         </section>
@@ -398,7 +398,7 @@ export default function OneSession({ setActive }) {
           <div className="rounded-xl bg-bun-700/40 border border-bun-600/30 p-4 text-left">
             <p className="text-sm text-slate-200">
               {diagnosis
-                ? <>Where you stand: estimated <span className="text-white font-semibold">{diagnosis.jlptEstimate}</span>{reachedRung ? <> · latest height in reach: <span className="text-white font-semibold">{reachedRung.label}</span></> : ''}{nextRung ? <> · next height: <span className="text-violet-300 font-semibold">{nextRung.label}</span> — {nextRung.proof}</> : ''}</>
+                ? <>Where you stand: estimated <span className="text-white font-semibold">{diagnosis.jlptEstimate}</span>{reachedRung ? <> · latest height in reach: <span className="text-white font-semibold">{reachedRung.label}</span></> : ''}{nextRung ? <> · next height: <span className="text-[#FF8A75] font-semibold">{nextRung.label}</span> — {nextRung.proof}</> : ''}</>
                 : 'No diagnosis yet — run the 10-minute health check once, and this screen will show your ladder position and your next height.'}
             </p>
           </div>
@@ -412,13 +412,13 @@ export default function OneSession({ setActive }) {
             {effort && <p className="text-xs text-emerald-300">{effort === 'Not really' ? 'That’s the target state. Come back tomorrow — same small size.' : 'Noted — the sessions stay small either way. Tomorrow is the same size, never bigger by surprise.'}</p>}
           </div>
           {bonusAvailable > 0 && (
-            <div className="rounded-xl bg-violet-500/10 border border-violet-500/30 p-4 space-y-2">
+            <div className="rounded-xl bg-[#FF6B57]/10 border border-[#FF6B57]/30 p-4 space-y-2">
               <p className="text-sm text-slate-200">You’re climbing this week — that’s a Surge, in the app’s own bookkeeping. More is on offer if you want it, never owed if you don’t.</p>
               <button onClick={startBonus} className="px-5 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 text-white text-sm font-semibold">Keep Going — A Few More Cards</button>
             </div>
           )}
           <div className="flex flex-wrap justify-center gap-2 pt-1">
-            <button onClick={() => setActive?.('dashboard')} className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold flex items-center gap-1.5"><Play size={15} /> Back to Today</button>
+            <button onClick={() => setActive?.('dashboard')} className="px-5 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold flex items-center gap-1.5"><Play size={15} /> Back to Today</button>
             <button onClick={() => setActive?.('diagnosis')} className="px-5 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium">See my diagnosis & ladder</button>
           </div>
         </section>
