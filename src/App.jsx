@@ -301,7 +301,7 @@ function Badge({ children, color = 'plum' }) {
   )
 }
 
-function Header({ active, daysToExam, user, onSignOut, isSupabaseConfigured }) {
+function Header({ active, daysToExam, user, onSignOut, isSupabaseConfigured, onToggleMenu, menuOpen }) {
   // P0-4: the header used to show invented stats ("N2 Candidate / Next
   // mock in 2 days") and a streak flame. It now shows only what the
   // learner's own record holds: the diagnosed estimate, and the next
@@ -332,6 +332,14 @@ function Header({ active, daysToExam, user, onSignOut, isSupabaseConfigured }) {
   return (
     <header className="border-b border-bun-600/30 page-gutter py-3 flex items-center justify-between gap-2">
       <div className="flex items-center gap-2 min-w-0">
+        <button
+          onClick={onToggleMenu}
+          aria-label={menuOpen ? 'Close the menu' : 'Open the menu'}
+          aria-expanded={menuOpen}
+          className="lg:hidden p-2.5 rounded-lg bg-bun-700 text-slate-200 min-w-[42px] min-h-[42px] flex items-center justify-center"
+        >
+          {menuOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
         <h2 className="text-lg font-semibold truncate">{nav.find((n) => n.id === active)?.label}</h2>
       </div>
       <div className="flex items-center gap-2 sm:gap-4">
@@ -440,7 +448,7 @@ function Sidebar({ active, setActive, mobileOpen, setMobileOpen }) {
 const quickNav = ['session', 'dashboard', 'sensei', 'twin']
 
 /** Fixed bottom tab bar so the PWA always has visible navigation on mobile. */
-function BottomNav({ active, setActive, onMenu }) {
+function BottomNav({ active, setActive, onMenu, menuOpen }) {
   const items = quickNav.map((id) => nav.find((n) => n.id === id)).filter(Boolean)
   return (
     <nav
@@ -465,11 +473,12 @@ function BottomNav({ active, setActive, onMenu }) {
         })}
         <button
           onClick={onMenu}
-          aria-label="Open the full menu"
-          className="flex-1 flex flex-col items-center gap-0.5 py-2 min-h-[56px] justify-center transition text-slate-400"
+          aria-label={menuOpen ? 'Close the menu' : 'Open the full menu'}
+          aria-expanded={menuOpen}
+          className={`flex-1 flex flex-col items-center gap-0.5 py-2 min-h-[56px] justify-center transition ${menuOpen ? 'text-[#FF8A75]' : 'text-slate-400'}`}
         >
-          <Menu size={20} />
-          <span className="text-[10px] font-medium leading-none">Menu</span>
+          {menuOpen ? <X size={20} /> : <Menu size={20} />}
+          <span className="text-[10px] font-medium leading-none">{menuOpen ? 'Close' : 'Menu'}</span>
         </button>
       </div>
     </nav>
@@ -1690,13 +1699,15 @@ function App() {
       <div className="status-bar-scrim lg:hidden" aria-hidden="true" />
       <Sidebar active={active} setActive={setActive} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
       <main className="flex-1 min-w-0 flex flex-col">
-        <div className="pt-safe bg-bun-900/80 backdrop-blur sticky top-0 z-10">
+        <div className="pt-safe bg-bun-900/80 backdrop-blur sticky top-0 z-30">
           <Header
             active={active}
             daysToExam={daysToExam}
             user={user}
             onSignOut={signOut}
             isSupabaseConfigured={isSupabaseConfigured}
+            onToggleMenu={() => setMobileOpen((o) => !o)}
+            menuOpen={mobileOpen}
           />
         </div>
         <div className="flex-1 page-gutter py-5 sm:py-6 lg:py-8 overflow-y-auto swipe-area pb-28 lg:pb-8">
@@ -1713,7 +1724,7 @@ function App() {
           </div>
         </div>
       </main>
-      <BottomNav active={active} setActive={setActive} onMenu={() => setMobileOpen(true)} />
+      <BottomNav active={active} setActive={setActive} onMenu={() => setMobileOpen((o) => !o)} menuOpen={mobileOpen} />
       <SelectionPopup dictionary={dictionary} onNeedDictionary={ensureDictionary} />
       <ChatBubble context={active} />
     </div>
