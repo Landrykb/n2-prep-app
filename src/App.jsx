@@ -74,6 +74,8 @@ const OneSession = lazy(() => import('./components/OneSession.jsx'))
 const SenseiCall = lazy(() => import('./components/SenseiCall.jsx'))
 const TwinView = lazy(() => import('./components/TwinView.jsx'))
 const CoachLetter = lazy(() => import('./components/CoachLetter.jsx'))
+const PrivacyPolicy = lazy(() => import('./components/PrivacyPolicy.jsx'))
+const Terms = lazy(() => import('./components/Terms.jsx'))
 import { userKey } from './lib/userKey.js'
 import { getErrorLogs, addErrorLog, reviewErrorLog, deleteErrorLog, getUserProgress, setUserProgress } from './lib/supabaseApi.js'
 import {
@@ -1590,6 +1592,8 @@ function App() {
     sensei: <SenseiCall />,
     diagnosis: <Diagnosis setActive={setActive} />,
     twin: <TwinView setActive={setActive} />,
+    privacy: <PrivacyPolicy setActive={setActive} />,
+    terms: <Terms setActive={setActive} />,
     coach: <CoachLetter />,
     mine: <Mining />,
     lessons: <Lessons />,

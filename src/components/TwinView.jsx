@@ -9,6 +9,8 @@ import { detectMode } from '../lib/modes.js'
 import { PERSONAS, PAINS, PROOF_TARGETS } from '../lib/profile.js'
 import { SECTION_KEYS } from '../lib/levels.js'
 import Mascot from './Mascot.jsx'
+import { useAuth } from '../hooks/useAuth.js'
+import { downloadAllLocalData, wipeAllLocalData, requestServerAccountDeletion } from '../lib/accountDeletion.js'
 
 // THE TWIN VIEW — "What your fleet knows about you" (Doc 06 §4, Doc 10 §3).
 // The Twin is VISIBLE on purpose: a learner who can inspect what the app
@@ -39,6 +41,10 @@ function Section({ title, children, hint }) {
 
 export default function TwinView({ setActive }) {
   const [twin, setTwin] = useState(() => refreshTwin())
+  const { user, signOut } = useAuth()
+  const [delStep, setDelStep] = useState('idle') // idle | confirm | working | done
+  const [delAgreed, setDelAgreed] = useState(false)
+  const [delResult, setDelResult] = useState(null)
   const [deleted, setDeleted] = useState(false)
   const { meta } = detectMode()
   const patterns = topPatterns(twin, 8)
@@ -57,6 +63,19 @@ export default function TwinView({ setActive }) {
     a.download = 'my-learner-twin.json'
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  // Full account + data deletion (Doc 15 — Apple 5.1.1(v), Play deletion
+  // policy). Export is offered first; the wipe removes EVERY app key on
+  // this device; the server account delete is attempted honestly and its
+  // real result is reported in the result panel.
+  const runAccountDeletion = async () => {
+    setDelStep('working')
+    const server = await requestServerAccountDeletion()
+    const removed = wipeAllLocalData()
+    if (user) { try { await signOut() } catch { /* already gone */ } }
+    setDelResult({ removed, server })
+    setDelStep('done')
   }
 
   const wipe = () => {
@@ -192,6 +211,61 @@ export default function TwinView({ setActive }) {
         <p className="text-sm text-slate-300 flex-1 min-w-[220px]">This model is yours. Take it with you, or erase the fleet’s memory — the queue, your problem and your diagnosis stay either way.</p>
         <button onClick={exportTwin} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1.5"><Download size={15} /> Export My Twin</button>
         <button onClick={wipe} className="px-4 py-2 rounded-xl bg-rose-600/15 hover:bg-rose-600/25 border border-rose-500/30 text-rose-200 text-sm font-medium flex items-center gap-1.5"><Trash2 size={15} /> Delete Fleet Memory</button>
+      </section>
+
+      <section className="rounded-2xl border border-bun-600/30 p-5 space-y-4">
+        <div>
+          <h3 className="text-lg font-bold text-white">Privacy, Terms And Your Account</h3>
+          <p className="text-xs text-slate-500 mt-0.5">Different from Delete Fleet Memory above: that erases only what the fleet learned. This section is everything — all of your data, and your account itself.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => setActive?.('privacy')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium">Privacy Policy</button>
+          <button onClick={() => setActive?.('terms')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium">Terms Of Use</button>
+          <button onClick={downloadAllLocalData} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1.5"><Download size={15} /> Export Everything On This Device</button>
+        </div>
+
+        {delStep === 'idle' && (
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-sm text-slate-300 flex-1 min-w-[220px]">Leaving for good? Delete your account and every piece of data {brand.name} holds about you.</p>
+            <button onClick={() => setDelStep('confirm')} className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold">Delete My Account And Data</button>
+          </div>
+        )}
+
+        {delStep === 'confirm' && (
+          <div className="rounded-xl bg-rose-600/10 border border-rose-500/30 p-4 space-y-3">
+            <p className="text-sm font-bold text-white">What happens, exactly</p>
+            <ul className="text-sm text-slate-300 space-y-1.5 list-disc pl-5">
+              <li>Everything stored on this device is erased: your Twin, queue, profile, diagnosis, plans, letters, call settings and history — all of it.</li>
+              <li>{user ? 'Your server account deletion is requested and your rows are removed with it.' : 'You are not signed in on this device, so there is no server account attached to this data.'} One honest caveat: the server-side delete step is still being finished — if it cannot complete today, the result screen will tell you plainly, and your local data is still fully erased.</li>
+              <li>This cannot be undone. If you might come back, export first.</li>
+            </ul>
+            <label className="flex items-start gap-2 text-sm text-slate-200 cursor-pointer">
+              <input type="checkbox" checked={delAgreed} onChange={(e) => setDelAgreed(e.target.checked)} className="mt-0.5" />
+              I exported my data, or I am sure I don't need it
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={downloadAllLocalData} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium">Export Everything First</button>
+              <button onClick={runAccountDeletion} disabled={!delAgreed} className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white text-sm font-semibold">Yes — Delete Everything</button>
+              <button onClick={() => setDelStep('idle')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium">Keep My Account</button>
+            </div>
+          </div>
+        )}
+
+        {delStep === 'working' && <p className="text-sm text-slate-300">Deleting…</p>}
+
+        {delStep === 'done' && delResult && (
+          <div className="rounded-xl bg-bun-700/40 border border-bun-600/30 p-4 space-y-2">
+            <p className="text-sm font-bold text-white">Done — here is exactly what happened</p>
+            <p className="text-sm text-slate-300">On this device: {delResult.removed} stored item{delResult.removed === 1 ? '' : 's'} erased. Nothing about you remains in this app on this device.</p>
+            <p className="text-sm text-slate-300">
+              {delResult.server === 'deleted' && 'On the server: your account and its data were deleted.'}
+              {delResult.server === 'not-signed-in' && 'On the server: you were not signed in, so there was no account to delete.'}
+              {delResult.server === 'not-configured' && 'On the server: this build has no account server connected, so nothing existed there.'}
+              {delResult.server === 'pending-server' && 'On the server: the account deletion step could not complete — that part is still being finished on our side. Your data on this device is fully erased; to complete the server deletion, contact us from the Privacy Policy page and we will finish it for you.'}
+            </p>
+            <button onClick={() => setActive?.('dashboard')} className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold">Back To Today</button>
+          </div>
+        )}
       </section>
     </div>
   )

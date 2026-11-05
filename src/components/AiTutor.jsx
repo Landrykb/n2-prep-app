@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabaseClient.js'
 import { consumeAiPrefill } from '../lib/aiPrefill.js'
 import RichText from './RichText.jsx'
 import TtsButton from './TtsButton.jsx'
-import { Send, Loader2, Sparkles, RotateCcw, Copy, Check } from 'lucide-react'
+import { Send, Loader2, Sparkles, RotateCcw, Copy, Check, Flag } from 'lucide-react'
 
 const QUICK_ACTIONS = [
   { label: 'Explain N2 grammar', prompt: 'Explain the difference between 〜わけがない and 〜わけではない with a Japanese example.', mode: 'ask' },
@@ -21,6 +21,20 @@ const QUICK_ACTIONS = [
 
 export default function AiTutor({ context = '', compact = false }) {
   const { isSupabaseConfigured } = useAuth()
+  const [reported, setReported] = useState({})
+  // Report/flag for AI-generated replies (Google Play AI-Generated Content
+  // policy + Apple 1.2 posture — Doc 15 §1). Flags are kept on-device today
+  // (jpn:ai-flags:v1); they move to the moderation inbox with the server
+  // step in Doc 15 §6. Reports inform the fleet's filters (Doc 05).
+  const reportReply = (i, content) => {
+    try {
+      const key = 'jpn:ai-flags:v1'
+      const flags = JSON.parse(localStorage.getItem(key) || '[]')
+      flags.push({ at: new Date().toISOString(), surface: 'ai-tutor', content: String(content).slice(0, 500) })
+      localStorage.setItem(key, JSON.stringify(flags))
+    } catch { /* ignore */ }
+    setReported((r) => ({ ...r, [i]: true }))
+  }
   const STORAGE_KEY = `n2:tutor:${context || 'general'}`
 
   const [messages, setMessages] = useState(() => {
@@ -209,6 +223,11 @@ export default function AiTutor({ context = '', compact = false }) {
                       <button onClick={() => regenerate(i)} className="p-1.5 rounded-lg bg-bun-800/50 hover:bg-bun-700 text-slate-400 hover:text-violet-300" title="Regenerate">
                         <RotateCcw size={13} />
                       </button>
+                      {reported[i]
+                        ? <span className="text-[11px] text-emerald-300 px-1.5 py-1">Reported — thank you, reports teach the fleet what to fix</span>
+                        : <button onClick={() => reportReply(i, msg.content)} className="p-1.5 rounded-lg bg-bun-800/50 hover:bg-bun-700 text-slate-400 hover:text-rose-300" title="Report this AI reply — wrong or offensive content">
+                            <Flag size={13} />
+                          </button>}
                     </div>
                   )}
                   {msg.sources && msg.sources.length > 0 && (

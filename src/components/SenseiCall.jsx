@@ -10,6 +10,8 @@ import {
 import { bestScore, missingPhrases } from './VoiceLoop.jsx'
 import { recordVoiceAttempt, recordCallOutcome } from '../lib/twin.js'
 import Mascot from './Mascot.jsx'
+import MicPrompt from './MicPrompt.jsx'
+import { micExplained, markMicExplained } from '../lib/micConsent.js'
 import TtsButton from './TtsButton.jsx'
 import KanjiTapText from './KanjiTapText.jsx'
 
@@ -149,6 +151,14 @@ export default function SenseiCall() {
   handleMissedRef.current = handleMissed
 
   // ---------- the call ----------
+  const [showMicPrompt, setShowMicPrompt] = useState(false)
+  // Same first-use microphone explanation as the Voice Loop (Doc 15).
+  const requestListening = () => {
+    if (micExplained()) startListening()
+    else setShowMicPrompt(true)
+  }
+  const confirmMic = () => { markMicExplained(); setShowMicPrompt(false); startListening() }
+
   const startListening = () => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SR) return
@@ -430,11 +440,12 @@ export default function SenseiCall() {
               </div>
             </div>
             <p className="text-sm text-slate-200"><span className="text-violet-300 font-semibold">Your turn — say this, your way:</span> {scene.promptEn}</p>
+            {showMicPrompt && <MicPrompt onUseMic={confirmMic} onTypeInstead={() => setShowMicPrompt(false)} />}
             <div className="flex gap-2">
               <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={2} placeholder="Speak with the mic, or type your Japanese here…"
                 className="flex-1 rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 focus:border-violet-500 focus:outline-none" />
               <div className="flex flex-col gap-2">
-                <button onClick={startListening} disabled={!speechSupported || listening} className="px-3 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white text-xs font-medium flex items-center gap-1.5">
+                <button onClick={requestListening} disabled={!speechSupported || listening} className="px-3 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white text-xs font-medium flex items-center gap-1.5">
                   {listening ? <MicOff size={14} /> : <Mic size={14} />} {listening ? 'Listening…' : 'Speak'}
                 </button>
                 <button onClick={check} disabled={!input.trim()} className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-medium">Say it</button>
