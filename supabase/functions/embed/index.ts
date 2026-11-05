@@ -55,7 +55,7 @@ serve(async (req: Request) => {
     }
 
     const openrouterKey = Deno.env.get('OPENROUTER_API_KEY') ?? ''
-    const referer = Deno.env.get('APP_URL') ?? 'https://jpn2easy.vercel.app'
+    const referer = Deno.env.get('APP_URL') ?? 'https://yonde.app'
     const embedModel = Deno.env.get('OPENROUTER_EMBEDDING_MODEL') ?? 'liquid/lfm-2.5-embedding-350m:free'
     let indexed = 0
 
@@ -69,7 +69,7 @@ serve(async (req: Request) => {
           'Authorization': `Bearer ${openrouterKey}`,
           'Content-Type': 'application/json',
           'HTTP-Referer': referer,
-          'X-Title': 'JPN2easy',
+          'X-Title': 'Yonde',
         },
         body: JSON.stringify({ model: embedModel, input: inputs }),
       })

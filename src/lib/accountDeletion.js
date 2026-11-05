@@ -2,11 +2,13 @@
 // requires in-app account deletion; Google Play account-deletion policy —
 // in-app path + web link). This module does everything the CLIENT honestly
 // can, and says so: local data is wiped completely; the server-side account
-// delete needs the `delete-account` edge function specified in Doc 15 §6,
-// which does not exist yet. requestServerAccountDeletion() already attempts
-// that function — the day it deploys, this flow starts reporting full
-// deletion with no client change. Until then it reports 'pending-server'
-// and the UI copy says exactly that. No fake success, ever.
+// delete runs through the `delete-account` edge function specified in
+// Doc 15 §6 — the function code exists in supabase/functions/delete-account
+// but, like all Phase 2 server pieces, it is live only once Landry runs the
+// Doc 09 §7 activation steps. requestServerAccountDeletion() already
+// attempts that function — the day it deploys, this flow starts reporting
+// full deletion with no client change. Until then it reports
+// 'pending-server' and the UI copy says exactly that. No fake success, ever.
 
 import { supabase, isSupabaseConfigured } from './supabaseClient.js'
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'jpn2easy-v4'
+const CACHE_NAME = 'yonde-v5'
 const PRECACHE = ['/', '/index.html', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png']
 
 self.addEventListener('install', (event) => {
@@ -63,11 +63,11 @@ self.addEventListener('fetch', (event) => {
 self.addEventListener('push', (event) => {
   const data = event.data ? event.data.json() : {}
   const isCall = data.kind === 'yobidashi-call'
-  const title = data.title || (isCall ? '呼び出しの時間 — Yobidashi no Jikan' : 'Time to study N2!')
+  const title = data.title || (isCall ? '呼び出しの時間 — Yobidashi no Jikan' : 'Yonde — a light few minutes, when you are ready')
   const options = {
     body: data.body || (isCall
       ? 'You are being summoned — a few minutes of spoken Japanese with your sensei.'
-      : 'Keep your streak alive — do a quick drill or review your deck.'),
+      : 'Your fleet kept today small on purpose. One short session is waiting whenever you are — no pile, no pressure.'),
     icon: '/icon-192.png',
     badge: '/icon-192.png',
     tag: data.tag || (isCall ? 'yobidashi-call' : 'study-reminder'),

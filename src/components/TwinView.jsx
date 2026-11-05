@@ -12,6 +12,11 @@ import Mascot from './Mascot.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { downloadAllLocalData, wipeAllLocalData, requestServerAccountDeletion } from '../lib/accountDeletion.js'
 import { getTwinSyncState, subscribeTwinSync, TWIN_SYNC_EVENT } from '../lib/twinSync.js'
+import { getStateSyncState, subscribeStateSync } from '../lib/stateSync.js'
+import { validateExport, planRestore } from '../lib/restore.js'
+import { loadMetrics, summariseMetrics } from '../lib/metrics.js'
+import FeedbackBox from './FeedbackBox.jsx'
+import { Upload } from 'lucide-react'
 
 // THE TWIN VIEW — "What your fleet knows about you" (Doc 06 §4, Doc 10 §3).
 // The Twin is VISIBLE on purpose: a learner who can inspect what the app
@@ -47,6 +52,10 @@ export default function TwinView({ setActive }) {
   // one plain line under the header — never a badge, never a nag.
   const [syncState, setSyncState] = useState(() => getTwinSyncState())
   useEffect(() => subscribeTwinSync(setSyncState), [])
+  const [stateSyncState, setStateSyncState] = useState(() => getStateSyncState())
+  useEffect(() => subscribeStateSync(setStateSyncState), [])
+  const [restoreReport, setRestoreReport] = useState(null)
+  const [restoreError, setRestoreError] = useState('')
   useEffect(() => {
     const onSynced = () => setTwin(refreshTwin())
     window.addEventListener(TWIN_SYNC_EVENT, onSynced)
@@ -74,6 +83,24 @@ export default function TwinView({ setActive }) {
     a.download = 'my-learner-twin.json'
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  // Backup restore (P0-1): the export used to be a dead end. Restoring
+  // MERGES (restore.js): the queue unions, newer documents win, other
+  // keys only fill gaps — a backup can never shrink what this device has
+  // learned. Counts are reported before the learner reloads.
+  const runRestore = async (file) => {
+    setRestoreError(''); setRestoreReport(null)
+    if (!file) return
+    let parsed
+    try { parsed = JSON.parse(await file.text()) } catch { setRestoreError('That file could not be read as JSON — nothing was restored.'); return }
+    const v = validateExport(parsed)
+    if (!v.ok) { setRestoreError(v.reason); return }
+    const { writes, report } = planRestore(collectAllLocalData(), v.data)
+    try {
+      for (const [k, val] of Object.entries(writes)) localStorage.setItem(k, JSON.stringify(val))
+    } catch { setRestoreError('This device refused part of the restore (storage may be full) — some items may not have been written. Nothing was deleted.'); return }
+    setRestoreReport(report)
   }
 
   // Full account + data deletion (Doc 15 — Apple 5.1.1(v), Play deletion
@@ -115,6 +142,13 @@ export default function TwinView({ setActive }) {
           : syncState === 'synced'
             ? 'synced to your account'
             : syncState === 'syncing'
+              ? 'syncing to your account…'
+              : 'on this device — sync will retry'}</p>
+        <p className="text-xs text-slate-500 mt-1">Your queue, problem, diagnosis and promise: {stateSyncState === 'local-only'
+          ? 'on this device only — sign in and they follow you'
+          : stateSyncState === 'synced'
+            ? 'synced to your account — a new phone picks up where this one left off'
+            : stateSyncState === 'syncing'
               ? 'syncing to your account…'
               : 'on this device — sync will retry'}</p>
       </div>
@@ -210,6 +244,10 @@ export default function TwinView({ setActive }) {
             <li><span className="text-slate-500">Sessions logged:</span> {(twin.rhythm.sessionLog || []).length} recent · last {twin.rhythm.lastSessionAt ? new Date(twin.rhythm.lastSessionAt).toLocaleDateString() : '—'}</li>
             <li><span className="text-slate-500">Calls:</span> {kept + missed ? `${kept} kept of ${kept + missed} recorded` : 'none recorded yet'}</li>
             <li><span className="text-slate-500">Recent felt effort:</span> {(twin.rhythm.feltEffortRecent || []).slice(-3).join(' · ') || 'not answered yet'}</li>
+            {(() => { const m = summariseMetrics(loadMetrics()); return (
+              <li><span className="text-slate-500">Proof pace (North Star):</span> {m.minutesPerProofPoint !== null
+                ? <>{m.minutesPerProofPoint} minutes per proof point — {m.minutes} minutes across {m.sessions} finished session{m.sessions === 1 ? '' : 's'}, {m.proofPoints} proof points. Calls: {m.callsKept} kept · {m.callsPartial} partial · {m.callsMissed} missed (missed costs nothing, ever).</>
+                : 'not enough data yet — it is computed from your finished sessions only, never estimated.'}</li>) })()}
             <li className="flex items-center gap-2 pt-1"><Mascot agent="michi" size={28} showName={false} /><span><span className="text-slate-500">Right now:</span> {meta.label} — the plan on Today already matches this.</span></li>
           </ul>
           <button onClick={() => setActive?.('coach')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1"><Mail size={14} /> Read Michi’s Letter</button>
@@ -240,7 +278,28 @@ export default function TwinView({ setActive }) {
           <button onClick={() => setActive?.('privacy')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium">Privacy Policy</button>
           <button onClick={() => setActive?.('terms')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium">Terms Of Use</button>
           <button onClick={downloadAllLocalData} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1.5"><Download size={15} /> Export Everything On This Device</button>
+          <label className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1.5 cursor-pointer">
+            <Upload size={15} /> Restore From A Backup
+            <input type="file" accept="application/json,.json" className="hidden" onChange={(e) => { runRestore(e.target.files?.[0]); e.target.value = '' }} />
+          </label>
         </div>
+        <p className="text-xs text-slate-500">Restoring merges with what is on this device — your queue can only grow, newer records win, and nothing here is ever deleted by a restore.</p>
+        {restoreError && <p className="text-sm text-rose-300">{restoreError}</p>}
+        {restoreReport && (
+          <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-4 space-y-2">
+            <p className="text-sm font-bold text-white">Backup merged in</p>
+            <p className="text-sm text-slate-300">
+              Queue: {restoreReport.queueBefore} → {restoreReport.queueAfter} cards ({restoreReport.queueAdded} added).
+              {restoreReport.historyAfter > restoreReport.historyBefore && <> Diagnosis history grew by {restoreReport.historyAfter - restoreReport.historyBefore}.</>}
+              {restoreReport.twin === 'updated' && <> Your Twin was updated from the backup (it was newer).</>}
+              {restoreReport.slicesUpdated.length > 0 && <> Updated: {restoreReport.slicesUpdated.map((k) => k.replace('jpn:', '').replace(':v1', '')).join(', ')}.</>}
+              {restoreReport.restoredKeys > 0 && <> {restoreReport.restoredKeys} other saved item{restoreReport.restoredKeys === 1 ? '' : 's'} filled in.</>}
+            </p>
+            <button onClick={() => window.location.reload()} className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold">Reload To See It Everywhere</button>
+          </div>
+        )}
+
+        <FeedbackBox context="fleet-account" />
 
         {delStep === 'idle' && (
           <div className="flex flex-wrap items-center gap-3">

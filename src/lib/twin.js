@@ -24,6 +24,7 @@ import { loadQueue } from './queue.js'
 import { loadProfile, loadDiagnosis } from './profile.js'
 import { loadCallState } from './calls.js'
 import { todayStr } from './session.js'
+import { recordMetric } from './metrics.js'
 
 export const TWIN_KEY = 'jpn:twin:v1'
 export const DIAGNOSIS_HISTORY_KEY = 'jpn:diagnosisHistory:v1'
@@ -327,11 +328,13 @@ export function recordSessionSummary({ minutes = 0, accuracy01 = null, lapseRate
 }
 
 /** Sensei Call outcomes. */
-export function recordCallOutcome({ kept, bestScore = null }) {
+export function recordCallOutcome({ kept, bestScore = null, partial = false }) {
   let twin = loadTwin()
   if (kept) twin.rhythm.callsKept += 1
   else twin.rhythm.callsMissed += 1
   if (kept && bestScore !== null) pushAccuracy(twin, 'voice', Math.min(1, bestScore / 100))
+  // Gate metric (Doc 11): kept | missed | partial (ended warmly early).
+  recordMetric('call_outcome', { outcome: partial ? 'partial' : kept ? 'kept' : 'missed' })
   return saveTwin(twin)
 }
 

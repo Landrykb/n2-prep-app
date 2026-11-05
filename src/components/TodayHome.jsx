@@ -5,6 +5,8 @@ import { loadCallState } from '../lib/calls.js'
 import { detectMode } from '../lib/modes.js'
 import { getPlanFor, tomorrowStr } from '../lib/planner.js'
 import { recordQueueRating } from '../lib/twin.js'
+import { loadMetrics, summariseMetrics } from '../lib/metrics.js'
+import FeedbackBox from './FeedbackBox.jsx'
 import Mascot from './Mascot.jsx'
 import { loadProfile, loadDiagnosis, derivePlan, daysSinceLastVisit, markVisit } from '../lib/profile.js'
 import { loadQueue, todaySession, rateQueueItem } from '../lib/queue.js'
@@ -27,7 +29,9 @@ function loadWeek() {
   } catch { return [] }
 }
 function recordToday() {
-  const today = new Date().toISOString().slice(0, 10)
+  // P2-2: local calendar day, not UTC — toISOString() rolled the date at
+  // 09:00 JST, so a morning visit could be recorded as yesterday.
+  const today = todayStr()
   const days = loadWeek()
   if (!days.includes(today)) {
     const cutoff = Date.now() - 7 * 86400000
@@ -124,6 +128,10 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
               <span className="flex items-center gap-1.5 font-medium text-emerald-300"><Calendar size={15} /> {daysToExam} days to {examLabel} · {dateLabel}</span>
               <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-bun-800/60 border border-bun-600/40 text-slate-300"><Flame size={12} className="text-orange-300" /> This week: {weekCount}/7 days · rhythm goal 4 — a missed day breaks nothing</span>
               <button onClick={() => setShowOnboarding(true)} className="flex items-center gap-1 px-2 py-1 rounded-full bg-bun-800/60 border border-bun-600/40 text-slate-400 hover:text-white transition"><RefreshCw size={11} /> My problem changed</button>
+              {(() => { const m = summariseMetrics(loadMetrics()); return (
+                <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-bun-800/60 border border-bun-600/40 text-slate-300" title="The North Star: minutes of study per proof point earned, from your own finished sessions">
+                  <Target size={12} className="text-violet-300" /> {m.minutesPerProofPoint !== null ? `${m.minutesPerProofPoint} min per proof point · ${m.sessions} session${m.sessions === 1 ? '' : 's'}` : 'Proof pace: not enough data yet — finish a session and it appears here'}
+                </span>) })()}
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold text-white">Your problem → your plan today</h1>
             <p className="max-w-2xl text-slate-200 leading-relaxed text-sm sm:text-base">{plan.line}</p>
@@ -234,6 +242,7 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
         <NotificationCard />
       </div>
       <p className="text-[11px] text-slate-600 flex items-center gap-1.5"><Target size={12} /> Day streak kept for reference: {streak}. It no longer runs this home page — weekly rhythm does.</p>
+      <FeedbackBox context="today" />
     </div>
   )
 }

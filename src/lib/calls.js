@@ -18,6 +18,10 @@ import { todayStr } from './session.js'
 
 export const CALLS_KEY = 'jpn:calls:v1'
 export const INBOX_KEY = 'jpn:inbox:v1'
+// sessionStorage hand-off for a summons tapped from a push notification:
+// the service worker messages App.jsx, which stashes the slot here and
+// routes to the Yobidashi screen; SenseiCall consumes it once on mount.
+export const INCOMING_CALL_KEY = 'jpn:incoming-call:v1'
 export const MASTERY = 85
 
 export function dateHash(str) {

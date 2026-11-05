@@ -27,12 +27,16 @@
 // and the copy says so. No blanket promises: no diagnosis, no promise.
 
 import { jlptLevel } from './levels.js'
+import { emitLearnerStateSaved } from './stateEvents.js'
 import { SECTION_KEYS } from './levels.js'
 
 export const PROMISE_KEY = 'jpn:promise:v1'
 
 const ORDER = ['N5', 'N4', 'N3', 'N2', 'N1']
-const BJT_THRESHOLDS = [200, 320, 420, 480, 530, 600]
+// 400 is the HSP N2-category line (10 pts) and 480 the N1-category line
+// (15 pts) — 400 was missing, which made the `next === 400` note in
+// bjtSide below unreachable dead code (P2-8).
+const BJT_THRESHOLDS = [200, 320, 400, 420, 480, 530, 600]
 
 function realLifeHeight(profile) {
   if (profile?.realLifeGoal) return profile.realLifeGoal
@@ -131,6 +135,6 @@ export function loadPromise() {
 
 export function savePromise(promise) {
   if (!promise) return null
-  try { localStorage.setItem(PROMISE_KEY, JSON.stringify(promise)) } catch { /* ignore */ }
+  try { localStorage.setItem(PROMISE_KEY, JSON.stringify(promise)); emitLearnerStateSaved() } catch { /* ignore */ }
   return promise
 }

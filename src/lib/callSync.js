@@ -37,6 +37,7 @@ export async function callReachMode() {
 }
 
 export async function syncCallWindows(state = loadCallState()) {
+  armCallSyncListeners()
   if (!isSupabaseConfigured || !supabase) return 'not-configured'
   try {
     const { data } = await supabase.auth.getSession()
@@ -67,4 +68,19 @@ export async function syncCallWindows(state = loadCallState()) {
     console.error('callSync error:', err)
     return 'error'
   }
+}
+
+// P2-5: timezone + windows used to sync only at sign-in and at settings
+// edits — travel across timezones and the server kept ringing at the
+// OLD zone's hours. Re-sync whenever the app returns to the front, the
+// device reconnects, or the window regains focus. Armed once, from the
+// first syncCallWindows call (AuthContext sign-in path).
+let listenersArmed = false
+export function armCallSyncListeners() {
+  if (listenersArmed || typeof window === 'undefined') return
+  listenersArmed = true
+  const resync = () => { syncCallWindows().catch(() => {}) }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') resync() })
+  window.addEventListener('online', resync)
+  window.addEventListener('focus', resync)
 }

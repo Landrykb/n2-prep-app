@@ -40,7 +40,7 @@ async function getAppServer(): Promise<webpush.ApplicationServer> {
   if (appServer) return appServer
   const publicKey = Deno.env.get('VAPID_PUBLIC_KEY') ?? ''
   const privateKey = Deno.env.get('VAPID_PRIVATE_KEY') ?? ''
-  const subject = Deno.env.get('VAPID_SUBJECT') ?? 'mailto:hello@jpn2easy.vercel.app'
+  const subject = Deno.env.get('VAPID_SUBJECT') ?? 'mailto:hello@yonde.app'
   if (!publicKey || !privateKey) {
     throw new Error('VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY must be set')
   }
@@ -81,7 +81,7 @@ serve(async (req: Request) => {
       userId = user.id
     }
 
-    const { title = 'Time to study N2!', body = 'Keep your streak alive.', url = '/', tag = 'study-reminder', user_id, kind, slotId, slotDate, slotIdx } = await req.json()
+    const { title = 'Yonde — a light few minutes, when you are ready', body = 'Your fleet kept today small on purpose. One short session is waiting whenever you are — no pile, no pressure.', url = '/', tag = 'study-reminder', user_id, kind, slotId, slotDate, slotIdx } = await req.json()
     if (providedAdminSecret) userId = user_id ?? userId
     if (typeof title !== 'string' || title.length > 120 || typeof body !== 'string' || body.length > 240) {
       return new Response(JSON.stringify({ error: 'Invalid title or body' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })

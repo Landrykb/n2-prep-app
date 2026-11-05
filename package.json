@@ -11,7 +11,8 @@
     "lint": "oxlint",
     "test:phase2": "TZ=UTC node tests/phase2.test.mjs",
     "validate": "node scripts/validate-data.mjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:readiness": "TZ=UTC node tests/readiness.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.109.0",

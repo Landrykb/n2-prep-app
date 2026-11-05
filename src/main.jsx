@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
+import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { AuthProvider } from './contexts/AuthContext.jsx'
 import { KanjiModalProvider } from './contexts/KanjiModalContext.jsx'
 import { FuriganaProvider } from './contexts/FuriganaContext.jsx'
@@ -11,7 +12,9 @@ createRoot(document.getElementById('root')).render(
     <AuthProvider>
       <FuriganaProvider>
         <KanjiModalProvider>
-          <App />
+          <ErrorBoundary>
+            <App />
+          </ErrorBoundary>
         </KanjiModalProvider>
       </FuriganaProvider>
     </AuthProvider>

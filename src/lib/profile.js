@@ -2,6 +2,8 @@
 // they are climbing toward. Diagnosis and the Today prescription READ this
 // profile — the app starts from the person's problem, not from features.
 
+import { emitLearnerStateSaved } from './stateEvents.js'
+
 export const PROFILE_KEY = 'jpn:profile:v1'
 export const DIAGNOSIS_KEY = 'jpn:diagnosis:v1'
 export const LAST_VISIT_KEY = 'jpn:last-visit:v1'
@@ -40,7 +42,11 @@ export function loadProfile() {
 }
 
 export function saveProfile(profile) {
-  try { localStorage.setItem(PROFILE_KEY, JSON.stringify({ ...profile, updatedAt: new Date().toISOString() })) } catch { /* ignore */ }
+  try { localStorage.setItem(PROFILE_KEY, JSON.stringify({ ...profile, updatedAt: new Date().toISOString() })); emitLearnerStateSaved() } catch { /* ignore */ }
+}
+
+export function saveDiagnosis(diagnosis) {
+  try { localStorage.setItem(DIAGNOSIS_KEY, JSON.stringify(diagnosis)); emitLearnerStateSaved() } catch { /* ignore */ }
 }
 
 export function loadDiagnosis() {

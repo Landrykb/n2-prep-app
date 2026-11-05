@@ -3,11 +3,12 @@ import { Stethoscope, ChevronRight, RotateCcw, Target } from 'lucide-react'
 import { computeSixtyDayPromise, savePromise } from '../lib/promise.js'
 import PromisePanel from './PromisePanel.jsx'
 import { loadDictionary, localDictionary, quizPool } from '../lib/dictionary.js'
-import { questions as bankQuestions, passages } from '../data.js'
-import { listeningPlus } from '../data/listeningPlus.js'
+import { questions as bankQuestions } from '../data.js'
+import { selectDiagnosisItems, sectionComponent } from '../lib/diagnosisItems.js'
 import { JLPT_LEVELS, jlptLevel, estimateBjtScore, bjtBandForScore, SECTION_KEYS } from '../lib/levels.js'
-import { loadProfile, DIAGNOSIS_KEY } from '../lib/profile.js'
-import { recordDiagnosis, diagnosisDeltas, recordReading } from '../lib/twin.js'
+import { loadProfile, saveDiagnosis, DIAGNOSIS_KEY } from '../lib/profile.js'
+import { recordDiagnosis, diagnosisDeltas, recordReading, loadDiagnosisHistory } from '../lib/twin.js'
+import { recordMetric } from '../lib/metrics.js'
 import Mascot from './Mascot.jsx'
 import { ProofLadderView } from './ProblemStart.jsx'
 import TtsButton from './TtsButton.jsx'
@@ -45,7 +46,15 @@ export default function Diagnosis({ setActive }) {
   const [current, setCurrent] = useState(null)
   const [picked, setPicked] = useState(null)
   const [answers, setAnswers] = useState([]) // {level, correct, kind}
-  const [listeningCorrect, setListeningCorrect] = useState(null)
+  // P0-2: listening + reading are now SETS of level-banded, rotated items
+  // (lib/diagnosisItems.js) — two per section, never last run's items
+  // while the pool allows. lCorrect/rCorrect count right answers.
+  const [itemSet, setItemSet] = useState(null)
+  const [lIdx, setLIdx] = useState(0)
+  const [lCorrect, setLCorrect] = useState(0)
+  const [rIdx, setRIdx] = useState(0)
+  const [rCorrect, setRCorrect] = useState(0)
+  const [poolNote, setPoolNote] = useState('')
   const [result, setResult] = useState(() => { try { return JSON.parse(localStorage.getItem(DIAGNOSIS_KEY) || 'null') } catch { return null } })
   const usedRef = useRef(new Set())
   const profile = useMemo(loadProfile, [])
@@ -56,8 +65,6 @@ export default function Diagnosis({ setActive }) {
   const promise = useMemo(() => computeSixtyDayPromise(result, profile), [result, profile])
   useEffect(() => { if (promise) savePromise(promise) }, [promise])
 
-  const listeningItem = useMemo(() => listeningPlus.find((l) => l.level === 'N3') || listeningPlus[0], [])
-  const readingItem = useMemo(() => passages[0], [])
   const grammarSteps = new Set([3, 6])
 
   const nextQuestion = (forStep, atLevelIdx, used) => {
@@ -65,13 +72,23 @@ export default function Diagnosis({ setActive }) {
     return makeVocabQuestion(dict, LEVEL_IDS[atLevelIdx], used) || makeVocabQuestion(dict, 'N2', used) || makeGrammarQuestion(used)
   }
 
+  const selectItems = (d, bandIdx) => {
+    const last = loadDiagnosisHistory().at(-1)
+    return selectDiagnosisItems(d, bandIdx, {
+      listening: last?.sample?.listeningIds || [],
+      reading: last?.sample?.readingIds || [],
+    })
+  }
+
   const start = async () => {
     const d = await loadDictionary(); setDict(d)
     usedRef.current = new Set()
-    setAnswers([]); setStep(0); setLevelIdx(2); setPicked(null); setListeningCorrect(null)
+    setAnswers([]); setStep(0); setLevelIdx(2); setPicked(null)
+    setItemSet(null); setLIdx(0); setLCorrect(0); setRIdx(0); setRCorrect(0); setPoolNote('')
     // nextQuestion closes over the stale `dict`; rebuild with loaded dictionary directly:
     const pool = quizPool(d, { levels: ['N3'] })
     const entry = pick(pool)
+    if (!entry) { setPoolNote('The word deck could not be loaded on this device, so the check cannot start. Check your connection and try again — nothing was recorded.'); return }
     usedRef.current.add(entry.word)
     const distractors = shuffle(pool.filter((e) => e.word !== entry.word && e.meaning !== entry.meaning)).slice(0, 3)
     setCurrent({ kind: 'vocab', level: 'N3', prompt: `「${entry.word}」${entry.reading ? `（${entry.reading}）` : ''} — what does it mean?`, options: shuffle([entry.meaning, ...distractors.map((x) => x.meaning)]).map((label) => ({ label, correct: label === entry.meaning })), explanation: `${entry.word} = ${entry.meaning}` })
@@ -89,36 +106,62 @@ export default function Diagnosis({ setActive }) {
     setTimeout(() => {
       const ns = step + 1
       setPicked(null)
-      if (ns >= VOCAB_STEPS) { setPhase('listening'); return }
+      if (ns >= VOCAB_STEPS) {
+        setItemSet(selectItems(dict, nextIdx)); setPhase('listening'); return
+      }
       setStep(ns)
-      setCurrent(nextQuestion(ns, nextIdx, usedRef.current))
+      const nq = nextQuestion(ns, nextIdx, usedRef.current)
+      if (!nq) {
+        // P2-9: never strand the learner on a null question — finish the
+        // quiz early with an honest note and continue to listening.
+        setPoolNote('The word deck ran short partway through, so the language score rests on fewer words than usual. Listening and reading are unaffected.')
+        setItemSet(selectItems(dict, nextIdx)); setPhase('listening'); return
+      }
+      setCurrent(nq)
     }, 650)
   }
 
-  const finish = (readingOk) => {
-    const totalQ = answers.length + 2
+  const finish = (readingCorrectFinal) => {
+    const lN = itemSet?.listening.length || 0
+    const rN = itemSet?.reading.length || 0
+    const totalQ = answers.length + lN + rN
     const correctCount = answers.filter((a) => a.correct).length
     const net = answers.reduce((acc, a) => acc + (a.correct ? 1 : -1), 0)
     const estIdx = Math.max(0, Math.min(4, 2 + Math.round(net / 3)))
     const jlptEstimate = LEVEL_IDS[estIdx]
     const langAcc = answers.length ? correctCount / answers.length : 0
     const language = Math.max(6, Math.min(58, Math.round(langAcc * 44 + (estIdx / 4) * 14)))
-    const listening = Math.max(5, Math.min(58, Math.round(language * 0.35 + (listeningCorrect ? 38 : 9))))
-    const reading = Math.max(5, Math.min(58, Math.round(language * 0.35 + (readingOk ? 38 : 9))))
+    // Same formula shape as the original single-item version; the binary
+    // 38/9 component is now the per-set proportion (sectionComponent),
+    // so one item can no longer swing a section across the 19/60 line.
+    const listening = Math.max(5, Math.min(58, Math.round(language * 0.35 + sectionComponent(lCorrect, lN))))
+    const reading = Math.max(5, Math.min(58, Math.round(language * 0.35 + sectionComponent(readingCorrectFinal, rN))))
     const sections = { language, reading, listening }
     const weakestKey = Object.entries(sections).sort((a, b) => a[1] - b[1])[0][0]
-    const overallAccuracy = (correctCount + (listeningCorrect ? 1 : 0) + (readingOk ? 1 : 0)) / totalQ
+    const overallAccuracy = totalQ ? (correctCount + lCorrect + readingCorrectFinal) / totalQ : 0
     const bjtScore = estimateBjtScore(0.2 + 0.68 * overallAccuracy)
     const res = {
       at: new Date().toISOString(), jlptEstimate, sections, total: language + reading + listening,
       weakest: weakestKey, bjtScore, bjtBand: bjtBandForScore(bjtScore).id,
       passMark: jlptLevel(jlptEstimate)?.passMark ?? null,
+      // P0-2: what this run actually measured with — the band, the item
+      // ids (the next run rotates away from these) and how many items
+      // were deck-generated because the band had no real ones.
+      sample: {
+        band: itemSet?.band || null,
+        listeningIds: (itemSet?.listening || []).map((i) => i.id),
+        readingIds: (itemSet?.reading || []).map((i) => i.id),
+        listeningItems: lN,
+        readingItems: rN,
+        generatedItems: [...(itemSet?.listening || []), ...(itemSet?.reading || [])].filter((i) => i.generated).length,
+      },
     }
-    try { localStorage.setItem(DIAGNOSIS_KEY, JSON.stringify(res)) } catch { /* ignore */ }
+    saveDiagnosis(res)
     // Diagnosis history (jpn:diagnosisHistory:v1) + Twin section levels —
     // written by diagnosis code only, so trends stay honest (Doc 04 §5).
     recordDiagnosis(res)
-    recordReading({ correct: readingOk })
+    recordMetric('diagnosis_completed', { total: res.total, estimate: res.jlptEstimate }) // gate metric (Doc 11)
+    recordReading({ correct: rN > 0 && readingCorrectFinal * 2 >= rN }) // majority of the reading set
     setResult(res); setPhase('result')
   }
 
@@ -143,14 +186,15 @@ export default function Diagnosis({ setActive }) {
     <div className="space-y-6">
       <div>
         <div className="flex items-center gap-2 mb-1"><Stethoscope size={20} className="text-violet-400" /><h2 className="text-2xl font-bold text-white">Diagnosis — your language health check</h2></div>
-        <p className="text-sm text-slate-400">Adaptive: right answers step the questions up a level, wrong answers step down. Then one listening item (played by voice, transcript hidden) and one reading item. About 10 minutes.</p>
+        <p className="text-sm text-slate-400">Adaptive: right answers step the questions up a level, wrong answers step down. Then two short listening items and two reading items at your band — the items rotate every run, so a re-check measures growth, not memory. About 10 minutes.</p>
       </div>
 
       {phase === 'intro' && (
         <div className="rounded-2xl glass p-6 card-glow space-y-4">
           <p className="text-sm text-slate-300">Most learners study blind for months. This check estimates your JLPT section scores — language knowledge, reading, listening, each /60 against the <span className="text-white font-semibold">19/60 survival line</span> — plus a rough BJT band, then prescribes your next two weeks{profile ? ' around the problem you named' : ''}.</p>
+          {poolNote && phase === 'intro' && <p className="text-sm text-amber-200 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2">{poolNote}</p>}
           {result && <p className="text-sm text-slate-400">Last check: <span className="text-white font-semibold">{result.jlptEstimate}</span> · total {result.total}/180 · weakest: {result.weakest} · BJT ~{result.bjtScore} ({result.bjtBand}) · {new Date(result.at).toLocaleDateString()}</p>}
-          <button onClick={start} className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold">{result ? 'Re-run diagnosis' : 'Start diagnosis'}</button>
+          <button onClick={start} className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold">{result ? 'Re-Run Diagnosis' : 'Start Diagnosis'}</button>
           {result && promise && <PromisePanel promise={promise} />}
           {result && <div className="pt-2"><ProofLadderView diagnosis={result} profile={profile} /></div>}
         </div>
@@ -172,33 +216,50 @@ export default function Diagnosis({ setActive }) {
         </div>
       )}
 
-      {phase === 'listening' && (
+      {phase === 'listening' && (() => {
+        const item = itemSet?.listening?.[lIdx]
+        return (
         <div className="rounded-2xl glass p-6 card-glow space-y-4">
-          <p className="text-xs text-slate-400">Listening · {listeningItem.level} · in the real exam it plays once — here you may replay, but try once first</p>
-          <div className="flex items-center gap-3"><TtsButton text={listeningItem.script} className="px-4 py-2 text-sm font-medium" /><span className="text-sm text-slate-300">{listeningItem.title} — listen, then answer</span></div>
-          <p className="text-white">{listeningItem.questions[0].prompt}</p>
+          <p className="text-xs text-slate-400">Listening {itemSet ? `${lIdx + 1} of ${itemSet.listening.length}` : ''}{item ? ` · ${item.level}` : ''} · in the real exam it plays once — here you may replay, but try once first</p>
+          {poolNote && <p className="text-sm text-amber-200 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2">{poolNote}</p>}
+          {item ? (<>
+          <div className="flex items-center gap-3"><TtsButton text={item.script} className="px-4 py-2 text-sm font-medium" /><span className="text-sm text-slate-300">{item.title} — listen, then answer{item.generated ? ' · built from a deck word' : ''}</span></div>
+          <p className="text-white">{item.question.prompt}</p>
           <div className="grid gap-2">
-            {listeningItem.questions[0].options.map((opt, i) => (
-              <button key={i} onClick={() => { setListeningCorrect(!!opt.correct); setPhase('reading') }}
+            {item.question.options.map((opt, i) => (
+              <button key={i} onClick={() => { if (opt.correct) setLCorrect((c) => c + 1); if (lIdx + 1 < itemSet.listening.length) { setLIdx(lIdx + 1) } else { setPhase('reading') } }}
                 className="text-left px-4 py-3 rounded-xl border bg-bun-700/40 border-bun-600/30 text-slate-200 hover:bg-bun-700/60 transition">{opt.label}</button>
             ))}
           </div>
+          </>) : (<>
+          <p className="text-sm text-slate-300">No listening items could be prepared for this band on this device, so listening is skipped this run — the section score below rests on your language score alone and is marked by its smaller sample.</p>
+          <button onClick={() => setPhase('reading')} className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold">Continue To Reading</button>
+          </>)}
         </div>
-      )}
+        )
+      })()}
 
-      {phase === 'reading' && (
+      {phase === 'reading' && (() => {
+        const item = itemSet?.reading?.[rIdx]
+        return (
         <div className="rounded-2xl glass p-6 card-glow space-y-4">
-          <p className="text-xs text-slate-400">Reading · {readingItem.level} · read once, at speed</p>
-          <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-5 leading-loose text-slate-100"><KanjiTapText text={readingItem.text} /></div>
-          <p className="text-white">{readingItem.questions[0].prompt}</p>
+          <p className="text-xs text-slate-400">Reading {itemSet ? `${rIdx + 1} of ${itemSet.reading.length}` : ''}{item ? ` · ${item.level}` : ''} · read once, at speed</p>
+          {item ? (<>
+          <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-5 leading-loose text-slate-100"><KanjiTapText text={item.text} /></div>
+          <p className="text-white">{item.question.prompt}</p>
           <div className="grid gap-2">
-            {readingItem.questions[0].options.map((opt, i) => (
-              <button key={i} onClick={() => finish(!!opt.correct)}
+            {item.question.options.map((opt, i) => (
+              <button key={i} onClick={() => { const nc = rCorrect + (opt.correct ? 1 : 0); if (opt.correct) setRCorrect(nc); if (rIdx + 1 < itemSet.reading.length) { setRIdx(rIdx + 1) } else { finish(nc) } }}
                 className="text-left px-4 py-3 rounded-xl border bg-bun-700/40 border-bun-600/30 text-slate-200 hover:bg-bun-700/60 transition">{opt.label}</button>
             ))}
           </div>
+          </>) : (<>
+          <p className="text-sm text-slate-300">No reading items could be prepared for this band on this device, so reading is skipped this run — the section score below rests on your language score alone and is marked by its smaller sample.</p>
+          <button onClick={() => finish(rCorrect)} className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold">See My Result</button>
+          </>)}
         </div>
-      )}
+        )
+      })()}
 
       {phase === 'result' && result && (
         <div className="space-y-6">
@@ -214,6 +275,7 @@ export default function Diagnosis({ setActive }) {
               ))}
             </div>
             <p className="text-sm text-slate-300">At {result.jlptEstimate}, the pass mark is <span className="text-white font-semibold">{result.passMark}/180</span> with every section ≥ 19/60. Your modeled total is {result.total} — {result.total >= (result.passMark || 0) ? 'at/above the line on paper, but sit the exam only when practice mocks clear it by 15–20 points with margin in EVERY section.' : `you need +${(result.passMark || 0) - result.total} modeled points, and the cheapest points are in ${result.weakest}.`} BJT estimate: <span className="text-white font-semibold">~{result.bjtScore} ({result.bjtBand})</span> — a rough cross-estimate; the BJT trainer measures business Japanese directly.</p>
+            {result.sample && <p className="text-xs text-slate-500">This run measured with {result.sample.listeningItems} listening and {result.sample.readingItems} reading items at the {result.sample.band} band{result.sample.generatedItems ? ` — ${result.sample.generatedItems} of them built from real deck words because that band has no written items yet` : ''}. Items rotate every run.</p>}
             <p className="text-xs text-slate-500">Honest limits: this is an in-app estimate from a short adaptive sample, not an official score. JLPT publishes no official vocab lists, so level pools are community estimates. Use it to aim your study — the mock exams and the real exam are the proof.</p>
           </div>
 
@@ -247,7 +309,7 @@ export default function Diagnosis({ setActive }) {
                 <ChevronRight size={15} className="text-violet-300 mt-0.5 shrink-0" /><span className="text-sm text-slate-200">{line.text}</span>
               </button>
             ))}
-            <button onClick={() => setPhase('intro')} className="px-4 py-2 rounded-lg bg-bun-700 hover:bg-bun-600 text-slate-200 text-xs font-medium flex items-center gap-1.5"><RotateCcw size={13} /> Back / re-run later</button>
+            <button onClick={() => setPhase('intro')} className="px-4 py-2 rounded-lg bg-bun-700 hover:bg-bun-600 text-slate-200 text-xs font-medium flex items-center gap-1.5"><RotateCcw size={13} /> Back / Re-Run Later</button>
           </div>
 
           <ProofLadderView diagnosis={result} profile={profile} />

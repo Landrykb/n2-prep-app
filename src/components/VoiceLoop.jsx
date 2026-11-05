@@ -7,6 +7,7 @@ import { recordVoiceAttempt } from '../lib/twin.js'
 import Mascot from './Mascot.jsx'
 import MicPrompt from './MicPrompt.jsx'
 import { micExplained, markMicExplained } from '../lib/micConsent.js'
+import { micErrorCopy } from '../lib/speechErrors.js'
 import TtsButton from './TtsButton.jsx'
 import KanjiTapText from './KanjiTapText.jsx'
 
@@ -14,7 +15,7 @@ const MASTERED_KEY = 'jpn:voice:mastered'
 const MASTERY = 85
 
 function normalise(s) {
-  return (s || '').replace(/[\s。、！？!?・「」『』（）()]/g, '').replace(/です/g, 'です').trim()
+  return (s || '').replace(/[\s。、！？!?・「」『』（）()]/g, '').trim()
 }
 function bigrams(s) {
   const out = new Map()
@@ -72,6 +73,7 @@ export default function VoiceLoop() {
   const [input, setInput] = useState('')
   const [attempts, setAttempts] = useState([]) // { text, score, missing }
   const [listening, setListening] = useState(false)
+  const [micError, setMicError] = useState(null)
   const [savedNote, setSavedNote] = useState('')
   const [shadowChecks, setShadowChecks] = useState({ heard: false, matched: false, meaning: false })
   const [mastered, setMastered] = useState(loadMastered)
@@ -99,8 +101,8 @@ export default function VoiceLoop() {
     const rec = new SR()
     recogRef.current = rec
     rec.lang = 'ja-JP'; rec.interimResults = false; rec.maxAlternatives = 1
-    rec.onresult = (e) => { setInput(e.results[0][0].transcript || ''); setListening(false) }
-    rec.onerror = () => setListening(false)
+    rec.onresult = (e) => { setInput(e.results[0][0].transcript || ''); setListening(false); setMicError(null) }
+    rec.onerror = (e) => { setListening(false); setMicError(micErrorCopy(e?.error)) }
     rec.onend = () => setListening(false)
     setListening(true)
     try { rec.start() } catch { setListening(false) }
@@ -207,6 +209,12 @@ export default function VoiceLoop() {
                 <button onClick={check} disabled={!input.trim()} className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-medium">Check me</button>
               </div>
             </div>
+            {micError && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+                <p className="text-sm font-semibold text-amber-200">{micError.title}</p>
+                <p className="text-xs text-amber-100/80 mt-0.5">{micError.body}</p>
+              </div>
+            )}
             {!speechSupported && <p className="text-xs text-slate-500">Voice recognition isn’t available in this browser — typing your version works exactly the same way here.</p>}
 
             {attempts.map((a, i) => (
@@ -253,6 +261,12 @@ export default function VoiceLoop() {
                 <button onClick={check} disabled={!input.trim()} className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-medium">Self-check</button>
               </div>
             </div>
+            {micError && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+                <p className="text-sm font-semibold text-amber-200">{micError.title}</p>
+                <p className="text-xs text-amber-100/80 mt-0.5">{micError.body}</p>
+              </div>
+            )}
             {last && <p className="text-sm text-slate-200">Shadow match: <span className={`font-bold ${last.score >= MASTERY ? 'text-emerald-300' : 'text-amber-300'}`}>{last.score}%</span>{last.missing.length ? <> · missing: {last.missing.join('、')}</> : ''}</p>}
             <div className="space-y-2">
               {[['heard', 'I listened twice and understood every word first'], ['matched', 'I matched the timing and intonation, not just the words'], ['meaning', 'I could explain what this line means and when to use it']].map(([key, label]) => (

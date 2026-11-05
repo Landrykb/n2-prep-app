@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Phone, PhoneOff, Mic, MicOff, CheckCircle2, RotateCcw, Clock, Bell, Inbox, X } from 'lucide-react'
 import { loadProfile } from '../lib/profile.js'
+import { micErrorCopy } from '../lib/speechErrors.js'
+import { speakText } from '../lib/tts.js'
 import { addToQueue } from '../lib/queue.js'
 import { todayStr } from '../lib/session.js'
 import {
@@ -70,6 +72,7 @@ export default function SenseiCall() {
   const [results, setResults] = useState([]) // per finished exchange
   const [current, setCurrent] = useState(null) // running stats for the live exchange
   const [listening, setListening] = useState(false)
+  const [micError, setMicError] = useState(null)
   const [wrap, setWrap] = useState(null) // wrap-up summary
   const recogRef = useRef(null)
   const phaseRef = useRef(phase)
@@ -216,12 +219,23 @@ export default function SenseiCall() {
     const rec = new SR()
     recogRef.current = rec
     rec.lang = 'ja-JP'; rec.interimResults = false; rec.maxAlternatives = 1
-    rec.onresult = (e) => { setInput(e.results[0][0].transcript || ''); setListening(false) }
-    rec.onerror = () => setListening(false)
+    rec.onresult = (e) => { setInput(e.results[0][0].transcript || ''); setListening(false); setMicError(null) }
+    rec.onerror = (e) => { setListening(false); setMicError(micErrorCopy(e?.error)) }
     rec.onend = () => setListening(false)
     setListening(true)
     try { rec.start() } catch { setListening(false) }
   }
+
+  // Auto-speak (P2-4): when a new exchange opens mid-call, Koe's line is
+  // spoken automatically — no hunting for a speaker icon while talking.
+  const spokenForRef = useRef('')
+  useEffect(() => {
+    if (phase !== 'incall' || !scene) return
+    const key = `${scene.id}:${exIdx}`
+    if (spokenForRef.current === key) return
+    spokenForRef.current = key
+    speakText(scene.partner)
+  }, [phase, exIdx, scene])
 
   const finishExchange = (finalCurrent) => {
     const done = [...results, finalCurrent]
@@ -264,7 +278,7 @@ export default function SenseiCall() {
   const finishCall = (done) => {
     const queued = queueErrors(done)
     const bestScoreVal = done.length ? Math.round(done.reduce((a, r) => a + r.best, 0) / done.length) : 0
-    if (ring && ring.source !== 'test') recordCallOutcome({ kept: true, bestScore: bestScoreVal })
+    if (ring && ring.source !== 'test') recordCallOutcome({ kept: true, bestScore: bestScoreVal, partial: done.length < chain.length })
     const weakest = [...done].sort((a, b) => a.best - b.best)[0]
     let s = loadCallState()
     s = recordHistory(s, { kind: 'call', scene: chain[0]?.title || 'Practice call', status: 'completed', bestScore: bestScoreVal, exchanges: done.length })
@@ -410,7 +424,7 @@ export default function SenseiCall() {
         <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4 text-xs text-slate-400 leading-relaxed">
           <p className="text-slate-200 font-semibold text-sm mb-1 flex items-center gap-1.5"><Bell size={14} /> The honest note — how a web app “calls” you</p>
           While this app is closed, it cannot ring your phone like a carrier call. What it <em>can</em> do is send a <strong className="text-slate-200">push notification</strong> (turn those on in the card on the Today page) at your call time — tapping it opens this call screen. {reachMode === 'server'
-            ? 'Because you are signed in, your windows are synced to a small server scheduler, so that push can be sent at your call time even while the app is closed; if a summons is ever missed, opening the app offers the call once more.'
+            ? 'Because you are signed in, your windows are synced to a small server scheduler, so that push can be sent at your call time even while the app is closed; if a summons is ever missed, opening the app offers the call once more. Call times follow this device’s timezone — travel, and your new timezone is re-synced when the app comes back to the front.'
             : 'That only works while you are signed in — signed out, nothing leaves this device, and your call simply rings here the next time you open the app.'} While the app is open, the call arrives right here, like the test call above. No real phone number is dialled, and nothing here pretends otherwise.
         </div>
       </section>
@@ -515,6 +529,12 @@ export default function SenseiCall() {
                 <button onClick={check} disabled={!input.trim()} className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-medium">Say it</button>
               </div>
             </div>
+            {micError && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+                <p className="text-sm font-semibold text-amber-200">{micError.title}</p>
+                <p className="text-xs text-amber-100/80 mt-0.5">{micError.body}</p>
+              </div>
+            )}
             {!speechSupported && <p className="text-xs text-slate-500">Voice recognition isn’t available in this browser — typing your version works the same way on a call.</p>}
 
             {lastAttempt && (

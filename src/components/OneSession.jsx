@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Play, Mic, MicOff, CheckCircle2, RotateCcw, Headphones, Sparkles, ChevronRight, Coffee } from 'lucide-react'
 import { loadProfile, loadDiagnosis, ladderWithStatus } from '../lib/profile.js'
+import { micErrorCopy } from '../lib/speechErrors.js'
 import { loadQueue, addToQueue, rateQueueItem } from '../lib/queue.js'
 import { previewIntervals, Rating } from '../lib/fsrs.js'
 import {
@@ -10,6 +11,7 @@ import {
 import { bestScore, missingPhrases } from './VoiceLoop.jsx'
 import { scenes as allScenes } from '../data/scenes.js'
 import { recordVoiceAttempt, recordQueueRating, recordSessionSummary } from '../lib/twin.js'
+import { recordMetric } from '../lib/metrics.js'
 import { getPlanFor, markPlanConsumed, noteSessionForExperiment } from '../lib/planner.js'
 import Mascot from './Mascot.jsx'
 import TtsButton from './TtsButton.jsx'
@@ -59,6 +61,7 @@ export default function OneSession({ setActive }) {
   const [lastAttempt, setLastAttempt] = useState(null) // { text, score, missing }
   const [flipped, setFlipped] = useState(false)
   const [listening, setListening] = useState(false)
+  const [micError, setMicError] = useState(null)
   const [effort, setEffort] = useState('')
   const [nowTick, setNowTick] = useState(Date.now())
   const recogRef = useRef(null)
@@ -95,8 +98,8 @@ export default function OneSession({ setActive }) {
     const rec = new SR()
     recogRef.current = rec
     rec.lang = 'ja-JP'; rec.interimResults = false; rec.maxAlternatives = 1
-    rec.onresult = (e) => { setInput(e.results[0][0].transcript || ''); setListening(false) }
-    rec.onerror = () => setListening(false)
+    rec.onresult = (e) => { setInput(e.results[0][0].transcript || ''); setListening(false); setMicError(null) }
+    rec.onerror = (e) => { setListening(false); setMicError(micErrorCopy(e?.error)) }
     rec.onend = () => setListening(false)
     setListening(true)
     try { rec.start() } catch { setListening(false) }
@@ -172,6 +175,7 @@ export default function OneSession({ setActive }) {
         listeningCorrect: isBusy ? null : listeningCorrect,
         listeningScript: bite.script,
       })
+      recordMetric('session_completed', { minutes: minutesSpent, proof }) // gate metric (Doc 11)
       if (state.planExperiment) noteSessionForExperiment({ experiment: state.planExperiment }, { proof })
     }
     patch({ step: 3, done: true, recorded: true, elapsedBaseSec: elapsedSec, segmentStartAt: new Date().toISOString() })
@@ -269,7 +273,13 @@ export default function OneSession({ setActive }) {
               <button onClick={checkScene} disabled={!input.trim()} className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-medium">Check me</button>
             </div>
           </div>
-          {!speechSupported && <p className="text-xs text-slate-500">Voice recognition isn’t available in this browser — typing your version works the same way here.</p>}
+          {micError && (
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+            <p className="text-sm font-semibold text-amber-200">{micError.title}</p>
+            <p className="text-xs text-amber-100/80 mt-0.5">{micError.body}</p>
+          </div>
+            )}
+            {!speechSupported && <p className="text-xs text-slate-500">Voice recognition isn’t available in this browser — typing your version works the same way here.</p>}
 
           {lastAttempt && (
             <div className={`rounded-xl border p-4 space-y-2 ${lastAttempt.score >= MASTERY ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-bun-700/40 border-bun-600/20'}`}>

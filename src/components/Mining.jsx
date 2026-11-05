@@ -34,7 +34,10 @@ word: entry.word,
 reading: entry.reading || '',
 meaning: entry.meaning || '',
 level: entry.level || '',
-front: sentence.replace(entry.word, ``),
+// P2-1: the front used to DELETE the target word silently — the card
+// read as a broken sentence with a hole in it. Now it is a real cloze:
+// a visible blank with the reading as the hint.
+front: sentence.replace(entry.word, entry.reading ? `＿＿＿（${entry.reading}）` : '＿＿＿'),
 back: `${entry.word}${entry.reading? `（${entry.reading}）`: ''} — ${entry.meaning} · in your sentence: ${sentence}`,
 })
 }
@@ -89,7 +92,7 @@ return (
 <textarea value={text} onChange={(e) => setText(e.target.value)} rows={6} placeholder="Paste Japanese text here — an email, a letter from school, meeting minutes…"
 className="w-full rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 leading-loose focus:border-violet-500 focus:outline-none" />
 <div className="flex flex-wrap gap-2">
-<button onClick={runMine} disabled={!text.trim()} className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white text-sm font-semibold">Mine this text</button>
+<button onClick={runMine} disabled={!text.trim()} className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white text-sm font-semibold">Mine This Text</button>
 <button onClick={() => setText(SAMPLE)} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-200 text-sm">Try a sample city-office notice</button>
 </div>
 {note && <p className="text-sm text-emerald-300 flex items-center gap-2"><CheckCircle2 size={15} /> {note}</p>}

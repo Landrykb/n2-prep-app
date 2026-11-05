@@ -1,14 +1,26 @@
-// Mock exam generator — builds a JLPT N2-shaped paper entirely from the
-// app's authoritative data (vocabLessons, commonWords, grammarLessons,
-// questions, passages, n2Listening). Nothing here invents Japanese text:
+// Mock exam generator — builds a JLPT-shaped paper at the learner's
+// level from the app's real banks. Nothing here invents Japanese text:
 // every prompt, option, and explanation is lifted from real study content.
+//
+// LEVEL HONESTY (P1-3): vocabulary/kanji come from the level-tagged deck
+// (8,334 entries, N5–N1) when the caller passes the loaded dictionary;
+// listening comes from listeningPlus at the paper's level (+ the N2 bank
+// at N2). But the written grammar bank and the reading passages exist
+// ONLY at N2 — for any other level those sections are ESTIMATED from the
+// N2 bank and the paper says so in `meta.estimated`, on screen, never
+// silently. Without a dictionary the generator falls back to the
+// built-in N2 word bank and says that too.
 //
 // Generation is deterministic for a given seed (mulberry32 via shuffle.js) so
 // a refreshed page can rebuild the identical paper.
 
 import { grammarLessons, vocabLessons, passages, questions, commonWords } from '../data.js'
 import { n2Listening } from '../data/n2Listening.js'
+import { listeningPlus } from '../data/listeningPlus.js'
+import { jlptLevel } from './levels.js'
 import { seededRandom, shuffleWithSeed } from './shuffle.js'
+
+const LEVEL_ORDER = ['N5', 'N4', 'N3', 'N2', 'N1']
 
 const KANJI_RE = /[㐀-䶿一-龿]/
 const hasKanji = (w) => KANJI_RE.test(w)
@@ -80,23 +92,55 @@ const PLANS = {
 
 export const MOCK_LENGTHS = {
   quick: { label: 'Quick mock', desc: 'Short paper — one sit-down practice run', timeA: 25, timeB: 10 },
-  full: { label: 'Full mock', desc: 'Real N2 timing and every bank item', timeA: 105, timeB: 50 },
+  full: { label: 'Full mock', desc: 'Full-length paper — every bank item at your level', timeA: 105, timeB: 50 },
 }
 
-export function buildMockExam(length = 'quick', seed = Date.now() % 2147483647) {
+export function buildMockExam(length = 'quick', seed = Date.now() % 2147483647, { level = 'N2', dict = null } = {}) {
   const plan = PLANS[length] || PLANS.quick
+  const meta = { estimated: [], thin: [], vocabFrom: 'the built-in study bank' }
+
+  // --- word pool for this level -------------------------------------------
+  // Deck entries at the paper's level first; if that pool cannot build a
+  // paper, widen to neighbouring levels and SAY so in meta.estimated.
+  let words = uniqueWords
+  if (dict?.entries?.length) {
+    const usable = (e) => e.word && e.reading && e.meaning && hasKanji(e.word)
+    const dedupe = (list) => { const seen = new Set(); return list.filter((e) => !seen.has(e.word) && seen.add(e.word)) }
+    const idx = Math.max(0, LEVEL_ORDER.indexOf(level))
+    const order = [0, -1, 1, -2, 2].map((o) => idx + o).filter((i) => i >= 0 && i < LEVEL_ORDER.length)
+    let pool = []
+    const usedLevels = []
+    for (const li of order) {
+      pool = [...pool, ...dict.entries.filter((e) => usable(e) && e.level === LEVEL_ORDER[li])]
+      usedLevels.push(LEVEL_ORDER[li])
+      if (dedupe(pool).length >= 12) break
+    }
+    if (dedupe(pool).length >= 12) {
+      words = dedupe(pool)
+      meta.vocabFrom = usedLevels.join(' + ')
+      if (usedLevels.length > 1) meta.estimated.push({ section: 'Vocabulary & kanji', from: `deck words from ${usedLevels.join(' and ')} — the ${level} pool alone is thin` })
+    } else {
+      meta.estimated.push({ section: 'Vocabulary & kanji', from: 'the built-in study bank — the deck pool at this level is too small to build a paper' })
+    }
+  } else if (level !== 'N2') {
+    meta.estimated.push({ section: 'Vocabulary & kanji', from: 'the built-in N2 study bank — the level deck had not loaded' })
+  }
+  if (level !== 'N2') {
+    meta.estimated.push({ section: 'Grammar & sentence structure', from: 'the N2 bank — the only written grammar bank in the app' })
+    meta.estimated.push({ section: 'Reading passages', from: 'N2 passages — the only written passages in the app' })
+  }
   const rand = seededRandom(seed)
   let qid = 0
   const id = () => `q${seed.toString(36)}-${qid++}`
 
   // --- 問題1 漢字読み: kanji word → correct reading -----------------------
-  const kanjiPool = shuffleWithSeed(uniqueWords.filter((w) => w.reading.length >= 2), seed + 1)
+  const kanjiPool = shuffleWithSeed(words.filter((w) => w.reading.length >= 2), seed + 1)
   const kanjiQs = kanjiPool.slice(0, plan.kanji).map((w, i) => {
-    const near = uniqueWords.filter((x) => x.word !== w.word && Math.abs(x.reading.length - w.reading.length) <= 2)
+    const near = words.filter((x) => x.word !== w.word && Math.abs(x.reading.length - w.reading.length) <= 2)
     const ds = distractors(near, w.reading, 3, rand, (x) => x.reading)
     if (ds.length < 3) {
       const picked = new Set(ds.map((x) => x.reading))
-      ds.push(...distractors(uniqueWords.filter((x) => x.word !== w.word && !picked.has(x.reading)), w.reading, 3 - ds.length, rand, (x) => x.reading))
+      ds.push(...distractors(words.filter((x) => x.word !== w.word && !picked.has(x.reading)), w.reading, 3 - ds.length, rand, (x) => x.reading))
     }
     return {
       id: id(), type: 'kanji-reading', group: '問題1 漢字読み',
@@ -108,13 +152,13 @@ export function buildMockExam(length = 'quick', seed = Date.now() % 2147483647) 
   })
 
   // --- 問題2 表記: reading → correct kanji spelling ------------------------
-  const orthoPool = shuffleWithSeed(uniqueWords.filter((w) => !kanjiQs.some((q) => q.target === w.word)), seed + 2)
+  const orthoPool = shuffleWithSeed(words.filter((w) => !kanjiQs.some((q) => q.target === w.word)), seed + 2)
   const orthoQs = orthoPool.slice(0, plan.orthography).map((w, i) => {
-    const near = uniqueWords.filter((x) => x.word !== w.word && Math.abs(x.word.length - w.word.length) <= 1)
+    const near = words.filter((x) => x.word !== w.word && Math.abs(x.word.length - w.word.length) <= 1)
     const ds = distractors(near, w.word, 3, rand, (x) => x.word)
     if (ds.length < 3) {
       const picked = new Set(ds.map((x) => x.word))
-      ds.push(...distractors(uniqueWords.filter((x) => x.word !== w.word && !picked.has(x.word)), w.word, 3 - ds.length, rand, (x) => x.word))
+      ds.push(...distractors(words.filter((x) => x.word !== w.word && !picked.has(x.word)), w.word, 3 - ds.length, rand, (x) => x.word))
     }
     return {
       id: id(), type: 'orthography', group: '問題2 表記',
@@ -127,10 +171,10 @@ export function buildMockExam(length = 'quick', seed = Date.now() % 2147483647) 
 
   // --- 問題3 文脈規定・言い換え: word → meaning -----------------------------
   const generatedMeaning = shuffleWithSeed(
-    uniqueWords.filter((w) => !kanjiQs.some((q) => q.target === w.word) && !orthoQs.some((q) => q.target === w.word)),
+    words.filter((w) => !kanjiQs.some((q) => q.target === w.word) && !orthoQs.some((q) => q.target === w.word)),
     seed + 3,
   ).map((w, i) => {
-    const ds = distractors(uniqueWords, w.meaning, 3, rand, (x) => x.meaning)
+    const ds = distractors(words, w.meaning, 3, rand, (x) => x.meaning)
     return {
       id: id(), type: 'vocab-meaning', group: '問題3 文脈規定・言い換え',
       prompt: w.example ? `${w.example}` : `「${w.word}」の意味として最もよいものを選びなさい。`,
@@ -175,7 +219,13 @@ export function buildMockExam(length = 'quick', seed = Date.now() % 2147483647) 
   }))
 
   // --- 聴解 ------------------------------------------------------------------
-  const listeningGroups = shuffleWithSeed(n2Listening, seed + 8).slice(0, plan.listening).map((l) => ({
+  const listeningPool = level === 'N2'
+    ? [...n2Listening, ...listeningPlus.filter((l) => l.level === 'N2')]
+    : listeningPlus.filter((l) => l.level === level)
+  if (listeningPool.length < Math.min(plan.listening === Infinity ? 2 : plan.listening, 2)) {
+    meta.thin.push(`Listening has only ${listeningPool.length} dialogue${listeningPool.length === 1 ? '' : 's'} at ${level}, so this paper's listening section is shorter than the real exam.`)
+  }
+  const listeningGroups = shuffleWithSeed(listeningPool, seed + 8).slice(0, plan.listening).map((l) => ({
     name: '問題1 聴解',
     intro: '音声を聞いて、質問と選択肢から最もよい答えを選びなさい。',
     listening: { title: l.title, script: l.script },
@@ -188,6 +238,8 @@ export function buildMockExam(length = 'quick', seed = Date.now() % 2147483647) 
   return {
     length,
     seed,
+    level,
+    meta,
     sections: [
       {
         id: 'A',
@@ -251,7 +303,11 @@ export function scoreExam(exam, answers) {
     listening: lsT ? Math.round((lsC / lsT) * 60) : 0,
   }
   scaled.total = scaled.lk + scaled.reading + scaled.listening
-  const passed = scaled.total >= 90 && scaled.lk >= 19 && scaled.reading >= 19 && scaled.listening >= 19
+  // Pass mark belongs to the paper's level (N5 80 · N4 90 · N3 95 · N2 90
+  // · N1 100) — scoring an N5 paper against N2's 90 was part of the
+  // N2-only fiction. Section minimum stays 19/60 at every level.
+  const passMark = jlptLevel(exam.level)?.passMark ?? 90
+  const passed = scaled.total >= passMark && scaled.lk >= 19 && scaled.reading >= 19 && scaled.listening >= 19
 
-  return { scaled, passed, byType, wrong }
+  return { scaled, passed, passMark, byType, wrong }
 }

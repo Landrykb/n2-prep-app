@@ -9,10 +9,10 @@ const corsHeaders = {
 
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1'
 
-const JPN2EASY_PERSONA = `You are JPN2easy's expert AI Japanese-language tutor. You teach across the whole app: JLPT N5–N2, BJT business Japanese (J1–J5), kanji, grammar, reading, listening, keigo, and SRS/Anki review. Your goal is to help the learner level up efficiently and keep them motivated.
+const JPN2EASY_PERSONA = `You are the AI tutor of Yonde — a friendly fleet of AI agents that learns how each learner learns. You teach across the whole app: JLPT N5–N1 and beyond, BJT business Japanese (J5–J1+), kanji, grammar, reading, listening, keigo, and spaced review. Your goal is to help the learner level up efficiently and keep them motivated.
 
 What you know about the platform:
-- JPN2easy is a PWA with tabs: Dashboard (daily actions, JLPT countdown, habit check), Drills (N2 filtered questions), Anki (SRS cards), Lessons (kanji / vocab / grammar), Reading (passages with Furigana), N2 Listening (TTS audio + Japanese questions), BJT (J1–J5 score map, business vocab, keigo, reading, listening, daily drills), Videos, Resources, and an Error Log.
+- Yonde is a PWA built around a fleet: a Today home with one light session, the Yobidashi (Koe calls the learner for a few minutes of spoken practice), a Voice Loop of real-life scenes, a Diagnosis that tells the truth by section, a personal review queue (FSRS), Mining (learners paste real Japanese documents and learn from them), a BJT trainer, level-matched mock exams, and a library of lessons, reading and listening. There is no streak and no punishment — the fleet adapts to the learner's week.
 - N2 study covers ~150 kanji lessons, grammar patterns (e.g. 〜わけがない, 〜ざるを得ない, 〜ものだ, 〜ことになっている), N2 vocabulary, common words, reading passages, and multiple-choice drills.
 - BJT study covers J1–J5 business vocabulary, honorifics (sonkeigo / kenjougo), Japanese reading passages with Japanese questions, and listening scripts.
 - SRS uses an Anki-style scheduler; the error log records mistakes and their fixes.
@@ -24,7 +24,7 @@ Teaching rules:
 - Always give at least one clear Japanese example sentence when explaining grammar, vocabulary, or keigo. Provide romaji and a natural English translation with it.
 - Adjust your explanation depth to the user's level. If the user is weak, simplify; if they are strong, be precise and use N1-level nuance when useful.
 - If the user makes a mistake, gently correct it, explain why, and ask a short follow-up to check understanding (Socratic style).
-- If the user asks about app navigation or study strategy, be specific to JPN2easy and suggest which tab / action to use next.
+- If the user asks about app navigation or study strategy, be specific to Yonde and suggest which part of the fleet or which action to use next.
 - If the requested topic is not covered by the provided study context, use your general knowledge and say so honestly. Do not make up app data.`
 
 serve(async (req: Request) => {
@@ -67,11 +67,11 @@ serve(async (req: Request) => {
     }
 
     const openrouterKey = Deno.env.get('OPENROUTER_API_KEY') ?? ''
-    const referer = Deno.env.get('APP_URL') ?? 'https://jpn2easy.vercel.app'
+    const referer = Deno.env.get('APP_URL') ?? 'https://yonde.app'
     const chatModel = Deno.env.get('OPENROUTER_CHAT_MODEL') ?? 'openrouter/free'
 
     const contextBlock = context
-      ? `\n\nThe user is currently on the "${context}" page of JPN2easy. Try to relate your answer to that area when it helps. If the page is BJT, n2listening, or n2-specific, adapt examples and quiz questions to that test type.`
+      ? `\n\nThe user is currently on the "${context}" page of Yonde. Try to relate your answer to that area when it helps. If the page is BJT, n2listening, or n2-specific, adapt examples and quiz questions to that test type.`
       : ''
 
     let systemPrompt = JPN2EASY_PERSONA + contextBlock
@@ -93,7 +93,7 @@ serve(async (req: Request) => {
         .map((e: any, i: number) => `${i + 1}. [${e.section}] ${e.mistake}${e.cause ? ` (cause: ${e.cause})` : ''}${e.fix ? ` (fix: ${e.fix})` : ''}`)
         .join('\n') || 'No errors logged yet.'
 
-      systemPrompt += `\n\nThe learner wants a review of their recent error log. Here are their most recent errors:\n${errorContext}\n\nAnalyze the patterns. Pick 2-3 weak areas, explain each briefly with a Japanese example, and give concrete next steps using JPN2easy tabs. End with one follow-up question.`
+      systemPrompt += `\n\nThe learner wants a review of their recent error log. Here are their most recent errors:\n${errorContext}\n\nAnalyze the patterns. Pick 2-3 weak areas, explain each briefly with a Japanese example, and give concrete next steps using Yonde's fleet and library. End with one follow-up question.`
     } else if (context !== 'bjt' && !context.startsWith('n2listening')) {
       // Use N2 vector search for N2-study pages
       const embedModel = Deno.env.get('OPENROUTER_EMBEDDING_MODEL') ?? 'liquid/lfm-2.5-embedding-350m:free'
@@ -103,7 +103,7 @@ serve(async (req: Request) => {
           'Authorization': `Bearer ${openrouterKey}`,
           'Content-Type': 'application/json',
           'HTTP-Referer': referer,
-          'X-Title': 'JPN2easy',
+          'X-Title': 'Yonde',
         },
         body: JSON.stringify({ model: embedModel, input: message }),
       })
@@ -142,7 +142,7 @@ serve(async (req: Request) => {
         systemPrompt += `\n\nUse the following N2 study context to answer when it is relevant. If it does not answer the question, use your general knowledge and say so honestly.\n\n${n2Context}`
       }
     } else {
-      systemPrompt += `\n\nThe user is focusing on ${context === 'bjt' ? 'BJT business Japanese' : 'N2 listening'}. Use your knowledge of that test and the JPN2easy material to help them. If they ask for a quiz, produce one appropriate question with Japanese options labeled A, B, C, D and do NOT reveal the answer yet.`
+      systemPrompt += `\n\nThe user is focusing on ${context === 'bjt' ? 'BJT business Japanese' : 'N2 listening'}. Use your knowledge of that test and the Yonde material to help them. If they ask for a quiz, produce one appropriate question with Japanese options labeled A, B, C, D and do NOT reveal the answer yet.`
     }
 
     const messages = [
@@ -157,7 +157,7 @@ serve(async (req: Request) => {
         'Authorization': `Bearer ${openrouterKey}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': referer,
-        'X-Title': 'JPN2easy',
+        'X-Title': 'Yonde',
       },
       body: JSON.stringify({
         model: chatModel,

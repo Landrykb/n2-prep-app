@@ -2,24 +2,35 @@ import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../hooks/useAuth.js'
 import { supabase } from '../lib/supabaseClient.js'
 import { consumeAiPrefill } from '../lib/aiPrefill.js'
+import { loadDiagnosis } from '../lib/profile.js'
 import RichText from './RichText.jsx'
 import TtsButton from './TtsButton.jsx'
 import { Send, Loader2, Sparkles, RotateCcw, Copy, Check, Flag } from 'lucide-react'
 
-const QUICK_ACTIONS = [
-  { label: 'Explain N2 grammar', prompt: 'Explain the difference between 〜わけがない and 〜わけではない with a Japanese example.', mode: 'ask' },
-  { label: 'Explain BJT keigo', prompt: 'What is the difference between 尊敬語 and 謙譲語? Give a workplace example.', mode: 'ask' },
-  { label: 'N2 vocab', prompt: 'Teach one high-value N2 business word and how to use it.', mode: 'ask' },
-  { label: 'Quiz me N2', prompt: 'Give me one JLPT N2 multiple-choice question. Do not reveal the answer yet.', mode: 'quiz' },
-  { label: 'BJT question', prompt: 'Give me one BJT business Japanese multiple-choice question. Do not reveal the answer yet.', mode: 'quiz' },
-  { label: 'Review errors', prompt: 'Review my recent errors and recommend the next 3 things to study.', mode: 'review' },
-  { label: '7-day plan', prompt: 'Based on my recent activity, suggest a focused 7-day study plan.', mode: 'review' },
-  { label: 'Kanji story', prompt: 'Pick one N2 kanji and tell me a mnemonic story to remember it.', mode: 'ask' },
-  { label: 'Listening tip', prompt: 'Give me one tip for improving JLPT N2 listening and a short example sentence.', mode: 'ask' },
-  { label: 'Make a sentence', prompt: 'Give me one useful N2 example sentence and explain the grammar in it.', mode: 'ask' },
-]
+function quickActions(level) {
+  const L = level || 'N2'
+  return [
+    { label: `Explain ${L} Grammar`, prompt: `Explain one high-value ${L} grammar point with a Japanese example and a plain-English breakdown.`, mode: 'ask' },
+    { label: 'Explain BJT Keigo', prompt: 'What is the difference between 尊敬語 and 謙譲語? Give a workplace example.', mode: 'ask' },
+    { label: `${L} Vocab`, prompt: `Teach me one high-value ${L} word and show me how to use it in a real sentence.`, mode: 'ask' },
+    { label: `Quiz Me ${L}`, prompt: `Give me one JLPT ${L} multiple-choice question. Do not reveal the answer yet.`, mode: 'quiz' },
+    { label: 'BJT Question', prompt: 'Give me one BJT business Japanese multiple-choice question. Do not reveal the answer yet.', mode: 'quiz' },
+    { label: 'Review My Errors', prompt: 'Review my recent errors and recommend the next 3 things to study.', mode: 'review' },
+    { label: '7-Day Plan', prompt: 'Based on my recent activity, suggest a focused 7-day study plan.', mode: 'review' },
+    { label: 'Kanji Story', prompt: `Pick one ${L} kanji and tell me a mnemonic story to remember it.`, mode: 'ask' },
+    { label: 'Listening Tip', prompt: `Give me one tip for improving JLPT ${L} listening and a short example sentence.`, mode: 'ask' },
+    { label: 'Make A Sentence', prompt: `Give me one useful ${L} example sentence and explain the grammar in it.`, mode: 'ask' },
+  ]
+}
 
+function tutorGreeting(level) {
+  const base = 'Hi! I am your Yonde tutor — one of the fleet that learns how you learn. I can help with JLPT N5–N1 and beyond, BJT business Japanese, kanji, grammar, reading, listening, keigo, or study strategy.'
+  const pitch = level ? `\n\nYour last diagnosis put you around ${level}, so I will pitch answers there unless you ask for another level.` : ''
+  return `${base}${pitch}\n\nType a question below or tap a quick topic to get started.`
+}
 export default function AiTutor({ context = '', compact = false }) {
+  const level = (() => { try { return loadDiagnosis()?.jlptEstimate || null } catch { return null } })()
+  const QUICK_ACTIONS = quickActions(level)
   const { isSupabaseConfigured } = useAuth()
   const [reported, setReported] = useState({})
   // Report/flag for AI-generated replies (Google Play AI-Generated Content
@@ -46,7 +57,7 @@ export default function AiTutor({ context = '', compact = false }) {
     } catch {}
     return [{
       role: 'assistant',
-      content: 'Hi! I am your Yonde AI tutor. I can help with JLPT N2, BJT business Japanese, kanji, grammar, reading, listening, or study strategy.\n\nType a question below or tap a quick topic to get started.',
+      content: tutorGreeting(level),
       pending: false,
     }]
   })
@@ -105,7 +116,8 @@ export default function AiTutor({ context = '', compact = false }) {
     setTimeout(scrollToBottom, 50)
 
     if (!isSupabaseConfigured || !supabase) {
-      setMessages((m) => [...m, { role: 'assistant', content: 'Supabase is not configured, so the AI tutor is unavailable. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env.', pending: false }])
+      setMessages((m) => [...m, { role: 'assistant', content: 'The tutor cannot connect right now — please try again in a little while. Everything else in Yonde keeps working.', pending: false }])
+      console.error('[tutor] backend not configured on this deployment')
       setLoading(false)
       scrollToBottom()
       return
@@ -120,7 +132,8 @@ export default function AiTutor({ context = '', compact = false }) {
       if (error) throw error
       setMessages((m) => [...m, { role: 'assistant', content: data.answer || 'No response.', sources: data.sources || [], pending: true }])
     } catch (err) {
-      setMessages((m) => [...m, { role: 'assistant', content: `Error: ${err.message || 'Could not reach the AI tutor.'}`, pending: false }])
+      setMessages((m) => [...m, { role: 'assistant', content: 'The tutor could not answer just now — please try again in a moment.', pending: false }])
+      console.error('[tutor] request failed', err)
     } finally {
       setLoading(false)
       scrollToBottom()
@@ -180,7 +193,7 @@ export default function AiTutor({ context = '', compact = false }) {
         <Sparkles className="text-violet-400" size={22} />
         <div>
           <h2 className="text-xl sm:text-2xl font-bold text-white leading-tight">Yonde AI Tutor</h2>
-          <p className="text-xs text-slate-400">N2 · BJT · Kanji · Grammar · Listening · Study strategy</p>
+          <p className="text-xs text-slate-400">N5–N1 & Beyond · BJT · Kanji · Grammar · Listening · Study Strategy</p>
         </div>
       </div>
 
@@ -269,7 +282,7 @@ export default function AiTutor({ context = '', compact = false }) {
                 ? 'Ask for a question or answer the one above…'
                 : mode === 'review'
                 ? 'Review my error log and tell me what to study…'
-                : 'Ask about N2, BJT, grammar, kanji, or study strategy…'
+                : 'Ask about any level, BJT, grammar, kanji, or study strategy…'
             }
             disabled={loading}
             className="flex-1 rounded-xl bg-bun-900 border border-bun-600/40 px-4 py-3 text-slate-100 placeholder-slate-500 focus:border-violet-500 focus:outline-none resize-none overflow-hidden min-h-[48px] max-h-[160px]"

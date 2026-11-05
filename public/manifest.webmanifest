@@ -1,7 +1,7 @@
 {
-  "name": "JPN2easy",
-  "short_name": "JPN2easy",
-  "description": "JLPT N2 study companion — kanji, vocabulary, grammar, drills, and AI tutor.",
+  "name": "Yonde",
+  "short_name": "Yonde",
+  "description": "Yonde — Summon your Japanese. A friendly fleet of AI agents that learns how you learn: spoken calls, one light session a day, N5 to N1 and the BJT.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f1220",

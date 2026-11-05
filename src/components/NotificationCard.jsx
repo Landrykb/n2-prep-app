@@ -39,7 +39,7 @@ export default function NotificationCard() {
           <div>
             <h3 className="font-bold text-white text-sm">Study reminders</h3>
             <p className="text-xs text-slate-400">
-              {subscribed ? 'Push reminders are on.' : needsPermission ? 'Permission denied.' : 'Get a nudge to keep your streak.'}
+              {subscribed ? 'Push reminders are on.' : needsPermission ? 'Permission denied.' : 'Get a gentle nudge when your light session is ready.'}
             </p>
           </div>
         </div>

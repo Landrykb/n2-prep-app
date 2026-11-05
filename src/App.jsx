@@ -5,7 +5,6 @@ import {
   Dumbbell,
   Map,
   AlertCircle,
-  Flame,
   Brain,
   Eye,
   ChevronRight,
@@ -47,6 +46,8 @@ import { cleanReading } from './lib/furigana.js'
 import { supabase } from './lib/supabaseClient.js'
 import { findStudyItem } from './lib/findStudyItem.js'
 import { localDictionary, loadDictionary, lookup } from './lib/dictionary.js'
+import { loadDiagnosis } from './lib/profile.js'
+import { loadPromise } from './lib/promise.js'
 import { KANJI_LEVELS, loadKanjiLevel } from './lib/kanjiData.js'
 import { useHashRoute } from './hooks/useHashRoute.js'
 import { useSwipeNav } from './hooks/useSwipeNav.js'
@@ -92,31 +93,36 @@ import {
 } from './data.js'
 
 const nav = [
-  { id: 'session', label: 'One Session', short: 'Session', icon: Play },
-  { id: 'dashboard', label: 'Today', icon: LayoutDashboard },
-  { id: 'voice', label: 'Voice Loop', icon: Mic },
-  { id: 'sensei', label: 'Yobidashi', short: 'Yobidashi', icon: Phone },
-  { id: 'diagnosis', label: 'Diagnosis', icon: Stethoscope },
-  { id: 'twin', label: 'Your Fleet', short: 'Fleet', icon: Users },
-  { id: 'coach', label: 'Coach Letter', short: 'Letter', icon: Mail },
-  { id: 'mine', label: 'Mine Your Japanese', icon: Pickaxe },
-  { id: 'lessons', label: 'Memory Lessons', icon: BookOpen },
-  { id: 'drills', label: 'Drills', icon: Dumbbell },
-  { id: 'mock', label: 'Mock Exam', icon: ClipboardCheck },
-  { id: 'anki', label: 'Anki Cards', icon: Layers },
-  { id: 'speed', label: 'Speed Cards', icon: Zap },
-  { id: 'dictionary', label: 'Dictionary', icon: Search },
-  { id: 'reading', label: 'Daily Reading', icon: Eye },
-  { id: 'ai', label: 'AI Tutor', icon: Bot },
-  { id: 'plan', label: 'Study Plan', icon: Map },
-  { id: 'resources', label: 'Resources', icon: Library },
-  { id: 'videos', label: 'Videos', icon: Play },
-  { id: 'n2listening', label: 'Listening', icon: Headphones },
-  { id: 'bjt', label: 'BJT', icon: Building2 },
-  { id: 'errors', label: 'Error Log', icon: AlertCircle },
+  { id: 'session', label: 'One Session', short: 'Session', icon: Play , group: 'today' },
+  { id: 'dashboard', label: 'Today', icon: LayoutDashboard , group: 'today' },
+  { id: 'voice', label: 'Voice Loop', icon: Mic , group: 'library' },
+  { id: 'sensei', label: 'Yobidashi', short: 'Yobidashi', icon: Phone , group: 'fleet' },
+  { id: 'diagnosis', label: 'Diagnosis', icon: Stethoscope , group: 'fleet' },
+  { id: 'twin', label: 'Your Fleet', short: 'Fleet', icon: Users , group: 'fleet' },
+  { id: 'coach', label: 'Coach Letter', short: 'Letter', icon: Mail , group: 'fleet' },
+  { id: 'mine', label: 'Mine Your Japanese', icon: Pickaxe , group: 'library' },
+  { id: 'lessons', label: 'Memory Lessons', icon: BookOpen , group: 'library' },
+  { id: 'drills', label: 'Drills', icon: Dumbbell , group: 'library' },
+  { id: 'mock', label: 'Mock Exam', icon: ClipboardCheck , group: 'library' },
+  { id: 'anki', label: 'Anki Cards', icon: Layers , group: 'library' },
+  { id: 'speed', label: 'Speed Cards', icon: Zap , group: 'library' },
+  { id: 'dictionary', label: 'Dictionary', icon: Search , group: 'library' },
+  { id: 'reading', label: 'Daily Reading', icon: Eye , group: 'library' },
+  { id: 'ai', label: 'AI Tutor', icon: Bot , group: 'library' },
+  { id: 'plan', label: 'Study Plan', icon: Map , group: 'library' },
+  { id: 'resources', label: 'Resources', icon: Library , group: 'library' },
+  { id: 'videos', label: 'Videos', icon: Play , group: 'library' },
+  { id: 'n2listening', label: 'Listening', icon: Headphones , group: 'library' },
+  { id: 'bjt', label: 'BJT', icon: Building2 , group: 'library' },
+  { id: 'errors', label: 'Error Log', icon: AlertCircle , group: 'library' },
 ]
 
 const navIds = nav.map((n) => n.id)
+const NAV_GROUPS = [
+  { id: 'today', label: 'Today' },
+  { id: 'fleet', label: 'Your Fleet' },
+  { id: 'library', label: 'Library' },
+]
 
 function Furigana({ text, glossary = [] }) {
   const { open } = useKanjiModal()
@@ -198,7 +204,7 @@ function FuriganaWord({ p, onOpen }) {
   )
 }
 
-function SelectionPopup({ dictionary }) {
+function SelectionPopup({ dictionary, onNeedDictionary }) {
   const [selected, setSelected] = useState(null)
   const [pos, setPos] = useState({ x: 0, y: 0 })
   const popupRef = useRef(null)
@@ -220,6 +226,7 @@ function SelectionPopup({ dictionary }) {
         setSelected(null)
         return
       }
+      onNeedDictionary?.() // P1-5: the full deck loads on first real use, not on mount
       const match = lookup(dictionary, text)
       const range = selection.getRangeAt(0)
       const rect = range.getBoundingClientRect()
@@ -233,7 +240,7 @@ function SelectionPopup({ dictionary }) {
       document.removeEventListener('mouseup', handle)
       document.removeEventListener('touchend', touchEnd)
     }
-  }, [dictionary])
+  }, [dictionary]) // eslint-disable-line react-hooks/exhaustive-deps -- onNeedDictionary is a stable lazy-load trigger
 
   if (!selected) return null
 
@@ -294,7 +301,33 @@ function Badge({ children, color = 'violet' }) {
   )
 }
 
-function Header({ active, setMobileOpen, streak, daysToExam, user, onSignOut, isSupabaseConfigured, onBack, canGoBack }) {
+function Header({ active, setMobileOpen, daysToExam, user, onSignOut, isSupabaseConfigured, onBack, canGoBack }) {
+  // P0-4: the header used to show invented stats ("N2 Candidate / Next
+  // mock in 2 days") and a streak flame. It now shows only what the
+  // learner's own record holds: the diagnosed estimate, and the next
+  // mock gate derived from the Promise's own Day-30/Day-55 plan.
+  const readRecord = () => {
+    const diagnosis = loadDiagnosis()
+    const promise = loadPromise()
+    let mockGate = null
+    const at = promise?.at ? new Date(promise.at).getTime() : null
+    if (at) {
+      mockGate = 'Mock gates passed — time to re-check'
+      for (const day of [30, 55]) {
+        const when = at + day * 86400000
+        if (Date.now() < when) { mockGate = `Next mock gate · Day ${day} — ${new Date(when).toLocaleDateString()}`; break }
+      }
+    }
+    return { diagnosis, promise, mockGate }
+  }
+  const [record, setRecord] = useState(readRecord)
+  useEffect(() => {
+    const read = () => setRecord(readRecord())
+    read()
+    window.addEventListener('jpn:state-synced', read)
+    window.addEventListener('focus', read)
+    return () => { window.removeEventListener('jpn:state-synced', read); window.removeEventListener('focus', read) }
+  }, [active]) // eslint-disable-line react-hooks/exhaustive-deps
   const { enabled: furiganaOn, toggle: toggleFurigana } = useFurigana()
   return (
     <header className="border-b border-bun-600/30 page-gutter py-3 flex items-center justify-between gap-2">
@@ -330,12 +363,13 @@ function Header({ active, setMobileOpen, streak, daysToExam, user, onSignOut, is
           <span className="hidden sm:inline">ふりがな</span>
         </button>
         <div className="text-right hidden lg:block">
-          <p className="text-sm font-medium text-slate-100">N2 Candidate</p>
-          <p className="text-xs text-slate-400">Next mock in 2 days</p>
-        </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-bun-700/50 border border-bun-600/30">
-          <Flame size={16} className="text-orange-400" />
-          <span className="text-sm font-bold text-orange-200">{streak}</span>
+          {record.diagnosis ? (<>
+            <p className="text-sm font-medium text-slate-100">{record.diagnosis.jlptEstimate} estimate · {record.diagnosis.total}/180</p>
+            <p className="text-xs text-slate-400">{record.mockGate || 'From your diagnosis'}</p>
+          </>) : (<>
+            <p className="text-sm font-medium text-slate-100">No diagnosis yet</p>
+            <p className="text-xs text-slate-400">Your real level appears here after the 10-minute check</p>
+          </>)}
         </div>
         <div className="hidden sm:flex items-center gap-2 text-xs text-slate-300">
           <Calendar size={14} className="text-violet-300" />
@@ -360,8 +394,8 @@ function Header({ active, setMobileOpen, streak, daysToExam, user, onSignOut, is
           </div>
         )}
         {!isSupabaseConfigured && (
-          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-cyan-500 to-violet-500 flex items-center justify-center text-sm font-bold shadow-md">
-            N2
+          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-cyan-500 to-violet-500 flex items-center justify-center text-sm font-bold shadow-md" title="Yonde">
+            よ
           </div>
         )}
       </div>
@@ -369,7 +403,7 @@ function Header({ active, setMobileOpen, streak, daysToExam, user, onSignOut, is
   )
 }
 
-function Sidebar({ active, setActive, mobileOpen, setMobileOpen, streak }) {
+function Sidebar({ active, setActive, mobileOpen, setMobileOpen }) {
   return (
     <>
       <aside className={`fixed z-40 top-0 left-0 h-full w-64 bg-bun-800 border-r border-bun-600/30 transform transition-transform lg:translate-x-0 lg:static flex flex-col pt-safe pb-safe ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
@@ -383,7 +417,10 @@ function Sidebar({ active, setActive, mobileOpen, setMobileOpen, streak }) {
           </div>
         </div>
         <nav className="flex-1 overflow-y-auto px-6 pb-4 space-y-1.5">
-          {nav.map((n) => {
+          {NAV_GROUPS.map((g) => (
+            <div key={g.id} className="pt-3 first:pt-0">
+              <p className="px-3.5 pb-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">{g.label}</p>
+              {nav.filter((n) => (n.group || 'library') === g.id).map((n) => {
             const Icon = n.icon
             return (
               <button
@@ -396,14 +433,13 @@ function Sidebar({ active, setActive, mobileOpen, setMobileOpen, streak }) {
               </button>
             )
           })}
+            </div>
+          ))}
         </nav>
         <div className="shrink-0 p-6 border-t border-bun-600/30">
           <div className="rounded-xl bg-bun-700/60 p-4 border border-bun-600/30">
-            <div className="flex items-center gap-2 mb-2">
-              <Flame size={16} className="text-orange-400" />
-              <span className="text-sm font-semibold text-orange-200">{streak} day streak</span>
-            </div>
-            <p className="text-xs text-slate-400">Consistency beats intensity.</p>
+            <p className="text-sm font-semibold text-slate-100">Small days count</p>
+            <p className="text-xs text-slate-400 mt-1">Michi's rule: the plan bends, it doesn't break. A light day kept is worth more than a heavy day skipped — your weekly rhythm lives on Today.</p>
           </div>
         </div>
       </aside>
@@ -412,11 +448,13 @@ function Sidebar({ active, setActive, mobileOpen, setMobileOpen, streak }) {
   )
 }
 
-// The handful of sections that deserve one-tap access on a phone.
-const quickNav = ['session', 'dashboard', 'voice', 'anki', 'diagnosis', 'ai']
+// The handful of sections that deserve one-tap access on a phone
+// (P1-9): the daily loop first — Session, Today, Yobidashi, Fleet —
+// and Menu opens the full grouped sidebar for everything else.
+const quickNav = ['session', 'dashboard', 'sensei', 'twin']
 
 /** Fixed bottom tab bar so the PWA always has visible navigation on mobile. */
-function BottomNav({ active, setActive }) {
+function BottomNav({ active, setActive, onMenu }) {
   const items = quickNav.map((id) => nav.find((n) => n.id === id)).filter(Boolean)
   return (
     <nav
@@ -439,6 +477,14 @@ function BottomNav({ active, setActive }) {
             </button>
           )
         })}
+        <button
+          onClick={onMenu}
+          aria-label="Open the full menu"
+          className="flex-1 flex flex-col items-center gap-0.5 py-2 min-h-[56px] justify-center transition text-slate-400"
+        >
+          <Menu size={20} />
+          <span className="text-[10px] font-medium leading-none">Menu</span>
+        </button>
       </div>
     </nav>
   )
@@ -577,7 +623,7 @@ function KanjiDetail({ item, showBack, setShowBack }) {
 
           {item.example ? (
             <>
-              <button onClick={() => setShowBack((s) => !s)} className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition">{showBack ? 'Hide example' : 'Show example sentence'}</button>
+              <button onClick={() => setShowBack((s) => !s)} className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition">{showBack ? 'Hide Example' : 'Show Example Sentence'}</button>
               {showBack && (
                 <div className="mt-4 rounded-xl bg-gradient-to-r from-violet-900/30 to-fuchsia-900/30 border border-violet-500/20 p-4 animate-fade-in">
                   <div className="text-slate-100 font-medium text-lg leading-loose mb-2">
@@ -636,7 +682,7 @@ function GrammarDetail({ item, showBack, setShowBack }) {
             </div>
           )}
 
-          <button onClick={() => setShowBack((s) => !s)} className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition">{showBack ? 'Hide example' : 'Show example sentence'}</button>
+          <button onClick={() => setShowBack((s) => !s)} className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition">{showBack ? 'Hide Example' : 'Show Example Sentence'}</button>
           {showBack && (
             <div className="mt-4 rounded-xl bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-500/20 p-4 animate-fade-in">
               <div className="text-slate-100 font-medium text-lg leading-loose mb-2">
@@ -682,7 +728,7 @@ function VocabDetail({ item, showBack, setShowBack }) {
           )}
 
           <p className="text-sm text-slate-400 mb-2">Collocation: <KanjiTapText text={item.collocation} className="text-slate-200" /></p>
-          <button onClick={() => setShowBack((s) => !s)} className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition">{showBack ? 'Hide example' : 'Show example sentence'}</button>
+          <button onClick={() => setShowBack((s) => !s)} className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition">{showBack ? 'Hide Example' : 'Show Example Sentence'}</button>
           {showBack && (
             <div className="mt-4 rounded-xl bg-gradient-to-r from-emerald-900/30 to-teal-900/30 border border-emerald-500/20 p-4 animate-fade-in">
               <div className="text-slate-100 font-medium text-lg leading-loose mb-2">
@@ -828,7 +874,7 @@ function Drills() {
         <p className='text-lg text-slate-300 mb-6'>{daily.score || 0} / {pool.length} correct · {pct}%</p>
         <div className='h-3 w-64 mx-auto rounded-full bg-bun-700 overflow-hidden mb-8'><div className={`h-full ${pct >= 70 ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: pct + '%' }} /></div>
         <div className='flex justify-center gap-4'>
-          <button onClick={() => { setMode('free'); setFilter('all') }} className='px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-medium transition'>Free practice</button>
+          <button onClick={() => { setMode('free'); setFilter('all') }} className='px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-medium transition'>Free Practice</button>
         </div>
       </div>
     )
@@ -845,9 +891,9 @@ function Drills() {
         <div className="flex justify-center gap-4">
           <button onClick={restart} className="px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-medium transition"><RotateCcw size={16} className="inline mr-2" /> Retry</button>
           {mode === 'free' ? (
-            <button onClick={() => setFilter('all')} className='px-6 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-white font-medium transition'>All questions</button>
+            <button onClick={() => setFilter('all')} className='px-6 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-white font-medium transition'>All Questions</button>
           ) : (
-            <button onClick={() => setMode('free')} className='px-6 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-white font-medium transition'>Free practice</button>
+            <button onClick={() => setMode('free')} className='px-6 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-white font-medium transition'>Free Practice</button>
           )}
         </div>
       </div>
@@ -859,7 +905,7 @@ function Drills() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className='flex items-center gap-3 flex-wrap'>
           <h2 className='text-2xl font-bold text-white'>Drills</h2>
-          <span className='text-xs text-slate-500 hidden sm:inline'>{mode === 'daily' ? 'Daily 10' : 'Free practice'}</span>
+          <span className='text-xs text-slate-500 hidden sm:inline'>{mode === 'daily' ? 'Daily 10' : 'Free Practice'}</span>
           <div className='flex p-1 rounded-lg bg-bun-700/40 border border-bun-600/30'>
             {['daily', 'free'].map((m) => (
               <button
@@ -1520,11 +1566,16 @@ function App() {
   const [dictionary, setDictionary] = useState(localDictionary)
   const { nextExam, daysToExam, examLabel, setting: examSetting, setSetting: setExamSetting } = useExamDate()
 
-  useEffect(() => {
-    let cancelled = false
-    loadDictionary().then((dict) => { if (!cancelled) setDictionary(dict) })
-    return () => { cancelled = true }
-  }, [])
+  // P1-5: the ~1 MB deck used to download on every cold start for the
+  // selection popup alone. It now loads lazily — the first time the
+  // learner actually selects text (localDictionary covers lesson words
+  // instantly; the full deck lands a moment later).
+  const dictRequestedRef = useRef(false)
+  const ensureDictionary = () => {
+    if (dictRequestedRef.current) return
+    dictRequestedRef.current = true
+    loadDictionary().then((dict) => setDictionary(dict)).catch(() => {})
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -1651,13 +1702,12 @@ function App() {
     <div className="min-h-screen bg-bun-900 text-slate-100 flex">
       {/* Paints the notch strip so the translucent status bar is not a gap. */}
       <div className="status-bar-scrim lg:hidden" aria-hidden="true" />
-      <Sidebar active={active} setActive={setActive} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} streak={streak} />
+      <Sidebar active={active} setActive={setActive} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
       <main className="flex-1 min-w-0 flex flex-col">
         <div className="pt-safe bg-bun-900/80 backdrop-blur sticky top-0 z-10">
           <Header
             active={active}
             setMobileOpen={setMobileOpen}
-            streak={streak}
             daysToExam={daysToExam}
             user={user}
             onSignOut={signOut}
@@ -1680,8 +1730,8 @@ function App() {
           </div>
         </div>
       </main>
-      <BottomNav active={active} setActive={setActive} />
-      <SelectionPopup dictionary={dictionary} />
+      <BottomNav active={active} setActive={setActive} onMenu={() => setMobileOpen(true)} />
+      <SelectionPopup dictionary={dictionary} onNeedDictionary={ensureDictionary} />
       <ChatBubble context={active} />
     </div>
   )

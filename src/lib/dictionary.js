@@ -150,7 +150,13 @@ export function loadDictionary() {
         return r.json()
       })
       .then((rows) => index(merge(localEntries(), rows.map(parseDeckEntry))))
-      .catch(() => localDictionary)
+      .catch(() => {
+        // P2-3: a failed fetch used to be cached forever — one offline
+        // cold start meant the small local dictionary for the whole
+        // session. Reset so the next lookup retries the real deck.
+        deckPromise = null
+        return localDictionary
+      })
   }
   return deckPromise
 }

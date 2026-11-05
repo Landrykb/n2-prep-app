@@ -2,7 +2,8 @@
 // tagline, and the mascot fleet roster (Doc 13 — Mascot Fleet & Character
 // System). A future rename is a ONE-FILE change: edit `brand.name` (and
 // `brand.tagline`) here and every surface that reads from this module
-// follows. 'JPN2easy' is the current working name, not a forever name.
+// follows. (The product was renamed from JPN2easy to Yonde on 2026-11-05;
+// this file is where the rename landed first.)
 //
 // Fleet colours and props are Doc 13 §1, verbatim. Names are working
 // names (Doc 13 marks them an open decision for Landry) — they live here
@@ -12,6 +13,9 @@ export const brand = {
   name: 'Yonde',
   tagline: 'Summon your Japanese',
   differentiator: 'It learns how you learn',
+  // Support address used by the legal pages and the feedback mailto
+  // fallback. TO CONFIRM before public launch (Doc 15 §6 checklist).
+  supportEmail: 'support@yonde.app',
   callRitual: { name: 'Yobidashi', jp: '呼び出し', moment: 'Yobidashi no Jikan', momentJp: '呼び出しの時間' },
   // The family's outline colour (Doc 13 §4): deep plum, near-black.
   outline: '#2A1A33',

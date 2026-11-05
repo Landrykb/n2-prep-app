@@ -7,6 +7,7 @@
 // second or third pile waiting in another tab.
 
 import { createCardState, reviewCard, isDue } from './fsrs.js'
+import { emitLearnerStateSaved } from './stateEvents.js'
 
 export const QUEUE_KEY = 'jpn:queue:v1'
 
@@ -23,6 +24,7 @@ export function loadQueue() {
 export function saveQueue(items) {
   try {
     localStorage.setItem(QUEUE_KEY, JSON.stringify(items))
+    emitLearnerStateSaved()
   } catch { /* storage full / unavailable — queue just won't persist */ }
 }
 

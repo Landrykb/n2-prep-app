@@ -5,6 +5,10 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth.js'
 import { buildMockExam, flattenSection, scoreExam, TYPE_LABEL, MOCK_LENGTHS } from '../lib/mockExam.js'
+import { loadDictionary } from '../lib/dictionary.js'
+import { loadDiagnosis } from '../lib/profile.js'
+
+const MOCK_LEVELS = ['N5', 'N4', 'N3', 'N2', 'N1']
 import { loadMockHistory, saveMockAttempt } from '../lib/mockStore.js'
 import { setAiPrefill } from '../lib/aiPrefill.js'
 import { addErrorLog } from '../lib/supabaseApi.js'
@@ -53,6 +57,11 @@ export default function MockExam({ setActive }) {
   const { user } = useAuth()
   const [session, setSession] = useState(loadSession)
   const [result, setResult] = useState(null)
+  // P1-3: the paper is built at the learner's diagnosed level (changeable
+  // here), with the level-tagged deck loaded for its word banks.
+  const [level, setLevel] = useState(() => loadDiagnosis()?.jlptEstimate || 'N2')
+  const [dict, setDict] = useState(null)
+  useEffect(() => { let cancelled = false; loadDictionary().then((d) => { if (!cancelled) setDict(d) }).catch(() => {}); return () => { cancelled = true } }, [])
   const [history, setHistory] = useState([])
   const [confirmSubmit, setConfirmSubmit] = useState(false)
   const [remaining, setRemaining] = useState(() => {
@@ -93,6 +102,7 @@ export default function MockExam({ setActive }) {
       id: `mock-${nowMs()}`,
       date: new Date().toISOString(),
       length: session.length,
+      level: session.exam.level || 'N2',
       scaled: scored.scaled,
       passed: scored.passed,
       byType: scored.byType,
@@ -143,7 +153,7 @@ export default function MockExam({ setActive }) {
 
   const startExam = (length) => {
     const seed = newSeed()
-    const exam = buildMockExam(length, seed)
+    const exam = buildMockExam(length, seed, { level, dict })
     setResult(null)
     const deadline = nowMs() + exam.sections[0].timeMin * 60000
     setRemaining(secLeft(deadline))
@@ -180,7 +190,7 @@ export default function MockExam({ setActive }) {
   const askAi = (q, group, selected) => {
     const correct = q.options.find((o) => o.correct)
     const lines = [
-      'I just took a JLPT N2 mock exam. Please explain this question.',
+      'I just took a JLPT mock exam. Please explain this question.',
       `Section: ${group.name}`,
       `Question: ${q.prompt}`,
       q.target ? `Target: ${q.target}` : null,
@@ -201,8 +211,18 @@ export default function MockExam({ setActive }) {
         <div>
           <h2 className="text-2xl font-bold text-white">Mock Exam</h2>
           <p className="text-sm text-slate-400 mt-1">
-            A timed, JLPT N2-format paper built from your study bank. No feedback until the end — just like the real thing.
+            A timed, JLPT-format paper at your level, built from your study bank. No feedback until the end — just like the real thing.
           </p>
+        </div>
+        <div className="rounded-2xl glass p-5 card-glow space-y-3">
+          <p className="text-xs text-slate-400 uppercase tracking-wider">Paper level {loadDiagnosis() ? '— from your diagnosis, change it if you are training up' : '— run Diagnosis and this starts at your level'}</p>
+          <div className="flex flex-wrap gap-2">
+            {MOCK_LEVELS.map((l) => (
+              <button key={l} onClick={() => setLevel(l)} className={`px-4 py-2 rounded-xl text-sm font-semibold border transition ${level === l ? 'bg-violet-600 text-white border-violet-500' : 'bg-bun-700/50 text-slate-300 border-bun-600/30 hover:text-white'}`}>{l}</button>
+            ))}
+          </div>
+          {!dict && <p className="text-xs text-slate-500">Loading the level word banks… a paper started now would fall back to the built-in bank and say so on the paper.</p>}
+          {level !== 'N2' && <p className="text-xs text-amber-200/90">Honest note for {level}: vocabulary, kanji and listening come from the {level} banks. Grammar, sentence structure and reading passages are estimated from the N2 bank — the only written grammar/passage bank in the app — and the paper labels them as estimates. Nothing is silently faked.</p>}
         </div>
         {last && (
           <div className="rounded-2xl glass p-5 card-glow flex items-center justify-between gap-4">
@@ -247,7 +267,7 @@ export default function MockExam({ setActive }) {
         <h2 className="text-2xl font-bold text-white mb-2">Section A complete</h2>
         <p className="text-slate-400 mb-8">Take a breath. Section B is 聴解 (listening) — {session.exam.sections[session.sectionIndex + 1].timeMin} minutes. Audio can be replayed in this practice mock.</p>
         <div className="flex justify-center gap-4">
-          <button onClick={startListening} className="px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-medium transition">Start listening section</button>
+          <button onClick={startListening} className="px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-medium transition">Start Listening Section</button>
           <button onClick={abandon} className="px-6 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-slate-300 font-medium transition">Abandon</button>
         </div>
       </div>
@@ -391,7 +411,7 @@ export default function MockExam({ setActive }) {
             </p>
             <div className="flex gap-3">
               <button onClick={() => submitSection(false)} className="flex-1 px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition">Submit</button>
-              <button onClick={() => setConfirmSubmit(false)} className="flex-1 px-4 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-slate-200 text-sm font-medium transition">Keep working</button>
+              <button onClick={() => setConfirmSubmit(false)} className="flex-1 px-4 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-slate-200 text-sm font-medium transition">Keep Working</button>
             </div>
           </div>
         </div>
@@ -428,7 +448,7 @@ function ResultsView({ result, setActive, askAi, onRetake }) {
         <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Estimated score — real JLPT uses IRT scaling</p>
         <p className="text-5xl font-bold text-white">{scaled.total}<span className="text-lg text-slate-400 font-normal"> / 180</span></p>
         <span className={`inline-block mt-3 text-xs font-semibold px-3 py-1 rounded-full border ${passed ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' : 'bg-rose-500/15 text-rose-300 border-rose-500/30'}`}>
-          {passed ? 'Pass estimate (≥90 and ≥19 per section)' : 'Below the pass line (need ≥90 and ≥19 per section)'}
+          {passed ? `Pass estimate (≥${result.passMark ?? 90} for ${exam.level || 'N2'} and ≥19 per section)` : `Below the pass line (need ≥${result.passMark ?? 90} for ${exam.level || 'N2'} and ≥19 per section)`}
         </span>
         <div className="grid sm:grid-cols-3 gap-5 mt-7 text-left">
           <ScoreBar label="Language Knowledge" value={scaled.lk} />
@@ -436,8 +456,12 @@ function ResultsView({ result, setActive, askAi, onRetake }) {
           <ScoreBar label="Listening" value={scaled.listening} />
         </div>
         <p className="text-xs text-slate-500 mt-5">
-          {MOCK_LENGTHS[attempt.length]?.label} · {Math.floor(attempt.durationSec / 60)} min {attempt.durationSec % 60}s
+          {MOCK_LENGTHS[attempt.length]?.label} · {exam.level || 'N2'} paper · {Math.floor(attempt.durationSec / 60)} min {attempt.durationSec % 60}s
         </p>
+        {exam.meta?.estimated?.length > 0 && (
+          <p className="text-xs text-amber-200/90 mt-3">Estimated sections in this paper: {exam.meta.estimated.map((e) => `${e.section} (from ${e.from})`).join(' · ')}</p>
+        )}
+        {exam.meta?.thin?.map((note, i) => <p key={i} className="text-xs text-amber-200/90 mt-1">{note}</p>)}
       </div>
 
       <div className="rounded-3xl glass p-6 card-glow">

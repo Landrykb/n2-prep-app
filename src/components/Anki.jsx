@@ -2,11 +2,42 @@ import { useEffect, useState, useMemo } from 'react'
 import { useAuth } from '../hooks/useAuth.js'
 import { getUserProgress, setUserProgress } from '../lib/supabaseApi.js'
 import { addToQueue, loadQueue, saveQueue, queueItemId } from '../lib/queue.js'
+import { userKey } from '../lib/userKey.js'
+import { mergeAnkiProgress } from '../lib/stateMerge.js'
 import KanjiTapText from './KanjiTapText.jsx'
 import { Download, ExternalLink, Loader2, RotateCcw, Search, Settings, Shuffle, CheckCircle2, XCircle, Layers } from 'lucide-react'
 
 const SRS = [1, 3, 7, 14, 30, 90, 180]
-const PROGRESS_KEY = 'n2:anki-progress'
+// P1-4: progress used to live under one global key ('n2:anki-progress'),
+// so accounts sharing a browser overwrote each other. It now lives under
+// userKey(user, 'anki-progress') — 'n2:anon:anki-progress' signed out,
+// 'n2:<userId>:anki-progress' signed in. The global key is migrated once
+// (moved, not copied — moving is what stops the leak) by
+// migrateLegacyAnkiKey() inside the component, the only place that knows
+// the current user.
+const LEGACY_GLOBAL_PROGRESS_KEY = 'n2:anki-progress'
+const progressKeyFor = (user) => userKey(user, 'anki-progress')
+
+function migrateLegacyAnkiKey(user) {
+  try {
+    const target = progressKeyFor(user)
+    if (localStorage.getItem(target) !== null) return
+    const legacy = localStorage.getItem(LEGACY_GLOBAL_PROGRESS_KEY)
+    if (legacy !== null) {
+      localStorage.setItem(target, legacy)
+      localStorage.removeItem(LEGACY_GLOBAL_PROGRESS_KEY)
+      return
+    }
+    // Signed in and this user's key is still empty: adopt the guest
+    // (anon) copy directly too — AuthContext's anonMerge pass also does
+    // this for every n2:anon:* key, but this view must not depend on
+    // which of the two effects happens to run first.
+    if (user?.id) {
+      const anon = localStorage.getItem(progressKeyFor(null))
+      if (anon !== null) localStorage.setItem(target, anon)
+    }
+  } catch { /* ignore */ }
+}
 const MIGRATION_KEY = 'jpn:anki-migration:v1'
 
 function loadMigration() {
@@ -45,7 +76,7 @@ function MigrationCard({ cards, progress }) {
     // 1) Backup first — always, before anything is written anywhere.
     const backup = {
       exportedAt: now.toISOString(),
-      kind: 'jpn2easy-anki-legacy-backup',
+      kind: 'yonde-anki-legacy-backup',
       progress,
       learnedCount: learnedIds.length,
     }
@@ -53,7 +84,7 @@ function MigrationCard({ cards, progress }) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'jpn2easy-anki-backup.json'
+    a.download = 'yonde-anki-backup.json'
     a.click()
     URL.revokeObjectURL(url)
 
@@ -107,9 +138,9 @@ const addDays = (n) => {
   return d.toISOString().slice(0, 10)
 }
 
-const loadProgress = () => {
+const loadProgress = (key) => {
   try {
-    const raw = localStorage.getItem(PROGRESS_KEY)
+    const raw = localStorage.getItem(key)
     if (raw) {
       const p = JSON.parse(raw)
       const t = today()
@@ -125,8 +156,8 @@ const loadProgress = () => {
   return { due: {}, count: {}, lastDate: today(), newToday: 0, newLimit: 20 }
 }
 
-const saveProgress = (p) => {
-  try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(p)) } catch {}
+const saveProgress = (key, p) => {
+  try { localStorage.setItem(key, JSON.stringify(p)) } catch {}
 }
 
 function Stat({ label, value }) {
@@ -143,7 +174,7 @@ export default function Anki() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  const [progress, setProgress] = useState(loadProgress())
+  const [progress, setProgress] = useState(() => loadProgress(progressKeyFor(null)))
   const [mode, setMode] = useState('due')
   const [level, setLevel] = useState('all')
   const [shuffle, setShuffle] = useState(false)
@@ -176,21 +207,38 @@ export default function Anki() {
   }, [])
 
   useEffect(() => {
+    migrateLegacyAnkiKey(user)
+    setProgress(loadProgress(progressKeyFor(user)))
+  }, [user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
     if (!user) return
     let cancelled = false
     getUserProgress(user.id).then((data) => {
       if (cancelled || !data?.anki) return
       const p = data.anki
       const t = today()
-      const fresh = {
+      const cloud = {
         due: p.due || {},
         count: p.count || {},
-        lastDate: t,
+        lastDate: p.lastDate || t,
         newToday: p.lastDate === t ? Math.max(0, Number(p.newToday) || 0) : 0,
         newLimit: Math.max(1, Math.min(100, Number(p.newLimit) || 20)),
       }
-      setProgress(fresh)
-      setNewLimit(fresh.newLimit)
+      // Merge, never overwrite (P1-4): per card, the side with more
+      // reviews is further along and its schedule wins (stateMerge).
+      // Overwriting here used to erase the other device's progress.
+      setProgress((local) => {
+        const merged = mergeAnkiProgress(local, cloud)
+        const normalised = {
+          ...merged,
+          lastDate: t,
+          newToday: merged.lastDate === t ? merged.newToday : 0,
+        }
+        saveProgress(progressKeyFor(user), normalised)
+        return normalised
+      })
+      setNewLimit(cloud.newLimit)
     })
     return () => { cancelled = true }
   }, [user])
@@ -264,7 +312,7 @@ export default function Anki() {
     }
 
     setProgress(next)
-    saveProgress(next)
+    saveProgress(progressKeyFor(user), next)
     if (user) setUserProgress(user.id, { anki: next })
     setFlipped(false)
 
@@ -280,7 +328,7 @@ export default function Anki() {
     if (typeof window !== 'undefined' && window.confirm('Reset all saved Anki progress?')) {
       const fresh = { due: {}, count: {}, lastDate: today(), newToday: 0, newLimit }
       setProgress(fresh)
-      saveProgress(fresh)
+      saveProgress(progressKeyFor(user), fresh)
       if (user) setUserProgress(user.id, { anki: fresh })
     }
   }
@@ -292,7 +340,7 @@ export default function Anki() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'n2-anki-cards.csv'
+    a.download = 'yonde-anki-cards.csv'
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -374,7 +422,7 @@ export default function Anki() {
               setNewLimit(n)
               setProgress((p) => {
                 const next = { ...p, newLimit: n }
-                saveProgress(next)
+                saveProgress(progressKeyFor(user), next)
                 if (user) setUserProgress(user.id, { anki: next })
                 return next
               })

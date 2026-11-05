@@ -10,6 +10,7 @@ import { scenes } from '../data/scenes.js'
 import { listeningPlus } from '../data/listeningPlus.js'
 import { n2Listening } from '../data/n2Listening.js'
 import { todaySession } from './queue.js'
+import { recordMetric } from './metrics.js'
 
 export const SESSION_KEY = 'jpn:session:v1'
 export const EFFORT_KEY = 'jpn:effort:v1'
@@ -102,6 +103,7 @@ export function setIntent(variant) {
 
 /** Felt-effort check history: [{ date, variant, answer }] — one per day+variant. */
 export function saveEffort(answer, variant, now = new Date()) {
+  recordMetric('effort_check', { answer, variant }) // gate metric (Doc 11)
   const date = todayStr(now)
   let list = []
   try { list = JSON.parse(localStorage.getItem(EFFORT_KEY) || '[]') } catch { list = [] }
