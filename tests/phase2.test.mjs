@@ -88,3 +88,19 @@ check('undated cloud never overwrites dated local', () => assert.equal(pickNewer
 check('undated local yields to dated cloud', () => assert.equal(pickNewerTwin(T(null), T('2026-11-05T11:00:00Z')), 'cloud'))
 
 console.log(`\n${passed} checks passed`)
+
+// 4. Scheduler auth helper: legacy service_role JWT recognition.
+const b64u = (o) => Buffer.from(JSON.stringify(o)).toString('base64url')
+const jwt = (payload) => `${b64u({ alg: 'HS256', typ: 'JWT' })}.${b64u(payload)}.sig`
+check('service_role JWT for this project is recognised', () =>
+  assert.equal(port.isServiceRoleJwtForProject(jwt({ role: 'service_role', ref: 'rcckuxwvqgtyvovwpxaw' }), 'rcckuxwvqgtyvovwpxaw'), true))
+check('anon JWT is not recognised as service_role', () =>
+  assert.equal(port.isServiceRoleJwtForProject(jwt({ role: 'anon', ref: 'rcckuxwvqgtyvovwpxaw' }), 'rcckuxwvqgtyvovwpxaw'), false))
+check('service_role JWT for ANOTHER project is rejected', () =>
+  assert.equal(port.isServiceRoleJwtForProject(jwt({ role: 'service_role', ref: 'otherproject' }), 'rcckuxwvqgtyvovwpxaw'), false))
+check('non-JWT values are rejected', () => {
+  assert.equal(port.isServiceRoleJwtForProject('sb_secret_abc', 'rcckuxwvqgtyvovwpxaw'), false)
+  assert.equal(port.isServiceRoleJwtForProject('', 'rcckuxwvqgtyvovwpxaw'), false)
+  assert.equal(port.isServiceRoleJwtForProject('a.b.c', 'rcckuxwvqgtyvovwpxaw'), false)
+})
+console.log(`\nphase2: ${passed} checks passed (incl. scheduler-auth)`)

@@ -91,3 +91,26 @@ export function todaysSlots(settings, dateStr, timeZone) {
   }
   return out
 }
+
+/**
+ * True when `token` is a JWT whose payload claims the service_role for this
+ * project. This does NOT verify the signature — it is only safe because the
+ * function is deployed with verify_jwt = true, so the Supabase gateway has
+ * already verified the signature before the request reaches this code.
+ * Needed since the 2025 key migration: the runtime now injects the new
+ * sb_secret key as SUPABASE_SERVICE_ROLE_KEY, while schedulers (pg_cron)
+ * still present the project's legacy service_role JWT.
+ */
+export function isServiceRoleJwtForProject(token, projectRef) {
+  if (!token || !projectRef) return false
+  const parts = String(token).split('.')
+  if (parts.length !== 3) return false
+  try {
+    const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4)
+    const payload = JSON.parse(decodeURIComponent(Array.from(atob(padded), (c) => '%' + c.charCodeAt(0).toString(16).padStart(2, '0')).join('')))
+    return payload?.role === 'service_role' && payload?.ref === projectRef
+  } catch {
+    return false
+  }
+}

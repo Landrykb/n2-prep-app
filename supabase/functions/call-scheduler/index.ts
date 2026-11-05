@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { localDateStr, todaysSlots, slotIdFor } from './slot.ts'
+import { localDateStr, todaysSlots, slotIdFor, isServiceRoleJwtForProject } from './slot.ts'
 
 // Yobidashi server scheduler (Doc 02 §3.2/§7, Phase 2 step 2.5).
 //
@@ -53,7 +53,15 @@ serve(async (req: Request) => {
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     const providedSecret = req.headers.get('X-Admin-Secret') ?? ''
     const bearer = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '')
-    const authorised = (providedSecret !== '' && providedSecret === adminSecret) || (bearer !== '' && bearer === serviceKey)
+    // Auth (any one): the shared admin secret; the runtime service key; or a
+    // gateway-verified legacy service_role JWT for THIS project (pg_cron
+    // presents that one — the runtime now injects sb_secret as
+    // SUPABASE_SERVICE_ROLE_KEY, so the legacy JWT no longer string-matches;
+    // verify_jwt = true means the gateway already checked its signature).
+    const projectRef = (Deno.env.get('SUPABASE_URL') ?? '').replace('https://', '').split('.')[0]
+    const authorised = (providedSecret !== '' && providedSecret === adminSecret)
+      || (bearer !== '' && bearer === serviceKey)
+      || isServiceRoleJwtForProject(bearer, projectRef)
     if (!authorised) {
       return json({ error: 'Unauthorized' }, 401)
     }
