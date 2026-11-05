@@ -332,7 +332,7 @@ function Header({ active, daysToExam, user, onSignOut, isSupabaseConfigured }) {
   return (
     <header className="border-b border-bun-600/30 page-gutter py-3 flex items-center justify-between gap-2">
       <div className="flex items-center gap-2 min-w-0">
-        <h2 className="text-lg font-semibold hidden sm:block truncate">{nav.find((n) => n.id === active)?.label}</h2>
+        <h2 className="text-lg font-semibold truncate">{nav.find((n) => n.id === active)?.label}</h2>
       </div>
       <div className="flex items-center gap-2 sm:gap-4">
         <button
@@ -344,7 +344,8 @@ function Header({ active, daysToExam, user, onSignOut, isSupabaseConfigured }) {
           }`}
         >
           <Baseline size={16} />
-          <span className="hidden sm:inline">ふりがな</span>
+          <span>ふりがな</span>
+          <span className={`text-[10px] font-bold uppercase tracking-wide ${furiganaOn ? 'text-[#FFA08D]' : 'text-slate-500'}`}>{furiganaOn ? 'On' : 'Off'}</span>
         </button>
         <div className="text-right hidden lg:block">
           {record.diagnosis ? (<>
@@ -369,10 +370,11 @@ function Header({ active, daysToExam, user, onSignOut, isSupabaseConfigured }) {
               <button
                 onClick={onSignOut}
                 aria-label="Sign out"
-                className="p-2.5 rounded-lg bg-bun-700 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 transition min-w-[42px] min-h-[42px] flex items-center justify-center"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-full border border-bun-600/30 bg-bun-700/50 hover:bg-rose-500/20 hover:border-rose-500/30 text-slate-300 hover:text-rose-300 transition text-xs sm:text-sm font-medium min-h-[42px]"
                 title="Sign out"
               >
-                <LogOut size={18} />
+                <LogOut size={16} />
+                <span>Log Out</span>
               </button>
             )}
           </div>
