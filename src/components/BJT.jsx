@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Building2, Headphones, BookOpen, Award, ExternalLink, Brain, Dumbbell, Play, Layers } from 'lucide-react'
+import { Building2, Headphones, BookOpen, Award, ExternalLink, Brain, Dumbbell, Play, Layers, Timer } from 'lucide-react'
 import {
   bjtScoreMapping,
   bjtLevels,
@@ -16,6 +16,7 @@ import { shuffleWithSeed } from '../lib/shuffle.js'
 import TtsButton from './TtsButton.jsx'
 import KanjiTapText from './KanjiTapText.jsx'
 import MiniQuiz from './MiniQuiz.jsx'
+import BjtTrainer from './BjtTrainer.jsx'
 
 function colorClass(color) {
   const map = {
@@ -105,6 +106,7 @@ export default function BJT() {
 
   const tabs = [
     { id: 'drill', label: 'Daily Drill', icon: Dumbbell },
+    { id: 'trainer', label: 'BJT Trainer', icon: Timer },
     { id: 'vocab', label: 'Vocab', icon: BookOpen },
     { id: 'keigo', label: 'Keigo', icon: Brain },
     { id: 'reading', label: 'Reading', icon: BookOpen },
@@ -187,6 +189,8 @@ export default function BJT() {
           </div>
         </section>
       )}
+
+      {active === 'trainer' && <BjtTrainer />}
 
       {active === 'vocab' && (
         <section className="rounded-2xl glass p-5 card-glow space-y-4">

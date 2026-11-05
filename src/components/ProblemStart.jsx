@@ -1,0 +1,113 @@
+import { useState } from 'react'
+import { X, CheckCircle2, Circle, Lock, Compass, Target, HeartPulse } from 'lucide-react'
+import { PERSONAS, PAINS, PROOF_TARGETS, saveProfile, ladderWithStatus, PROOF_LADDER } from '../lib/profile.js'
+
+// "Start with your problem" onboarding — three questions, saved to
+// localStorage (jpn:profile:v1), dismissible, re-openable from Today.
+export function OnboardingFlow({ initial, onDone, onClose }) {
+  const [persona, setPersona] = useState(initial?.persona || '')
+  const [pains, setPains] = useState(initial?.pains || [])
+  const [proofTarget, setProofTarget] = useState(initial?.proofTarget || '')
+  const [realLifeGoal, setRealLifeGoal] = useState(initial?.realLifeGoal || '')
+
+  const togglePain = (id) => setPains((cur) => (cur.includes(id) ? cur.filter((p) => p !== id) : [...cur, id]))
+  const complete = persona && pains.length && proofTarget
+
+  const finish = () => {
+    const profile = { persona, pains, proofTarget, realLifeGoal }
+    saveProfile(profile)
+    onDone?.(profile)
+  }
+
+  return (
+    <div className="rounded-3xl glass p-6 sm:p-8 card-glow space-y-7 border border-violet-500/25">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-violet-300 mb-1"><Compass size={14} /> Start with your problem</p>
+          <h2 className="text-2xl font-bold text-white">Not features. Your problem first.</h2>
+          <p className="text-sm text-slate-400 mt-1">Three questions. Your Today plan, your diagnosis and your scenes are built from these answers — and re-built when they change.</p>
+        </div>
+        {onClose && <button onClick={onClose} className="p-2 rounded-lg bg-bun-700 text-slate-400 hover:text-white shrink-0" aria-label="Dismiss"><X size={16} /></button>}
+      </div>
+
+      <section className="space-y-3">
+        <h3 className="text-sm font-bold text-white">1 · Who are you?</h3>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {PERSONAS.map((p) => (
+            <button key={p.id} onClick={() => setPersona(p.id)} className={`text-left rounded-xl border p-3 transition ${persona === p.id ? 'bg-violet-600/20 border-violet-500/50' : 'bg-bun-700/40 border-bun-600/30 hover:bg-bun-700/60'}`}>
+              <p className="text-sm font-semibold text-white">{p.label}</p>
+              <p className="text-xs text-slate-400 mt-0.5">{p.desc}</p>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <h3 className="text-sm font-bold text-white">2 · What hurts? <span className="text-slate-400 font-normal">(pick all that are true)</span></h3>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {PAINS.map((p) => {
+            const on = pains.includes(p.id)
+            return (
+              <button key={p.id} onClick={() => togglePain(p.id)} className={`text-left rounded-xl border p-3 transition ${on ? 'bg-rose-500/10 border-rose-500/40' : 'bg-bun-700/40 border-bun-600/30 hover:bg-bun-700/60'}`}>
+                <p className="text-sm font-semibold text-white flex items-center gap-2">{on ? <CheckCircle2 size={15} className="text-rose-300 shrink-0" /> : <Circle size={15} className="text-slate-500 shrink-0" />}{p.label}</p>
+                <p className="text-xs text-slate-400 mt-0.5 ml-6">{p.desc}</p>
+              </button>
+            )
+          })}
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <h3 className="text-sm font-bold text-white">3 · What proof are you climbing toward?</h3>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {PROOF_TARGETS.map((t) => (
+            <button key={t.id} onClick={() => setProofTarget(t.id)} className={`text-left rounded-xl border p-3 transition ${proofTarget === t.id ? 'bg-emerald-500/10 border-emerald-500/40' : 'bg-bun-700/40 border-bun-600/30 hover:bg-bun-700/60'}`}>
+              <p className="text-sm font-semibold text-white">{t.label}</p>
+              <p className="text-xs text-slate-400 mt-0.5">{t.desc}</p>
+            </button>
+          ))}
+        </div>
+        {proofTarget === 'real-life' && (
+          <input value={realLifeGoal} onChange={(e) => setRealLifeGoal(e.target.value)} placeholder="Your height, in your words — e.g. handle immigration alone in June"
+            className="w-full rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 focus:border-violet-500 focus:outline-none" />
+        )}
+      </section>
+
+      <button onClick={finish} disabled={!complete} className="w-full sm:w-auto px-6 py-3 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-sm transition">
+        Build my plan from my problem
+      </button>
+      {!complete && <p className="text-xs text-slate-500 -mt-4">Answer all three — persona, at least one pain, and a proof target.</p>}
+    </div>
+  )
+}
+
+// The Proof Ladder — where you are, the next height, what each height unlocks.
+export function ProofLadderView({ diagnosis, profile }) {
+  const ladder = ladderWithStatus(diagnosis)
+  return (
+    <div className="rounded-2xl glass p-5 card-glow space-y-3">
+      <h3 className="text-lg font-bold text-white flex items-center gap-2"><Target size={18} className="text-emerald-300" /> Your Proof Ladder</h3>
+      <p className="text-xs text-slate-400">
+        {diagnosis
+          ? <>Current estimate: <span className="text-white font-semibold">{diagnosis.jlptEstimate}</span> · sections — language {diagnosis.sections.language}/60, reading {diagnosis.sections.reading}/60, listening {diagnosis.sections.listening}/60 · BJT estimate ~{diagnosis.bjtScore} ({diagnosis.bjtBand}).</>
+          : 'No diagnosis yet — the ladder lights up after your first 10-minute health check.'}
+        {profile?.proofTarget === 'real-life' && profile?.realLifeGoal ? <> Your named height: <span className="text-emerald-300">{profile.realLifeGoal}</span>.</> : null}
+      </p>
+      <div className="space-y-2">
+        {ladder.map((h) => (
+          <div key={h.id} className={`flex items-start gap-3 rounded-xl border p-3 ${h.status === 'reached' ? 'bg-emerald-500/10 border-emerald-500/30' : h.status === 'next' ? 'bg-violet-600/15 border-violet-500/40' : 'bg-bun-700/30 border-bun-600/20 opacity-75'}`}>
+            <span className="mt-0.5 shrink-0">{h.status === 'reached' ? <CheckCircle2 size={17} className="text-emerald-300" /> : h.status === 'next' ? <HeartPulse size={17} className="text-violet-300" /> : <Lock size={15} className="text-slate-500" />}</span>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-white">{h.label} {h.status === 'next' && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-violet-600 text-white align-middle">NEXT HEIGHT</span>}{h.status === 'reached' && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-600/60 text-emerald-100 align-middle">REACHED (EST.)</span>}</p>
+              <p className="text-xs text-slate-400">Proof: {h.proof}</p>
+              <p className="text-xs text-slate-300">Unlocks: {h.unlocks}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="text-[11px] text-slate-500">Ladder heights use official pass marks and BJT bands. “Reached” is an estimate from your in-app diagnosis, not an exam result — the exam is the proof.</p>
+    </div>
+  )
+}
+
+export { PROOF_LADDER }

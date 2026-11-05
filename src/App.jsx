@@ -32,6 +32,10 @@ import {
   ChevronLeft,
   Baseline,
   ClipboardCheck,
+  Mic,
+  Stethoscope,
+  Pickaxe,
+  Phone,
 } from 'lucide-react'
 import { useAuth } from './hooks/useAuth.js'
 import { useKanjiModal } from './hooks/useKanjiModal.js'
@@ -46,7 +50,7 @@ import { useSwipeNav } from './hooks/useSwipeNav.js'
 import { useExamDate } from './hooks/useExamDate.js'
 import AuthModal from './components/AuthModal.jsx'
 import ChatBubble from './components/ChatBubble.jsx'
-import Dashboard from './components/Dashboard.jsx'
+import TodayHome from './components/TodayHome.jsx'
 import KanjiTapText from './components/KanjiTapText.jsx'
 import TtsButton from './components/TtsButton.jsx'
 import Skeleton, { SkeletonText } from './components/Skeleton.jsx'
@@ -60,6 +64,11 @@ const N2Listening = lazy(() => import('./components/N2Listening.jsx'))
 const SpeedCards = lazy(() => import('./components/SpeedCards.jsx'))
 const DictionaryView = lazy(() => import('./components/DictionaryView.jsx'))
 const MockExam = lazy(() => import('./components/MockExam.jsx'))
+const VoiceLoop = lazy(() => import('./components/VoiceLoop.jsx'))
+const Diagnosis = lazy(() => import('./components/Diagnosis.jsx'))
+const Mining = lazy(() => import('./components/Mining.jsx'))
+const OneSession = lazy(() => import('./components/OneSession.jsx'))
+const SenseiCall = lazy(() => import('./components/SenseiCall.jsx'))
 import { userKey } from './lib/userKey.js'
 import { getErrorLogs, addErrorLog, reviewErrorLog, deleteErrorLog, getUserProgress, setUserProgress } from './lib/supabaseApi.js'
 import {
@@ -75,7 +84,12 @@ import {
 } from './data.js'
 
 const nav = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'session', label: 'One Session', short: 'Session', icon: Play },
+  { id: 'dashboard', label: 'Today', icon: LayoutDashboard },
+  { id: 'voice', label: 'Voice Loop', icon: Mic },
+  { id: 'sensei', label: 'Sensei Call', short: 'Sensei', icon: Phone },
+  { id: 'diagnosis', label: 'Diagnosis', icon: Stethoscope },
+  { id: 'mine', label: 'Mine Your Japanese', icon: Pickaxe },
   { id: 'lessons', label: 'Memory Lessons', icon: BookOpen },
   { id: 'drills', label: 'Drills', icon: Dumbbell },
   { id: 'mock', label: 'Mock Exam', icon: ClipboardCheck },
@@ -87,7 +101,7 @@ const nav = [
   { id: 'plan', label: 'Study Plan', icon: Map },
   { id: 'resources', label: 'Resources', icon: Library },
   { id: 'videos', label: 'Videos', icon: Play },
-  { id: 'n2listening', label: 'N2 Listening', icon: Headphones },
+  { id: 'n2listening', label: 'Listening', icon: Headphones },
   { id: 'bjt', label: 'BJT', icon: Building2 },
   { id: 'errors', label: 'Error Log', icon: AlertCircle },
 ]
@@ -389,7 +403,7 @@ function Sidebar({ active, setActive, mobileOpen, setMobileOpen, streak }) {
 }
 
 // The handful of sections that deserve one-tap access on a phone.
-const quickNav = ['dashboard', 'anki', 'speed', 'dictionary', 'ai']
+const quickNav = ['session', 'dashboard', 'voice', 'anki', 'diagnosis', 'ai']
 
 /** Fixed bottom tab bar so the PWA always has visible navigation on mobile. */
 function BottomNav({ active, setActive }) {
@@ -411,7 +425,7 @@ function BottomNav({ active, setActive }) {
               className={`flex-1 flex flex-col items-center gap-0.5 py-2 min-h-[56px] justify-center transition ${isActive ? 'text-violet-300' : 'text-slate-400'}`}
             >
               <Icon size={20} />
-              <span className="text-[10px] font-medium leading-none">{n.label.split(' ')[0]}</span>
+              <span className="text-[10px] font-medium leading-none">{n.short || n.label.split(' ')[0]}</span>
             </button>
           )
         })}
@@ -1563,7 +1577,12 @@ function App() {
   }, [step])
 
   const content = {
-    dashboard: <Dashboard streak={streak} daysToExam={daysToExam} nextExam={nextExam} examLabel={examLabel} examSetting={examSetting} setExamSetting={setExamSetting} setActive={setActive} />,
+    session: <OneSession setActive={setActive} />,
+    dashboard: <TodayHome streak={streak} daysToExam={daysToExam} nextExam={nextExam} examLabel={examLabel} setActive={setActive} />,
+    voice: <VoiceLoop />,
+    sensei: <SenseiCall />,
+    diagnosis: <Diagnosis setActive={setActive} />,
+    mine: <Mining />,
     lessons: <Lessons />,
     drills: <Drills />,
     mock: <MockExam setActive={setActive} />,
