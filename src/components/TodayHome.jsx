@@ -97,7 +97,7 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
             <span className="w-14 h-14 shrink-0 rounded-2xl bg-white/20 flex items-center justify-center group-hover:scale-105 transition"><Play size={28} className="text-white ml-0.5" /></span>
             <span>
               <span className="block text-2xl sm:text-3xl font-bold text-white">Today — ~{sessionMins} minutes</span>
-              <span className="block text-sm text-[#FFD9D2] mt-1">{sessionInProgress ? 'Your session is in progress — it picks up right where you left off. What you already did counts.' : 'One session, no choices: one real scene in your voice, a few of your own cards, one listening bite. You won’t feel like you studied — that’s the point.'}</span>
+              <span className="block text-sm text-white mt-1">{sessionInProgress ? 'Your session is in progress — it picks up right where you left off. What you already did counts.' : 'One session, no choices: one real scene in your voice, a few of your own cards, one listening bite. You won’t feel like you studied — that’s the point.'}</span>
             </span>
           </span>
         </button>

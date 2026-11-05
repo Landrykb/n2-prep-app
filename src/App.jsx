@@ -28,7 +28,6 @@ import {
   Building2,
   Headphones,
   Zap,
-  ChevronLeft,
   Baseline,
   ClipboardCheck,
   Mic,
@@ -302,7 +301,7 @@ function Badge({ children, color = 'plum' }) {
   )
 }
 
-function Header({ active, setMobileOpen, daysToExam, user, onSignOut, isSupabaseConfigured, onBack, canGoBack }) {
+function Header({ active, daysToExam, user, onSignOut, isSupabaseConfigured }) {
   // P0-4: the header used to show invented stats ("N2 Candidate / Next
   // mock in 2 days") and a streak flame. It now shows only what the
   // learner's own record holds: the diagnosed estimate, and the next
@@ -333,22 +332,6 @@ function Header({ active, setMobileOpen, daysToExam, user, onSignOut, isSupabase
   return (
     <header className="border-b border-bun-600/30 page-gutter py-3 flex items-center justify-between gap-2">
       <div className="flex items-center gap-2 min-w-0">
-        <button
-          onClick={() => setMobileOpen(true)}
-          aria-label="Open navigation menu"
-          className="lg:hidden p-2.5 rounded-lg bg-bun-700 text-slate-200 min-w-[42px] min-h-[42px] flex items-center justify-center"
-        >
-          <Menu size={20} />
-        </button>
-        <button
-          onClick={onBack}
-          disabled={!canGoBack}
-          aria-label="Go back"
-          title="Go back"
-          className="p-2.5 rounded-lg bg-bun-700 text-slate-200 min-w-[42px] min-h-[42px] flex items-center justify-center disabled:opacity-35 disabled:cursor-not-allowed hover:bg-bun-600 transition"
-        >
-          <ChevronLeft size={20} />
-        </button>
         <h2 className="text-lg font-semibold hidden sm:block truncate">{nav.find((n) => n.id === active)?.label}</h2>
       </div>
       <div className="flex items-center gap-2 sm:gap-4">
@@ -1561,7 +1544,7 @@ function ErrorLog() {
 
 function App() {
   const { user, loading, isSupabaseConfigured, signOut } = useAuth()
-  const [active, setActive, { back, canGoBack }] = useHashRoute('dashboard', navIds)
+  const [active, setActive] = useHashRoute('dashboard', navIds)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [streak, setStreak] = useState(0)
   const [dictionary, setDictionary] = useState(localDictionary)
@@ -1708,13 +1691,10 @@ function App() {
         <div className="pt-safe bg-bun-900/80 backdrop-blur sticky top-0 z-10">
           <Header
             active={active}
-            setMobileOpen={setMobileOpen}
             daysToExam={daysToExam}
             user={user}
             onSignOut={signOut}
             isSupabaseConfigured={isSupabaseConfigured}
-            onBack={back}
-            canGoBack={canGoBack}
           />
         </div>
         <div className="flex-1 page-gutter py-5 sm:py-6 lg:py-8 overflow-y-auto swipe-area pb-28 lg:pb-8">
