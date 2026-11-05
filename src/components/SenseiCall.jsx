@@ -471,6 +471,8 @@ export default function SenseiCall() {
           <p className="text-xs uppercase tracking-[0.25em] text-slate-400 mb-6">{ring.source === 'callback' ? 'Calling back — once, as promised' : ring.source === 'catchup' ? 'Missed call — calling again now' : ring.source === 'test' ? 'Test call' : ring.source === 'mini' ? 'Your 60-second version' : 'Incoming practice call'}</p>
           <div className="relative mb-6">
             <span className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping" />
+            <span className="absolute inset-0 rounded-full bg-[#FF6B57]/15 animate-ping [animation-duration:1.9s] [animation-delay:0.5s]" />
+            <span className="absolute inset-0 rounded-full bg-[#FF6B57]/10 animate-ping [animation-duration:1.9s] [animation-delay:1.05s]" />
             <span className="relative block">
               <Mascot agent="koe" size={96} showName={false} motion="bounce" label={`${callState.settings.senseiName} — Koe, your sensei, is calling`} />
             </span>
@@ -567,6 +569,7 @@ export default function SenseiCall() {
       {phase === 'wrapup' && wrap && (
         <div className="fixed inset-0 z-[80] bg-bun-900 overflow-y-auto">
           <div className="max-w-2xl mx-auto p-6 space-y-5 text-center pt-14">
+            <Mascot agent="koe" size={76} showName={false} motion="hop" label="Koe, celebrating a kept call" />
             <CheckCircle2 size={42} className="text-emerald-400 mx-auto" />
             <div>
               <h3 className="text-2xl font-bold text-white">Call kept. よくできました。</h3>

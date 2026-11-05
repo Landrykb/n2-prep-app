@@ -216,6 +216,7 @@ export default function OneSession({ setActive }) {
     <div className="space-y-6 max-w-3xl mx-auto">
       <div className="text-center space-y-2 pt-2">
         <p className="flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#FF8A75]"><Sparkles size={14} /> One Session — that’s the whole day</p>
+        {state.done && <div className="mb-3"><Mascot agent="michi" size={64} showName={false} motion="hop" label="Michi, your coach, celebrating a finished session" /></div>}
         <h2 className="text-2xl sm:text-3xl font-bold text-white">{state.done ? 'Session saved. Day done.' : isBusy ? 'Busy day — just the scene' : 'Press nothing. Just follow along.'}</h2>
         <p className="text-sm text-slate-400 max-w-xl mx-auto">
           {state.step > 0 && !state.done

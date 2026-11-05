@@ -190,3 +190,19 @@ rt {
 @media (prefers-reduced-motion: reduce) {
   .mascot-bob, .mascot-bounce, .mascot-sway { animation: none; }
 }
+
+@keyframes mascotHop {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  35% { transform: translateY(-16%) scale(0.96, 1.05); }
+  60% { transform: translateY(0) scale(1.07, 0.92); }
+  80% { transform: translateY(-7%) scale(0.99, 1.02); }
+}
+@keyframes mascotShadow {
+  0%, 100% { transform: scaleX(1); opacity: 0.32; }
+  50% { transform: scaleX(0.8); opacity: 0.2; }
+}
+.mascot-hop { animation: mascotHop 0.85s ease-in-out 2; }
+.mascot-shadow { animation: mascotShadow 3.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .mascot-hop, .mascot-shadow { animation: none; }
+}
