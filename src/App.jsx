@@ -340,19 +340,19 @@ function Header({ active, daysToExam, user, onSignOut, isSupabaseConfigured, onT
         >
           {menuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
-        <h2 className="text-lg font-semibold truncate">{nav.find((n) => n.id === active)?.label}</h2>
+        <h2 className="text-base sm:text-lg font-semibold truncate">{nav.find((n) => n.id === active)?.label}</h2>
       </div>
-      <div className="flex items-center gap-2 sm:gap-4">
+      <div className="flex items-center gap-1.5 sm:gap-4 shrink-0">
         <button
           onClick={toggleFurigana}
           aria-pressed={furiganaOn}
           title={furiganaOn ? 'Furigana on — tap to hide readings' : 'Furigana off — tap to show readings above kanji'}
-          className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full border text-xs sm:text-sm font-medium transition ${
+          className={`flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-full border text-xs sm:text-sm font-medium transition whitespace-nowrap shrink-0 ${
             furiganaOn ? 'bg-[#FF6B57]/20 border-[#FF6B57]/50 text-[#FFA08D]' : 'bg-bun-700/50 border-bun-600/30 text-slate-300 hover:text-white'
           }`}
         >
           <Baseline size={16} />
-          <span>ふりがな</span>
+          <span className="whitespace-nowrap">ふりがな</span>
           <span className={`text-[10px] font-bold uppercase tracking-wide ${furiganaOn ? 'text-[#FFA08D]' : 'text-slate-500'}`}>{furiganaOn ? 'On' : 'Off'}</span>
         </button>
         <div className="text-right hidden lg:block">
@@ -378,11 +378,11 @@ function Header({ active, daysToExam, user, onSignOut, isSupabaseConfigured, onT
               <button
                 onClick={onSignOut}
                 aria-label="Sign out"
-                className="flex items-center gap-1.5 px-3 py-2 rounded-full border border-bun-600/30 bg-bun-700/50 hover:bg-rose-500/20 hover:border-rose-500/30 text-slate-300 hover:text-rose-300 transition text-xs sm:text-sm font-medium min-h-[42px]"
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-full border border-bun-600/30 bg-bun-700/50 hover:bg-rose-500/20 hover:border-rose-500/30 text-slate-300 hover:text-rose-300 transition text-xs sm:text-sm font-medium min-h-[42px] whitespace-nowrap shrink-0"
                 title="Sign out"
               >
                 <LogOut size={16} />
-                <span>Log Out</span>
+                <span className="whitespace-nowrap">Log Out</span>
               </button>
             )}
           </div>

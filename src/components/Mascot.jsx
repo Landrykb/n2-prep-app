@@ -36,7 +36,8 @@ export default function Mascot({ agent, size = 40, mood = 'happy', showName = tr
             className={motionClass}
             style={{
               width: Math.round(size * 1.12),
-              height: 'auto',
+              height: Math.round(size * 1.12),
+              objectFit: 'contain',
               opacity: resting ? 0.8 : 1,
               animationDuration: motionClass === 'mascot-bob' ? `${rhythm}s` : undefined,
             }}
