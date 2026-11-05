@@ -119,6 +119,12 @@ check('a named native ja-JP voice beats a plain ja-JP voice', () => {
   assert.ok(scoreJapaneseVoice(voice('Kyoko', 'ja-JP', true)) > scoreJapaneseVoice(voice('Plain Voice', 'ja-JP')))
   assert.ok(scoreJapaneseVoice(voice('Samantha', 'en-US')) < 0)
 })
+check('a humanlike (premium/enhanced/neural) ja voice beats the plain named voice', () => {
+  const picked = pickJapaneseVoiceFrom([voice('Kyoko', 'ja-JP', true), voice('Kyoko Premium', 'ja-JP', true)])
+  assert.equal(picked.name, 'Kyoko Premium')
+  assert.ok(scoreJapaneseVoice(voice('Voice Enhanced', 'ja-JP')) > scoreJapaneseVoice(voice('Kyoko', 'ja-JP', true)))
+  assert.ok(scoreJapaneseVoice(voice('Voice Neural', 'ja-JP')) > scoreJapaneseVoice(voice('Plain Voice', 'ja-JP')))
+})
 check('any ja voice beats a non-ja default', () => {
   const picked = pickJapaneseVoiceFrom([voice('Samantha', 'en-US', true), voice('Otoya', 'ja-JP')])
   assert.equal(picked.name, 'Otoya')

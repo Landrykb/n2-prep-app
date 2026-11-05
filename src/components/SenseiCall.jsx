@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Phone, PhoneOff, Mic, MicOff, CheckCircle2, RotateCcw, Clock, Bell, Inbox, X } from 'lucide-react'
+import { Phone, PhoneOff, Mic, MicOff, CheckCircle2, RotateCcw, Clock, Bell, Inbox, X, Volume2, VolumeX, ChevronDown } from 'lucide-react'
 import { loadProfile } from '../lib/profile.js'
 import { micErrorCopy } from '../lib/speechErrors.js'
-import { speakText } from '../lib/tts.js'
+import { speakText, primeSpeech, ttsAvailable } from '../lib/tts.js'
+import { useFurigana } from '../hooks/useFurigana.js'
+import { segmentFurigana, cleanReading } from '../lib/furigana.js'
+import { localDictionary, lookup } from '../lib/dictionary.js'
+import { findStudyItem } from '../lib/findStudyItem.js'
 import { addToQueue } from '../lib/queue.js'
 import { todayStr } from '../lib/session.js'
 import {
@@ -33,6 +37,51 @@ import KanjiTapText from './KanjiTapText.jsx'
 // call-style screen inside the app. It is not a real phone call.
 
 const RING_TIMEOUT_MS = 45000
+
+// Spoken once when a turn meets silence, before the call falls back to
+// the typed controls: "Go ahead — it's your turn."
+const REPROMPT_LINE = 'どうぞ、あなたの番です。'
+
+function shortMeaning(raw) {
+  if (!raw) return ''
+  const first = String(raw).split(/[;,(（]/)[0].trim()
+  return first.length > 42 ? `${first.slice(0, 42)}…` : first
+}
+
+/**
+ * The word-spotlight cards for a scene: dictionary words in the order
+ * Sensei speaks them (segmented from her line), then the scene's key
+ * phrases — the same list missingPhrases() checks the learner's answer
+ * against. Readings come from the app dictionary; meanings are shortened
+ * to the first gloss. Cards are a reading aid, lit in sequence while a
+ * line is spoken (estimated timing — see index.css .spot-active).
+ */
+function buildSpotlight(scene, index) {
+  if (!scene) return []
+  const seen = new Set()
+  const order = []
+  const readings = new Map()
+  const push = (word, reading) => {
+    const w = (word || '').trim()
+    if (!w || seen.has(w)) return
+    seen.add(w)
+    order.push(w)
+    if (reading) readings.set(w, reading)
+  }
+  if (index) {
+    for (const part of segmentFurigana(scene.partner || '', index)) {
+      if (part.type === 'w' && part.text.length >= 2) push(part.text, part.reading)
+    }
+  }
+  for (const p of scene.keyPhrases || []) push(p)
+  return order.slice(0, 8).map((word) => {
+    const entry = lookup(localDictionary, word)
+    let reading = readings.get(word) || ''
+    if (!reading && index) reading = segmentFurigana(word, index).map((p) => (p.type === 'w' ? p.reading : p.text)).join('')
+    if (entry?.reading) reading = cleanReading(entry.reading) || reading
+    return { word, reading, meaning: shortMeaning(entry?.meaning || findStudyItem(word)?.meaning || '') }
+  })
+}
 
 function freshRingChain(profile, slotIdx) {
   return pickCallScenes(profile, todayStr(), slotIdx || 0, 3)
@@ -86,6 +135,137 @@ export default function SenseiCall() {
   const scene = chain[Math.min(exIdx, Math.max(0, chain.length - 1))]
   const exchangesTotal = ring?.source === 'mini' ? 1 : chain.length
   const speechSupported = typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)
+
+  // ---------- hands-free turn-taking (the call runs itself) ----------
+  // turnState: 'sensei' (Sensei is speaking) → 'listening' (mic open,
+  // your turn) → 'scoring' → 'feedback' (the model plays, then the call
+  // advances on its own). 'manual' is the fallback whenever the loop
+  // can't run — no speech recognition, mic muted/blocked/not yet
+  // explained, or two silent turns — and hands over to the typed
+  // controls, which stay one tap away the whole call.
+  //
+  // HALF-DUPLEX, by construction: the mic is only ever open during
+  // 'listening'. speakLine() stops recognition before any speech, and
+  // startListening() cancels speech before opening the mic — so the mic
+  // can never again transcribe Sensei's own voice from the speaker.
+  const { index: furiganaIndex } = useFurigana()
+  const spotlight = useMemo(() => buildSpotlight(scene, furiganaIndex), [scene, furiganaIndex])
+  const [turnState, setTurnState] = useState('sensei')
+  const [micMuted, setMicMuted] = useState(false)
+  const [senseiMuted, setSenseiMuted] = useState(false)
+  const [interim, setInterim] = useState('')
+  const [spotActive, setSpotActive] = useState(-1)
+  const [manualOpen, setManualOpen] = useState(false)
+  const [manualNote, setManualNote] = useState('')
+  const turnRef = useRef('sensei')
+  const micMutedRef = useRef(false)
+  const senseiMutedRef = useRef(false)
+  const timersRef = useRef([])
+  const spotTimersRef = useRef([])
+  const listenSessionRef = useRef(0)
+  const repromptRef = useRef(0)
+  const advancedKeyRef = useRef('')
+  const currentRef = useRef(null)
+  currentRef.current = current
+
+  const goTurn = (t) => { turnRef.current = t; setTurnState(t) }
+  const later = (fn, ms) => {
+    const id = setTimeout(() => { timersRef.current = timersRef.current.filter((x) => x !== id); fn() }, ms)
+    timersRef.current.push(id)
+    return id
+  }
+  const clearTimers = () => { timersRef.current.forEach(clearTimeout); timersRef.current = [] }
+  const clearSpotTimers = () => { spotTimersRef.current.forEach(clearTimeout); spotTimersRef.current = [] }
+
+  const stopSpeech = () => { try { window.speechSynthesis?.cancel() } catch { /* no speech engine */ } }
+  const stopRecognition = () => {
+    listenSessionRef.current += 1 // invalidate any pending recognition callbacks
+    const rec = recogRef.current
+    if (rec) {
+      try { rec.onresult = null; rec.onend = null; rec.onerror = null; rec.stop() } catch { /* already stopped */ }
+      recogRef.current = null
+    }
+    setListening(false)
+  }
+
+  // Light the spotlight cards in the order their words occur in the
+  // spoken line, spreading the utterance's estimated duration across
+  // them (same estimate as the TTS safety timer — an approximation,
+  // not phoneme timing).
+  const runSpotlight = (text) => {
+    clearSpotTimers()
+    setSpotActive(-1)
+    if (!text || !spotlight.length) return
+    const hits = spotlight.map((c, i) => ({ i, at: text.indexOf(c.word) })).filter((h) => h.at >= 0).sort((a, b) => a.at - b.at)
+    if (!hits.length) return
+    const estMs = 1200 + 90 * text.length
+    const per = estMs / hits.length
+    hits.forEach((h, k) => { spotTimersRef.current.push(setTimeout(() => setSpotActive(h.i), Math.round(k * per))) })
+    spotTimersRef.current.push(setTimeout(() => setSpotActive(-1), estMs + 250))
+  }
+
+  // Every Sensei utterance in the call goes through here: mic closed
+  // first (half-duplex), spotlight running, and a muted Sensei voice
+  // simply steps the flow on after a beat instead of speaking.
+  const speakLine = (text, { rate = 0.95, onEnd } = {}) => {
+    stopRecognition()
+    if (senseiMutedRef.current) { if (onEnd) later(onEnd, 450); return }
+    runSpotlight(text)
+    speakText(text, {
+      rate,
+      onEnd: () => { clearSpotTimers(); setSpotActive(-1); if (onEnd) onEnd() },
+    })
+  }
+
+  const dropToManual = (note) => {
+    stopRecognition()
+    goTurn('manual')
+    setManualOpen(true)
+    if (note) setManualNote(note)
+  }
+
+  // A turn that heard nothing: one spoken re-prompt, then the typed
+  // controls — never a loop.
+  const handleSilence = () => {
+    if (turnRef.current !== 'listening') return
+    if (repromptRef.current >= 1) {
+      dropToManual('I couldn’t hear you that time — type your line below, or tap Speak when you’re ready. Nothing is lost.')
+      return
+    }
+    repromptRef.current += 1
+    goTurn('sensei')
+    speakLine(REPROMPT_LINE, { onEnd: () => later(() => { if (turnRef.current === 'sensei') beginUserTurn() }, 250) })
+  }
+
+  const beginUserTurn = () => {
+    if (phaseRef.current !== 'incall') return
+    if (micMutedRef.current) { dropToManual('Your mic is muted — unmute it above when you want to speak, or type instead.'); return }
+    if (!speechSupported) { dropToManual('Voice recognition isn’t available in this browser — typing works the same way on a call.'); return }
+    if (!micExplained()) { setShowMicPrompt(true); dropToManual(); return }
+    setInterim('')
+    startListening({ auto: true })
+  }
+
+  const toggleMicMute = () => {
+    const next = !micMutedRef.current
+    micMutedRef.current = next
+    setMicMuted(next)
+    if (next) {
+      if (turnRef.current === 'listening') dropToManual('Mic muted — unmute above when you want to speak, or type instead.')
+    } else if (phaseRef.current === 'incall' && turnRef.current === 'manual') {
+      setManualNote('')
+      beginUserTurn()
+    }
+  }
+
+  const toggleSenseiMute = () => {
+    const next = !senseiMutedRef.current
+    senseiMutedRef.current = next
+    setSenseiMuted(next)
+    // Cancelling makes the pending utterance complete (tts.js fires its
+    // onEnd exactly once), so a muted-mid-line call steps on by itself.
+    if (next) stopSpeech()
+  }
 
   // ---------- ringing triggers (checked on mount + every 20 s) ----------
   const startRinging = (ctx) => {
@@ -213,29 +393,93 @@ export default function SenseiCall() {
   }
   const confirmMic = () => { markMicExplained(); setShowMicPrompt(false); startListening() }
 
-  const startListening = () => {
+  const startListening = ({ auto = false } = {}) => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-    if (!SR) return
+    if (!SR) { if (auto) dropToManual('Voice recognition isn’t available in this browser — typing works the same way on a call.'); return }
+    stopSpeech() // half-duplex: Sensei is silenced before the mic opens
+    stopRecognition()
+    const session = listenSessionRef.current
     const rec = new SR()
     recogRef.current = rec
-    rec.lang = 'ja-JP'; rec.interimResults = false; rec.maxAlternatives = 1
-    rec.onresult = (e) => { setInput(e.results[0][0].transcript || ''); setListening(false); setMicError(null) }
-    rec.onerror = (e) => { setListening(false); setMicError(micErrorCopy(e?.error)) }
-    rec.onend = () => setListening(false)
+    rec.lang = 'ja-JP'; rec.interimResults = true; rec.maxAlternatives = 1
+    let gotFinal = false
+    rec.onresult = (e) => {
+      if (listenSessionRef.current !== session) return
+      let interimText = ''
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const res = e.results[i]
+        if (res.isFinal) {
+          gotFinal = true
+          const text = (res[0]?.transcript || '').trim()
+          stopRecognition()
+          setInterim('')
+          if (text) {
+            setInput(text)
+            setMicError(null)
+            if (auto) runCheckRef.current(text, { auto: true })
+          } else if (auto) {
+            handleSilence()
+          }
+          return
+        }
+        interimText += res[0]?.transcript || ''
+      }
+      if (interimText) setInterim(interimText)
+    }
+    rec.onerror = (e) => {
+      if (listenSessionRef.current !== session) return
+      setListening(false)
+      const err = e?.error
+      if (err === 'aborted' || err === 'no-speech') return // onend drives the silence path
+      setMicError(micErrorCopy(err))
+      if (auto) dropToManual()
+    }
+    rec.onend = () => {
+      if (listenSessionRef.current !== session) return
+      setListening(false)
+      if (!gotFinal && auto && turnRef.current === 'listening') handleSilence()
+    }
+    if (auto) goTurn('listening')
+    else { goTurn('manual'); setManualOpen(true) }
     setListening(true)
-    try { rec.start() } catch { setListening(false) }
+    try { rec.start() } catch { setListening(false); if (auto) handleSilence() }
   }
 
-  // Auto-speak (P2-4): when a new exchange opens mid-call, Koe's line is
-  // spoken automatically — no hunting for a speaker icon while talking.
+  // The automatic exchange loop: when an exchange opens, Sensei speaks
+  // her line (P2-4's auto-speak, now with turn-taking) — and when she
+  // finishes, the mic opens by itself. No buttons in the loop.
   const spokenForRef = useRef('')
   useEffect(() => {
     if (phase !== 'incall' || !scene) return
     const key = `${scene.id}:${exIdx}`
     if (spokenForRef.current === key) return
     spokenForRef.current = key
-    speakText(scene.partner)
+    repromptRef.current = 0
+    advancedKeyRef.current = ''
+    clearTimers()
+    clearSpotTimers()
+    setSpotActive(-1)
+    setInterim('')
+    setManualOpen(false)
+    setManualNote('')
+    goTurn('sensei')
+    if (senseiMutedRef.current) later(() => beginUserTurn(), 600)
+    else speakLine(scene.partner, { onEnd: () => later(() => beginUserTurn(), 350) })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, exIdx, scene])
+
+  // Leaving the in-call screen (hang up, wrap-up, unmount): silence both
+  // directions, so nothing talks or listens over whatever comes next.
+  useEffect(() => {
+    if (phase === 'incall') return
+    stopRecognition()
+    stopSpeech()
+    clearTimers()
+    clearSpotTimers()
+    setSpotActive(-1)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase])
+  useEffect(() => () => { stopRecognition(); stopSpeech(); clearTimers(); clearSpotTimers() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const finishExchange = (finalCurrent) => {
     const done = [...results, finalCurrent]
@@ -244,9 +488,21 @@ export default function SenseiCall() {
     else { setExIdx(exIdx + 1); setCurrent(null); setInput(''); setLastAttempt(null) }
   }
 
-  const check = () => {
-    const text = input.trim()
+  // Auto-advance out of feedback, exactly once per exchange: the model
+  // has played (or the muted-voice timer ran), so the call steps on.
+  const advanceNow = (key) => {
+    if (advancedKeyRef.current === key) return
+    if (turnRef.current !== 'feedback') return
+    advancedKeyRef.current = key
+    clearTimers()
+    const cur = currentRef.current
+    if (cur) finishExchange(cur)
+  }
+
+  const runCheck = (textRaw, { auto = false } = {}) => {
+    const text = (textRaw || '').trim()
     if (!text || !scene) return
+    if (auto) goTurn('scoring')
     const score = bestScore(text, scene)
     const missing = missingPhrases(text, scene)
     const attempt = { text, score, missing }
@@ -259,10 +515,40 @@ export default function SenseiCall() {
       imperfect: cur.imperfect || score < MASTERY,
     }
     setCurrent(next)
-    if (score >= MASTERY) finishExchange(next)
+    if (score >= MASTERY) { finishExchange(next); return }
+    if (!auto) return
+    // Feedback, hands-free: hear the model once, then the call moves on.
+    // Sensei voice muted (or no speech at all) → a plain reading pause
+    // on a timer instead. "Say it again" / "Move on" can still interrupt.
+    goTurn('feedback')
+    const key = `${scene.id}:${exIdx}`
+    if (senseiMutedRef.current || !ttsAvailable()) {
+      later(() => advanceNow(key), 2600)
+    } else {
+      later(() => {
+        if (turnRef.current !== 'feedback') return
+        speakLine(scene.model, { onEnd: () => later(() => advanceNow(key), 900) })
+      }, 350)
+    }
+  }
+  const runCheckRef = useRef(runCheck)
+  runCheckRef.current = runCheck
+
+  const check = () => runCheck(input)
+
+  // "Say it again" during feedback: cancel the pending auto-advance and
+  // hand the turn straight back to the learner.
+  const retryAttempt = () => {
+    clearTimers()
+    stopSpeech()
+    clearSpotTimers()
+    setSpotActive(-1)
+    setInput('')
+    repromptRef.current = 0
+    beginUserTurn()
   }
 
-  const moveOn = () => { if (current) finishExchange(current) }
+  const moveOn = () => { clearTimers(); stopSpeech(); if (current) finishExchange(current) }
 
   const queueErrors = (done) => {
     const items = done.filter((r) => r.imperfect).map((r) => ({
@@ -303,7 +589,10 @@ export default function SenseiCall() {
     finishCall(results)
   }
 
-  const accept = () => { setPhase('incall'); setExIdx(0); setResults([]); setCurrent(null); setInput(''); setLastAttempt(null) }
+  const accept = () => {
+    primeSpeech() // inside the tap, so iOS lets Sensei speak when her turn comes
+    setPhase('incall'); setExIdx(0); setResults([]); setCurrent(null); setInput(''); setLastAttempt(null)
+  }
 
   // ---------- settings ----------
   const saveSettings = () => {
@@ -512,32 +801,66 @@ export default function SenseiCall() {
             </div>
             <div className="flex gap-1.5">{chain.slice(0, exchangesTotal).map((_, i) => <div key={i} className={`h-1.5 flex-1 rounded-full ${i < results.length ? 'bg-emerald-500' : i === exIdx ? 'bg-[#FF6B57]' : 'bg-bun-700'}`} />)}</div>
 
-            <div className="rounded-2xl bg-bun-700/40 border border-bun-600/20 p-4">
+            {/* The only controls the call itself needs: two mutes. Turns,
+                scoring and advancing all happen on their own. */}
+            <div className="flex flex-wrap items-center gap-2">
+              <button onClick={toggleMicMute} aria-pressed={micMuted} title={micMuted ? 'Your mic is off — tap to unmute' : 'Your mic is on — tap to mute'} className={`px-3 py-2 rounded-full border text-xs font-semibold flex items-center gap-1.5 transition ${micMuted ? 'bg-rose-500/15 border-rose-500/40 text-rose-200' : 'bg-bun-700/60 border-bun-600/30 text-slate-200 hover:text-white'}`}>
+                {micMuted ? <MicOff size={14} /> : <Mic size={14} />} {micMuted ? 'Mic Off' : 'Mic On'}
+              </button>
+              <button onClick={toggleSenseiMute} aria-pressed={senseiMuted} title={senseiMuted ? 'Sensei’s voice is off — tap to hear her again' : 'Sensei’s voice is on — tap to mute her'} className={`px-3 py-2 rounded-full border text-xs font-semibold flex items-center gap-1.5 transition ${senseiMuted ? 'bg-rose-500/15 border-rose-500/40 text-rose-200' : 'bg-bun-700/60 border-bun-600/30 text-slate-200 hover:text-white'}`}>
+                {senseiMuted ? <VolumeX size={14} /> : <Volume2 size={14} />} {senseiMuted ? 'Sensei Voice Off' : 'Sensei Voice On'}
+              </button>
+              <span className="text-[11px] text-slate-500">The call runs itself — these two switches are all you need.</span>
+            </div>
+
+            <div className={`rounded-2xl bg-bun-700/40 border p-4 transition ${turnState === 'sensei' ? 'border-emerald-500/40' : 'border-bun-600/20'}`}>
               <p className="text-xs text-slate-400 mb-1">{callState.settings.senseiName} says:</p>
               <div className="flex items-start gap-2">
                 <p className="text-slate-100 leading-loose flex-1"><KanjiTapText text={scene.partner} /></p>
                 <TtsButton text={scene.partner} />
               </div>
             </div>
-            <p className="text-sm text-slate-200"><span className="text-[#FF8A75] font-semibold">Your turn — say this, your way:</span> {scene.promptEn}</p>
-            {showMicPrompt && <MicPrompt onUseMic={confirmMic} onTypeInstead={() => setShowMicPrompt(false)} />}
-            <div className="flex gap-2">
-              <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={2} placeholder="Speak with the mic, or type your Japanese here…"
-                className="flex-1 rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 focus:border-[#FF6B57] focus:outline-none" />
-              <div className="flex flex-col gap-2">
-                <button onClick={requestListening} disabled={!speechSupported || listening} className="px-3 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] disabled:opacity-40 text-white text-xs font-medium flex items-center gap-1.5">
-                  {listening ? <MicOff size={14} /> : <Mic size={14} />} {listening ? 'Listening…' : 'Speak'}
-                </button>
-                <button onClick={check} disabled={!input.trim()} className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-medium">Say it</button>
-              </div>
-            </div>
-            {micError && (
-              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
-                <p className="text-sm font-semibold text-amber-200">{micError.title}</p>
-                <p className="text-xs text-amber-100/80 mt-0.5">{micError.body}</p>
+
+            {spotlight.length > 0 && (
+              <div>
+                <div className="flex flex-wrap gap-2">
+                  {spotlight.map((c, i) => {
+                    const missed = !!lastAttempt && (lastAttempt.missing || []).includes(c.word)
+                    const active = spotActive === i
+                    return (
+                      <div key={c.word} className={`rounded-xl border px-3 py-2 text-center transition-colors duration-300 ${active ? 'spot-active border-[#FF6B57]/70 bg-[#FF6B57]/15' : missed ? 'border-amber-400/60 bg-amber-400/10' : 'border-bun-600/30 bg-bun-700/40'}`}>
+                        <p className="text-base font-bold text-white leading-tight">{c.word}</p>
+                        {c.reading && <p className="text-[11px] text-[#FF8A75] mt-0.5">{c.reading}</p>}
+                        {c.meaning && <p className="text-[11px] text-slate-400">{c.meaning}</p>}
+                      </div>
+                    )
+                  })}
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1.5">Key words for this scene — they glow roughly in time with the voice as each line is spoken, and words you missed stay amber after your try.</p>
               </div>
             )}
-            {!speechSupported && <p className="text-xs text-slate-500">Voice recognition isn’t available in this browser — typing your version works the same way on a call.</p>}
+
+            <p className="text-sm text-slate-200"><span className="text-[#FF8A75] font-semibold">Your turn — say this, your way:</span> {scene.promptEn}</p>
+
+            {turnState === 'sensei' && (
+              <p className="text-xs text-emerald-300 flex items-center gap-1.5"><Volume2 size={13} /> Sensei is speaking — just listen. The mic opens by itself when she finishes.</p>
+            )}
+            {turnState === 'listening' && (
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3">
+                <p className="text-xs text-emerald-300 font-semibold flex items-center gap-1.5"><Mic size={13} /> Your turn — I’m listening…</p>
+                <p className="text-sm text-slate-100 mt-1 min-h-[1.25rem]">{interim || '…'}</p>
+              </div>
+            )}
+            {turnState === 'scoring' && <p className="text-xs text-slate-400">Checking that against the model…</p>}
+            {turnState === 'feedback' && (
+              <p className="text-xs text-emerald-300 flex items-center gap-1.5"><Volume2 size={13} /> Listen to the model — then the call moves on by itself. “Say it again” below interrupts if you want another try first.</p>
+            )}
+            {turnState === 'manual' && manualNote && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+                <p className="text-xs text-amber-100/90">{manualNote}</p>
+              </div>
+            )}
+            {showMicPrompt && <MicPrompt onUseMic={confirmMic} onTypeInstead={() => setShowMicPrompt(false)} />}
 
             {lastAttempt && (
               <div className={`rounded-xl border p-4 space-y-2 ${lastAttempt.score >= MASTERY ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-bun-700/40 border-bun-600/20'}`}>
@@ -553,13 +876,43 @@ export default function SenseiCall() {
                     {lastAttempt.missing.length > 0 && <p className="text-sm text-amber-200">Missing: {lastAttempt.missing.join('、')}</p>}
                     <p className="text-xs text-slate-400">{scene.commonError}</p>
                     <div className="flex flex-wrap gap-2">
-                      <button onClick={() => setInput('')} className="px-3 py-1.5 rounded-lg bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-xs font-medium flex items-center gap-1"><RotateCcw size={13} /> Say it again</button>
+                      <button onClick={retryAttempt} className="px-3 py-1.5 rounded-lg bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-xs font-medium flex items-center gap-1"><RotateCcw size={13} /> Say it again</button>
                       {current && current.attempts >= 2 && <button onClick={moveOn} className="px-3 py-1.5 rounded-lg bg-bun-700 hover:bg-bun-600 text-slate-200 text-xs font-medium">Move on — it joins my queue</button>}
                     </div>
                   </>
                 )}
               </div>
             )}
+            {/* Manual fallback: the old tap-by-tap controls, kept whole
+                but folded away under the automatic flow. Opens on its
+                own whenever the call drops to 'manual'. */}
+            <div className="rounded-2xl border border-bun-600/20 bg-bun-800/40">
+              <button onClick={() => setManualOpen((o) => !o)} aria-expanded={manualOpen || turnState === 'manual'} className="w-full flex items-center justify-between px-4 py-3 text-sm text-slate-300 hover:text-white transition">
+                <span>Type or tap instead</span>
+                <ChevronDown size={16} className={`transition-transform ${(manualOpen || turnState === 'manual') ? 'rotate-180' : ''}`} />
+              </button>
+              {(manualOpen || turnState === 'manual') && (
+                <div className="px-4 pb-4 space-y-3">
+                  <div className="flex gap-2">
+                    <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={2} placeholder="Speak with the mic, or type your Japanese here…"
+                      className="flex-1 rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 focus:border-[#FF6B57] focus:outline-none" />
+                    <div className="flex flex-col gap-2">
+                      <button onClick={requestListening} disabled={!speechSupported || listening} className="px-3 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] disabled:opacity-40 text-white text-xs font-medium flex items-center gap-1.5">
+                        {listening ? <MicOff size={14} /> : <Mic size={14} />} {listening ? 'Listening…' : 'Speak'}
+                      </button>
+                      <button onClick={check} disabled={!input.trim()} className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-medium">Say it</button>
+                    </div>
+                  </div>
+                  {micError && (
+                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+                      <p className="text-sm font-semibold text-amber-200">{micError.title}</p>
+                      <p className="text-xs text-amber-100/80 mt-0.5">{micError.body}</p>
+                    </div>
+                  )}
+                  {!speechSupported && <p className="text-xs text-slate-500">Voice recognition isn’t available in this browser — typing your version works the same way on a call.</p>}
+                </div>
+              )}
+            </div>
             <p className="text-[11px] text-slate-600 text-center pb-4">Hanging up before the first exchange counts as a missed call (one callback, then a message). After that, hanging up just ends the call warmly — what you did is kept.</p>
           </div>
         </div>

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'yonde-v7'
+const CACHE_NAME = 'yonde-v8'
 const PRECACHE = ['/', '/index.html', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png']
 
 self.addEventListener('install', (event) => {

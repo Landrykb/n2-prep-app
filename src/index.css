@@ -206,3 +206,19 @@ rt {
 @media (prefers-reduced-motion: reduce) {
   .mascot-hop, .mascot-shadow { animation: none; }
 }
+
+/* Word spotlight (Sensei Call): the card for the word currently being
+   spoken pulses with a coral glow. Timing is an estimate spread across
+   the utterance — an honest approximation, not phoneme sync. Missed
+   words are held amber by the component after an attempt. */
+@keyframes spotPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+.spot-active {
+  animation: spotPulse 0.7s ease-in-out infinite;
+  box-shadow: 0 0 0 2px rgba(255, 107, 87, 0.35), 0 0 22px rgba(255, 107, 87, 0.35);
+}
+@media (prefers-reduced-motion: reduce) {
+  .spot-active { animation: none; }
+}
