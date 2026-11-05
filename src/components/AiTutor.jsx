@@ -32,7 +32,7 @@ export default function AiTutor({ context = '', compact = false }) {
     } catch {}
     return [{
       role: 'assistant',
-      content: 'Hi! I am your JPN2easy AI tutor. I can help with JLPT N2, BJT business Japanese, kanji, grammar, reading, listening, or study strategy.\n\nType a question below or tap a quick topic to get started.',
+      content: 'Hi! I am your Yonde AI tutor. I can help with JLPT N2, BJT business Japanese, kanji, grammar, reading, listening, or study strategy.\n\nType a question below or tap a quick topic to get started.',
       pending: false,
     }]
   })
@@ -165,7 +165,7 @@ export default function AiTutor({ context = '', compact = false }) {
       <div className="flex items-center gap-3">
         <Sparkles className="text-violet-400" size={22} />
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-white leading-tight">JPN2easy AI Tutor</h2>
+          <h2 className="text-xl sm:text-2xl font-bold text-white leading-tight">Yonde AI Tutor</h2>
           <p className="text-xs text-slate-400">N2 · BJT · Kanji · Grammar · Listening · Study strategy</p>
         </div>
       </div>

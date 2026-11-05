@@ -72,7 +72,7 @@ export function usePush() {
   const sendTest = async () => {
     const reg = await navigator.serviceWorker.ready
     if (!reg) return
-    reg.showNotification('JPN2easy test', {
+    reg.showNotification('Yonde test', {
       body: 'Your push setup is working! 🎉',
       icon: '/icon-192.png',
       badge: '/icon-192.png',

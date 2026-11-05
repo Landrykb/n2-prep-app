@@ -11,11 +11,11 @@ export default function ChatBubble({ context }) {
     <>
       <button
         onClick={() => setOpen(true)}
-        aria-label="Open the JPN2easy AI tutor"
+        aria-label="Open the Yonde AI tutor"
         className="fixed z-40 flex items-center gap-2 px-4 py-3 rounded-full bg-violet-600 hover:bg-violet-500 text-white font-medium shadow-lg shadow-violet-600/30 transition hover:-translate-y-1 right-4 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] lg:right-6 lg:bottom-6"
       >
         <Bot size={20} />
-        <span className="hidden sm:inline text-sm">Ask JPN2easy</span>
+        <span className="hidden sm:inline text-sm">Ask Yonde</span>
       </button>
 
       {open && (
@@ -26,7 +26,7 @@ export default function ChatBubble({ context }) {
             <div className="flex items-center justify-between px-4 py-3 border-b border-bun-600/30 bg-bun-800/50">
               <div className="flex items-center gap-2 text-violet-200">
                 <MessageCircle size={18} />
-                <span className="font-bold text-sm">JPN2easy AI Tutor</span>
+                <span className="font-bold text-sm">Yonde AI Tutor</span>
                 <span className="text-xs text-slate-400">· {context || 'general'}</span>
               </div>
               <button onClick={() => setOpen(false)} aria-label="Close the AI tutor" className="p-2 rounded-lg bg-bun-700 text-slate-300 hover:text-white">

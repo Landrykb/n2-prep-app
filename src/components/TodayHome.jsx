@@ -101,7 +101,7 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
           <Coffee size={15} className="text-amber-300" /> Busy day — 3 minutes <span className="text-slate-400">(just the voice scene — a small day still counts)</span>
         </button>
         <button onClick={() => setActive('sensei')} className="w-full rounded-2xl bg-emerald-500/10 border border-emerald-500/25 hover:border-emerald-400/40 p-3.5 text-sm text-slate-200 flex items-center justify-center gap-2 transition">
-          <Phone size={15} className="text-emerald-300" /> Sensei Call {(() => { const cs = loadCallState(); return cs.settings.enabled ? <span className="text-slate-400">is on — {cs.settings.callsPerDay} call{cs.settings.callsPerDay > 1 ? 's' : ''} a day inside your windows. Set times or test a call →</span> : <span className="text-slate-400">is off — let the app call <em>you</em> for a few minutes of spoken Japanese →</span> })()}
+          <Phone size={15} className="text-emerald-300" /> Yobidashi {(() => { const cs = loadCallState(); return cs.settings.enabled ? <span className="text-slate-400">is on — {cs.settings.callsPerDay} call{cs.settings.callsPerDay > 1 ? 's' : ''} a day inside your windows. Set times or test a call →</span> : <span className="text-slate-400">is off — let the app call <em>you</em> for a few minutes of spoken Japanese →</span> })()}
         </button>
       </section>
 

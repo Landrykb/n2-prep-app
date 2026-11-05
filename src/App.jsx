@@ -92,7 +92,7 @@ const nav = [
   { id: 'session', label: 'One Session', short: 'Session', icon: Play },
   { id: 'dashboard', label: 'Today', icon: LayoutDashboard },
   { id: 'voice', label: 'Voice Loop', icon: Mic },
-  { id: 'sensei', label: 'Sensei Call', short: 'Sensei', icon: Phone },
+  { id: 'sensei', label: 'Yobidashi', short: 'Yobidashi', icon: Phone },
   { id: 'diagnosis', label: 'Diagnosis', icon: Stethoscope },
   { id: 'twin', label: 'Your Fleet', short: 'Fleet', icon: Users },
   { id: 'coach', label: 'Coach Letter', short: 'Letter', icon: Mail },

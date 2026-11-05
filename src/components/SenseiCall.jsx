@@ -193,7 +193,7 @@ export default function SenseiCall() {
     const items = done.filter((r) => r.imperfect).map((r) => ({
       front: `${r.scene.title} — say it right: ${r.scene.promptEn}`,
       back: r.scene.model,
-      note: `From your Sensei Call. Your version: 「${r.firstText}」. Missing: ${r.firstMissing.join('、') || r.scene.targetPattern}. ${r.scene.commonError}`,
+      note: `From your Yobidashi call. Your version: 「${r.firstText}」. Missing: ${r.firstMissing.join('、') || r.scene.targetPattern}. ${r.scene.commonError}`,
       source: 'voice', level: r.scene.level,
     }))
     if (items.length) addToQueue(items)
@@ -254,7 +254,7 @@ export default function SenseiCall() {
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <div>
-        <h2 className="text-2xl font-bold text-white flex items-center gap-2"><Phone size={22} className="text-emerald-300" /> Sensei Call</h2>
+        <h2 className="text-2xl font-bold text-white flex items-center gap-2"><Phone size={22} className="text-emerald-300" /> Yobidashi</h2>
         <p className="text-sm text-slate-400 mt-1 max-w-2xl">The learners who got good had a life that <em>required</em> Japanese every day — a lab, a company. If your life requires none, this manufactures a small requirement instead: a short spoken call, at a varied time inside windows you choose. Miss it, and it calls back <strong className="text-slate-200">once</strong> — then leaves a kind message, then silence. No streaks. No penalties. Ever.</p>
       </div>
 
@@ -274,7 +274,7 @@ export default function SenseiCall() {
       <section className="rounded-2xl glass p-5 card-glow space-y-3">
         <h3 className="font-bold text-white">Today’s calls</h3>
         {!callState.settings.enabled ? (
-          <p className="text-sm text-slate-400">Sensei Call is off. Turn it on below and pick your windows — the first call can also be tested right now:</p>
+          <p className="text-sm text-slate-400">The Yobidashi is off. Turn it on below and pick your windows — the first call can also be tested right now:</p>
         ) : day && day.slots.length ? (
           <ul className="space-y-2">
             {day.slots.map((slot) => (
@@ -297,7 +297,7 @@ export default function SenseiCall() {
       <section className="rounded-2xl glass p-5 card-glow space-y-4">
         <h3 className="font-bold text-white">Call settings</h3>
         <label className="flex items-center justify-between gap-3 rounded-xl bg-bun-700/40 border border-bun-600/20 px-4 py-3 cursor-pointer">
-          <span className="text-sm text-slate-200">Sensei Call is <strong>{settings.enabled ? 'on' : 'off'}</strong><span className="block text-xs text-slate-400 mt-0.5">When on, calls arrive inside your windows below — only while this app can reach you (see the honest note).</span></span>
+          <span className="text-sm text-slate-200">The Yobidashi is <strong>{settings.enabled ? 'on' : 'off'}</strong><span className="block text-xs text-slate-400 mt-0.5">When on, calls arrive inside your windows below — only while this app can reach you (see the honest note).</span></span>
           <button role="switch" aria-checked={settings.enabled} onClick={() => setSettings((st) => ({ ...st, enabled: !st.enabled }))} className={`w-12 h-7 rounded-full shrink-0 transition ${settings.enabled ? 'bg-emerald-500' : 'bg-bun-600'}`}>
             <span className={`block w-5 h-5 rounded-full bg-white shadow transition-transform ${settings.enabled ? 'translate-x-6' : 'translate-x-1'}`} />
           </button>
@@ -387,6 +387,8 @@ export default function SenseiCall() {
               <Mascot agent="koe" size={96} showName={false} label={`${callState.settings.senseiName} — Koe, your sensei, is calling`} />
             </span>
           </div>
+          <p className="text-sm font-semibold tracking-widest text-amber-300 mb-1">呼び出しの時間</p>
+          <p className="text-[11px] uppercase tracking-[0.3em] text-slate-500 mb-4">Yobidashi no Jikan — your name is being called</p>
           <h3 className="text-3xl font-bold text-white">{callState.settings.senseiName}</h3>
           <p className="text-slate-300 mt-2">Wants to practice: <span className="text-white font-semibold">{chain[0]?.title}</span></p>
           <p className="text-xs text-slate-500 mt-1">{chain[0]?.domain} · {chain[0]?.level} · {ring.source === 'mini' ? '1 quick exchange' : `${exchangesTotal} short exchanges`} · about {ring.source === 'mini' ? '1' : '3'} minutes</p>

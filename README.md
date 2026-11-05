@@ -1,4 +1,6 @@
-# JPN2easy — AI-Powered JLPT N2 Study Command Center
+# Yonde — Summon Your Japanese
+
+_Yonde (formerly JPN2easy): a fleet of AI agents that learns how you learn — truthful diagnosis, a written promise, one session a day, and the Yobidashi, the call that summons your Japanese. N5 → N1 and the BJT._
 
 A Vite + React + Tailwind app for preparing for the JLPT N2, now with user accounts, an AI tutor, and Supabase-powered vector search (RAG).
 

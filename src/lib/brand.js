@@ -9,8 +9,10 @@
 // so renaming a mascot is also a one-file change.
 
 export const brand = {
-  name: 'JPN2easy',
-  tagline: 'It learns how you learn',
+  name: 'Yonde',
+  tagline: 'Summon your Japanese',
+  differentiator: 'It learns how you learn',
+  callRitual: { name: 'Yobidashi', jp: '呼び出し', moment: 'Yobidashi no Jikan', momentJp: '呼び出しの時間' },
   // The family's outline colour (Doc 13 §4): deep plum, near-black.
   outline: '#2A1A33',
   fleet: [
