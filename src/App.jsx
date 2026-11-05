@@ -404,10 +404,17 @@ function Sidebar({ active, setActive, mobileOpen, setMobileOpen }) {
         <div className="p-6 shrink-0">
           <div className="flex items-center gap-3 mb-6">
             <Mascot agent="koe" size={40} mood="happy" showName={false} />
-            <div>
+            <div className="flex-1 min-w-0">
               <h1 className="font-bold text-lg leading-tight">{brand.name}</h1>
               <p className="text-xs text-slate-400">{brand.tagline}</p>
             </div>
+            <button
+              onClick={() => setMobileOpen(false)}
+              aria-label="Close the menu"
+              className="lg:hidden p-2.5 rounded-lg bg-bun-700 text-slate-200 min-w-[42px] min-h-[42px] flex items-center justify-center shrink-0"
+            >
+              <X size={20} />
+            </button>
           </div>
         </div>
         <nav className="flex-1 overflow-y-auto px-6 pb-4 space-y-1.5">
