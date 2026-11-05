@@ -3,6 +3,8 @@ import { Mic, MicOff, Volume2, CheckCircle2, RotateCcw, Save, Ear, MessageSquare
 import { scenes, SCENE_DOMAINS } from '../data/scenes.js'
 import { addToQueue } from '../lib/queue.js'
 import { loadProfile } from '../lib/profile.js'
+import { recordVoiceAttempt } from '../lib/twin.js'
+import Mascot from './Mascot.jsx'
 import TtsButton from './TtsButton.jsx'
 import KanjiTapText from './KanjiTapText.jsx'
 
@@ -101,6 +103,9 @@ export default function VoiceLoop() {
     const attempt = { text, score, missing }
     const next = [...attempts, attempt]
     setAttempts(next)
+    // The Twin's error fingerprint learns from every attempt (heuristic
+    // classification over local signals — Doc 05 §4 fallback Corrector).
+    recordVoiceAttempt({ scene, text, score, missing })
     if (score >= MASTERY) {
       const wasImperfect = next.slice(0, -1).some((a) => a.score < MASTERY) || missing.length > 0
       setMastered((cur) => {
@@ -202,7 +207,7 @@ export default function VoiceLoop() {
             {last && (
               <div className="rounded-xl bg-bun-900/50 border border-violet-500/20 p-4 space-y-3">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-bold text-white flex items-center gap-2"><Sparkles size={15} className="text-violet-300" /> Correction</p>
+                  <p className="text-sm font-bold text-white flex items-center gap-2"><Mascot agent="nao" size={28} showName={false} /><Sparkles size={15} className="text-violet-300" /> Correction — from Nao, your fixer</p>
                   <div className="flex items-center gap-2"><TtsButton text={scene.model} /><span className="text-xs text-slate-400 flex items-center gap-1"><Volume2 size={12} /> hear the model</span></div>
                 </div>
                 <p className="text-slate-100 leading-loose"><KanjiTapText text={scene.model} /></p>

@@ -1,11 +1,104 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useAuth } from '../hooks/useAuth.js'
 import { getUserProgress, setUserProgress } from '../lib/supabaseApi.js'
+import { addToQueue, loadQueue, saveQueue, queueItemId } from '../lib/queue.js'
 import KanjiTapText from './KanjiTapText.jsx'
-import { Download, ExternalLink, Loader2, RotateCcw, Search, Settings, Shuffle, CheckCircle2, XCircle } from 'lucide-react'
+import { Download, ExternalLink, Loader2, RotateCcw, Search, Settings, Shuffle, CheckCircle2, XCircle, Layers } from 'lucide-react'
 
 const SRS = [1, 3, 7, 14, 30, 90, 180]
 const PROGRESS_KEY = 'n2:anki-progress'
+const MIGRATION_KEY = 'jpn:anki-migration:v1'
+
+function loadMigration() {
+  try { return JSON.parse(localStorage.getItem(MIGRATION_KEY) || 'null') } catch { return null }
+}
+
+/** A graduated FSRS state derived from legacy review counts: the word was
+ *  already learned here, so it enters the new queue as a REVIEW card whose
+ *  interval mirrors the old ladder step it had reached — not as a new card. */
+function graduatedState(count, now = new Date()) {
+  const step = Math.min(Math.max(count, 1) - 1, SRS.length - 1)
+  const days = SRS[step] || 7
+  return {
+    stability: days, difficulty: 5,
+    due: new Date(now.getTime() + days * 86400000).toISOString(),
+    lastReview: now.toISOString(),
+    reps: Math.max(1, count), lapses: 0, state: 'review', intervalDays: days,
+  }
+}
+
+// One-time, USER-INITIATED move of legacy Anki progress into the ONE queue.
+// Safety rules (Doc 08 §6): a JSON backup downloads FIRST; legacy progress
+// is never deleted or altered; the move is idempotent (flag + queue dedupe)
+// and never runs on its own.
+function MigrationCard({ cards, progress }) {
+  const [migration, setMigration] = useState(loadMigration)
+  const [note, setNote] = useState('')
+  const learnedIds = useMemo(
+    () => Object.keys(progress?.count || {}).filter((id) => (progress.count[id] || 0) > 0),
+    [progress],
+  )
+
+  const doMigration = () => {
+    if (!cards.length || !learnedIds.length) return
+    const now = new Date()
+    // 1) Backup first — always, before anything is written anywhere.
+    const backup = {
+      exportedAt: now.toISOString(),
+      kind: 'jpn2easy-anki-legacy-backup',
+      progress,
+      learnedCount: learnedIds.length,
+    }
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'jpn2easy-anki-backup.json'
+    a.click()
+    URL.revokeObjectURL(url)
+
+    // 2) Import the known words as graduated review cards.
+    const byId = new Map(cards.map((c) => [c.id, c]))
+    const items = learnedIds.map((id) => byId.get(id)).filter(Boolean).map((c) => ({
+      front: c.front,
+      back: c.back,
+      level: c.level,
+      source: 'anki',
+      note: `Moved from your Anki tab — you had already learned this word there (reviewed ${progress.count[c.id]}×).`,
+    }))
+    addToQueue(items, now)
+    const queue = loadQueue().map((item) => {
+      if (item.source !== 'anki') return item
+      const card = items.find((i) => queueItemId('anki', i.front) === item.id)
+      if (!card) return item
+      const legacy = cards.find((c) => c.front === card.front)
+      const count = legacy ? (progress.count[legacy.id] || 1) : 1
+      return { ...item, fsrs: graduatedState(count, now) }
+    })
+    saveQueue(queue)
+
+    const record = { doneAt: now.toISOString(), imported: items.length, backupDownloaded: true }
+    try { localStorage.setItem(MIGRATION_KEY, JSON.stringify(record)) } catch {}
+    setMigration(record)
+    setNote(`Done — ${items.length} known word${items.length === 1 ? '' : 's'} moved into the one queue as review cards. Your Anki progress here is untouched, and your backup file is in your downloads.`)
+  }
+
+  return (
+    <div className="rounded-2xl glass p-5 card-glow space-y-3 text-left">
+      <h3 className="font-bold text-white flex items-center gap-2"><Layers size={17} className="text-violet-300" /> One queue, everywhere</h3>
+      {migration ? (
+        <p className="text-sm text-emerald-300 flex items-start gap-2"><CheckCircle2 size={16} className="shrink-0 mt-0.5" /> Moved on {new Date(migration.doneAt).toLocaleDateString()}: {migration.imported} known words now live in the Today queue with their learning preserved. This tab keeps working exactly as before — nothing was deleted.</p>
+      ) : (
+        <>
+          <p className="text-sm text-slate-300">The rest of the app now reviews everything in <strong className="text-white">one queue</strong> with the newer FSRS scheduler. You have <strong className="text-white">{learnedIds.length} learned word{learnedIds.length === 1 ? '' : 's'}</strong> in this tab’s older system. Moving them is one tap, it downloads a backup of this progress <em>first</em>, and it never deletes anything here.</p>
+          <button onClick={doMigration} disabled={!learnedIds.length || !cards.length} className="px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white text-sm font-semibold">Move My Progress To The New System</button>
+          {!learnedIds.length && <p className="text-xs text-slate-500">Nothing to move yet — words become “learned” here after their first good review.</p>}
+        </>
+      )}
+      {note && <p className="text-xs text-slate-400">{note}</p>}
+    </div>
+  )
+}
 
 const today = () => new Date().toISOString().slice(0, 10)
 const addDays = (n) => {
@@ -234,6 +327,7 @@ export default function Anki() {
           <button onClick={() => setMode('all')} className="px-5 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-slate-200 text-sm font-medium transition">Study all</button>
           <button onClick={exportCSV} className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition"><Download size={16} className="inline mr-2" /> Export CSV</button>
         </div>
+        <MigrationCard cards={cards} progress={progress} />
       </div>
     )
   }
@@ -242,6 +336,7 @@ export default function Anki() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-28 sm:pb-24">
+      <MigrationCard cards={cards} progress={progress} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-2xl font-bold text-white">Anki Cards</h2>
         <div className="flex gap-2">

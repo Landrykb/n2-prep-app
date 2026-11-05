@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState} from 'react'
 import { Pickaxe, Plus, CheckCircle2} from 'lucide-react'
 import { loadDictionary, localDictionary} from '../lib/dictionary.js'
 import { addToQueue, loadQueue} from '../lib/queue.js'
+import { recordMining} from '../lib/twin.js'
+import Mascot from './Mascot.jsx'
 
 // Sentence mining from YOUR life: paste a real email, school letter, meeting
 // agenda or notice. The app finds dictionary words inside it and builds i+1
@@ -56,6 +58,7 @@ const mined = useMemo(() => cards, [cards])
 
 const runMine = () => {
 const found = mineText(dict, text)
+recordMining({ cardsFound: found.length, cardsAdded: 0 })
 setCards(found)
 setSelected(new Set(found.map((_, i) => i)))
 setNote(found.length? '': 'No dictionary words found in that text yet. Try a longer, real document — emails and official letters mine best.')
@@ -69,6 +72,7 @@ front: c.front, back: c.back, reading: c.reading, source: 'mining', level: c.lev
 note: `Mined from your own text. Target: ${c.word}.`,
 }))
 const { added, queue} = addToQueue(items)
+if (added) recordMining({ cardsFound: 0, cardsAdded: added })
 setQueueCount(queue.length)
 setNote(added? `Added ${added} card${added === 1? '': 's'} to your review queue — they will surface in Today and Anki-queue reviews, spaced by FSRS.`: 'Those cards are already in your queue.')
 }
@@ -76,7 +80,8 @@ setNote(added? `Added ${added} card${added === 1? '': 's'} to your review queue 
 return (
 <div className="space-y-6">
 <div>
-<div className="flex items-center gap-2 mb-1"><Pickaxe size={20} className="text-violet-400" /><h2 className="text-2xl font-bold text-white">Mine your own Japanese</h2></div>
+<div className="flex items-center gap-3 mb-1"><Pickaxe size={20} className="text-violet-400" /><h2 className="text-2xl font-bold text-white">Mine your own Japanese</h2><Mascot agent="hori" size={34} /></div>
+<p className="text-xs text-slate-500 mb-1">Hori digs; what Hori finds becomes material Tsuku shapes into your queue.</p>
 <p className="text-sm text-slate-400">Generic textbooks don’t contain your life. Paste a real work email, a school letter, a city-office notice — get i+1 cards (one new word per sentence) from the Japanese you actually have to survive. Processed locally in your browser; nothing is uploaded. Your queue currently holds {queueCount} personal cards.</p>
 </div>
 
@@ -93,7 +98,7 @@ className="w-full rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2.5 tex
 {mined.length > 0 && (
 <div className="space-y-3">
 <div className="flex items-center justify-between gap-3">
-<h3 className="text-lg font-bold text-white">{mined.length} i+1 cards found</h3>
+<h3 className="text-lg font-bold text-white flex items-center gap-2.5"><Mascot agent="tsuku" size={32} showName={false} /> {mined.length} i+1 cards found — new material, made from your words</h3>
 <button onClick={addSelected} disabled={!selected.size} className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-sm font-semibold flex items-center gap-1.5"><Plus size={15} /> Add {selected.size} to my queue</button>
 </div>
 {mined.map((c, i) => (

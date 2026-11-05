@@ -8,6 +8,8 @@ import {
   loadInbox, markInboxDone, fmtTime, MASTERY,
 } from '../lib/calls.js'
 import { bestScore, missingPhrases } from './VoiceLoop.jsx'
+import { recordVoiceAttempt, recordCallOutcome } from '../lib/twin.js'
+import Mascot from './Mascot.jsx'
 import TtsButton from './TtsButton.jsx'
 import KanjiTapText from './KanjiTapText.jsx'
 
@@ -132,6 +134,7 @@ export default function SenseiCall() {
     if (!ring) { setPhase('idle'); return }
     const { source, slotIdx } = ring
     if (source === 'test' || source === 'mini') { setRing(null); setPhase('idle'); return }
+    recordCallOutcome({ kept: false })
     let s = loadCallState()
     s = recordHistory(s, { kind: 'call', scene: chain[0]?.title || 'Practice call', status: 'missed', bestScore: null, how })
     const { state: next, outcome } = registerMiss(s, { slotIdx, wasCallback: source === 'callback', sceneTitle: chain[0]?.title })
@@ -173,6 +176,7 @@ export default function SenseiCall() {
     const missing = missingPhrases(text, scene)
     const attempt = { text, score, missing }
     setLastAttempt(attempt)
+    recordVoiceAttempt({ scene, text, score, missing })
     const cur = current || { scene, best: 0, attempts: 0, firstText: text, firstMissing: missing, imperfect: false }
     const next = {
       ...cur, attempts: cur.attempts + 1,
@@ -199,6 +203,7 @@ export default function SenseiCall() {
   const finishCall = (done) => {
     const queued = queueErrors(done)
     const bestScoreVal = done.length ? Math.round(done.reduce((a, r) => a + r.best, 0) / done.length) : 0
+    if (ring && ring.source !== 'test') recordCallOutcome({ kept: true, bestScore: bestScoreVal })
     const weakest = [...done].sort((a, b) => a.best - b.best)[0]
     let s = loadCallState()
     s = recordHistory(s, { kind: 'call', scene: chain[0]?.title || 'Practice call', status: 'completed', bestScore: bestScoreVal, exchanges: done.length })
@@ -378,7 +383,9 @@ export default function SenseiCall() {
           <p className="text-xs uppercase tracking-[0.25em] text-slate-400 mb-6">{ring.source === 'callback' ? 'Calling back — once, as promised' : ring.source === 'catchup' ? 'Missed call — calling again now' : ring.source === 'test' ? 'Test call' : ring.source === 'mini' ? 'Your 60-second version' : 'Incoming practice call'}</p>
           <div className="relative mb-6">
             <span className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping" />
-            <span className="relative w-24 h-24 rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-600 flex items-center justify-center text-3xl font-bold text-white shadow-2xl">{(callState.settings.senseiName || 'S').slice(0, 1)}</span>
+            <span className="relative block">
+              <Mascot agent="koe" size={96} showName={false} label={`${callState.settings.senseiName} — Koe, your sensei, is calling`} />
+            </span>
           </div>
           <h3 className="text-3xl font-bold text-white">{callState.settings.senseiName}</h3>
           <p className="text-slate-300 mt-2">Wants to practice: <span className="text-white font-semibold">{chain[0]?.title}</span></p>
@@ -405,6 +412,7 @@ export default function SenseiCall() {
             <div className="flex items-center justify-between gap-2 pt-2">
               <div>
                 <p className="text-xs uppercase tracking-wider text-emerald-300 flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> On a call with {callState.settings.senseiName}</p>
+                <span className="mt-2 block"><Mascot agent="koe" size={30} showName={false} /></span>
                 <h3 className="text-xl font-bold text-white mt-1">{scene.title}</h3>
                 <p className="text-xs text-slate-400">Exchange {exIdx + 1} of {exchangesTotal} · {scene.domain} · {scene.level}</p>
               </div>
@@ -469,7 +477,7 @@ export default function SenseiCall() {
             </div>
             {wrap.weakest && wrap.weakest.best < MASTERY && (
               <div className="rounded-2xl bg-amber-500/10 border border-amber-500/30 p-5 text-left space-y-2">
-                <p className="text-sm font-semibold text-amber-200">The one correction that matters most from this call</p>
+                <p className="text-sm font-semibold text-amber-200 flex items-center gap-2"><Mascot agent="nao" size={26} showName={false} /> Nao, your fixer: the one correction that matters most from this call</p>
                 <p className="text-sm text-slate-200">{wrap.weakest.scene.title}: <span className="text-white">「{wrap.weakest.scene.model}」</span></p>
                 <p className="text-xs text-slate-400">{wrap.weakest.scene.commonError} Target: {wrap.weakest.scene.targetPattern}</p>
                 <div className="flex"><TtsButton text={wrap.weakest.scene.model} className="px-3 py-1.5 text-sm" /></div>

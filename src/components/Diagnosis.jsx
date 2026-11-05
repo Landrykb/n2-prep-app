@@ -7,6 +7,8 @@ import { questions as bankQuestions, passages } from '../data.js'
 import { listeningPlus } from '../data/listeningPlus.js'
 import { JLPT_LEVELS, jlptLevel, estimateBjtScore, bjtBandForScore, SECTION_KEYS } from '../lib/levels.js'
 import { loadProfile, DIAGNOSIS_KEY } from '../lib/profile.js'
+import { recordDiagnosis, diagnosisDeltas, recordReading } from '../lib/twin.js'
+import Mascot from './Mascot.jsx'
 import { ProofLadderView } from './ProblemStart.jsx'
 import TtsButton from './TtsButton.jsx'
 import KanjiTapText from './KanjiTapText.jsx'
@@ -113,6 +115,10 @@ export default function Diagnosis({ setActive }) {
       passMark: jlptLevel(jlptEstimate)?.passMark ?? null,
     }
     try { localStorage.setItem(DIAGNOSIS_KEY, JSON.stringify(res)) } catch { /* ignore */ }
+    // Diagnosis history (jpn:diagnosisHistory:v1) + Twin section levels —
+    // written by diagnosis code only, so trends stay honest (Doc 04 §5).
+    recordDiagnosis(res)
+    recordReading({ correct: readingOk })
     setResult(res); setPhase('result')
   }
 
@@ -213,8 +219,29 @@ export default function Diagnosis({ setActive }) {
 
           <PromisePanel promise={promise} />
 
+          {(() => {
+            const d = diagnosisDeltas()
+            if (!d) return null
+            const fmt = (n) => (n > 0 ? `+${n}` : `${n}`)
+            return (
+              <div className="rounded-2xl glass p-6 card-glow space-y-2">
+                <h3 className="text-lg font-bold text-white">Since your last check</h3>
+                <p className="text-sm text-slate-300">
+                  Total {fmt(d.total)} (now {d.to.total}/180) · {SECTION_KEYS.map((s) => `${s.label.split(' (')[0]} ${fmt(d.sections[s.id] || 0)}`).join(' · ')}
+                </p>
+                <p className="text-xs text-slate-500">Same short check, measured the same way — the movement is the trend your Twin and your Coach letter use. Estimates, as always, not official scores.</p>
+              </div>
+            )
+          })()}
+
           <div className="rounded-2xl glass p-6 card-glow space-y-3">
-            <h3 className="text-lg font-bold text-white">Your next 2 weeks</h3>
+            <div className="flex items-center gap-3">
+              <Mascot agent="saki" size={36} showName={false} />
+              <div>
+                <h3 className="text-lg font-bold text-white">Your next 2 weeks</h3>
+                <p className="text-xs text-slate-400">Prepared by Saki, your planner — from this checkup and your problem</p>
+              </div>
+            </div>
             {prescription(result).map((line, i) => (
               <button key={i} onClick={() => setActive?.(line.tab)} className="w-full text-left flex items-start gap-2 rounded-xl bg-bun-700/40 border border-bun-600/30 p-3 hover:border-violet-500/40 transition">
                 <ChevronRight size={15} className="text-violet-300 mt-0.5 shrink-0" /><span className="text-sm text-slate-200">{line.text}</span>

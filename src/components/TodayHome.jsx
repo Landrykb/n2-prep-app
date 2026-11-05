@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Calendar, Target, Layers, Mic, Stethoscope, Pickaxe, ClipboardCheck, ChevronRight, RefreshCw, Flame, CheckCircle2, Play, Coffee, Phone } from 'lucide-react'
+import { Calendar, Target, Layers, Mic, Stethoscope, Pickaxe, ClipboardCheck, ChevronRight, RefreshCw, Flame, CheckCircle2, Play, Coffee, Phone, Mail } from 'lucide-react'
+import { brand } from '../lib/brand.js'
 import { loadCallState } from '../lib/calls.js'
+import { detectMode } from '../lib/modes.js'
+import { getPlanFor, tomorrowStr } from '../lib/planner.js'
+import { recordQueueRating } from '../lib/twin.js'
+import Mascot from './Mascot.jsx'
 import { loadProfile, loadDiagnosis, derivePlan, daysSinceLastVisit, markVisit } from '../lib/profile.js'
 import { loadQueue, todaySession, rateQueueItem } from '../lib/queue.js'
 import { estimateSessionMinutes, loadSessionState, setIntent, todayStr } from '../lib/session.js'
@@ -53,6 +58,10 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
   }, [])
 
   const plan = useMemo(() => derivePlan(profile, diagnosis), [profile, diagnosis])
+  // The fleet's read of the week (Doc 05 §7 modes — detected by code from
+  // Twin signals) and Saki's plan for tomorrow, shown before the day starts.
+  const modeInfo = useMemo(() => { try { return detectMode() } catch { return null } }, [])
+  const tomorrowPlan = useMemo(() => { try { return getPlanFor(tomorrowStr()) } catch { return null } }, [])
   const session = useMemo(() => todaySession(queue, { maxNew: MAX_NEW, maxDue: MAX_DUE_DISPLAY }), [queue])
   const reviewList = useMemo(() => [...session.due, ...session.fresh], [session])
   const card = reviewList[Math.min(reviewIdx, Math.max(0, reviewList.length - 1))]
@@ -68,6 +77,7 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
 
   const rate = (rating) => {
     if (!card) return
+    recordQueueRating(card, rating)
     setQueue(rateQueueItem(card.id, rating))
     setFlipped(false)
     setReviewIdx((i) => i + 1)
@@ -95,6 +105,16 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
         </button>
       </section>
 
+      {modeInfo && (
+        <section className="rounded-2xl glass p-4 card-glow flex items-start gap-3">
+          <Mascot agent="michi" size={38} mood={modeInfo.mode === 'badweek' ? 'resting' : 'happy'} />
+          <div>
+            <p className="text-sm text-slate-200"><span className="font-semibold text-white">Michi, your coach:</span> {modeInfo.meta.michiLine}</p>
+            <p className="text-[11px] text-slate-500 mt-1">{brand.name} · {brand.tagline} · this week reads as: {modeInfo.meta.label} (the fleet’s own bookkeeping — it changes the plan’s size and shape, never its honesty)</p>
+          </div>
+        </section>
+      )}
+
       {showOnboarding ? (
         <OnboardingFlow initial={profile} onDone={(p) => { setProfile(p); setShowOnboarding(false) }} onClose={profile ? () => setShowOnboarding(false) : undefined} />
       ) : (
@@ -120,10 +140,32 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
         </section>
       )}
 
+      {tomorrowPlan && (
+        <section className="rounded-2xl glass p-4 card-glow flex items-start gap-3">
+          <Mascot agent="saki" size={38} mood={modeInfo?.mode === 'badweek' ? 'resting' : 'happy'} />
+          <div className="flex-1">
+            <p className="text-sm text-slate-200"><span className="font-semibold text-white">Tomorrow, prepared by Saki:</span> {tomorrowPlan.note}</p>
+            {tomorrowPlan.experiment && <p className="text-xs text-slate-400 mt-1">A quiet test is running — {tomorrowPlan.experiment.variantLabel} — measured by what actually sticks for you. One thing at a time; you will see the verdict in your Twin.</p>}
+            <p className="text-[11px] text-slate-500 mt-1">Plans are made by Saki’s built-in rules on this device for now — the plan applies itself when tomorrow starts; you never set anything up.</p>
+          </div>
+        </section>
+      )}
+
+      <button onClick={() => setActive('coach')} className="w-full rounded-2xl bg-bun-800/70 border border-bun-600/40 hover:border-violet-500/40 p-3.5 text-sm text-slate-200 flex items-center justify-center gap-2 transition">
+        <Mail size={15} className="text-violet-300" /> Michi’s Weekly Letter <span className="text-slate-400">— your week, reported honestly, in a letter</span>
+      </button>
+
       {isComeback && (
         <section className="rounded-2xl bg-emerald-500/10 border border-emerald-500/30 p-5">
-          <h2 className="font-bold text-emerald-200 flex items-center gap-2"><CheckCircle2 size={17} /> Welcome back — {gapDays} days away changes nothing here</h2>
-          <p className="text-sm text-emerald-100/80 mt-1">No pile, no reset, no guilt screen. Below is a small, capped session sized to be finished today. The queue waited quietly; your rhythm counts this week, not an unbroken chain.</p>
+          <div className="flex items-start gap-3">
+            <Mascot agent="michi" size={38} showName={false} />
+            <div className="space-y-2">
+              <h2 className="font-bold text-emerald-200 flex items-center gap-2"><CheckCircle2 size={17} /> Welcome back — {gapDays} days away changes nothing here</h2>
+              <p className="text-sm text-emerald-100/80">No pile, no reset, no guilt screen. Today’s session starts from your strongest material, on purpose. The queue waited quietly; your rhythm counts this week, not an unbroken chain.</p>
+              <p className="text-sm text-emerald-100/80">Been away a while? Plans restart best from a fresh snapshot of where you actually are:</p>
+              <button onClick={() => setActive('diagnosis')} className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold flex items-center gap-1.5"><Stethoscope size={15} /> Take A Fresh Checkup</button>
+            </div>
+          </div>
         </section>
       )}
 

@@ -36,7 +36,10 @@ import {
   Stethoscope,
   Pickaxe,
   Phone,
+  Users,
+  Mail,
 } from 'lucide-react'
+import { brand } from './lib/brand.js'
 import { useAuth } from './hooks/useAuth.js'
 import { useKanjiModal } from './hooks/useKanjiModal.js'
 import { useFurigana } from './hooks/useFurigana.js'
@@ -69,6 +72,8 @@ const Diagnosis = lazy(() => import('./components/Diagnosis.jsx'))
 const Mining = lazy(() => import('./components/Mining.jsx'))
 const OneSession = lazy(() => import('./components/OneSession.jsx'))
 const SenseiCall = lazy(() => import('./components/SenseiCall.jsx'))
+const TwinView = lazy(() => import('./components/TwinView.jsx'))
+const CoachLetter = lazy(() => import('./components/CoachLetter.jsx'))
 import { userKey } from './lib/userKey.js'
 import { getErrorLogs, addErrorLog, reviewErrorLog, deleteErrorLog, getUserProgress, setUserProgress } from './lib/supabaseApi.js'
 import {
@@ -89,6 +94,8 @@ const nav = [
   { id: 'voice', label: 'Voice Loop', icon: Mic },
   { id: 'sensei', label: 'Sensei Call', short: 'Sensei', icon: Phone },
   { id: 'diagnosis', label: 'Diagnosis', icon: Stethoscope },
+  { id: 'twin', label: 'Your Fleet', short: 'Fleet', icon: Users },
+  { id: 'coach', label: 'Coach Letter', short: 'Letter', icon: Mail },
   { id: 'mine', label: 'Mine Your Japanese', icon: Pickaxe },
   { id: 'lessons', label: 'Memory Lessons', icon: BookOpen },
   { id: 'drills', label: 'Drills', icon: Dumbbell },
@@ -367,8 +374,8 @@ function Sidebar({ active, setActive, mobileOpen, setMobileOpen, streak }) {
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-lg shadow-lg">🦝</div>
             <div>
-              <h1 className="font-bold text-lg leading-tight">JPN2easy</h1>
-              <p className="text-xs text-slate-400">Learn &middot; Master &middot; Pass</p>
+              <h1 className="font-bold text-lg leading-tight">{brand.name}</h1>
+              <p className="text-xs text-slate-400">{brand.tagline}</p>
             </div>
           </div>
         </div>
@@ -1582,6 +1589,8 @@ function App() {
     voice: <VoiceLoop />,
     sensei: <SenseiCall />,
     diagnosis: <Diagnosis setActive={setActive} />,
+    twin: <TwinView setActive={setActive} />,
+    coach: <CoachLetter />,
     mine: <Mining />,
     lessons: <Lessons />,
     drills: <Drills />,

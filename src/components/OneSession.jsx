@@ -8,6 +8,10 @@ import {
   buildSessionCards, loadSessionState, saveSessionState, loadIntent, saveEffort,
 } from '../lib/session.js'
 import { bestScore, missingPhrases } from './VoiceLoop.jsx'
+import { scenes as allScenes } from '../data/scenes.js'
+import { recordVoiceAttempt, recordQueueRating, recordSessionSummary } from '../lib/twin.js'
+import { getPlanFor, markPlanConsumed, noteSessionForExperiment } from '../lib/planner.js'
+import Mascot from './Mascot.jsx'
 import TtsButton from './TtsButton.jsx'
 import KanjiTapText from './KanjiTapText.jsx'
 
@@ -21,14 +25,24 @@ const STEP_LABELS = ['Your scene', 'Your cards', 'Listening']
 
 function freshState(profile, diagnosis, queue, variant) {
   const date = todayStr()
-  const scene = pickSceneForProfile(profile, date)
+  // Saki's plan for today (lib/planner.js) chooses the scene and cards when
+  // one exists — the session consumes it, it does not re-decide. Mode
+  // adjustments (Slump re-wins, Event narrowing…) are already inside it.
+  let plan = null
+  try { plan = getPlanFor(date) } catch { plan = null }
+  const planScene = plan?.opener?.sceneId ? allScenes.find((s) => s.id === plan.opener.sceneId) : null
+  const scene = planScene || pickSceneForProfile(profile, date)
   const listening = pickListeningForDiagnosis(diagnosis, date)
-  const cardIds = buildSessionCards(queue).map((c) => c.id)
+  const planCards = (plan?.cardIds || []).filter((id) => queue.some((c) => c.id === id))
+  const cardIds = planCards.length ? planCards : buildSessionCards(queue).map((c) => c.id)
+  if (plan) markPlanConsumed(date)
   return {
-    date, variant, step: 0, sceneId: scene.id, listeningTitle: listening.title,
-    cardIds, ratedIds: [], startedAt: new Date().toISOString(), elapsedBaseSec: 0,
+    date, variant, step: 0, sceneId: scene.id, listeningTitle: plan?.listeningTitle || listening.title,
+    cardIds, ratedIds: [], cardResults: [], startedAt: new Date().toISOString(), elapsedBaseSec: 0,
     segmentStartAt: new Date().toISOString(),
     sceneBest: 0, sceneAttempts: 0, sceneDone: false, listeningPicked: null, done: false,
+    planMode: plan?.mode || null, planNote: plan?.note || null,
+    planExperiment: plan?.experiment || null, recorded: false, bonus: false,
   }
 }
 
@@ -73,7 +87,7 @@ export default function OneSession({ setActive }) {
   })
 
   // --- Scene (Step 1) ---
-  const scene = useMemo(() => pickSceneForProfile(profile, state.date), [profile, state.date]) // stored id is of the same deterministic pick for the day
+  const scene = useMemo(() => allScenes.find((s) => s.id === state.sceneId) || pickSceneForProfile(profile, state.date), [profile, state.date, state.sceneId])
   const speechSupported = typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)
   const startListening = () => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -94,6 +108,7 @@ export default function OneSession({ setActive }) {
     const missing = missingPhrases(text, scene)
     const attempts = (state.sceneAttempts || 0) + 1
     const best = Math.max(state.sceneBest || 0, score)
+    recordVoiceAttempt({ scene, text, score, missing })
     setLastAttempt({ text, score, missing })
     patch({ sceneAttempts: attempts, sceneBest: best, sceneDone: state.sceneDone || score >= MASTERY })
     if (score >= MASTERY && attempts > 1 && !(state.sceneBest >= MASTERY)) {
@@ -118,9 +133,13 @@ export default function OneSession({ setActive }) {
   const previews = useMemo(() => (card ? previewIntervals(card.fsrs) : null), [card])
   const rateCard = (rating) => {
     if (!card) return
+    recordQueueRating(card, rating)
     setQueue(rateQueueItem(card.id, rating))
     setFlipped(false)
-    patch({ ratedIds: [...(state.ratedIds || []), card.id] })
+    patch({
+      ratedIds: [...(state.ratedIds || []), card.id],
+      cardResults: [...(state.cardResults || []), { id: card.id, rating }],
+    })
   }
 
   // --- Listening (Step 3) ---
@@ -131,7 +150,47 @@ export default function OneSession({ setActive }) {
   const ladder = useMemo(() => ladderWithStatus(diagnosis), [diagnosis])
   const nextRung = ladder.find((h) => h.status === 'next')
   const reachedRung = [...ladder].reverse().find((h) => h.status === 'reached')
-  const finish = () => patch({ step: 3, done: true, elapsedBaseSec: elapsedSec, segmentStartAt: new Date().toISOString() })
+  const finish = () => {
+    if (!state.recorded) {
+      // The Twin learns from every finished session (Doc 04 §5): rhythm,
+      // accuracy trend, per-method proof — all proxies, all labelled.
+      const results = state.cardResults || []
+      const again = results.filter((r) => r.rating === 1).length
+      const good = results.filter((r) => r.rating >= 3).length
+      const proof = ((state.sceneBest || 0) >= MASTERY ? 1 : 0) + good
+      const cardAcc = results.length ? good / results.length : null
+      const sceneAcc = (state.sceneBest || 0) / 100
+      const accuracy01 = cardAcc === null ? sceneAcc : Math.round(((sceneAcc + cardAcc) / 2) * 100) / 100
+      const listeningCorrect = state.listeningPicked !== null && state.listeningPicked !== undefined
+        ? !!biteQuestion.options[state.listeningPicked]?.correct
+        : null
+      recordSessionSummary({
+        minutes: minutesSpent,
+        accuracy01,
+        lapseRate: results.length ? Math.round((again / results.length) * 100) / 100 : 0,
+        proof,
+        listeningCorrect: isBusy ? null : listeningCorrect,
+        listeningScript: bite.script,
+      })
+      if (state.planExperiment) noteSessionForExperiment({ experiment: state.planExperiment }, { proof })
+    }
+    patch({ step: 3, done: true, recorded: true, elapsedBaseSec: elapsedSec, segmentStartAt: new Date().toISOString() })
+  }
+
+  // Surge offer (Doc 05 §7): more is OFFERED on a climbing week, never
+  // forced — a few extra cards, only if the learner taps for them.
+  const startBonus = () => {
+    const extra = buildSessionCards(queueRef.current)
+      .filter((c) => !(state.cardIds || []).includes(c.id))
+      .slice(0, 3)
+    if (!extra.length) return
+    setFlipped(false)
+    setState((s) => ({
+      ...s, done: false, step: 1, bonus: true,
+      cardIds: [...(s.cardIds || []), ...extra.map((c) => c.id)],
+      segmentStartAt: new Date().toISOString(),
+    }))
+  }
   const chooseEffort = (answer) => { setEffort(answer); saveEffort(answer, state.variant) }
 
   const switchVariant = (variant) => {
@@ -145,6 +204,9 @@ export default function OneSession({ setActive }) {
 
   const isBusy = state.variant === 'busy'
   const sceneCleared = state.sceneDone || (state.sceneBest || 0) >= MASTERY || (state.sceneAttempts || 0) >= 3
+  const bonusAvailable = state.planMode === 'surge'
+    ? buildSessionCards(queue).filter((c) => !(state.cardIds || []).includes(c.id)).length
+    : 0
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
@@ -172,6 +234,13 @@ export default function OneSession({ setActive }) {
             </div>
           ))}
           <span className="text-xs text-slate-500 shrink-0 pl-2">{Math.floor(elapsedSec / 60)}:{String(elapsedSec % 60).padStart(2, '0')}</span>
+        </div>
+      )}
+
+      {!state.done && state.planNote && state.step === 0 && (
+        <div className="rounded-2xl bg-sky-500/10 border border-sky-500/25 p-4 flex items-start gap-3">
+          <Mascot agent="saki" size={32} showName={false} />
+          <p className="text-sm text-slate-200"><span className="font-semibold text-white">Saki prepared today:</span> {state.planNote}</p>
         </div>
       )}
 
@@ -209,6 +278,10 @@ export default function OneSession({ setActive }) {
                 <p className="text-sm text-emerald-200 flex items-center gap-2"><CheckCircle2 size={15} /> Clean. That’s the scene, in your voice.</p>
               ) : (
                 <>
+                  <div className="flex items-center gap-2">
+                    <Mascot agent="nao" size={26} showName={false} />
+                    <p className="text-xs text-slate-300"><span className="font-semibold text-white">Nao, your fixer — one thing:</span> here is the model line.</p>
+                  </div>
                   <div className="flex items-start gap-2">
                     <p className="text-sm text-slate-200 leading-loose flex-1">Model: <KanjiTapText text={scene.model} /></p>
                     <TtsButton text={scene.model} />
@@ -328,6 +401,12 @@ export default function OneSession({ setActive }) {
             </div>
             {effort && <p className="text-xs text-emerald-300">{effort === 'Not really' ? 'That’s the target state. Come back tomorrow — same small size.' : 'Noted — the sessions stay small either way. Tomorrow is the same size, never bigger by surprise.'}</p>}
           </div>
+          {bonusAvailable > 0 && (
+            <div className="rounded-xl bg-violet-500/10 border border-violet-500/30 p-4 space-y-2">
+              <p className="text-sm text-slate-200">You’re climbing this week — that’s a Surge, in the app’s own bookkeeping. More is on offer if you want it, never owed if you don’t.</p>
+              <button onClick={startBonus} className="px-5 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 text-white text-sm font-semibold">Keep Going — A Few More Cards</button>
+            </div>
+          )}
           <div className="flex flex-wrap justify-center gap-2 pt-1">
             <button onClick={() => setActive?.('dashboard')} className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold flex items-center gap-1.5"><Play size={15} /> Back to Today</button>
             <button onClick={() => setActive?.('diagnosis')} className="px-5 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium">See my diagnosis & ladder</button>
