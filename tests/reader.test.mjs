@@ -425,4 +425,132 @@ check('generation loop trace: stuffed draft rejected → forbidden list grows �
   console.log(`    trace: retry  ratio=${v2.ratio.toFixed(2)} unknowns=[${v2.unknowns.join(',')}] accept=${v2.accept}`)
 })
 
+// ---------- cold start: the starter track (Doc 16 §5 amendment #2) ----------
+// Landry's live test: linked, empty queue, no diagnosis → the "no
+// synced words" dead end. These checks pin the on-ramp: the
+// predicate, the starter pick, and the candidate cap. The gate
+// itself is untouched (all gate checks above still stand).
+
+// Object-token fixture builder: content tokens by headword.
+const ctoks = (heads) => heads.map((h) => ({ s: h, h, l: 'N5' }))
+
+check('isColdStart: a diagnosis is never cold; without one, 39 is cold and 40 is not', () => {
+  assert.equal(fit.COLD_START_KNOWN_LIMIT, 40)
+  assert.equal(fit.isColdStart(true, 0), false) // diagnosis = a fitting basis at any census
+  assert.equal(fit.isColdStart(true, 39), false)
+  assert.equal(fit.isColdStart(false, 0), true) // Landry's live-test state
+  assert.equal(fit.isColdStart(false, 39), true)
+  assert.equal(fit.isColdStart(false, 40), false)
+  assert.equal(fit.isColdStart(false, 400), false)
+})
+
+check('countKnownContent: kanji and long words count; short kana fragments do not', () => {
+  // 'は' is a grammar fragment; 'これ' (2 kana chars) undercounts by
+  // design — the conservative direction documented in readerFit.js.
+  const known = new Set(['猫', '食べる', 'は', 'これ', 'ありがとう', ''])
+  assert.equal(fit.countKnownContent(known), 3)
+  assert.equal(fit.countKnownContent(new Set()), 0)
+  assert.equal(fit.countKnownContent(null), 0)
+})
+
+check('pickStarter: band order beats unknown count (easiest shelf first)', () => {
+  const n5 = passage('n5-hard', 'N5', ctoks(['龍', '麟', '鳳', '鶴', '亀', '。'])) // 5 unknowns
+  const n4 = passage('n4-easy', 'N4', ctoks(['龍', '。'])) // 1 unknown
+  const picked = fit.pickStarter([n4, n5], new Set())
+  assert.equal(picked.passage.id, 'n5-hard')
+  assert.deepEqual(picked.unknowns, ['龍', '麟', '鳳', '鶴', '亀'])
+})
+
+check('pickStarter: within a band, fewest unknowns wins; ties break on fewer tokens', () => {
+  const known = fit.buildKnownSet([{ front: '猫' }])
+  const two = passage('two', 'N4', ctoks(['猫', '龍', '鳳', '。'])) // 2 unknowns
+  const one = passage('one', 'N4', ctoks(['猫', '龍', '。'])) // 1 unknown
+  assert.equal(fit.pickStarter([two, one], known).passage.id, 'one')
+  const short = passage('short', 'N4', ctoks(['猫', '龍'])) // 1 unknown, 2 tokens
+  const long = passage('long', 'N4', ctoks(['猫', '猫', '龍', '。'])) // 1 unknown, 4 tokens
+  assert.equal(fit.pickStarter([long, short], known).passage.id, 'short')
+})
+
+check('pickStarter: the 14-day exclusion applies — and an emptied pool falls back to it', () => {
+  const s1 = passage('s1', 'N5', ctoks(['龍']))
+  const s2 = passage('s2', 'N4', ctoks(['龍']))
+  const hard = passage('hard', 'N2', ctoks(['龍']))
+  assert.equal(fit.pickStarter([s1, s2, hard], new Set(), ['s1']).passage.id, 's2')
+  // Every starter excluded: a repeated starter beats a dead end —
+  // and the fallback still never reaches above the starter bands.
+  assert.equal(fit.pickStarter([s1, s2, hard], new Set(), ['s1', 's2']).passage.id, 's1')
+})
+
+check('pickStarter: a bank with nothing in the starter bands yields null', () => {
+  assert.equal(fit.pickStarter([passage('x', 'N2', ctoks(['龍'])), passage('y', 'N1', ctoks(['龍']))], new Set()), null)
+  assert.equal(fit.pickStarter([], new Set()), null)
+  assert.equal(fit.pickStarter(null, new Set()), null)
+})
+
+check('capCandidates: deck level ascending, null/absent/invalid last, text order stable, cap trims', () => {
+  const cands = [
+    { word: 'w-n2', level: 'N2' },
+    { word: 'w-n5a', level: 'N5' },
+    { word: 'w-null', level: null },
+    { word: 'w-n5b', level: 'N5' },
+    { word: 'w-n1', level: 'N1' },
+    { word: 'w-none' },
+    { word: 'w-bad', level: 'N9' },
+  ]
+  assert.deepEqual(
+    fit.capCandidates(cands).map((c) => c.word),
+    ['w-n5a', 'w-n5b', 'w-n2', 'w-n1', 'w-null', 'w-none', 'w-bad'],
+  )
+  assert.deepEqual(fit.capCandidates(cands, 3).map((c) => c.word), ['w-n5a', 'w-n5b', 'w-n2'])
+  const many = Array.from({ length: 15 }, (_, i) => ({ word: `m${i}`, level: 'N3' }))
+  assert.equal(fit.capCandidates(many).length, 12) // default max
+  assert.deepEqual(fit.capCandidates(null), [])
+})
+
+check('twin parity: cold-start APIs agree (predicate, census, starter pick, cap, constants)', () => {
+  assert.equal(port.COLD_START_KNOWN_LIMIT, fit.COLD_START_KNOWN_LIMIT)
+  assert.deepEqual(port.STARTER_BANDS, fit.STARTER_BANDS)
+  for (const [diag, n] of [[true, 0], [false, 0], [false, 39], [false, 40]]) {
+    assert.equal(port.isColdStart(diag, n), fit.isColdStart(diag, n))
+  }
+  const known = new Set(['猫', '食べる', 'は', 'ありがとう'])
+  assert.equal(port.countKnownContent(known), fit.countKnownContent(known))
+  const bankFx = [
+    passage('n4-easy', 'N4', ctoks(['龍', '。'])),
+    passage('n5-hard', 'N5', ctoks(['龍', '麟', '鳳', '。'])),
+    passage('n2', 'N2', ctoks(['龍'])),
+  ]
+  const pa = fit.pickStarter(bankFx, new Set(), [])
+  const pb = port.pickStarter(bankFx, new Set(), [])
+  assert.equal(pb.passage.id, pa.passage.id)
+  assert.deepEqual(pb.unknowns, pa.unknowns)
+  const cands = [{ word: 'a', level: 'N1' }, { word: 'b', level: null }, { word: 'c', level: 'N5' }]
+  assert.deepEqual(port.capCandidates(cands).map((c) => c.word), fit.capCandidates(cands).map((c) => c.word))
+  assert.deepEqual(port.unknownContentHeadwords(ctoks(['龍', '。', '鳳']), new Set()), fit.unknownContentHeadwords(ctoks(['龍', '。', '鳳']), new Set()))
+})
+
+check('cold start end-to-end (seeded bank shape): an empty known set yields a capped N5 starter', () => {
+  const rows = parseSeedRows(new URL('../supabase/seed/reading_passages.sql', import.meta.url))
+  const bankRows = [rows.get('scene-smalltalk-weekend'), rows.get('scene-city-address'), rows.get('bank-reading-1')]
+  assert.ok(bankRows.every(Boolean))
+  const empty = new Set()
+  // Landry's live-test state, exactly: no diagnosis, no known words.
+  assert.equal(fit.isColdStart(false, fit.countKnownContent(empty)), true)
+  // …and the gate really is a dead end here — the starter's own
+  // ratio sits far below it; that gap is why the track exists.
+  const starter = fit.pickStarter(bankRows, empty, [])
+  assert.equal(starter.passage.id, 'scene-smalltalk-weekend') // the bank's only N5
+  assert.ok(fit.passageRatio(starter.passage.tokens, empty) < fit.RATIO_MIN)
+  assert.ok(starter.unknowns.length > 0)
+  // The send caps the starter's candidates (levels resolved from
+  // the passage's own tokens, as index.ts does): ≤12, ordered.
+  const lvl = new Map(starter.passage.tokens.map((t) => [t.h, t.l]))
+  const enriched = starter.passage.candidates.map((c) => ({ ...c, level: lvl.get(c.h) ?? null }))
+  const capped = fit.capCandidates(enriched)
+  assert.ok(capped.length <= 12)
+  assert.equal(capped.length, Math.min(12, enriched.length))
+  const ranks = capped.map((c) => (c.level ? fit.BANDS.indexOf(c.level) : 99))
+  assert.deepEqual(ranks, [...ranks].sort((a, b) => a - b))
+})
+
 console.log(`reader: ${passed} checks passed`)

@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { BANDS, buildKnownSet, deckCreditSet, evaluateDraft, nextForbiddenList, pickPassage, shouldGenerate } from './fit.ts'
+import { BANDS, buildKnownSet, capCandidates, countKnownContent, deckCreditSet, evaluateDraft, isColdStart, nextForbiddenList, passageRatio, pickPassage, pickStarter, shouldGenerate } from './fit.ts'
 import { DECK_LEVELS } from './deck.ts'
 import { DECK_GLOSS } from './gloss.ts'
 import { segmentText } from './segment.ts'
@@ -19,6 +19,11 @@ import { segmentText } from './segment.ts'
 // new words into the ONE queue inside the learner_state document.
 // R0.5 adds fitted generation as the bank-miss fallback (see
 // tryGenerate below): AI drafts, code validates, the gate is the same.
+// Cold start (Doc 16 §5 amendment #2): a learner with no diagnosis
+// and <40 known content words has no fitting basis at all — /read
+// serves a LABELLED starter from the low bands (fit.ts pickStarter)
+// instead of the dead-end reply, and fitted generation is skipped
+// until a basis exists.
 // No morning dispatch (R1), no Mini App (R1), no voice (R2).
 //
 // The bot never nags (Doc 16 §9): it sends when asked, and is silent
@@ -207,6 +212,21 @@ const WELCOME =
 
 const HELP = 'I only know two tricks so far: /read (a passage at your level) and /unlink (disconnect this chat).'
 
+// The starter footer (cold start, Doc 16 §5 amendment #2). It must
+// never claim fitting that did not happen: it says plainly this is a
+// starter, says why, invites mining (mined words are the first real
+// known set), and names the checkup as the switch for fitting.
+const STARTER_FOOTER =
+  'A starter, not a fitted pick — I do not know your level yet, so this one is from the easy shelf, with the new words kept few. ' +
+  'Mine any words you like: every mined word teaches me what you know. ' +
+  'Take the 10-minute checkup in Yonde and fitting switches on — from then on, every passage is measured against your words before it is sent.'
+
+// Appended to the nothing-fits reply when the learner has words but
+// no diagnosis (and is not cold): the checkup is named as the switch
+// that turns level-fitting on, in the same spirit as the footers.
+const CHECKUP_SWITCH_LINE =
+  '\nThe checkup is the switch here: take the 10-minute checkup in Yonde, and I can fit to your level, not just your queue.'
+
 // The first sentence of `text` containing `word` — the mined card's
 // context line (Doc 16 §3: the card carries the sentence it came from).
 function sentenceWith(text: string, word: string): string {
@@ -235,6 +255,30 @@ function renderPassage(text: string, newWords: { word: string; reading: string }
     }
   }
   return out
+}
+
+// Stored bank candidates carry { word, reading, meaning, h } — no
+// level of their own. capCandidates orders by deck level, so the
+// send and mine paths resolve each candidate's level here: the deck
+// first, then the passage's own tokens (a token's `l` is the level
+// the bank builder assigned, scene overrides included), else null
+// (capCandidates sorts null level last).
+function withCandidateLevels(passage: Record<string, unknown>) {
+  const cands = Array.isArray(passage.new_word_candidates)
+    ? (passage.new_word_candidates as { word: string; reading: string; meaning: string; h?: string; level?: string | null }[])
+    : []
+  const tokenLevel = new Map<string, string | null>()
+  const tokens = Array.isArray(passage.tokens) ? passage.tokens : []
+  for (const t of tokens) {
+    const tok = t as { h?: string; l?: string | null }
+    if (tok && typeof tok.h === 'string' && !tokenLevel.has(tok.h)) tokenLevel.set(tok.h, tok.l ?? null)
+  }
+  const deck = DECK_LEVELS as Record<string, string>
+  return cands.map((c) => {
+    const head = c.h || c.word
+    const level = deck[head] ?? tokenLevel.get(head) ?? c.level ?? null
+    return { ...c, level }
+  })
 }
 
 serve(async (req: Request) => {
@@ -422,6 +466,12 @@ serve(async (req: Request) => {
       const row = await loadState(link.user_id)
       const state = (row?.state ?? {}) as Record<string, unknown>
       const { queue, known, hasDiagnosis, band } = knownFor(state)
+      // Cold start (Doc 16 §5 amendment #2): no diagnosis AND a
+      // known-content census under the limit = no fitting basis at
+      // all. For this learner the gated pick can fit nothing and
+      // generation has nothing to validate against — /read runs the
+      // starter track instead (below).
+      const cold = isColdStart(hasDiagnosis, countKnownContent(known))
 
       const since = new Date(Date.now() - RECENT_DAYS * 86400000).toISOString()
       const { data: sentRows } = await supabaseAdmin
@@ -443,29 +493,63 @@ serve(async (req: Request) => {
         return
       }
 
-      let picked = pickPassage(bank, known, band, recentIds)
+      let picked: { passage: Record<string, unknown>; ratio: number } | null = null
+      let coldStart = false
+      if (cold) {
+        // Starter track FIRST for a cold learner (Doc 16 §5
+        // amendment #2): a labelled low-band passage whose mined
+        // words become the first real known set. The gate is not
+        // consulted — with ~no known words it cannot pass anything,
+        // which is the dead end this track exists to end.
+        const starter = pickStarter(bank, known, recentIds)
+        if (starter) {
+          picked = {
+            passage: starter.passage as Record<string, unknown>,
+            ratio: passageRatio(starter.passage.tokens, known),
+          }
+          coldStart = true
+        }
+      }
       if (!picked) {
+        const fit = pickPassage(bank, known, band, recentIds)
+        if (fit) picked = { passage: fit.passage as Record<string, unknown>, ratio: fit.ratio }
+      }
+      if (!picked && !cold) {
         // R0.5: fitted generation — the bank was never written to
         // the 95% rule, so most learners fit nothing in it. A draft
         // that passes the SAME gate joins through the SAME send path
-        // below; one that cannot pass is never sent.
+        // below; one that cannot pass is never sent. Skipped when
+        // cold: generation validates drafts against the known set,
+        // and against ~nothing every verdict is meaningless — the
+        // spend buys rejections, not passages.
         picked = await tryGenerate(link, state, known, band)
       }
       if (!picked) {
+        const nothingFits = queue.length === 0
+          ? 'I do not have your synced words yet, so I cannot fit a passage to you. Open Yonde signed in once — your queue syncs on its own — then send /read again.'
+          : 'Nothing in the bank fits your words today. Every passage is checked against what you know before it is sent, and I would rather send nothing than the wrong level. New words from your next session change the fit — try /read again after it.'
         await sendMessage(
           botToken,
           chatId,
-          queue.length === 0
-            ? 'I do not have your synced words yet, so I cannot fit a passage to you. Open Yonde signed in once — your queue syncs on its own — then send /read again.'
-            : 'Nothing in the bank fits your words today. Every passage is checked against what you know before it is sent, and I would rather send nothing than the wrong level. New words from your next session change the fit — try /read again after it.',
+          // Not cold, has words, still nothing fits, and no diagnosis
+          // on file: name the checkup as the switch that turns
+          // level-fitting on (the starter track above already covers
+          // the truly cold; this line is for the in-between).
+          !cold && !hasDiagnosis ? nothingFits + CHECKUP_SWITCH_LINE : nothingFits,
         )
         return
       }
 
       const passage = picked.passage as Record<string, unknown>
-      const candidates = Array.isArray(passage.new_word_candidates)
+      const rawCandidates = Array.isArray(passage.new_word_candidates)
         ? (passage.new_word_candidates as { word: string; reading: string; meaning: string; h?: string }[])
         : []
+      // A starter is sent with the CAPPED candidate list (Doc 16 §5
+      // amendment #2): level-ordered (easiest first), at most 12, so
+      // bolding shows the most learnable words and the matching Mine
+      // can never flood a brand-new queue. Fitted sends keep the
+      // bank's own list untouched.
+      const candidates = coldStart ? capCandidates(withCandidateLevels(passage)) : rawCandidates
       // New-word selection matches by HEADWORD (Doc 16 §5): a candidate
       // whose dictionary form is already known — queued, or credited
       // below the learner's band — is not new, whatever surface the
@@ -482,7 +566,11 @@ serve(async (req: Request) => {
         // with a diagnosis, the learner's level (via below-band deck
         // credit) and their queue; without one, the queue only — the
         // copy must never claim level fitting that did not happen.
-        (hasDiagnosis
+        // A starter gets its own footer for the same reason: no fit
+        // was measured, so none is claimed (amendment #2).
+        (coldStart
+          ? STARTER_FOOTER
+          : hasDiagnosis
           ? `Fitted to your ${esc(band)} level and your queue: about ${pct}% of its words should already be familiar (an estimate) · ${newWords.length} new word${newWords.length === 1 ? '' : 's'}`
           : `Fitted to your queue: about ${pct}% of its words should already be familiar (an estimate) · ${newWords.length} new word${newWords.length === 1 ? '' : 's'}` +
             '\nBand N4 is a gentle default — take the 10-minute checkup in Yonde and I will fit to your real level.'),
@@ -501,6 +589,9 @@ serve(async (req: Request) => {
         band: String(passage.band),
         ratio: Math.round(picked.ratio * 1000) / 1000,
         newWords: newWords.length,
+        // Starter sends are flagged so the funnel can tell the
+        // on-ramp from fitted reads (Doc 16 §5 amendment #2).
+        ...(coldStart ? { coldStart: true } : {}),
       })
     }
 
@@ -527,7 +618,7 @@ serve(async (req: Request) => {
 
       const { data: passage } = await supabaseAdmin
         .from('reading_passages')
-        .select('id, band, topic, text, new_word_candidates')
+        .select('id, band, topic, text, tokens, new_word_candidates')
         .eq('id', passageId)
         .maybeSingle()
       if (!passage) {
@@ -548,9 +639,12 @@ serve(async (req: Request) => {
       // is mined only when it is genuinely new to this learner — not
       // queued, and not credited below their diagnosed band.
       const { known } = knownFor(state)
-      const candidates = Array.isArray(passage.new_word_candidates)
-        ? (passage.new_word_candidates as { word: string; reading: string; meaning: string; h?: string }[])
-        : []
+      // Mine works from the same capped, level-ordered candidate list
+      // a starter send bolds (Doc 16 §5 amendment #2): stored lists
+      // are builder-capped at 12 today, so for fitted passages the
+      // set is unchanged — the cap is the standing guarantee that no
+      // Mine, first or otherwise, adds more than 12 words at a tap.
+      const candidates = capCandidates(withCandidateLevels(passage as Record<string, unknown>))
       const toMine = candidates.filter((c) => c.word && !known.has(c.h || c.word))
 
       // Read-modify-write on the learner_state document, mirroring the

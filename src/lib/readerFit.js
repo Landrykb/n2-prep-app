@@ -132,6 +132,19 @@ export const UNKNOWN_CAP = 12
  */
 export function evaluateDraft(tokens, knownSet) {
   const ratio = passageRatio(tokens, knownSet)
+  const unknowns = unknownContentHeadwords(tokens, knownSet)
+  return { ratio, unknowns, accept: ratio >= RATIO_MIN && ratio <= RATIO_MAX && unknowns.length <= UNKNOWN_CAP }
+}
+
+/**
+ * The unknown CONTENT headwords of a token list, deduped, in text
+ * order — the one definition of "new vocabulary in this text" shared
+ * by draft evaluation (above) and the cold-start starter pick
+ * (below). A token counts when it is not known, is not freed by the
+ * grammar rule (tokenIsKnown covers that), and is not bare
+ * punctuation or a newline (segmentation debris, not vocabulary).
+ */
+export function unknownContentHeadwords(tokens, knownSet) {
   const unknowns = []
   const seen = new Set()
   for (const token of Array.isArray(tokens) ? tokens : []) {
@@ -144,7 +157,7 @@ export function evaluateDraft(tokens, knownSet) {
     seen.add(head)
     unknowns.push(head)
   }
-  return { ratio, unknowns, accept: ratio >= RATIO_MIN && ratio <= RATIO_MAX && unknowns.length <= UNKNOWN_CAP }
+  return unknowns
 }
 
 /**
@@ -196,4 +209,130 @@ export function pickPassage(passages, knownSet, band, recentIds = []) {
     }
   }
   return best ? { passage: best.passage, ratio: best.ratio } : null
+}
+
+// ---------- cold start: the starter track (Doc 16 §5 amendment #2) ----------
+//
+// Fitting needs a basis: a diagnosis (which certifies the vocabulary
+// below a band) or a queue that reflects what the learner knows. A
+// brand-new learner has NEITHER — Landry's live test (2026-11-06)
+// linked cleanly, sent /read, and got the "no synced words" reply
+// because his synced state carried an empty queue and no diagnosis.
+// An empty known set fits nothing, and generation cannot validate
+// against nothing either, so the fitted paths are a dead end until a
+// basis exists. The starter track is the on-ramp, NOT a widening of
+// the gate: it sends a low-band bank passage LABELLED as a starter,
+// whose few new words — once mined — become the first real known set,
+// and the checkup (diagnosis) remains the switch that turns fitting
+// itself on. The gate, the calibration, and the generation paths do
+// not change at all.
+
+/** A learner with fewer known content words than this — and no
+ *  diagnosis — has no fitting basis yet. 40 is roughly a first week
+ *  of mined/session words: enough census for the ratio to mean
+ *  something, few enough that a true beginner is never left at the
+ *  dead end while "almost" qualifying. */
+export const COLD_START_KNOWN_LIMIT = 40
+
+/**
+ * How many of the known set's headwords are CONTENT words. The
+ * content/grammar distinction is the fitting grammar rule's own
+ * profile (see the header): a headword is content when it carries
+ * kanji, or runs longer than the ≤3-char fragment cap the grammar
+ * rule frees. Short kana deck words （これ, なに) therefore
+ * undercount — the conservative direction: a learner judged colder
+ * than they are gets a labelled starter, never a passage above
+ * their level.
+ */
+export function countKnownContent(knownSet) {
+  let n = 0
+  for (const word of knownSet || []) {
+    if (typeof word !== 'string' || !word) continue
+    if (KANJI_RE.test(word) || [...word].length > 3) n++
+  }
+  return n
+}
+
+/**
+ * Cold start = no diagnosis AND a known-content census below the
+ * limit. Diagnosis ends cold start at any census: the diagnosis
+ * itself (plus below-band credit) IS a fitting basis.
+ */
+export function isColdStart(hasDiagnosis, knownContentCount) {
+  return !hasDiagnosis && (knownContentCount ?? 0) < COLD_START_KNOWN_LIMIT
+}
+
+/** Starters come only from the bottom of the bank: bands a true
+ *  beginner can plausibly read with support. */
+export const STARTER_BANDS = ['N5', 'N4', 'N3']
+
+/**
+ * Pick a starter passage for a cold-start learner. NO ratio gate —
+ * with an (almost) empty known set nothing could pass it, which is
+ * the dead end this track exists to end. Instead: candidates are
+ * the starter bands only, ordered by band (easiest shelf first),
+ * then by fewest unknown content headwords for THIS learner (even
+ * a near-empty set usually knows something — greetings, loanwords
+ * the queue picked up), then fewest total tokens, then id, so the
+ * pick is deterministic.
+ *   returns { passage, unknowns } (unknowns: the passage's unknown
+ *   content headwords, deduped, text order) or null when the bank
+ *   holds nothing in the starter bands.
+ * The 14-day exclusion is respected — but if it empties the starter
+ * pool, the pick falls back to the full pool: a repeated starter
+ * beats a dead end, and a cold learner re-reading an easy passage
+ * while their census grows is a feature, not a failure.
+ */
+export function pickStarter(passages, knownSet, recentIds = []) {
+  const maxRank = bandRank(STARTER_BANDS[STARTER_BANDS.length - 1])
+  const score = (pool) => {
+    const out = []
+    for (const p of pool || []) {
+      if (!p) continue
+      const rank = bandRank(p.band)
+      if (rank === -1 || rank > maxRank) continue
+      out.push({
+        passage: p,
+        rank,
+        unknowns: unknownContentHeadwords(p.tokens, knownSet),
+        size: Array.isArray(p.tokens) ? p.tokens.length : 0,
+      })
+    }
+    return out
+  }
+  const recent = new Set(recentIds || [])
+  let pool = score((passages || []).filter((p) => p && !recent.has(p.id)))
+  if (pool.length === 0) pool = score(passages)
+  if (pool.length === 0) return null
+  pool.sort((a, b) =>
+    a.rank - b.rank ||
+    a.unknowns.length - b.unknowns.length ||
+    a.size - b.size ||
+    (a.passage.id < b.passage.id ? -1 : a.passage.id > b.passage.id ? 1 : 0))
+  const best = pool[0]
+  return { passage: best.passage, unknowns: best.unknowns }
+}
+
+/**
+ * Cap a passage's new-word candidates for a starter send: order by
+ * deck level ascending (N5 first … N1; a candidate whose level is
+ * absent or not a band sorts LAST — unknown difficulty is treated
+ * as hardest), original text order breaking ties, and keep the
+ * first `max`. The candidate's level is read from its `level`
+ * field, which the send path resolves from the deck / the passage's
+ * own tokens (stored bank candidates carry no level of their own).
+ * A starter's Mine must never flood a brand-new queue: the cap is
+ * what the learner sees bolded AND what Mine can add.
+ */
+export function capCandidates(candidates, max = 12) {
+  if (!Array.isArray(candidates)) return []
+  const key = (c) => {
+    const r = c ? bandRank(c.level) : -1
+    return r === -1 ? Number.MAX_SAFE_INTEGER : r
+  }
+  return candidates
+    .map((c, i) => ({ c, i }))
+    .sort((a, b) => (key(a.c) - key(b.c)) || (a.i - b.i))
+    .slice(0, Math.max(0, max))
+    .map((d) => d.c)
 }
