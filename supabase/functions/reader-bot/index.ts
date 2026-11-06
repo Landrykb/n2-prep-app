@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { applyFeedback, BANDS, bandRank, buildKnownSet, capCandidates, countKnownContent, deckCreditSet, evaluateDraft, fitCallback, FOUNDATIONS_COMFY_TARGET, hasFeedbackFor, isColdStart, isDispatchDue, kanjiReadings, levelKeyboard, nextForbiddenList, parseFitCallback, passageRatio, pickGentle, pickPassage, pickStarter, resolveBand, serveBandFor, shouldAskLevel, shouldGenerate, unknownContentHeadwords, voiceReadWindow } from './fit.ts'
+import { applyFeedback, BANDS, bandRank, buildKnownSet, capCandidates, countKnownContent, currentBatchWords, deckCreditSet, evaluateDraft, fitCallback, FOUNDATIONS_COMFY_TARGET, hasFeedbackFor, isColdStart, isDispatchDue, kanjiReadings, levelKeyboard, nextForbiddenList, parseFitCallback, passageNewKanji, passageRatio, passageRecyclesBatch, pickGentle, pickPassage, pickStarter, resolveBand, seenKanjiSet, serveBandFor, shouldAskLevel, shouldGenerate, unknownContentHeadwords, voiceReadWindow } from './fit.ts'
 import { DECK_LEVELS } from './deck.ts'
 import { DECK_GLOSS } from './gloss.ts'
 import { segmentText } from './segment.ts'
@@ -338,7 +338,17 @@ const HELP =
   '/app — open Yonde: sessions, the checkup, Koe\'s calls\n' +
   '/level — tell me your level in one tap\n' +
   '/unlink — disconnect this chat\n' +
+  '🎙 Voice read: after a passage, hold the microphone button, read it out loud, and let go to send — I listen and answer with your reading match.\n' +
   'Reading when you feel like it is the whole design — no streaks, no nagging.'
+
+// The voice-proof instruction (Doc 16 §5 amendment #10): every
+// passage message carries this ONE line with its footer. The Read
+// It ✓ button is a self-report tap; the voice read is the performed
+// proof — but a learner who has never been told the gesture (hold
+// the microphone, read, let go) cannot discover it from a button
+// label, so the message itself teaches it, in plain words.
+const VOICE_INSTRUCTION =
+  '🎙 <b>Read it out loud:</b> hold the microphone button below, read the whole passage, and let go to send — I listen and answer with your reading match.'
 
 // The reply to the N7+ 😂 tap (Doc 16 §5 amendment #7): Hori laughs
 // WITH the learner — the joke is theirs, the warmth is real, and
@@ -592,7 +602,16 @@ serve(async (req: Request) => {
       const hasDiagnosis = bandSource === 'diagnosis'
       const band = resolvedBand ?? 'N4' // gentle default; the footer says so
       const credit = resolvedBand ? deckCreditSet(DECK_LEVELS, resolvedBand) : null
-      const known = buildKnownSet(queue, [], credit)
+      // Fit v2 (amendment #10): ENCOUNTERS — words the learner
+      // genuinely met outside the queue (Anki ratings, Speed Cards
+      // answers; synced into this same state document by the app).
+      // They ride buildKnownSet's personal-vocab slot: FULL proven
+      // credit, deliberately unlike the deck credit below them,
+      // which stays an assumption. Malformed entries are dropped
+      // here; buildKnownSet trims again.
+      const encounters = (Array.isArray(state.encounters) ? state.encounters : [])
+        .filter((w): w is string => typeof w === 'string')
+      const known = buildKnownSet(queue, encounters, credit)
       // Foundations pace is DERIVED, never stored: the winning
       // declaration is raw 'N7' AND no diagnosis exists (a diagnosis
       // overrides band, joke AND pace — resolveBand already put it
@@ -603,7 +622,7 @@ serve(async (req: Request) => {
       // basisBand is the resolved band itself (null when 'none'):
       // adaptive fit (amendment #4) shifts the SERVE band from it,
       // while credit above keeps following the basis untouched.
-      return { queue, known, hasDiagnosis, band, bandSource, basisBand: resolvedBand, joke, pace }
+      return { queue, known, encounters, hasDiagnosis, band, bandSource, basisBand: resolvedBand, joke, pace }
     }
 
     // ---------- R0.5 generation fallback ----------
@@ -804,10 +823,24 @@ serve(async (req: Request) => {
       const declaredAt = opts.declaredAt !== undefined ? opts.declaredAt : (link.declared_at ?? null)
       const row = await loadState(link.user_id)
       const state = (row?.state ?? {}) as Record<string, unknown>
-      const { queue, known, hasDiagnosis, band, bandSource, basisBand, joke, pace } = knownFor(state, {
+      const { queue, known, encounters, hasDiagnosis, band, bandSource, basisBand, joke, pace } = knownFor(state, {
         band: declaredBand,
         at: declaredAt,
       })
+
+      // Fit v2 (amendment #10): the rank keys every gated pick
+      // below reads — seen kanji from PROVEN words only (queue
+      // fronts ∪ encounters; the below-band deck credit inside
+      // `known` contributes nothing here, because its glyphs were
+      // assumed, never met), and the current batch — ungraduated
+      // Reader-sourced queue words — whose re-use in a candidate
+      // outranks even the new-kanji dose.
+      const seenKanji = seenKanjiSet([
+        ...queue.map((i) => (typeof i?.front === 'string' ? i.front : '')),
+        ...encounters,
+      ])
+      const batchWords = currentBatchWords(queue)
+      const fitOpts = { seenKanji, batchWords }
 
       // Adaptive fit (Doc 16 §5 amendment #4): /read aims at the
       // SERVE band — the basis band shifted by the learner's fit
@@ -873,7 +906,7 @@ serve(async (req: Request) => {
         // flow.
         const againRow = bank.find((p) => String(p.id) === opts.againPassageId)
         const verified = againRow
-          ? pickPassage([againRow as unknown as Record<string, unknown>], known, serveBand, [])
+          ? pickPassage([againRow as unknown as Record<string, unknown>], known, serveBand, [], fitOpts)
           : null
         if (againRow && verified) {
           picked = { passage: againRow as unknown as Record<string, unknown>, ratio: verified.ratio }
@@ -918,8 +951,8 @@ serve(async (req: Request) => {
       }
       if (!picked) {
         const fit = gentleActive
-          ? (pickGentle(bank, known, serveBand, recentIds) ?? pickPassage(bank, known, serveBand, recentIds))
-          : pickPassage(bank, known, serveBand, recentIds)
+          ? (pickGentle(bank, known, serveBand, recentIds, fitOpts) ?? pickPassage(bank, known, serveBand, recentIds, fitOpts))
+          : pickPassage(bank, known, serveBand, recentIds, fitOpts)
         if (fit) picked = { passage: fit.passage as Record<string, unknown>, ratio: fit.ratio }
       }
       let genOutcome: { attempted: boolean; reason: string | null } = { attempted: false, reason: null }
@@ -949,6 +982,7 @@ serve(async (req: Request) => {
             known,
             serveBand,
             [],
+            fitOpts,
           )
           : null
         if (recentFit) {
@@ -1045,6 +1079,24 @@ serve(async (req: Request) => {
           ? `\nStretching you a little past ${basisLabel} today — Push Me works both ways: Too Hard brings us back.`
           : `\nKeeping it a notch gentler than ${basisLabel} while it settles.`
       }
+      // Fit v2 footer honesty (amendment #10): the new-kanji dose
+      // is said out loud — carrying new kanji is the POINT of the
+      // passage (the goal is to know more), and the readings block
+      // below is where those kanji wait. A batch-recycle pick says
+      // so too — only when this passage truly re-uses batch words.
+      // Starters skip both lines: their footer already explains
+      // that no fit was measured.
+      const passageTokens = Array.isArray(passage.tokens) ? passage.tokens : []
+      const newKanji = coldStart ? [] : passageNewKanji(passageTokens, seenKanji)
+      if (newKanji.length === 1) {
+        footerText += '\n1 kanji here is new to you — it is in the readings block, and it will keep coming back until it is yours.'
+      } else if (newKanji.length > 1) {
+        footerText += `\n${newKanji.length} kanji here are new to you — they're in the readings block, and they'll keep coming back until they're yours.`
+      }
+      const recycledBatch = !coldStart && passageRecyclesBatch(passageTokens, batchWords)
+      if (recycledBatch) {
+        footerText += '\nThis one practises the batch you are learning now — the same words again, in new sentences, until they are yours.'
+      }
       // Kanji readings breakdown (amendment #9): EVERY kanji-bearing
       // word in the passage, not just the new words — a word can be
       // "known" by deck credit while its kanji was never learned,
@@ -1071,6 +1123,8 @@ serve(async (req: Request) => {
         ...(readingsBlock ? ['', readingsBlock] : []),
         '',
         footerText,
+        '',
+        VOICE_INSTRUCTION,
       ]
       // Every passage send carries the adaptive-fit feedback row
       // (amendment #4) under Mine: [Read It ✓] [Push Me 🔥]
@@ -1126,6 +1180,10 @@ serve(async (req: Request) => {
         // check can see them (and the funnel can tell a pushed
         // passage from a pulled one).
         ...(opts.kind === 'morning' ? { kind: 'morning' } : {}),
+        // Fit v2 (amendment #10): the dose this serve carried and
+        // whether it was a batch recycle — the funnel can then see
+        // the learning loop turning, not just passages moving.
+        ...(coldStart ? {} : { newKanji: newKanji.length, recycledBatch }),
       })
     }
 
@@ -1828,7 +1886,7 @@ serve(async (req: Request) => {
             `🔍 Heard you — reading match: ${pct}% of the passage text your voice covered. ` +
               'That is a match against the text, not a pronunciation grade. ' +
               'It sits under the line where a read counts as comfortable, so nothing is marked — reads here only ever add up, never against you. ' +
-              'Read it once more when you feel like it, and send it again.' +
+              'Read it once more when you feel like it — hold the microphone and send another voice note whenever you\'re ready.' +
               fixLine,
           )
         }
@@ -1849,7 +1907,7 @@ serve(async (req: Request) => {
           chatId,
           durationSec > win.maxSec
             ? '🔍 That ran long for this passage — a reading that long is usually the passage twice, or a pause in the middle. Once through, out loud, at your own pace is the receipt I can count.'
-            : '🔍 That was quick for this passage — shorter than a read-aloud of it runs. Read it aloud once through and send it again; your voice is the receipt.',
+            : '🔍 That was quick for this passage — shorter than a read-aloud of it runs. Read it aloud once through, then hold the microphone and send another voice note — your voice is the receipt.',
         )
         return
       }

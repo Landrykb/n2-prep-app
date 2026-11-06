@@ -186,7 +186,7 @@ export function passageRatio(tokens, knownSet) {
  * CANDIDATES THAT PASS. Returns null under exactly the conditions
  * pickPassage does. Same { passage, ratio } shape.
  */
-export function pickGentle(passages, knownSet, band, recentIds = []) {
+export function pickGentle(passages, knownSet, band, recentIds = [], fitOpts = {}) {
   const rank = bandRank(band)
   if (rank === -1) return null
   const recent = new Set(recentIds || [])
@@ -197,19 +197,27 @@ export function pickGentle(passages, knownSet, band, recentIds = []) {
     if (pRank === -1 || Math.abs(pRank - rank) > 1) continue
     const ratio = passageRatio(passage.tokens, knownSet)
     if (ratio < RATIO_MIN || ratio > RATIO_MAX) continue
+    // Fit v2 keys (amendment #10): batch recycle first, then the
+    // new-kanji dose band — both constant (0) when the caller passes
+    // no fitOpts, which preserves the pre-v2 order exactly.
+    const { recycle, dose } = fitRankKeys(passage.tokens, fitOpts)
     // Starter order: easiest band first, then fewest new words,
     // then shortest, then id — the pick stays deterministic.
     const unknowns = unknownContentHeadwords(passage.tokens, knownSet).length
     if (
       !best ||
-      pRank < best.pRank ||
-      (pRank === best.pRank &&
-        (unknowns < best.unknowns ||
-          (unknowns === best.unknowns &&
-            (passage.tokens.length < best.passage.tokens.length ||
-              (passage.tokens.length === best.passage.tokens.length && passage.id < best.passage.id)))))
+      recycle < best.recycle ||
+      (recycle === best.recycle &&
+        (dose < best.dose ||
+          (dose === best.dose &&
+            (pRank < best.pRank ||
+              (pRank === best.pRank &&
+                (unknowns < best.unknowns ||
+                  (unknowns === best.unknowns &&
+                    (passage.tokens.length < best.passage.tokens.length ||
+                      (passage.tokens.length === best.passage.tokens.length && passage.id < best.passage.id)))))))))
     ) {
-      best = { passage, ratio, pRank, unknowns }
+      best = { passage, ratio, pRank, unknowns, recycle, dose }
     }
   }
   return best ? { passage: best.passage, ratio: best.ratio } : null
@@ -287,7 +295,7 @@ export function shouldGenerate(bankPick, cooldownOk) {
   return !bankPick && !!cooldownOk
 }
 
-export function pickPassage(passages, knownSet, band, recentIds = []) {
+export function pickPassage(passages, knownSet, band, recentIds = [], fitOpts = {}) {
   const rank = bandRank(band)
   if (rank === -1) return null
   const recent = new Set(recentIds || [])
@@ -298,15 +306,23 @@ export function pickPassage(passages, knownSet, band, recentIds = []) {
     if (pRank === -1 || Math.abs(pRank - rank) > 1) continue
     const ratio = passageRatio(passage.tokens, knownSet)
     if (ratio < RATIO_MIN || ratio > RATIO_MAX) continue
+    // Fit v2 keys (amendment #10): batch recycle first, then the
+    // new-kanji dose band — both constant (0) when the caller passes
+    // no fitOpts, which preserves the pre-v2 order exactly.
+    const { recycle, dose } = fitRankKeys(passage.tokens, fitOpts)
     const dist = Math.abs(ratio - RATIO_TARGET)
     if (
       !best ||
-      dist < best.dist ||
-      (dist === best.dist &&
-        (passage.tokens.length < best.passage.tokens.length ||
-          (passage.tokens.length === best.passage.tokens.length && passage.id < best.passage.id)))
+      recycle < best.recycle ||
+      (recycle === best.recycle &&
+        (dose < best.dose ||
+          (dose === best.dose &&
+            (dist < best.dist ||
+              (dist === best.dist &&
+                (passage.tokens.length < best.passage.tokens.length ||
+                  (passage.tokens.length === best.passage.tokens.length && passage.id < best.passage.id)))))))
     ) {
-      best = { passage, ratio, dist }
+      best = { passage, ratio, dist, recycle, dose }
     }
   }
   return best ? { passage: best.passage, ratio: best.ratio } : null
@@ -738,4 +754,161 @@ export function kanjiReadings(tokens, readingOf) {
     out.push({ word: surface, reading })
   }
   return out
+}
+
+// ---------- Fit v2: encounters, seen kanji, dose, batch (amendment #10) ----------
+//
+// Landry's method, in his words: "Master what you've seen… new
+// learn, read it many times. Then add other. Go go and bring it
+// back after few days." — and his correction, which outranks the
+// first framing: "do not limit to the ones you know… The goal is
+// to know more." So the known set is NEVER a whitelist: it is the
+// readable BASE, and every passage must still carry a deliberate
+// dose of the new. This section is the ranking layer that sits
+// UNDER the unchanged 0.93–0.97 word gate (the gate filters first,
+// exactly as before; nothing here can admit a failing passage):
+//
+//   PROVEN words — queue fronts plus ENCOUNTERS (words the learner
+//   genuinely met outside the queue: Anki cards they rated, Speed
+//   Cards they answered — synced into learner_state.encounters).
+//   Proven words earn FULL credit in the known set (buildKnownSet's
+//   personal-vocab slot), unlike below-band deck credit, which is
+//   an assumption. SEEN KANJI derives from proven words only, for
+//   the same reason: a credited word's glyphs may never have been
+//   met; a proven word's glyphs were on the screen in front of them.
+//
+//   DOSE — for an in-gate candidate, newKanji = the distinct kanji
+//   in its surfaces that are not seen kanji. The productive band is
+//   1..NEW_KANJI_DOSE_MAX: enough new to grow, few enough to carry.
+//   Ranking: dosed first, ZERO-new below it (a passage with nothing
+//   new teaches nothing), over-dosed last — but over-dosed is a
+//   RANK, never an exclusion: alone in the gate, it still serves,
+//   with the readings block as its support. The unseen count is a
+//   ceiling on overload, never a minimisation target.
+//
+//   BATCH RECYCLE — the current batch is the learner's ungraduated
+//   Reader-sourced queue words (graduated = fsrs reps ≥ 3, the
+//   Twin's rule in twin.js). While a batch exists, a candidate
+//   whose text re-uses batch words outranks dose ordering entirely:
+//   repetition of the current learn set, in new contexts, comes
+//   first — "read it many times" — and the new-dose preference only
+//   leads once the batch is graduated or empty.
+
+/** The productive new-kanji dose ceiling per passage. */
+export const NEW_KANJI_DOSE_MAX = 8
+/** fsrs reps at which a queue word counts as graduated (twin.js). */
+export const GRADUATED_REPS = 3
+
+/** Every kanji character of a string, in order (duplicates kept). */
+export function kanjiCharsOf(str) {
+  const out = []
+  for (const ch of String(str || '')) if (KANJI_RE.test(ch)) out.push(ch)
+  return out
+}
+
+/**
+ * The seen-kanji set: every kanji appearing inside a PROVEN word
+ * (queue fronts ∪ encounters — graduated queue words are queue
+ * fronts already, so the union needs no third term). Deck credit
+ * deliberately contributes NOTHING: its glyphs were assumed, not met.
+ */
+export function seenKanjiSet(provenWords) {
+  const seen = new Set()
+  for (const word of provenWords || []) {
+    if (typeof word !== 'string' || !word) continue
+    for (const ch of word) if (KANJI_RE.test(ch)) seen.add(ch)
+  }
+  return seen
+}
+
+/**
+ * The distinct kanji of a passage that the learner has NOT seen —
+ * token SURFACES (what is actually on the page), deduped, in order
+ * of first appearance. String tokens normalise as elsewhere. A
+ * missing/invalid seen set reads as "nothing seen" (everything is
+ * new) rather than crashing the pick.
+ */
+export function passageNewKanji(tokens, seenKanji) {
+  const seen = seenKanji && typeof seenKanji.has === 'function' ? seenKanji : new Set()
+  const out = []
+  const found = new Set()
+  for (const token of Array.isArray(tokens) ? tokens : []) {
+    const t = typeof token === 'string' ? { s: token } : token
+    const surface = typeof t?.s === 'string' ? t.s : ''
+    if (!surface) continue
+    for (const ch of surface) {
+      if (!KANJI_RE.test(ch) || seen.has(ch) || found.has(ch)) continue
+      found.add(ch)
+      out.push(ch)
+    }
+  }
+  return out
+}
+
+/**
+ * Dose rank for a new-kanji count (lower ranks first):
+ *   0 — productive dose (1..NEW_KANJI_DOSE_MAX new kanji)
+ *   1 — zero new kanji (nothing to learn from it)
+ *   2 — over-dosed (above the ceiling; support, don't prefer)
+ */
+export function doseRankOf(newKanjiCount) {
+  const n = Math.max(0, Math.trunc(Number(newKanjiCount) || 0))
+  if (n === 0) return 1
+  return n <= NEW_KANJI_DOSE_MAX ? 0 : 2
+}
+
+/**
+ * The current batch: fronts of the learner's UNGRADUATED queue
+ * words sourced from the Reader — the learn set currently in
+ * rotation. Deduped, queue order. Graduated words (fsrs reps ≥
+ * GRADUATED_REPS, the Twin's rule) have left the batch: they come
+ * back through FSRS timing and later recycling, not through the
+ * batch bonus.
+ */
+export function currentBatchWords(queueItems) {
+  const out = []
+  const seen = new Set()
+  for (const item of queueItems || []) {
+    if (!item || item.source !== 'reader') continue
+    if ((item.fsrs?.reps || 0) >= GRADUATED_REPS) continue
+    const front = typeof item.front === 'string' ? item.front.trim() : ''
+    if (!front || seen.has(front)) continue
+    seen.add(front)
+    out.push(front)
+  }
+  return out
+}
+
+/**
+ * Does this passage's text re-use any batch word? Matching is by
+ * HEADWORD (the batch holds dictionary forms; the passage may
+ * inflect them) — the same matching the known set uses.
+ */
+export function passageRecyclesBatch(tokens, batchWords) {
+  const batch = batchWords instanceof Set ? batchWords : new Set(batchWords || [])
+  if (batch.size === 0) return false
+  for (const token of Array.isArray(tokens) ? tokens : []) {
+    const t = typeof token === 'string' ? { s: token, h: token } : token
+    if (!t) continue
+    if (batch.has(t.h || t.s) || batch.has(t.s)) return true
+  }
+  return false
+}
+
+/**
+ * The Fit v2 rank keys for one candidate: { recycle, dose }, both
+ * lower-is-better, recycle outranking dose. Each key is a constant
+ * 0 when its input is absent (no batch → no recycle key; no seen
+ * set → no dose key), so callers that pass no fitOpts get exactly
+ * the pre-v2 ordering.
+ */
+export function fitRankKeys(tokens, fitOpts = {}) {
+  const batch = fitOpts?.batchWords
+  const recycle = batch && (batch instanceof Set ? batch.size > 0 : batch.length > 0)
+    ? (passageRecyclesBatch(tokens, batch) ? 0 : 1)
+    : 0
+  const dose = fitOpts?.seenKanji
+    ? doseRankOf(passageNewKanji(tokens, fitOpts.seenKanji).length)
+    : 0
+  return { recycle, dose }
 }

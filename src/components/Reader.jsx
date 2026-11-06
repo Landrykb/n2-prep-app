@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { BookOpenText, CheckCircle2, Mic, Pickaxe, RefreshCw, Square } from 'lucide-react'
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient.js'
 import { useAuth } from '../hooks/useAuth.js'
@@ -8,14 +8,16 @@ import { addToQueue, loadQueue, queueItemId } from '../lib/queue.js'
 import { loadDictionary } from '../lib/dictionary.js'
 import { recordMetric } from '../lib/metrics.js'
 import {
-  BANDS, bandRank, buildKnownSet, countKnownContent, deckCreditSet,
-  isColdStart, passageRatio, pickPassage, pickStarter, capCandidates,
-  resolveBand, serveBandFor, applyFeedback,
+  BANDS, bandRank, buildKnownSet, countKnownContent, currentBatchWords, deckCreditSet,
+  isColdStart, kanjiReadings, passageNewKanji, passageRatio, passageRecyclesBatch,
+  pickPassage, pickStarter, capCandidates,
+  resolveBand, seenKanjiSet, serveBandFor, applyFeedback,
 } from '../lib/readerFit.js'
 import {
   READ_ALOUD_PASS_SCORE, normalizeSpeechText, scoreReadAloud, firstMissedCandidate,
 } from '../lib/readAloud.js'
 import KanjiTapText from './KanjiTapText.jsx'
+import KanjiChips from './KanjiChips.jsx'
 import Mascot from './Mascot.jsx'
 
 // THE READER (Doc 16 §2/§7 R1) — the web surface of Hori's Reader, the
@@ -118,21 +120,50 @@ function splitSegments(text, newWords) {
   return segs
 }
 
-function PassageText({ text, newWords }) {
+function PassageText({ text, newWords, highlightWord }) {
   const { enabled: furiganaOn } = useFurigana()
   const segments = useMemo(() => splitSegments(text, newWords), [text, newWords])
+  // The kanji strip's pulse (KanjiChips): the tapped word lights up
+  // HERE, in the passage, so the eye travels from chip to context.
+  // The first occurrence carries the scroll anchor. Plain runs are
+  // split around the word (KanjiTapText keeps the rest tappable);
+  // a new-word segment that IS the word wraps in place.
+  let anchored = false
+  const anchorProps = () => {
+    if (anchored) return {}
+    anchored = true
+    return { 'data-kanji-anchor': 'true' }
+  }
   return (
     <p className="text-lg leading-loose text-slate-100">
       {segments.map((seg, i) => {
-        if (!seg.word) return <KanjiTapText key={i} text={seg.text} />
+        if (!seg.word) {
+          if (!highlightWord || !seg.text.includes(highlightWord)) return <KanjiTapText key={i} text={seg.text} />
+          const parts = seg.text.split(highlightWord)
+          return (
+            <span key={i}>
+              {parts.map((part, j) => (
+                <Fragment key={j}>
+                  {j > 0 && <mark {...anchorProps()} className="kanji-pulse rounded-md bg-transparent text-inherit">{highlightWord}</mark>}
+                  {part && <KanjiTapText text={part} />}
+                </Fragment>
+              ))}
+            </span>
+          )
+        }
         const reading = seg.word.reading
-        return furiganaOn && reading && reading !== seg.text ? (
-          <ruby key={i} className="font-bold text-[#FFA08D]">
+        const body = furiganaOn && reading && reading !== seg.text ? (
+          <ruby className="font-bold text-[#FFA08D]">
             {seg.text}
             <rt className="text-[0.6em] font-normal text-[#FF8A75] select-none">{reading}</rt>
           </ruby>
         ) : (
-          <strong key={i} className="font-bold text-[#FFA08D]">{seg.text}</strong>
+          <strong className="font-bold text-[#FFA08D]">{seg.text}</strong>
+        )
+        return seg.text === highlightWord ? (
+          <span key={i} {...anchorProps()} className="kanji-pulse rounded-md">{body}</span>
+        ) : (
+          <Fragment key={i}>{body}</Fragment>
         )
       })}
     </p>
@@ -163,6 +194,7 @@ export default function Reader() {
   // transcript against the passage in code. One recognition session
   // per passage — present() aborts it, so a stale transcript can
   // never be scored against a new passage.
+  const [pulseWord, setPulseWord] = useState('') // kanji strip tap → passage highlight
   const [aloud, setAloud] = useState(null) // listening | scored | empty | error
   const recogRef = useRef(null)
   const finalTextRef = useRef('')
@@ -189,9 +221,12 @@ export default function Reader() {
       if (!starter) return null
       const candidates = capCandidates(withCandidateLevels(starter.passage, ctx.deckLevels))
       const newWords = candidates.filter((c) => c.word && !ctx.known.has(c.h || c.word))
-      return { passage: starter.passage, ratio: passageRatio(starter.passage.tokens, ctx.known), coldStart: true, newWords, sentNewCount: newWords.length, stepLine: '' }
+      return { passage: starter.passage, ratio: passageRatio(starter.passage.tokens, ctx.known), coldStart: true, newWords, sentNewCount: newWords.length, stepLine: '', newKanjiCount: passageNewKanji(starter.passage.tokens, ctx.seenKanji).length, recycledBatch: false }
     }
-    const fit = pickPassage(ctx.bank, ctx.known, ctx.serveBand, recent)
+    // Fit v2 (amendment #10): the gated pick reads the rank keys —
+    // batch recycle above the new-kanji dose — and the pick records
+    // its dose so the footer can say it out loud.
+    const fit = pickPassage(ctx.bank, ctx.known, ctx.serveBand, recent, { seenKanji: ctx.seenKanji, batchWords: ctx.batchWords })
     if (!fit) return null
     const rawCandidates = Array.isArray(fit.passage.new_word_candidates) ? fit.passage.new_word_candidates : []
     const newWords = rawCandidates.filter((c) => c.word && !ctx.known.has(c.h || c.word))
@@ -206,12 +241,22 @@ export default function Reader() {
       : ctx.fitStep < 0
         ? `\nKeeping it a notch gentler than ${basisLabel} while it settles.`
         : ''
-    return { passage: fit.passage, ratio: fit.ratio, coldStart: false, newWords, sentNewCount: newWords.length, stepLine }
+    return {
+      passage: fit.passage,
+      ratio: fit.ratio,
+      coldStart: false,
+      newWords,
+      sentNewCount: newWords.length,
+      stepLine,
+      newKanjiCount: passageNewKanji(fit.passage.tokens, ctx.seenKanji).length,
+      recycledBatch: passageRecyclesBatch(fit.passage.tokens, ctx.batchWords),
+    }
   }
 
   const present = (next) => {
     stopListening()
     setAloud(null)
+    setPulseWord('')
     setPick(next)
     setFinished(false)
     setMineNote('')
@@ -303,7 +348,23 @@ export default function Reader() {
         const hasDiagnosis = source === 'diagnosis'
         const band = resolvedBand ?? 'N4' // gentle default; the footer says so
         const credit = resolvedBand ? deckCreditSet(deckLevels, resolvedBand) : null
-        const known = buildKnownSet(queue, [], credit)
+        // Fit v2 (amendment #10), exactly as the bot's knownFor:
+        // encounters — words genuinely met outside the queue (Anki
+        // ratings, Speed Cards answers, synced in this same state
+        // document) — earn FULL proven credit, and proven words
+        // (queue fronts ∪ encounters) define the seen-kanji set.
+        const encounters = (Array.isArray(state.encounters) ? state.encounters : [])
+          .filter((w) => typeof w === 'string')
+        const known = buildKnownSet(queue, encounters, credit)
+        const seenKanji = seenKanjiSet([
+          ...queue.map((i) => (typeof i?.front === 'string' ? i.front : '')),
+          ...encounters,
+        ])
+        const batchWords = currentBatchWords(queue)
+        const dictByWord = new Map()
+        for (const e of dict?.entries || []) {
+          if (e?.word && !dictByWord.has(e.word)) dictByWord.set(e.word, e)
+        }
         const serveBand = serveBandFor(resolvedBand, fitStep) ?? band
         const cold = source === 'none' && isColdStart(hasDiagnosis, countKnownContent(known))
 
@@ -332,7 +393,7 @@ export default function Reader() {
         } catch { recentIds = [] }
 
         if (cancelled) return
-        const ctx = { bank, known, deckLevels, serveBand, band, resolvedBand, fitStep, fitState, hasLink, source, cold, recentIds, queueLength: queue.length }
+        const ctx = { bank, known, deckLevels, serveBand, band, resolvedBand, fitStep, fitState, hasLink, source, cold, recentIds, queueLength: queue.length, encounters, seenKanji, batchWords, dictByWord }
         ctxRef.current = ctx
         excludedRef.current = []
         setBandSource(source)
@@ -365,15 +426,17 @@ export default function Reader() {
     setBusy(false)
   }
 
-  const mine = () => {
-    if (!pick || pick.newWords.length === 0) return
+  // Mining — the queue front is the HEADWORD (it dedupes against the
+  // same word added anywhere via the shared queueItemId hash, and
+  // FSRS teaches the dictionary form); the passage's own sentence
+  // rides on the card as its note. One flow, two doors: the Mine
+  // button mines the passage's new words; a kanji chip's Mine This
+  // Word mines exactly one (Fit v2) — same queue-item shape either way.
+  const mineCandidates = (cands) => {
+    if (!pick || !cands || cands.length === 0) return
     const passage = pick.passage
-    // The bot's mining semantics, mirrored: the queue front is the
-    // HEADWORD (it dedupes against the same word added anywhere via
-    // the shared queueItemId hash, and FSRS teaches the dictionary
-    // form); the passage's own sentence rides on the card as its note.
     const before = new Set(loadQueue().map((i) => i.id))
-    const items = pick.newWords.map((c) => {
+    const items = cands.map((c) => {
       const front = c.h || c.word
       return {
         front,
@@ -389,7 +452,12 @@ export default function Reader() {
     if (added > 0) {
       recordMetric('word_mined', { passageId: String(passage.id), count: added, words: minedWords })
       const ctx = ctxRef.current
-      if (ctx) for (const w of minedWords) ctx.known.add(w)
+      if (ctx) {
+        for (const w of minedWords) ctx.known.add(w)
+        // The just-mined words ARE the current batch now — refresh
+        // the rank key so the next pick can recycle them at once.
+        ctx.batchWords = [...new Set([...(ctx.batchWords || []), ...minedWords])]
+      }
       const minedFronts = new Set(minedWords)
       setPick((cur) => (cur ? { ...cur, newWords: cur.newWords.filter((c) => !minedFronts.has(c.h || c.word)) } : cur))
     }
@@ -397,6 +465,8 @@ export default function Reader() {
       ? `⛏ ${added} word${added === 1 ? '' : 's'} joined your review queue — they will surface in your sessions, with this passage's sentence on the card.`
       : 'Nothing new to mine — you already know, or have already queued, every bolded word in that passage.')
   }
+
+  const mine = () => { if (pick) mineCandidates(pick.newWords) }
 
   // passage_completed is logged once per passage per session, from
   // whichever door earned it — the Finished Reading tap or a passed
@@ -534,8 +604,56 @@ export default function Reader() {
     } else {
       text = `Fitted to your queue: about ${pct}% of its words should already be familiar (an estimate) · ${words}\nBand N4 is a gentle default — take the 10-minute checkup in Yonde and I will fit to your real level.`
     }
-    return text + (p.stepLine || '')
+    // Fit v2 honesty (amendment #10), the bot footer's family: the
+    // new-kanji dose is said out loud (the kanji strip below the
+    // passage is where those kanji wait), and a batch-recycle pick
+    // says so — only when true.
+    let extra = ''
+    if (p.newKanjiCount === 1) extra += '\n1 kanji here is new to you — it is in the kanji strip below, and it will keep coming back until it is yours.'
+    else if (p.newKanjiCount > 1) extra += `\n${p.newKanjiCount} kanji here are new to you — they're in the kanji strip below, and they'll keep coming back until they're yours.`
+    if (p.recycledBatch) extra += '\nThis one practises the batch you are learning now — the same words again, in new sentences, until they are yours.'
+    return text + (p.stepLine || '') + extra
   }
+
+  // The kanji strip's data (Fit v2): every distinct kanji word in
+  // the passage (kanjiReadings — the readings block's own
+  // derivation), readings and meanings from the passage's candidate
+  // glosses first, then the app's dictionary, and the matching
+  // still-unmined new-word candidate when there is one — only a
+  // candidate can be mined, and only while pick.newWords holds it.
+  const chips = useMemo(() => {
+    if (!pick) return []
+    const ctx = ctxRef.current
+    const byWord = ctx?.dictByWord || new Map()
+    const gloss = new Map()
+    for (const c of Array.isArray(pick.passage.new_word_candidates) ? pick.passage.new_word_candidates : []) {
+      const head = c.h || c.word
+      if (head && !gloss.has(head)) gloss.set(head, c)
+      if (c.word && !gloss.has(c.word)) gloss.set(c.word, c)
+    }
+    const headOf = new Map()
+    for (const t of Array.isArray(pick.passage.tokens) ? pick.passage.tokens : []) {
+      if (t && typeof t.s === 'string' && !headOf.has(t.s)) headOf.set(t.s, typeof t.h === 'string' && t.h ? t.h : t.s)
+    }
+    const readingOf = (h) => gloss.get(h)?.reading || byWord.get(h)?.reading || undefined
+    return kanjiReadings(pick.passage.tokens, readingOf).map((r) => {
+      const head = headOf.get(r.word) || r.word
+      const candidate = pick.newWords.find((c) => c.word === r.word || (c.h || c.word) === head) || null
+      return {
+        ...r,
+        meaning: candidate?.meaning || gloss.get(head)?.meaning || byWord.get(head)?.meaning || '',
+        candidate,
+      }
+    })
+  }, [pick])
+
+  // A strip tap pulses the word in the passage and scrolls the
+  // first occurrence into view.
+  useEffect(() => {
+    if (!pulseWord) return
+    const el = document.querySelector('[data-kanji-anchor="true"]')
+    try { el?.scrollIntoView({ behavior: 'smooth', block: 'center' }) } catch { /* the anchor alone still highlights */ }
+  }, [pulseWord])
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
@@ -581,7 +699,8 @@ export default function Reader() {
         <>
           <section className="rounded-3xl glass p-6 sm:p-8 card-glow space-y-5">
             <p className="text-sm text-slate-400">🔍 Hori dug this up for you — {pick.passage.topic || 'Reading'} · {pick.passage.band}</p>
-            <PassageText text={pick.passage.text} newWords={pick.newWords} />
+            <PassageText text={pick.passage.text} newWords={pick.newWords} highlightWord={pulseWord} />
+            <KanjiChips key={String(pick.passage.id)} chips={chips} activeWord={pulseWord} onHighlight={setPulseWord} onMineWord={mineCandidates} />
             {pick.newWords.length > 0 && (
               <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4">
                 <h3 className="text-sm font-bold text-[#FF8A75] mb-2">New Words In This Passage</h3>

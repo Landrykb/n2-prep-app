@@ -85,10 +85,30 @@ export function mergeDiagnosisHistory(localHist, otherHist) {
 }
 
 /**
+ * Encounters (Fit v2, amendment #10): a plain word list merged by
+ * UNION — local order first, the other side's new words appended.
+ * An encounter, once met, was met: the merged list can only ever
+ * grow, never shrink, whichever side is older.
+ */
+export function mergeEncounters(localWords, otherWords) {
+  const out = []
+  const seen = new Set()
+  for (const w of [...(Array.isArray(localWords) ? localWords : []), ...(Array.isArray(otherWords) ? otherWords : [])]) {
+    if (typeof w !== 'string') continue
+    const word = w.trim()
+    if (!word || seen.has(word)) continue
+    seen.add(word)
+    out.push(word)
+  }
+  return out
+}
+
+/**
  * Merge two learner-state documents ({ queue, profile, diagnosis,
- * diagnosisHistory, promise, declaredLevel }). Returns a new document;
- * inputs untouched. declaredLevel is a single document like the
- * others — the newer declaration (its `at`) wins whole.
+ * diagnosisHistory, promise, declaredLevel, encounters }). Returns a
+ * new document; inputs untouched. declaredLevel is a single document
+ * like the others — the newer declaration (its `at`) wins whole.
+ * Encounters union (above): met words are never un-met by a merge.
  */
 export function mergeLearnerState(local, other) {
   const L = local || {}
@@ -100,6 +120,7 @@ export function mergeLearnerState(local, other) {
     diagnosisHistory: mergeDiagnosisHistory(L.diagnosisHistory, O.diagnosisHistory),
     promise: pickDoc(L.promise, O.promise, (d) => d.at),
     declaredLevel: pickDoc(L.declaredLevel, O.declaredLevel, (d) => d.at),
+    encounters: mergeEncounters(L.encounters, O.encounters),
   }
 }
 

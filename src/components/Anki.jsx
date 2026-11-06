@@ -4,6 +4,7 @@ import { getUserProgress, setUserProgress } from '../lib/supabaseApi.js'
 import { addToQueue, loadQueue, saveQueue, queueItemId } from '../lib/queue.js'
 import { userKey } from '../lib/userKey.js'
 import { mergeAnkiProgress } from '../lib/stateMerge.js'
+import { recordEncounters, ankiEncounterWords } from '../lib/encounters.js'
 import KanjiTapText from './KanjiTapText.jsx'
 import { Download, ExternalLink, Loader2, RotateCcw, Search, Settings, Shuffle, CheckCircle2, XCircle, Layers } from 'lucide-react'
 
@@ -243,6 +244,17 @@ export default function Anki() {
     return () => { cancelled = true }
   }, [user])
 
+  // Fit v2 encounters (Doc 16 §5 amendment #10): every card the
+  // learner has RATED here was genuinely met — derive its word and
+  // record it as an encounter, so the Reader's fit (the app and the
+  // Telegram bot alike, through the synced learner state) grants it
+  // proven credit. recordEncounters no-ops when nothing is new, so
+  // running this on every progress change cannot churn.
+  useEffect(() => {
+    if (!cards.length) return
+    recordEncounters(ankiEncounterWords(progress, cards))
+  }, [cards, progress])
+
   const refreshQueue = () => {
     if (!cards.length) return
     const t = today()
@@ -313,6 +325,9 @@ export default function Anki() {
 
     setProgress(next)
     saveProgress(progressKeyFor(user), next)
+    // The rated card was met, whatever the rating — an encounter
+    // (Fit v2): it joins the proven set the Reader fits against.
+    recordEncounters([current.front])
     if (user) setUserProgress(user.id, { anki: next })
     setFlipped(false)
 

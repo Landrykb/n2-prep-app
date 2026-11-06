@@ -3,7 +3,7 @@
 // cloud sync (stateSync.js) in the same shape the merge logic
 // (stateMerge.js) consumes:
 //
-//   { queue, profile, diagnosis, diagnosisHistory, promise, declaredLevel }
+//   { queue, profile, diagnosis, diagnosisHistory, promise, declaredLevel, encounters }
 //
 // Local storage stays the offline source of truth; this module only
 // reads/writes the existing keys. Diagnosis history writes go through
@@ -13,6 +13,7 @@ import { QUEUE_KEY, loadQueue } from './queue.js'
 import { PROFILE_KEY, DIAGNOSIS_KEY, loadProfile, loadDiagnosis } from './profile.js'
 import { PROMISE_KEY, loadPromise } from './promise.js'
 import { emitLearnerStateSaved } from './stateEvents.js'
+import { ENCOUNTERS_KEY, collectEncounterWords } from './encounters.js'
 
 export const DIAGNOSIS_HISTORY_KEY = 'jpn:diagnosisHistory:v1'
 export const DECLARED_LEVEL_KEY = 'jpn:declaredLevel:v1'
@@ -56,6 +57,10 @@ export function collectLearnerState() {
     diagnosisHistory: loadDiagnosisHistory(),
     promise: loadPromise(),
     declaredLevel: loadDeclaredLevel(),
+    // Fit v2 (amendment #10): words genuinely met outside the queue
+    // (encounters.js) — the server-side fit reads them from this
+    // same document and grants them full proven credit.
+    encounters: collectEncounterWords(),
   }
 }
 
@@ -66,6 +71,7 @@ const SLICE_KEYS = [
   ['diagnosisHistory', DIAGNOSIS_HISTORY_KEY],
   ['promise', PROMISE_KEY],
   ['declaredLevel', DECLARED_LEVEL_KEY],
+  ['encounters', ENCOUNTERS_KEY],
 ]
 
 /** Write a (merged) state document back to the local keys, verbatim —

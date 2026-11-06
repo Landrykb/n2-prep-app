@@ -1316,4 +1316,133 @@ await checkAsync('telegram initData: a signed but malformed user payload is reje
   assert.deepEqual(result, { ok: false, reason: 'bad_user' })
 })
 
+console.log('fit v2 — encounters, seen kanji, dose band, batch recycle (amendment #10):')
+{
+  // Proven words: 21 single-kanji words the learner demonstrably met.
+  const proven = ['猫', '犬', '鳥', '魚', '馬', '牛', '羊', '豚', '兎', '熊', '鹿', '象', '蝶', '蜂', '蟻', '蟹', '鮫', '鶴', '亀', '舌', '山']
+  const seen = fit.seenKanjiSet(proven)
+  const knownSet = fit.buildKnownSet([], proven, null)
+  const toks = (unknown) => [
+    ...proven.slice(0, 19).map((w) => ({ s: w, h: w })),
+    { s: unknown, h: unknown },
+  ]
+  const passage = (id, unknown) => ({ id, band: 'N3', tokens: toks(unknown) })
+  // Each candidate: 19/20 known = 0.95, squarely in the gate.
+  const dosed = passage('dosed', '温泉') // 温+泉 unseen → 2 new kanji
+  const zeroNew = passage('zero', '猫舌') // both kanji seen; the WORD is new
+  const overDosed = passage('over', '龍鳳麒麟鷲鷺鴨鴛鴦') // 9 distinct new kanji
+  const coldish = passage('batchy', '氷河') // 氷+河 unseen → also dosed
+
+  check('seenKanjiSet derives kanji from proven words only', () => {
+    assert.equal(seen.has('猫'), true)
+    assert.equal(seen.has('舌'), true)
+    assert.equal(seen.has('温'), false)
+    assert.equal(fit.seenKanjiSet([]).size, 0)
+    assert.equal(fit.seenKanjiSet(['あい', '']).size, 0)
+  })
+
+  check('passageNewKanji: distinct unseen kanji, first-appearance order', () => {
+    assert.deepEqual(fit.passageNewKanji(dosed.tokens, seen), ['温', '泉'])
+    assert.deepEqual(fit.passageNewKanji(zeroNew.tokens, seen), [])
+    assert.equal(fit.passageNewKanji(overDosed.tokens, seen).length, 9)
+    assert.deepEqual(fit.passageNewKanji(['猫', '温泉'], seen), ['温', '泉'])
+  })
+
+  check('doseRankOf: dosed (1..8) < zero-new < over-dosed (>8)', () => {
+    assert.equal(fit.doseRankOf(1), 0)
+    assert.equal(fit.doseRankOf(8), 0)
+    assert.equal(fit.doseRankOf(0), 1)
+    assert.equal(fit.doseRankOf(9), 2)
+    assert.equal(fit.NEW_KANJI_DOSE_MAX, 8)
+  })
+
+  check('dose ordering: dosed beats zero-new beats over-dosed', () => {
+    const opts = { seenKanji: seen, batchWords: [] }
+    assert.equal(fit.pickPassage([zeroNew, overDosed, dosed], knownSet, 'N3', [], opts).passage.id, 'dosed')
+    assert.equal(fit.pickPassage([overDosed, zeroNew], knownSet, 'N3', [], opts).passage.id, 'zero')
+  })
+
+  check('over-dosed still serves when it alone passes the gate', () => {
+    const opts = { seenKanji: seen, batchWords: [] }
+    const pick = fit.pickPassage([overDosed], knownSet, 'N3', [], opts)
+    assert.equal(pick.passage.id, 'over')
+    assert.ok(pick.ratio >= 0.93 && pick.ratio <= 0.97)
+  })
+
+  check('no fitOpts → pre-v2 order unchanged (dose-blind)', () => {
+    // Identical ratio/size: the id tie-break decides, as before v2.
+    assert.equal(fit.pickPassage([zeroNew, dosed], knownSet, 'N3', []).passage.id, 'dosed')
+    assert.equal(fit.pickPassage([dosed, zeroNew], knownSet, 'N3', []).passage.id, 'dosed')
+  })
+
+  check('currentBatchWords: ungraduated Reader queue words only', () => {
+    const queue = [
+      { front: '温泉', source: 'reader', fsrs: { reps: 0 } },
+      { front: '猫舌', source: 'reader', fsrs: { reps: 3 } }, // graduated
+      { front: '氷河', source: 'reader' }, // no fsrs yet → in batch
+      { front: '単語', source: 'lesson', fsrs: { reps: 0 } }, // not Reader
+      { front: '温泉', source: 'reader', fsrs: { reps: 1 } }, // dupe
+    ]
+    assert.deepEqual(fit.currentBatchWords(queue), ['温泉', '氷河'])
+    assert.equal(fit.GRADUATED_REPS, 3)
+  })
+
+  check('passageRecyclesBatch matches by headword', () => {
+    assert.equal(fit.passageRecyclesBatch(zeroNew.tokens, ['猫舌']), true)
+    assert.equal(fit.passageRecyclesBatch([{ s: '猫舌だ', h: '猫舌' }], ['猫舌']), true)
+    assert.equal(fit.passageRecyclesBatch(dosed.tokens, ['猫舌']), false)
+    assert.equal(fit.passageRecyclesBatch(dosed.tokens, []), false)
+  })
+
+  check('batch recycle outranks dose', () => {
+    // zeroNew recycles the batch word 猫舌 (dose rank 1); coldish is
+    // purely dosed (rank 0, no batch word). Recycle wins.
+    const opts = { seenKanji: seen, batchWords: ['猫舌'] }
+    assert.equal(fit.pickPassage([coldish, zeroNew], knownSet, 'N3', [], opts).passage.id, 'zero')
+    // With an empty batch the dose preference leads again.
+    assert.equal(fit.pickPassage([coldish, zeroNew], knownSet, 'N3', [], { seenKanji: seen, batchWords: [] }).passage.id, 'batchy')
+  })
+
+  check('pickGentle honours the same Fit v2 keys', () => {
+    const opts = { seenKanji: seen, batchWords: [] }
+    assert.equal(fit.pickGentle([zeroNew, dosed], knownSet, 'N3', [], opts).passage.id, 'dosed')
+  })
+
+  check('fit v2 twin parity: every new helper agrees', () => {
+    const queue = [
+      { front: '温泉', source: 'reader', fsrs: { reps: 0 } },
+      { front: '猫舌', source: 'reader', fsrs: { reps: 5 } },
+    ]
+    for (const [name, args] of [
+      ['kanjiCharsOf', ['温泉の猫']],
+      ['doseRankOf', [0]],
+      ['doseRankOf', [4]],
+      ['doseRankOf', [12]],
+      ['currentBatchWords', [queue]],
+      ['passageRecyclesBatch', [dosed.tokens, ['温泉']]],
+      ['fitRankKeys', [dosed.tokens, { seenKanji: seen, batchWords: ['温泉'] }]],
+      ['fitRankKeys', [zeroNew.tokens, { seenKanji: seen, batchWords: [] }]],
+    ]) {
+      assert.deepEqual(port[name](...args), fit[name](...args), name)
+    }
+    assert.deepEqual([...port.seenKanjiSet(proven)].sort(), [...fit.seenKanjiSet(proven)].sort())
+    assert.deepEqual(port.passageNewKanji(overDosed.tokens, seen), fit.passageNewKanji(overDosed.tokens, seen))
+    assert.equal(port.NEW_KANJI_DOSE_MAX, fit.NEW_KANJI_DOSE_MAX)
+    assert.equal(port.GRADUATED_REPS, fit.GRADUATED_REPS)
+    const opts = { seenKanji: seen, batchWords: ['猫舌'] }
+    assert.equal(
+      port.pickPassage([coldish, zeroNew], knownSet, 'N3', [], opts).passage.id,
+      fit.pickPassage([coldish, zeroNew], knownSet, 'N3', [], opts).passage.id,
+    )
+  })
+
+  check('the passage message teaches the voice gesture (amendment #10)', () => {
+    const src = readFileSync(new URL('../supabase/functions/reader-bot/index.ts', import.meta.url), 'utf8')
+    assert.ok(src.includes('hold the microphone button below, read the whole passage'), 'passage instruction line')
+    assert.ok((src.match(/VOICE_INSTRUCTION/g) || []).length >= 2, 'instruction is composed into the passage send')
+    assert.ok(src.includes('🎙 Voice read: after a passage, hold the microphone button'), 'HELP explains the voice read')
+    assert.ok(src.includes('hold the microphone and send another voice note'), 'score replies name the gesture')
+  })
+}
+
 console.log(`reader: ${passed} checks passed`)

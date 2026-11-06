@@ -353,4 +353,48 @@ check('telegram bridge: a different webview account → bridge to the linked acc
   )
 })
 
+console.log('encounters — collect derivations + union merge (Fit v2, amendment #10):')
+{
+  const enc = await import('../src/lib/encounters.js')
+  const { mergeEncounters, mergeLearnerState } = await import('../src/lib/stateMerge.js')
+
+  check('ankiEncounterWords: rated cards only (due or positive count)', () => {
+    const cards = [
+      { id: 'c1', front: '猫' }, { id: 'c2', front: '犬' },
+      { id: 'c3', front: '鳥' }, { id: 'c4', front: '魚' },
+    ]
+    const progress = { due: { c1: '2026-11-08' }, count: { c2: 2, c3: 0 } }
+    assert.deepEqual(enc.ankiEncounterWords(progress, cards), ['猫', '犬'])
+    assert.deepEqual(enc.ankiEncounterWords(null, cards), [])
+    assert.deepEqual(enc.ankiEncounterWords(progress, []), [])
+  })
+
+  check('speedEncounterWords: answered prompts only, word half of the key', () => {
+    const stats = { '猫|ねこ': { m: 1, h: 2 }, '犬|いぬ': { m: 0, h: 0 }, '鳥|とり': { m: 0, h: 1 } }
+    assert.deepEqual(enc.speedEncounterWords(stats), ['猫', '鳥'])
+    assert.deepEqual(enc.speedEncounterWords(null), [])
+  })
+
+  check('collectEncounterWords is storage-safe with nothing stored', () => {
+    assert.deepEqual(enc.collectEncounterWords(), [])
+  })
+
+  check('mergeEncounters unions and never shrinks', () => {
+    assert.deepEqual(mergeEncounters(['猫', '犬'], ['犬', '鳥']), ['猫', '犬', '鳥'])
+    assert.deepEqual(mergeEncounters(['猫', '犬'], []), ['猫', '犬'])
+    assert.deepEqual(mergeEncounters([], ['猫']), ['猫'])
+    assert.deepEqual(mergeEncounters(null, undefined), [])
+    assert.deepEqual(mergeEncounters([' 猫 ', 42, ''], ['猫']), ['猫'])
+  })
+
+  check('mergeLearnerState carries encounters as a union slice', () => {
+    const merged = mergeLearnerState(
+      { encounters: ['猫'] },
+      { encounters: ['犬', '猫'] },
+    )
+    assert.deepEqual(merged.encounters, ['猫', '犬'])
+    assert.deepEqual(mergeLearnerState({}, {}).encounters, [])
+  })
+}
+
 console.log(`\nphase2: ${passed} checks passed (incl. scheduler-auth)`)
