@@ -64,6 +64,15 @@ check('newer diagnosis wins, missing slices are filled', () => {
   assert.equal(merged.diagnosis.total, 110)
   assert.ok(merged.promise)
 })
+check('declaredLevel merges like the other documents — newer declaration wins, missing is filled', () => {
+  const merged = mergeLearnerState(
+    { declaredLevel: { band: 'N7', at: '2026-11-07T01:00:00Z' } },
+    { declaredLevel: { band: 'N2', at: '2026-11-06T01:00:00Z' } },
+  )
+  assert.equal(merged.declaredLevel.band, 'N7') // the newer tap survives the round trip
+  const filled = mergeLearnerState({}, { declaredLevel: { band: 'N4', at: '2026-11-06T01:00:00Z' } })
+  assert.equal(filled.declaredLevel.band, 'N4')
+})
 check('history unions by timestamp', () => {
   const merged = mergeDiagnosisHistory([{ at: '2026-11-01' }, { at: '2026-11-03' }], [{ at: '2026-11-02' }, { at: '2026-11-03' }])
   assert.equal(merged.length, 3)

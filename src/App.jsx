@@ -35,6 +35,7 @@ import {
   Stethoscope,
   Pickaxe,
   Phone,
+  Repeat,
   Users,
   Mail,
 } from 'lucide-react'
@@ -75,6 +76,7 @@ const Mining = lazy(() => import('./components/Mining.jsx'))
 const OneSession = lazy(() => import('./components/OneSession.jsx'))
 const SenseiCall = lazy(() => import('./components/SenseiCall.jsx'))
 const TwinView = lazy(() => import('./components/TwinView.jsx'))
+const GrowthLoop = lazy(() => import('./components/GrowthLoop.jsx'))
 const Reader = lazy(() => import('./components/Reader.jsx'))
 const CoachLetter = lazy(() => import('./components/CoachLetter.jsx'))
 const PrivacyPolicy = lazy(() => import('./components/PrivacyPolicy.jsx'))
@@ -101,6 +103,7 @@ const nav = [
   { id: 'sensei', label: 'Yobidashi', short: 'Yobidashi', icon: Phone , group: 'fleet' },
   { id: 'diagnosis', label: 'Diagnosis', icon: Stethoscope , group: 'fleet' },
   { id: 'twin', label: 'Your Fleet', short: 'Fleet', icon: Users , group: 'fleet' },
+  { id: 'loop', label: 'The Loop', short: 'Loop', icon: Repeat , group: 'fleet' },
   { id: 'coach', label: 'Coach Letter', short: 'Letter', icon: Mail , group: 'fleet' },
   { id: 'mine', label: 'Mine Your Japanese', icon: Pickaxe , group: 'library' },
   { id: 'lessons', label: 'Memory Lessons', icon: BookOpen , group: 'library' },
@@ -1675,6 +1678,7 @@ function App() {
     sensei: <SenseiCall />,
     diagnosis: <Diagnosis setActive={setActive} />,
     twin: <TwinView setActive={setActive} />,
+    loop: <GrowthLoop setActive={setActive} />,
     privacy: <PrivacyPolicy setActive={setActive} />,
     terms: <Terms setActive={setActive} />,
     coach: <CoachLetter />,

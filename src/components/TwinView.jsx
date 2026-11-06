@@ -17,7 +17,8 @@ import { getStateSyncState, subscribeStateSync } from '../lib/stateSync.js'
 import { validateExport, planRestore } from '../lib/restore.js'
 import { loadMetrics, summariseMetrics } from '../lib/metrics.js'
 import { estimateWorkingLevel } from '../lib/twinEstimate.js'
-import { collectLearnerState } from '../lib/learnerState.js'
+import { collectLearnerState, loadDeclaredLevel, saveDeclaredLevel } from '../lib/learnerState.js'
+import { resolveLevelBasis } from '../lib/levelBasis.js'
 import FeedbackBox from './FeedbackBox.jsx'
 import { Upload } from 'lucide-react'
 
@@ -222,6 +223,108 @@ function WorkingLevelCard({ user }) {
   )
 }
 
+// Your Level (2026-11-07): the level question gets a home in the app.
+// Until now the one-tap declaration existed only in Telegram (Doc 16
+// §5 amendment #3). This card asks the same question here and writes
+// the SAME contract the bot reads — state.declaredLevel = { band, at }
+// via learnerState.saveDeclaredLevel — resolved by lib/levelBasis.js:
+// diagnosis > declaration > none, 'N7' floored to N5 with foundations
+// pace while it is the winning basis. "Not Sure" records nothing and
+// points at the checkup, the real answer.
+function YourLevelCard({ setActive }) {
+  const [declared, setDeclared] = useState(() => loadDeclaredLevel())
+  const [justPicked, setJustPicked] = useState(null)
+  const [notSure, setNotSure] = useState(false)
+  const state = collectLearnerState()
+  const diagnosisBand = typeof state.diagnosis?.jlptEstimate === 'string' ? state.diagnosis.jlptEstimate : null
+  const basis = resolveLevelBasis({ diagnosisBand, declaredLevel: declared })
+  const declaredDisplay = basis.rawBand === 'N7' ? 'N7+ 😂' : basis.rawBand
+
+  const pick = (band) => {
+    setDeclared(saveDeclaredLevel(band))
+    setJustPicked(band)
+    setNotSure(false)
+  }
+  const pickNotSure = () => { setNotSure(true); setJustPicked(null) }
+
+  const bandButton = (band, label) => {
+    const active = declared?.band === band
+    return (
+      <button
+        key={band}
+        onClick={() => pick(band)}
+        aria-pressed={active}
+        className={`px-3.5 py-2 rounded-xl text-sm font-semibold border transition-colors ${active
+          ? 'bg-[#FF6B57]/15 border-[#FF6B57] text-white'
+          : 'bg-bun-700 hover:bg-bun-600 border-white/10 text-slate-200'}`}
+      >
+        {label}
+      </button>
+    )
+  }
+
+  return (
+    <Section title="Your Level" hint="The level your fleet aims at. A checkup measures it; a tap just declares it — and you can change your mind any time.">
+      {basis.source === 'diagnosis' && (
+        <div className="space-y-1">
+          <p className="text-3xl font-bold text-white">{basis.band}</p>
+          <p className="text-sm text-slate-300">From your checkup — it measured you, so it stays in charge.</p>
+          <p className="text-sm text-slate-400">Your checkup outranks a tap — it measured, this guesses. You can still declare below; it just stays second.</p>
+          {declared && <p className="text-xs text-slate-500">On record from your tap: {declaredDisplay}.</p>}
+        </div>
+      )}
+      {basis.source === 'declared' && basis.rawBand === 'N7' && (
+        <div className="space-y-1">
+          <p className="text-3xl font-bold text-white">N7+ 😂</p>
+          <p className="text-sm text-slate-300">You told us — and we heard the real message underneath the joke: start me gently.</p>
+          <p className="text-sm text-slate-300"><span className="text-[#FF8A75] font-medium">Foundations pace:</span> we start from the bases and climb slower — more comfortable reads before anything steps up.</p>
+        </div>
+      )}
+      {basis.source === 'declared' && basis.rawBand !== 'N7' && (
+        <div className="space-y-1">
+          <p className="text-3xl font-bold text-white">{basis.band}</p>
+          <p className="text-sm text-slate-300">You told us: {declaredDisplay}. No checkup yet, so your fleet aims at your word until a checkup measures the real thing.</p>
+        </div>
+      )}
+      {basis.source === 'none' && (
+        <div className="space-y-1">
+          <p className="text-xl font-bold text-white">Not set yet</p>
+          <p className="text-sm text-slate-300">Tell us where you think you are, and your fleet has a level to aim at from day one.</p>
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        {['N5', 'N4', 'N3', 'N2', 'N1'].map((b) => bandButton(b, b))}
+        {bandButton('N7', 'N7+ 😂')}
+        <button
+          onClick={pickNotSure}
+          className="px-3.5 py-2 rounded-xl text-sm font-medium border border-white/10 bg-transparent hover:bg-white/5 text-slate-300 transition-colors"
+        >
+          Not Sure
+        </button>
+      </div>
+
+      {justPicked === 'N7' && (
+        <p className="text-sm text-[#FF8A75]">N7+ — the legendary level. Below the test, above giving up. We start at the very beginning.</p>
+      )}
+      {justPicked && justPicked !== 'N7' && (
+        <p className="text-sm text-[#FF8A75]">{basis.source === 'diagnosis'
+          ? `Noted — ${justPicked} is on record. Your checkup still leads.`
+          : `Got it — ${justPicked} it is. Your fleet aims there now.`}</p>
+      )}
+      {notSure && (
+        <div className="space-y-2">
+          <p className="text-sm text-slate-300">Fair enough — guessing helps nobody. The checkup is the real answer.</p>
+          <button onClick={() => setActive?.('diagnosis')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium inline-flex items-center gap-1">
+            Take The Checkup <ChevronRight size={14} />
+          </button>
+        </div>
+      )}
+      <p className="text-xs text-slate-500">One declaration, everywhere — this is the same level your Reader on Telegram reads.</p>
+    </Section>
+  )
+}
+
 function Section({ title, children, hint }) {
   return (
     <section className="rounded-2xl glass p-5 card-glow space-y-3">
@@ -342,6 +445,21 @@ export default function TwinView({ setActive }) {
               : 'on this device — sync will retry'}</p>
       </div>
 
+      {/* The Loop entry (Doc 05 §11): the fleet-togetherness view. The
+          line-up below says WHO the fleet is; the Loop shows them
+          WORKING — one cycle around the Twin, with live numbers. */}
+      <button
+        onClick={() => setActive?.('loop')}
+        className="w-full text-left rounded-2xl glass p-5 card-glow flex items-center gap-4 hover:bg-white/[0.04] transition-colors"
+      >
+        <Mascot agent="michi" size={46} showName={false} motion="none" />
+        <span className="flex-1 min-w-0">
+          <span className="block text-base font-semibold text-white">See How Your Fleet Works Together</span>
+          <span className="block text-sm text-slate-400 mt-0.5">The Loop — six agents handing work to each other around your Twin, with your real numbers on every handoff.</span>
+        </span>
+        <ChevronRight size={18} className="text-slate-400 shrink-0" />
+      </button>
+
       {/* Fleet line-up (Doc 06 §3: the line-up belongs here and on the letter) */}
       <section className="rounded-2xl glass p-5 card-glow">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
@@ -383,6 +501,8 @@ export default function TwinView({ setActive }) {
         </div>
         {deltas && <p className="text-xs text-slate-500">Latest movement between checks: total {deltas.total > 0 ? `+${deltas.total}` : deltas.total} — the full trend lives in Diagnosis and in Michi’s letters.</p>}
       </Section>
+
+      <YourLevelCard setActive={setActive} />
 
       <WorkingLevelCard user={user} />
 

@@ -86,7 +86,9 @@ export function mergeDiagnosisHistory(localHist, otherHist) {
 
 /**
  * Merge two learner-state documents ({ queue, profile, diagnosis,
- * diagnosisHistory, promise }). Returns a new document; inputs untouched.
+ * diagnosisHistory, promise, declaredLevel }). Returns a new document;
+ * inputs untouched. declaredLevel is a single document like the
+ * others — the newer declaration (its `at`) wins whole.
  */
 export function mergeLearnerState(local, other) {
   const L = local || {}
@@ -97,6 +99,7 @@ export function mergeLearnerState(local, other) {
     diagnosis: pickDoc(L.diagnosis, O.diagnosis, (d) => d.at),
     diagnosisHistory: mergeDiagnosisHistory(L.diagnosisHistory, O.diagnosisHistory),
     promise: pickDoc(L.promise, O.promise, (d) => d.at),
+    declaredLevel: pickDoc(L.declaredLevel, O.declaredLevel, (d) => d.at),
   }
 }
 

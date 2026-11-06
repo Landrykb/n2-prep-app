@@ -194,4 +194,124 @@ check('confidence grows with independent evidence volume', () => {
   const mid = est.estimateWorkingLevel({ diagnosisBand: 'N3', declaredBand: 'N3', lastGoodStep: 0 })
   assert.equal(mid.confidence, 'medium') // diagnosis 2 + reader 1 = 3 points
 })
+// ---------------------------------------------------------------
+// The Loop stats (src/lib/loopStats.js): every number the fleet
+// loop surface shows must trace to a real Twin field or a real
+// metrics event. Empty in → nulls out (never a flattering zero);
+// Tsuku has no local source and must stay null forever.
+const loop = await import('../src/lib/loopStats.js')
+
+const emptyTwin = {
+  sections: {}, speaking: { attempts: 0, masteredScenes: 0 },
+  fingerprint: {}, vocab: { queueTotal: 0, graduated: 0, fresh: 0, bySource: {} },
+  rhythm: { callsKept: 0, callsMissed: 0, sessionLog: [] }, mode: 'cruise',
+}
+const DAY = 24 * 60 * 60 * 1000
+const NOW = new Date('2026-11-07T12:00:00Z')
+
+check('loop: a fresh twin yields no stats, only the mode line', () => {
+  const s = loop.agentLoopStats({ twin: emptyTwin })
+  assert.equal(s.michi.stat, null)
+  assert.equal(s.michi.detail, 'Mode: Cruise')
+  assert.equal(s.saki.stat, null)
+  assert.equal(s.koe.stat, null)
+  assert.equal(s.nao.stat, null)
+  assert.equal(s.hori.stat, null)
+  assert.equal(s.tsuku.stat, null)
+  assert.deepEqual(loop.loopCentre(emptyTwin), { queueTotal: 0, graduated: 0, fresh: 0 })
+  assert.equal(loop.weekStrip([], NOW).hasData, false)
+})
+check('loop: koe prefers kept calls, falls back to speaking attempts', () => {
+  const withCalls = loop.agentLoopStats({ twin: { ...emptyTwin, rhythm: { callsKept: 3 }, speaking: { attempts: 9, masteredScenes: 2 } } })
+  assert.equal(withCalls.koe.stat, '3 calls taken')
+  assert.equal(withCalls.koe.detail, '2 scenes mastered in Voice Loop')
+  const attemptsOnly = loop.agentLoopStats({ twin: { ...emptyTwin, speaking: { attempts: 1 } } })
+  assert.equal(attemptsOnly.koe.stat, '1 speaking attempt')
+})
+check('loop: nao sums the fingerprint and names the top pattern', () => {
+  const twin = { ...emptyTwin, fingerprint: { a: { count: 2 }, b: { count: 5 }, c: {} } }
+  const s = loop.agentLoopStats({ twin, topPattern: { label: 'を vs に' } })
+  assert.equal(s.nao.stat, '7 slips spotted')
+  assert.equal(s.nao.detail, 'Your current one fix: を vs に')
+})
+check('loop: hori counts reader + mining queue items, with the split', () => {
+  const twin = { ...emptyTwin, vocab: { queueTotal: 12, graduated: 3, fresh: 4, bySource: { reader: 4, mining: 6, manual: 2 } } }
+  const s = loop.agentLoopStats({ twin })
+  assert.equal(s.hori.stat, '10 words mined into your queue')
+  assert.equal(s.hori.detail, '4 from the Reader · 6 from your documents')
+  assert.deepEqual(loop.loopCentre(twin), { queueTotal: 12, graduated: 3, fresh: 4 })
+})
+check('loop: saki reads only a SAVED tomorrow plan', () => {
+  const s = loop.agentLoopStats({ twin: emptyTwin, tomorrowPlan: { minutes: 12, note: 'Hospital scene — 8 cards.' } })
+  assert.equal(s.saki.stat, '~12 min planned for tomorrow')
+  assert.equal(s.saki.detail, 'Hospital scene — 8 cards.')
+})
+check('loop: michi counts real checkups and carries mode + estimate', () => {
+  const metrics = [
+    { type: 'diagnosis_completed', at: NOW.toISOString() },
+    { type: 'diagnosis_completed', at: NOW.toISOString() },
+    { type: 'session_completed', at: NOW.toISOString(), minutes: 9, proof: 1 },
+  ]
+  const s = loop.agentLoopStats({ twin: { ...emptyTwin, mode: 'badweek' }, metrics, workingLevel: { band: 'N3' } })
+  assert.equal(s.michi.stat, '2 checkups read')
+  assert.equal(s.michi.detail, 'Mode: Bad Week · working level N3 (an estimate, from your activity)')
+})
+check('loop: week strip counts only the last 7 days, tiles capped at 3', () => {
+  const metrics = [
+    { type: 'session_completed', at: new Date(NOW - 1 * DAY).toISOString(), minutes: 20, proof: 2 },
+    { type: 'session_completed', at: new Date(NOW - 8 * DAY).toISOString(), minutes: 99, proof: 9 }, // too old — excluded
+    { type: 'word_mined', at: new Date(NOW - 2 * DAY).toISOString(), count: 5 },
+    { type: 'word_mined', at: new Date(NOW - 2 * DAY).toISOString() }, // no count → 1
+    { type: 'call_outcome', at: new Date(NOW - 3 * DAY).toISOString(), outcome: 'kept' },
+    { type: 'call_outcome', at: new Date(NOW - 3 * DAY).toISOString(), outcome: 'missed' },
+  ]
+  const w = loop.weekStrip(metrics, NOW)
+  assert.equal(w.hasData, true)
+  assert.deepEqual(w.sums, { proof: 2, minutes: 20, mined: 6, calls: 1 })
+  assert.deepEqual(w.tiles.map((t) => t.id), ['proof', 'minutes', 'mined']) // priority order, cap 3
+})
+check('loop: week strip ignores events with no usable timestamp', () => {
+  const w = loop.weekStrip([{ type: 'session_completed', minutes: 5, proof: 1 }], NOW)
+  assert.equal(w.hasData, false)
+})
+
+// ---------------------------------------------------------------
+// Level basis (src/lib/levelBasis.js): the shared contract behind
+// the TwinView "Your Level" card and the Telegram one-tap question.
+// Precedence: diagnosis > declaration > none. 'N7' floors to N5 and,
+// while it is the winning basis, puts the learner on foundations
+// pace; a diagnosis outranks the tap entirely, pace included.
+const basis = await import('../src/lib/levelBasis.js')
+
+check('basis: nothing anywhere → none, standard pace', () => {
+  assert.deepEqual(basis.resolveLevelBasis({}), { band: null, source: 'none', rawBand: null, pace: 'standard' })
+  assert.deepEqual(basis.resolveLevelBasis({ declaredLevel: { band: 'N9', at: '2026-11-07T00:00:00Z' } }).source, 'none')
+})
+check('basis: a plain declaration wins when there is no diagnosis', () => {
+  const r = basis.resolveLevelBasis({ declaredLevel: { band: 'N2', at: '2026-11-07T00:00:00Z' } })
+  assert.deepEqual(r, { band: 'N2', source: 'declared', rawBand: 'N2', pace: 'standard' })
+})
+check('basis: N7 floors to N5 and switches pace to foundations', () => {
+  const r = basis.resolveLevelBasis({ declaredLevel: { band: 'N7', at: '2026-11-07T00:00:00Z' } })
+  assert.equal(r.band, 'N5') // consumed at the floor…
+  assert.equal(r.rawBand, 'N7') // …but displayed as declared
+  assert.equal(r.source, 'declared')
+  assert.equal(r.pace, 'foundations')
+  assert.equal(basis.normalizeBand('N7'), 'N5')
+  assert.equal(basis.normalizeBand('n3'), 'N3')
+  assert.equal(basis.normalizeBand('N0'), null)
+})
+check('basis: a diagnosis outranks any tap — even an N7 one', () => {
+  const r = basis.resolveLevelBasis({
+    diagnosisBand: 'N3',
+    declaredLevel: { band: 'N7', at: '2026-11-07T00:00:00Z' },
+  })
+  assert.deepEqual(r, { band: 'N3', source: 'diagnosis', rawBand: 'N3', pace: 'standard' })
+})
+check('basis: a junk diagnosis falls through to the declaration', () => {
+  const r = basis.resolveLevelBasis({ diagnosisBand: 'expert', declaredLevel: { band: 'N4', at: '2026-11-07T00:00:00Z' } })
+  assert.equal(r.source, 'declared')
+  assert.equal(r.band, 'N4')
+})
+
 console.log(`\nphase2: ${passed} checks passed (incl. scheduler-auth)`)
