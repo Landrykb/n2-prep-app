@@ -932,4 +932,67 @@ check('firstMissedCandidate: the headword counts — voicing the dictionary form
   assert.equal(aloud.firstMissedCandidate(null, '猫'), null)
 })
 
+// ---------- server scoring twin (Doc 16 §5 amendment #6) ----------
+// The Telegram surface scores too, now: the voice note is
+// transcribed by Groq's Whisper and judged by score.ts, the server
+// port of readAloud.js. One ruler for the proof-of-reading on both
+// surfaces — the twins must agree on every fixture, exactly like
+// the fit.ts / readerFit.js parity above.
+
+const scorePort = await import('../supabase/functions/reader-bot/score.ts')
+
+check('score twin: the pass line is the same 0.7 on both surfaces', () => {
+  assert.equal(scorePort.READ_ALOUD_PASS_SCORE, aloud.READ_ALOUD_PASS_SCORE)
+  assert.equal(scorePort.READ_ALOUD_PASS_SCORE, 0.7)
+})
+
+check('score twin: normalisation agrees with the web module', () => {
+  const samples = ['猫は、ご飯を 食べる。', '「明日」は ９時！', 'ｶﾀｶﾅ', '', null, undefined, '、。！？', '３つの駅']
+  for (const s of samples) {
+    assert.equal(scorePort.normalizeSpeechText(s), aloud.normalizeSpeechText(s))
+  }
+})
+
+check('score twin: coverage scores agree across shared fixtures', () => {
+  const fixtures = [
+    ['猫はご飯を食べる。', '猫はご飯を食べる'],
+    ['猫はご飯を食べる。', '猫は、えーと、猫はご飯を食べる'],
+    ['猫はご飯を食べる', '猫はご飯'],
+    ['猫はご飯を食べる', '食べる'],
+    ['猫はご飯を食べる', '犬は水を飲む'],
+    ['今日は天気がいいので、駅まで歩いて行きます。', '今日天気いいので駅まで歩いて行きます'],
+    ['猫はご飯を食べる', ''],
+    ['', '猫'],
+    [null, null],
+  ]
+  for (const [text, heard] of fixtures) {
+    assert.deepEqual(scorePort.scoreReadAloud(text, heard), aloud.scoreReadAloud(text, heard))
+  }
+})
+
+check('score twin: an honest Telegram read passes; a partial one does not', () => {
+  const text = '今日は天気がいいので、駅まで歩いて行きます。'
+  const honest = scorePort.scoreReadAloud(text, '今日天気いいので駅まで歩いて行きます').score
+  assert.ok(honest >= scorePort.READ_ALOUD_PASS_SCORE, `honest read ${honest} must pass`)
+  const partial = scorePort.scoreReadAloud(text, '今日は天気がいい').score
+  assert.ok(partial < scorePort.READ_ALOUD_PASS_SCORE, `partial read ${partial} must not pass`)
+})
+
+check('score twin: firstMissedCandidate agrees — same fix, same order', () => {
+  const cands = [
+    { word: 'ご飯', h: 'ご飯', reading: 'ごはん', meaning: 'cooked rice; a meal' },
+    { word: '散歩', h: '散歩', reading: 'さんぽ', meaning: 'a walk' },
+    { word: '天気', h: '天気', reading: 'てんき', meaning: 'weather' },
+  ]
+  const heard = ['猫はご飯を食べる', 'ご飯と散歩と天気', '', '天気と散歩とご飯']
+  for (const h of heard) {
+    assert.deepEqual(scorePort.firstMissedCandidate(cands, h), aloud.firstMissedCandidate(cands, h))
+  }
+  const move = [{ word: '引っ越し', h: '引っ越す', reading: 'ひっこし', meaning: 'moving house' }]
+  assert.equal(scorePort.firstMissedCandidate(move, '来月引っ越す予定です'), null) // headword voiced
+  assert.equal(scorePort.firstMissedCandidate(move, '来月旅行します'), move[0])
+  assert.equal(scorePort.firstMissedCandidate(null, '猫'), null)
+  assert.equal(scorePort.firstMissedCandidate(cands, ''), null)
+})
+
 console.log(`reader: ${passed} checks passed`)

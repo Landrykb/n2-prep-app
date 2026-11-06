@@ -5,6 +5,7 @@ import { DECK_LEVELS } from './deck.ts'
 import { DECK_GLOSS } from './gloss.ts'
 import { segmentText } from './segment.ts'
 import { synthesizeSpeechOgg } from './voice.ts'
+import { READ_ALOUD_PASS_SCORE, firstMissedCandidate, scoreReadAloud } from './score.ts'
 
 // Yonde Reader bot (Doc 16 §6/§7 R0, Doc 12 step 3.6).
 //
@@ -62,16 +63,28 @@ import { synthesizeSpeechOgg } from './voice.ts'
 //   last resort. Register difficulty is a KNOWN GATE LIMIT (§9);
 //   the Too Hard tap is today's corrective for it.
 // · VOICE OUT: every passage send is followed by the passage as a
-//   Telegram voice note (voice.ts, Edge TTS ja-JP-NanamiNeural —
-//   free; the file_id is cached on the passage row, migration
-//   00014). Text first, voice second; voice never blocks text.
-// · VOICE IN (R2 v1): a voice note from a linked learner is the
-//   read-aloud PROOF: plausible duration (voiceReadWindow in the
-//   twins) counts as that passage's comfy 'read' through the same
-//   applyFeedback + dedupe the tap uses, and logs shadow_attempted.
-//   NO transcription and NO score claim in v1 — the copy says so;
-//   the STT slot is marked where a keyed transcription call plugs
-//   in later (env READER_STT_API_KEY, not built).
+//   Telegram voice note (the file_id is cached on the passage row,
+//   migration 00014). Text first, voice second; voice never blocks
+//   text. The synthesis SEAT moved with amendment #6 (below): Edge
+//   TTS refuses this function's datacenter egress, so an uncached
+//   passage falls through a direct Edge attempt to a voice_jobs
+//   row (migration 00016) for the VM Voice Worker to synthesize.
+// · VOICE IN (R2): a voice note from a linked learner is the
+//   read-aloud PROOF. With READER_STT_API_KEY set (amendment #6),
+//   the note is transcribed by Groq's Whisper and SCORED in code
+//   (score.ts — the readAloud twin): at/above 0.7 it counts as
+//   that passage's comfy 'read' through the same applyFeedback +
+//   dedupe the tap uses, and the reply carries the honest
+//   reading-match line plus Nao's one fix. Without the key — or
+//   on any transcription failure — the v1 duration proof
+//   (voiceReadWindow plausibility) is the fallback, byte-for-byte
+//   the v1 behaviour: no transcript, no score claim.
+// · VOICE WORKER (amendment #6, 2026-11-07): the ?voicejob=<id>
+//   route (x-cron-secret, the dispatch pattern) delivers
+//   worker-made audio — download from the voice-cache bucket,
+//   sendVoice, cache the file_id on the passage, mark the job
+//   sent. The dispatch route sweeps done-but-unsent jobs as the
+//   backstop, so a missed poke delays a voice note, never loses it.
 // · MORNING DISPATCH (R1): POST ?dispatch=1, authorised by the
 //   x-cron-secret header vs READER_CRON_SECRET (pg_cron fires it,
 //   like yonde-call-scheduler), serves due learners their morning
@@ -91,7 +104,10 @@ import { synthesizeSpeechOgg } from './voice.ts'
 // R0.5 adds: OPENROUTER_API_KEY (the chat function's project secret,
 // reused under the same name) and optional READER_MODEL (default
 // 'openrouter/free' — Doc 03 Tier C standing rule). Dispatch adds
-// READER_CRON_SECRET (the pg_cron job's shared secret).
+// READER_CRON_SECRET (the pg_cron job's shared secret, which also
+// authorises the ?voicejob route). Amendment #6 adds optional
+// READER_STT_API_KEY (Groq — the voice-in transcription key;
+// absent = the duration proof only, exactly the v1 behaviour).
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -401,14 +417,21 @@ serve(async (req: Request) => {
     // runtime key, so it could never be used — a dead door is attack
     // surface, and it was removed 2026-11-06 (Doc 16).
 
-    // ---------- morning dispatch route (R1) ----------
-    // Checked BEFORE the webhook route: the pg_cron caller carries
-    // no Telegram secret, only x-cron-secret vs READER_CRON_SECRET.
-    // Fail closed: no env secret set, no dispatch — ever. The
-    // actual serving happens in handleDispatch, once the shared
-    // helpers below exist; this branch only authorises and flags.
+    // ---------- cron routes: morning dispatch (R1) + voice jobs ----------
+    // Checked BEFORE the webhook route: cron callers carry no
+    // Telegram secret, only x-cron-secret vs READER_CRON_SECRET.
+    // Fail closed: no env secret set, no service — ever. Two flags:
+    //   ?dispatch=1     — the morning run (pg_cron, R1);
+    //   ?voicejob=<id>  — the Voice Worker's completion poke
+    //     (voice-queue fires it the moment a job's audio lands;
+    //     amendment #6).
+    // The actual serving happens in handleDispatch / handleVoiceJob
+    // once the shared helpers below exist; this branch only
+    // authorises and flags.
+    const routeParams = new URL(req.url).searchParams
     let dispatchMode = false
-    if (new URL(req.url).searchParams.get('dispatch') === '1') {
+    let voiceJobId: string | null = null
+    if (routeParams.get('dispatch') === '1' || routeParams.get('voicejob')) {
       const cronSecret = Deno.env.get('READER_CRON_SECRET') ?? ''
       const providedCron = req.headers.get('x-cron-secret') ?? ''
       if (!cronSecret || !providedCron || providedCron !== cronSecret) {
@@ -418,7 +441,8 @@ serve(async (req: Request) => {
         console.error('reader-bot: READER_BOT_TOKEN is not set')
         return json({ error: 'Bot is not configured' }, 500)
       }
-      dispatchMode = true
+      if (routeParams.get('dispatch') === '1') dispatchMode = true
+      else voiceJobId = routeParams.get('voicejob')
     } else {
       // ---------- webhook route ----------
       // Fail closed: no configured secret, no service.
@@ -431,8 +455,8 @@ serve(async (req: Request) => {
       }
     }
 
-    const update = dispatchMode ? null : await req.json().catch(() => null)
-    if (!dispatchMode && !update) return json({ ok: true })
+    const update = (dispatchMode || voiceJobId) ? null : await req.json().catch(() => null)
+    if (!dispatchMode && !voiceJobId && !update) return json({ ok: true })
 
     const supabaseAdmin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
 
@@ -567,9 +591,45 @@ serve(async (req: Request) => {
     // Telegram voice note (Doc 16, 2026-11-06 late). Cached rows
     // (voice_file_id, migration 00014) resend by file_id — free and
     // instant. A fresh synthesis uploads once and the file_id is
-    // stored back (best-effort). ANY failure along the way is a
-    // console line, never a user-facing error: voice enhances the
-    // passage; the text is the passage.
+    // stored back (best-effort).
+    //
+    // Amendment #6 (2026-11-07): Edge TTS refuses THIS function's
+    // datacenter egress (the same block the `tts` function hit —
+    // Doc 17), so the direct synthesis below is a lottery ticket,
+    // not a route. When it produces nothing, the passage is queued
+    // for the VM Voice Worker instead (voice_jobs, migration
+    // 00016): the worker synthesizes from an egress Microsoft
+    // answers, voice-queue stores the audio in the voice-cache
+    // bucket, and the ?voicejob route delivers it moments later.
+    // ANY failure along the way is a console line, never a
+    // user-facing error: voice enhances the passage; the text is
+    // the passage.
+    const enqueueVoiceJob = async (chatId: number, passage: Record<string, unknown>) => {
+      try {
+        const passageId = String(passage.id ?? '')
+        const text = String(passage.text ?? '')
+        if (!passageId || !text) return
+        // One live job per passage is enough: a pending/claimed job
+        // will produce the audio, and a done one is awaiting (or
+        // retrying) delivery through the dispatch sweep. A failed
+        // job does NOT block a fresh enqueue — the next send of
+        // this passage retries the worker.
+        const { data: live } = await supabaseAdmin
+          .from('voice_jobs')
+          .select('id')
+          .eq('passage_id', passageId)
+          .in('status', ['pending', 'claimed', 'done'])
+          .limit(1)
+        if (live && live.length > 0) return
+        const { error } = await supabaseAdmin
+          .from('voice_jobs')
+          .insert({ passage_id: passageId, chat_id: chatId, text })
+        if (error) console.error('reader-bot: voice job enqueue failed')
+      } catch (err) {
+        console.error('reader-bot: voice job enqueue failed', err)
+      }
+    }
+
     const sendPassageVoice = async (chatId: number, passage: Record<string, unknown>) => {
       try {
         const cached = typeof passage.voice_file_id === 'string' ? passage.voice_file_id : ''
@@ -578,26 +638,31 @@ serve(async (req: Request) => {
           return
         }
         const bytes = await synthesizeSpeechOgg(String(passage.text ?? ''))
-        if (!bytes) return
-        const form = new FormData()
-        form.append('chat_id', String(chatId))
-        form.append('voice', new Blob([bytes], { type: 'audio/ogg' }), 'passage.ogg')
-        const res = await fetch(`https://api.telegram.org/bot${botToken}/sendVoice`, {
-          method: 'POST',
-          body: form,
-        })
-        const body = await res.json().catch(() => null)
-        const fileId = body?.result?.voice?.file_id
-        if (!body?.ok || typeof fileId !== 'string') {
+        if (bytes) {
+          const form = new FormData()
+          form.append('chat_id', String(chatId))
+          form.append('voice', new Blob([bytes], { type: 'audio/ogg' }), 'passage.ogg')
+          const res = await fetch(`https://api.telegram.org/bot${botToken}/sendVoice`, {
+            method: 'POST',
+            body: form,
+          })
+          const body = await res.json().catch(() => null)
+          const fileId = body?.result?.voice?.file_id
+          if (body?.ok && typeof fileId === 'string') {
+            passage.voice_file_id = fileId // in case this row sends again in-process
+            const { error } = await supabaseAdmin
+              .from('reading_passages')
+              .update({ voice_file_id: fileId })
+              .eq('id', String(passage.id))
+            if (error) console.error('reader-bot: voice_file_id cache write failed')
+            return
+          }
           console.error(`reader-bot: sendVoice upload failed status=${res.status}`)
-          return
         }
-        passage.voice_file_id = fileId // in case this row sends again in-process
-        const { error } = await supabaseAdmin
-          .from('reading_passages')
-          .update({ voice_file_id: fileId })
-          .eq('id', String(passage.id))
-        if (error) console.error('reader-bot: voice_file_id cache write failed')
+        // No voice from this egress — hand the passage to the VM
+        // Voice Worker. Its delivery arrives as its own message
+        // through the ?voicejob route (or the dispatch sweep).
+        await enqueueVoiceJob(chatId, passage)
       } catch (err) {
         console.error('reader-bot: passage voice send failed', err)
       }
@@ -1204,27 +1269,155 @@ serve(async (req: Request) => {
       }
     }
 
-    // ---------- voice in: the read-aloud proof (R2 v1) ----------
+    // ---------- voice in: the read-aloud proof (R2) ----------
     // A voice note from a linked learner is a READ, performed out
     // loud — the receipt the feedback taps cannot be (Doc 16, 2026-
-    // 11-06 late). v1 measures DURATION only (Telegram puts it in
-    // the update; the audio file is never downloaded): a duration
-    // inside voiceReadWindow's plausible window for the current
-    // passage counts as that passage's comfy 'read', through the
-    // SAME applyFeedback transition and the SAME hasFeedbackFor
-    // dedupe as the Read It ✓ tap — a passage is proven once, by
-    // voice or by tap, never twice. Every attempt logs
-    // shadow_attempted { passageId, durationSec, expectedSec,
-    // plausible } — the event name predates the STT decision
-    // (00009 admitted it); shadow_scored stays unwritten until
-    // transcription exists to score WITH.
-    //
-    // STT slot: when a transcription key lands (env
-    // READER_STT_API_KEY — not built, no key, no call), the audio
-    // gets downloaded via getFile and transcribed HERE, and Nao's
-    // one-fix scoring joins on the transcript. Until then the bot
-    // says plainly that it heard the reading but cannot score it
-    // word by word yet — no transcript, no score claim, ever.
+    // 11-06 late). Two proofs, one effect:
+    // · SCORED (amendment #6, when READER_STT_API_KEY is set): the
+    //   audio is downloaded via getFile and transcribed by Groq's
+    //   Whisper (tryTranscribeAndScore below); the transcript is
+    //   scored in code (score.ts) and the attempt logs
+    //   shadow_attempted { passageId, score, method:
+    //   'groq-whisper' }. At/above READ_ALOUD_PASS_SCORE the read
+    //   counts, and the reply carries the honest reading-match
+    //   line plus Nao's one fix when a new word was skipped.
+    // · DURATION (v1, the fallback): Telegram puts the duration in
+    //   the update and the audio is never downloaded; a duration
+    //   inside voiceReadWindow's plausible window counts the same
+    //   way and logs shadow_attempted { passageId, durationSec,
+    //   expectedSec, plausible }.
+    // Both count through the SAME applyFeedback transition and the
+    // SAME hasFeedbackFor dedupe as the Read It ✓ tap (shared via
+    // applyVoiceReadEffect) — a passage is proven once, by voice
+    // or by tap, never twice. The scored path is authoritative
+    // when it produces a score; ANY transcription failure falls
+    // back to the duration proof, and without the key the handler
+    // behaves byte-for-byte as v1 did.
+    // The comfy-read effect of a PROVEN voice read — shared by the
+    // duration proof (v1) and the Groq-scored proof (amendment #6):
+    // dedupe against reading_feedback (a passage is proven once,
+    // by voice or by tap, never twice), apply the same
+    // applyFeedback 'read' transition the Read It ✓ tap uses, and
+    // write the resulting fit state back to the link row. Returns
+    // whether the ratchet trialled the learner up a step (callers
+    // say so out loud when it fires).
+    const applyVoiceReadEffect = async (
+      link: { user_id: string; fit_step?: number | null; last_good_step?: number | null; comfy_streak?: number | null },
+      passageId: string,
+      via: string,
+    ): Promise<boolean> => {
+      const { data: priorRows } = await supabaseAdmin
+        .from('metrics_events')
+        .select('payload')
+        .eq('user_id', link.user_id)
+        .eq('type', 'reading_feedback')
+        .order('created_at', { ascending: false })
+        .limit(100)
+      const priorPayloads = (priorRows || []).map((r) => r.payload as Record<string, unknown>)
+      if (hasFeedbackFor(priorPayloads, passageId)) return false
+      const after = applyFeedback(
+        {
+          fit_step: link.fit_step ?? 0,
+          last_good_step: link.last_good_step ?? 0,
+          comfy_streak: link.comfy_streak ?? 0,
+        },
+        'read',
+      )
+      const { error } = await supabaseAdmin
+        .from('telegram_links')
+        .update({
+          fit_step: after.fit_step,
+          last_good_step: after.last_good_step,
+          comfy_streak: after.comfy_streak,
+        })
+        .eq('user_id', link.user_id)
+      if (error) {
+        console.error('reader-bot: voice-read fit state write failed')
+        return false
+      }
+      await logEvent(link.user_id, 'reading_feedback', {
+        kind: 'read',
+        passageId,
+        fitStepAfter: after.fit_step,
+        via,
+      })
+      return after.effect === 'trial_up'
+    }
+
+    // ---------- voice in: Groq transcription (amendment #6) ----------
+    // When READER_STT_API_KEY is set, the learner's voice note is
+    // downloaded from Telegram and transcribed by Groq's
+    // OpenAI-compatible endpoint (whisper-large-v3-turbo; the free
+    // tier's 28,800 audio-seconds/day dwarfs a Reader's ~20-second
+    // notes). The transcript is scored HERE, in code (score.ts) —
+    // the AI is a sense; the verdict is spine, like every Reader
+    // judgement. Returns { score, missed } or null on ANY failure —
+    // no key, no file, HTTP error, timeout, empty transcript — and
+    // null always means the caller runs the v1 duration proof
+    // instead. The transcript itself is never logged or stored;
+    // only the score and the one missed word leave this function.
+    const GROQ_TRANSCRIBE_URL = 'https://api.groq.com/openai/v1/audio/transcriptions'
+    const tryTranscribeAndScore = async (
+      voice: Record<string, unknown>,
+      passage: Record<string, unknown>,
+      link: { user_id: string; declared_band?: string | null },
+    ): Promise<{ score: number; missed: Record<string, unknown> | null } | null> => {
+      const key = Deno.env.get('READER_STT_API_KEY') ?? ''
+      if (!key) return null
+      const fileId = typeof voice.file_id === 'string' ? voice.file_id : ''
+      if (!fileId) return null
+      const ctrl = new AbortController()
+      const timer = setTimeout(() => ctrl.abort(), 45000)
+      try {
+        // Telegram hands out a file path, then serves the bytes.
+        const info = await tg(botToken, 'getFile', { file_id: fileId })
+        const filePath = info?.result?.file_path
+        if (!info?.ok || typeof filePath !== 'string' || !filePath) return null
+        const fileRes = await fetch(`https://api.telegram.org/file/bot${botToken}/${filePath}`, { signal: ctrl.signal })
+        if (!fileRes.ok) return null
+        const audio = await fileRes.arrayBuffer()
+        if (!audio.byteLength || audio.byteLength > 10 * 1024 * 1024) return null
+
+        const form = new FormData()
+        form.append('file', new Blob([audio], { type: 'audio/ogg' }), 'voice.ogg')
+        form.append('model', 'whisper-large-v3-turbo')
+        form.append('language', 'ja')
+        form.append('response_format', 'json')
+        const res = await fetch(GROQ_TRANSCRIBE_URL, {
+          method: 'POST',
+          signal: ctrl.signal,
+          headers: { 'Authorization': `Bearer ${key}` },
+          body: form,
+        })
+        if (!res.ok) {
+          console.error(`reader-bot: groq transcription HTTP ${res.status}`)
+          return null
+        }
+        const data = await res.json().catch(() => null)
+        const transcript = typeof data?.text === 'string' ? data.text.trim() : ''
+        // An empty transcript proves nothing either way (silence,
+        // or a hallucination guard tripping) — fall back to the
+        // duration proof rather than scoring a phantom read.
+        if (!transcript) return null
+
+        const { score } = scoreReadAloud(String(passage.text ?? ''), transcript)
+        // Nao's one fix runs over THIS learner's new words for the
+        // passage — the same list /read bolded: the passage's
+        // candidates minus the learner's known set, in passage
+        // order, checked by surface then headword.
+        const stateRow = await loadState(link.user_id)
+        const sttState = (stateRow?.state ?? {}) as Record<string, unknown>
+        const { known } = knownFor(sttState, link.declared_band ?? null)
+        const newWords = withCandidateLevels(passage).filter((c) => c.word && !known.has(c.h || c.word))
+        const missed = firstMissedCandidate(newWords, transcript) as unknown as Record<string, unknown> | null
+        return { score, missed }
+      } catch {
+        return null
+      } finally {
+        clearTimeout(timer)
+      }
+    }
+
     const handleVoiceNote = async (voiceMsg: Record<string, unknown>) => {
       const vChat = (voiceMsg.chat ?? {}) as Record<string, unknown>
       const vFrom = (voiceMsg.from ?? {}) as Record<string, unknown>
@@ -1259,11 +1452,72 @@ serve(async (req: Request) => {
       }
       const { data: passage } = await supabaseAdmin
         .from('reading_passages')
-        .select('id, text')
+        .select('id, text, tokens, new_word_candidates')
         .eq('id', currentId)
         .maybeSingle()
       if (!passage) {
         await sendMessage(botToken, chatId, '🔍 That passage is no longer on my shelf, so I cannot take your reading of it — send /read and read the new one aloud back to me.')
+        return
+      }
+
+      // ---------- the scored proof (amendment #6) ----------
+      // With a transcription key, the scored proof runs FIRST and
+      // is authoritative when it produces a score: the reply names
+      // the reading match honestly (a match against the text,
+      // never a pronunciation grade — the web Reader's words,
+      // mirrored), at/above the pass line the comfy-read effect
+      // applies, and a skipped new word earns Nao's one fix.
+      // Below the line nothing is marked — reads here only ever
+      // add up, never against the learner. On ANY transcription
+      // failure (or no key) control falls through to the v1
+      // duration proof below, untouched.
+      const scored = await tryTranscribeAndScore(voice, passage as Record<string, unknown>, link)
+      if (scored) {
+        const pct = Math.round(scored.score * 100)
+        await logEvent(link.user_id, 'shadow_attempted', {
+          passageId: currentId,
+          score: Math.round(scored.score * 1000) / 1000,
+          method: 'groq-whisper',
+        })
+        const missedWord = scored.missed ? String(scored.missed.word ?? '') : ''
+        const fixLine = scored.missed && missedWord
+          ? "\n\nNao's one fix — the first new word your voice skipped: " +
+            `<b>${esc(missedWord)}</b>` +
+            (scored.missed.reading && scored.missed.reading !== scored.missed.word
+              ? `（${esc(String(scored.missed.reading))}）`
+              : '') +
+            (scored.missed.meaning ? ` — ${esc(String(scored.missed.meaning))}` : '') +
+            `.\nIt lives in this sentence: 「${esc(sentenceWith(String(passage.text), missedWord))}」 — say that sentence once more, with the word in it.`
+          : ''
+        if (scored.score >= READ_ALOUD_PASS_SCORE) {
+          const trialUpScored = await applyVoiceReadEffect(link, currentId, 'voice')
+          await sendMessage(
+            botToken,
+            chatId,
+            `🔍 Heard you — reading match: ${pct}% of the passage text your voice covered. ` +
+              'That is a match against the text, not a pronunciation grade — and at that level it counts here as a comfortable read, proven out loud.' +
+              fixLine,
+          )
+          if (trialUpScored) {
+            await sendMessage(
+              botToken,
+              chatId,
+              '🔍 Three comfortable reads in a row — that level is properly yours now. ' +
+                'The next passage stretches a little past it; that is the fit hardening, one notch at a time. ' +
+                'If it overshoots, Too Hard brings us straight back.',
+            )
+          }
+        } else {
+          await sendMessage(
+            botToken,
+            chatId,
+            `🔍 Heard you — reading match: ${pct}% of the passage text your voice covered. ` +
+              'That is a match against the text, not a pronunciation grade. ' +
+              'It sits under the line where a read counts as comfortable, so nothing is marked — reads here only ever add up, never against you. ' +
+              'Read it once more when you feel like it, and send it again.' +
+              fixLine,
+          )
+        }
         return
       }
 
@@ -1288,45 +1542,10 @@ serve(async (req: Request) => {
 
       // Plausible: the read counts. If a feedback tap (or an
       // earlier voice read) already proved this passage, the voice
-      // is thanked but never double-counted — dedupe first.
-      const { data: priorRows } = await supabaseAdmin
-        .from('metrics_events')
-        .select('payload')
-        .eq('user_id', link.user_id)
-        .eq('type', 'reading_feedback')
-        .order('created_at', { ascending: false })
-        .limit(100)
-      const priorPayloads = (priorRows || []).map((r) => r.payload as Record<string, unknown>)
-      let trialUp = false
-      if (!hasFeedbackFor(priorPayloads, currentId)) {
-        const after = applyFeedback(
-          {
-            fit_step: link.fit_step ?? 0,
-            last_good_step: link.last_good_step ?? 0,
-            comfy_streak: link.comfy_streak ?? 0,
-          },
-          'read',
-        )
-        const { error } = await supabaseAdmin
-          .from('telegram_links')
-          .update({
-            fit_step: after.fit_step,
-            last_good_step: after.last_good_step,
-            comfy_streak: after.comfy_streak,
-          })
-          .eq('user_id', link.user_id)
-        if (error) {
-          console.error('reader-bot: voice-read fit state write failed')
-        } else {
-          await logEvent(link.user_id, 'reading_feedback', {
-            kind: 'read',
-            passageId: currentId,
-            fitStepAfter: after.fit_step,
-            via: 'voice',
-          })
-          trialUp = after.effect === 'trial_up'
-        }
-      }
+      // is thanked but never double-counted — the shared effect
+      // helper dedupes first, then applies the same transition the
+      // scored path uses.
+      const trialUp = await applyVoiceReadEffect(link, currentId, 'voice')
       await sendMessage(
         botToken,
         chatId,
@@ -1345,6 +1564,72 @@ serve(async (req: Request) => {
       }
     }
 
+    // ---------- voice job delivery (amendment #6) ----------
+    // The worker made the audio; this is the last mile. Download
+    // the ogg from the private voice-cache bucket, sendVoice it to
+    // the job's chat, cache Telegram's file_id on the passage (so
+    // every future send of this passage takes the free file_id
+    // path in sendPassageVoice), and mark the job sent. Used by
+    // the ?voicejob route (the immediate poke from voice-queue)
+    // and by the dispatch sweep (the backstop). Returns whether
+    // the voice was delivered; any failure leaves the job `done`
+    // for the sweep to retry — delayed, never lost.
+    const deliverVoiceJob = async (job: Record<string, unknown>): Promise<boolean> => {
+      try {
+        const storagePath = typeof job.storage_path === 'string' ? job.storage_path : ''
+        const chatId = Number(job.chat_id)
+        if (!storagePath || !Number.isFinite(chatId)) return false
+        const { data: blob, error } = await supabaseAdmin.storage.from('voice-cache').download(storagePath)
+        if (error || !blob) {
+          console.error(`reader-bot: voice job audio download failed job=${String(job.id)}`)
+          return false
+        }
+        const bytes = new Uint8Array(await blob.arrayBuffer())
+        const form = new FormData()
+        form.append('chat_id', String(chatId))
+        form.append('voice', new Blob([bytes], { type: 'audio/ogg' }), 'passage.ogg')
+        const res = await fetch(`https://api.telegram.org/bot${botToken}/sendVoice`, {
+          method: 'POST',
+          body: form,
+        })
+        const body = await res.json().catch(() => null)
+        const fileId = body?.result?.voice?.file_id
+        if (!body?.ok || typeof fileId !== 'string') {
+          console.error(`reader-bot: voice job sendVoice failed status=${res.status} job=${String(job.id)}`)
+          return false
+        }
+        if (typeof job.passage_id === 'string' && job.passage_id) {
+          const { error: cacheError } = await supabaseAdmin
+            .from('reading_passages')
+            .update({ voice_file_id: fileId })
+            .eq('id', job.passage_id)
+          if (cacheError) console.error('reader-bot: voice job file_id cache write failed')
+        }
+        const { error: sentError } = await supabaseAdmin
+          .from('voice_jobs')
+          .update({ status: 'sent', sent_at: new Date().toISOString() })
+          .eq('id', String(job.id))
+          .eq('status', 'done')
+        if (sentError) console.error('reader-bot: voice job sent write failed')
+        return true
+      } catch (err) {
+        console.error('reader-bot: voice job delivery failed', err)
+        return false
+      }
+    }
+
+    const handleVoiceJob = async (jobId: string) => {
+      const { data: job } = await supabaseAdmin
+        .from('voice_jobs')
+        .select('id, passage_id, chat_id, status, storage_path')
+        .eq('id', jobId)
+        .maybeSingle()
+      if (!job) return json({ ok: false, error: 'Job not found' }, 404)
+      if (job.status !== 'done') return json({ ok: true, skipped: String(job.status) })
+      const delivered = await deliverVoiceJob(job as Record<string, unknown>)
+      return json({ ok: delivered })
+    }
+
     // ---------- morning dispatch (R1) ----------
     // Fired by pg_cron (READER_CRON_SECRET header — authorised in
     // the route check above, before the webhook secret is even
@@ -1358,6 +1643,22 @@ serve(async (req: Request) => {
     // stranger into declaring a level (§9); their /read asks the
     // question when THEY come.
     const handleDispatch = async () => {
+      // Voice backstop (amendment #6): any job the worker finished
+      // whose completion poke never landed — or whose delivery
+      // failed — is retried on the cron's regular pass, before the
+      // morning serves. A missed callback can delay a voice note;
+      // it can never lose one. Delivery failures are logged inside
+      // deliverVoiceJob and never break the dispatch itself.
+      const { data: doneJobs } = await supabaseAdmin
+        .from('voice_jobs')
+        .select('id, passage_id, chat_id, status, storage_path')
+        .eq('status', 'done')
+        .order('completed_at', { ascending: true })
+        .limit(25)
+      for (const job of doneJobs ?? []) {
+        await deliverVoiceJob(job as Record<string, unknown>)
+      }
+
       const { data: links, error } = await supabaseAdmin
         .from('telegram_links')
         .select('user_id, chat_id, declared_band, morning_time, tz')
@@ -1444,6 +1745,12 @@ serve(async (req: Request) => {
     // A dispatch call has no Telegram update — serve and return.
     if (dispatchMode) {
       return await handleDispatch()
+    }
+
+    // A voicejob call has no Telegram update either — deliver the
+    // one worker-made voice and return.
+    if (voiceJobId) {
+      return await handleVoiceJob(voiceJobId)
     }
 
     // ---------- update routing ----------

@@ -12,9 +12,12 @@
 // service; Yonde receives only the transcript text, in-page, and
 // keeps only the score.)
 //
-// This module is WEB-ONLY by design: it has no fit.ts twin, because
-// there is no server surface for it to twin with. The scoring is
-// pure text maths over two strings, pinned by tests/reader.test.mjs.
+// The scoring is pure text maths over two strings, pinned by
+// tests/reader.test.mjs. Since Doc 16 §5 amendment #6 it HAS a
+// server twin — supabase/functions/reader-bot/score.ts — because
+// the Telegram surface now scores too (Groq Whisper transcription,
+// server-side). TWIN WARNING: change both files together; the test
+// suite imports both and runs them over shared fixtures.
 //
 // HONESTY: the score is a TEXT MATCH — how much of the passage's
 // characters the learner's voice covered, in order. It is NOT a
