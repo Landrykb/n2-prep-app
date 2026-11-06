@@ -870,6 +870,7 @@ serve(async (req: Request) => {
         return
       }
       await answer(`${choice} — got it.`)
+      await logEvent(link.user_id, 'level_declared', { band: choice })
       // Serve immediately through the normal /read flow: the tap
       // should feel like the passage just arrives. If nothing fits
       // even with the declared credit, the normal nothing-fits copy
