@@ -1,14 +1,17 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { applyFeedback, BANDS, buildKnownSet, capCandidates, countKnownContent, deckCreditSet, evaluateDraft, fitCallback, hasFeedbackFor, isColdStart, nextForbiddenList, parseFitCallback, passageRatio, pickPassage, pickStarter, resolveBand, serveBandFor, shouldAskLevel, shouldGenerate } from './fit.ts'
+import { applyFeedback, BANDS, bandRank, buildKnownSet, capCandidates, countKnownContent, deckCreditSet, evaluateDraft, fitCallback, hasFeedbackFor, isColdStart, isDispatchDue, nextForbiddenList, parseFitCallback, passageRatio, pickPassage, pickStarter, resolveBand, serveBandFor, shouldAskLevel, shouldGenerate, unknownContentHeadwords, voiceReadWindow } from './fit.ts'
 import { DECK_LEVELS } from './deck.ts'
 import { DECK_GLOSS } from './gloss.ts'
 import { segmentText } from './segment.ts'
+import { synthesizeSpeechOgg } from './voice.ts'
 
 // Yonde Reader bot (Doc 16 §6/§7 R0, Doc 12 step 3.6).
 //
-// One route only:
+// Two routes:
 //   POST /functions/v1/reader-bot            — the Telegram webhook.
+//   POST /functions/v1/reader-bot?dispatch=1 — the morning dispatch
+//     (pg_cron; x-cron-secret vs READER_CRON_SECRET, fail closed).
 // Operator setup (webhook + command registration) lives in the
 // separate reader-admin function, so the bot token never leaves
 // Supabase env and this function carries no dead admin door.
@@ -43,10 +46,43 @@ import { segmentText } from './segment.ts'
 // Too Hard runs the overshoot protocol (apologize, explain what
 // was sent, step back to the previous known level — never a crash
 // below it). /read aims at serveBandFor(basis, fit_step).
-// No morning dispatch (R1), no Mini App (R1), no voice (R2).
 //
-// The bot never nags (Doc 16 §9): it sends when asked, and is silent
-// otherwise. There is no reading streak and no missed-day message.
+// 2026-11-06 late (Landry, live: "build everything, don't stop") —
+// R1/R2 pulled forward, Doc 16 build status:
+// · CONTINUATION: a Too Hard or Push Me tap no longer ends in a
+//   promise — after the protocol message the NEXT passage is served
+//   immediately, at the stepped-back / pushed step. Silence after
+//   feedback was the live test's first gap.
+// · OVERSHOOT v2: when the too-hard passage carried no unknown
+//   candidates (its difficulty was register — keigo — invisible to
+//   the word gate), the explanation falls back to the words the
+//   learner has not personally met (passage tokens not in their
+//   QUEUE — credit is an assumption, the queue is fact), hardest
+//   first; the honest "ran ahead of your words" line remains the
+//   last resort. Register difficulty is a KNOWN GATE LIMIT (§9);
+//   the Too Hard tap is today's corrective for it.
+// · VOICE OUT: every passage send is followed by the passage as a
+//   Telegram voice note (voice.ts, Edge TTS ja-JP-NanamiNeural —
+//   free; the file_id is cached on the passage row, migration
+//   00014). Text first, voice second; voice never blocks text.
+// · VOICE IN (R2 v1): a voice note from a linked learner is the
+//   read-aloud PROOF: plausible duration (voiceReadWindow in the
+//   twins) counts as that passage's comfy 'read' through the same
+//   applyFeedback + dedupe the tap uses, and logs shadow_attempted.
+//   NO transcription and NO score claim in v1 — the copy says so;
+//   the STT slot is marked where a keyed transcription call plugs
+//   in later (env READER_STT_API_KEY, not built).
+// · MORNING DISPATCH (R1): POST ?dispatch=1, authorised by the
+//   x-cron-secret header vs READER_CRON_SECRET (pg_cron fires it,
+//   like yonde-call-scheduler), serves due learners their morning
+//   passage — the bot's ONE sanctioned proactive message (§9).
+// · MINI APP: every passage keyboard gains an "Open in Yonde" row
+//   (web_app → the PWA /reader route) — tap-a-word lives there,
+//   where per-word taps are possible; chat stays fully readable.
+//
+// The bot never nags (Doc 16 §9): it sends when asked, greets once
+// each morning when due, and is silent otherwise. There is no
+// reading streak and no missed-day message.
 //
 // Env: READER_BOT_TOKEN, READER_WEBHOOK_SECRET (both set as function
 // secrets when the bot is created — never in code), PUSH_ADMIN_SECRET
@@ -54,11 +90,12 @@ import { segmentText } from './segment.ts'
 // SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY (runtime-injected).
 // R0.5 adds: OPENROUTER_API_KEY (the chat function's project secret,
 // reused under the same name) and optional READER_MODEL (default
-// 'openrouter/free' — Doc 03 Tier C standing rule).
+// 'openrouter/free' — Doc 03 Tier C standing rule). Dispatch adds
+// READER_CRON_SECRET (the pg_cron job's shared secret).
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-admin-secret, x-telegram-bot-api-secret-token',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-admin-secret, x-telegram-bot-api-secret-token, x-cron-secret',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
@@ -66,6 +103,16 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
 const RECENT_DAYS = 14
+
+// The Mini App surface (Doc 16 R1): the live PWA's /reader route.
+// web_app buttons are valid in private chats with the bot — and
+// every Reader chat is private by design.
+const MINI_APP_READER_URL = 'https://jpn2easy.vercel.app/reader'
+
+// The morning greeting (Doc 16 R1/§9): the one line that precedes a
+// dispatched passage. Warm, short, and free of streak/nag language —
+// it greets the day; it never comments on yesterday.
+const MORNING_GREETING = '🔍 おはよう — morning. Here is today\'s passage, fitted to your words.'
 
 // --- R0.5 fitted generation (Doc 16 §7: pulled forward from R1) ---
 // The bank was never written to the 95% rule, so bank-first alone
@@ -354,18 +401,38 @@ serve(async (req: Request) => {
     // runtime key, so it could never be used — a dead door is attack
     // surface, and it was removed 2026-11-06 (Doc 16).
 
-    // ---------- webhook route ----------
-    // Fail closed: no configured secret, no service.
-    if (!webhookSecret || req.headers.get('x-telegram-bot-api-secret-token') !== webhookSecret) {
-      return json({ error: 'Unauthorized' }, 401)
-    }
-    if (!botToken) {
-      console.error('reader-bot: READER_BOT_TOKEN is not set')
-      return json({ error: 'Bot is not configured' }, 500)
+    // ---------- morning dispatch route (R1) ----------
+    // Checked BEFORE the webhook route: the pg_cron caller carries
+    // no Telegram secret, only x-cron-secret vs READER_CRON_SECRET.
+    // Fail closed: no env secret set, no dispatch — ever. The
+    // actual serving happens in handleDispatch, once the shared
+    // helpers below exist; this branch only authorises and flags.
+    let dispatchMode = false
+    if (new URL(req.url).searchParams.get('dispatch') === '1') {
+      const cronSecret = Deno.env.get('READER_CRON_SECRET') ?? ''
+      const providedCron = req.headers.get('x-cron-secret') ?? ''
+      if (!cronSecret || !providedCron || providedCron !== cronSecret) {
+        return json({ error: 'Unauthorized' }, 401)
+      }
+      if (!botToken) {
+        console.error('reader-bot: READER_BOT_TOKEN is not set')
+        return json({ error: 'Bot is not configured' }, 500)
+      }
+      dispatchMode = true
+    } else {
+      // ---------- webhook route ----------
+      // Fail closed: no configured secret, no service.
+      if (!webhookSecret || req.headers.get('x-telegram-bot-api-secret-token') !== webhookSecret) {
+        return json({ error: 'Unauthorized' }, 401)
+      }
+      if (!botToken) {
+        console.error('reader-bot: READER_BOT_TOKEN is not set')
+        return json({ error: 'Bot is not configured' }, 500)
+      }
     }
 
-    const update = await req.json().catch(() => null)
-    if (!update) return json({ ok: true })
+    const update = dispatchMode ? null : await req.json().catch(() => null)
+    if (!dispatchMode && !update) return json({ ok: true })
 
     const supabaseAdmin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
 
@@ -495,6 +562,47 @@ serve(async (req: Request) => {
       return null
     }
 
+    // ---------- voice out ----------
+    // After a passage TEXT send, the passage also arrives as a
+    // Telegram voice note (Doc 16, 2026-11-06 late). Cached rows
+    // (voice_file_id, migration 00014) resend by file_id — free and
+    // instant. A fresh synthesis uploads once and the file_id is
+    // stored back (best-effort). ANY failure along the way is a
+    // console line, never a user-facing error: voice enhances the
+    // passage; the text is the passage.
+    const sendPassageVoice = async (chatId: number, passage: Record<string, unknown>) => {
+      try {
+        const cached = typeof passage.voice_file_id === 'string' ? passage.voice_file_id : ''
+        if (cached) {
+          await tg(botToken, 'sendVoice', { chat_id: chatId, voice: cached })
+          return
+        }
+        const bytes = await synthesizeSpeechOgg(String(passage.text ?? ''))
+        if (!bytes) return
+        const form = new FormData()
+        form.append('chat_id', String(chatId))
+        form.append('voice', new Blob([bytes], { type: 'audio/ogg' }), 'passage.ogg')
+        const res = await fetch(`https://api.telegram.org/bot${botToken}/sendVoice`, {
+          method: 'POST',
+          body: form,
+        })
+        const body = await res.json().catch(() => null)
+        const fileId = body?.result?.voice?.file_id
+        if (!body?.ok || typeof fileId !== 'string') {
+          console.error(`reader-bot: sendVoice upload failed status=${res.status}`)
+          return
+        }
+        passage.voice_file_id = fileId // in case this row sends again in-process
+        const { error } = await supabaseAdmin
+          .from('reading_passages')
+          .update({ voice_file_id: fileId })
+          .eq('id', String(passage.id))
+        if (error) console.error('reader-bot: voice_file_id cache write failed')
+      } catch (err) {
+        console.error('reader-bot: passage voice send failed', err)
+      }
+    }
+
     // ---------- /read ----------
     // opts.fromLevelTap: this serve ANSWERS a level tap, so the ask
     // below must not fire again inside it. opts.forceStarter: the
@@ -502,10 +610,13 @@ serve(async (req: Request) => {
     // census alone would not call this learner cold. opts
     // .declaredBand overrides the row's value (the level callback
     // has just written it; the serve should not depend on re-read
-    // timing).
+    // timing). opts.kind = 'morning': a dispatch serve (R1) — the
+    // caller has already verified basis + due-ness, the greeting
+    // line precedes the passage, and the passage_sent payload is
+    // tagged so tomorrow's dispatch can see today's.
     const handleRead = async (
       chatId: number,
-      opts: { declaredBand?: string | null; fromLevelTap?: boolean; forceStarter?: boolean } = {},
+      opts: { declaredBand?: string | null; fromLevelTap?: boolean; forceStarter?: boolean; kind?: string } = {},
     ) => {
       const link = await linkByChat(chatId)
       if (!link) {
@@ -561,7 +672,7 @@ serve(async (req: Request) => {
 
       const { data: bank, error: bankError } = await supabaseAdmin
         .from('reading_passages')
-        .select('id, band, topic, text, tokens, new_word_candidates, source')
+        .select('id, band, topic, text, tokens, new_word_candidates, source, voice_file_id')
       if (bankError || !bank) {
         console.error('reader-bot: passage bank fetch failed')
         await sendMessage(botToken, chatId, 'The reading shelf is empty on my side right now — try again a little later.')
@@ -683,8 +794,10 @@ serve(async (req: Request) => {
       // [Too Hard]. The payloads carry the passage id (fitCallback)
       // so the handler can dedupe — one tap per passage counts —
       // and so Too Hard can explain THAT passage. Read It ✓ is
-      // self-report, honestly: chat cannot verify a read (the
-      // voice-note proof belongs to R2, §5 amendment #4).
+      // self-report, honestly: a tap cannot verify a read — the
+      // voice-note read-aloud (handleVoiceNote) is the performed
+      // proof, and both paths share this dedupe so a passage is
+      // proven once, by voice or by tap.
       const keyboardRows: Record<string, string>[][] = []
       if (newWords.length > 0) {
         keyboardRows.push([{ text: 'Mine the New Words', callback_data: `mine:${String(passage.id)}` }])
@@ -694,8 +807,25 @@ serve(async (req: Request) => {
         { text: 'Push Me 🔥', callback_data: fitCallback('up', String(passage.id)) },
         { text: 'Too Hard', callback_data: fitCallback('hard', String(passage.id)) },
       ])
+      // The Mini App row (R1): tap-a-word lives on the PWA /reader
+      // page — chat text cannot do per-word taps — so every passage
+      // keyboard ends with the door to it. The chat message stays
+      // fully readable on its own; this is a door, never a toll.
+      keyboardRows.push([
+        { text: '📖 Open in Yonde — tap the words', web_app: { url: MINI_APP_READER_URL } },
+      ])
       const extra: Record<string, unknown> = { reply_markup: { inline_keyboard: keyboardRows } }
+      // A dispatch serve opens with the morning greeting — the one
+      // sanctioned proactive line (Doc 16 §9) — then the passage.
+      if (opts.kind === 'morning') {
+        await sendMessage(botToken, chatId, MORNING_GREETING)
+      }
       await sendMessage(botToken, chatId, lines.join('\n'), extra)
+      // Voice out: the passage as a voice note, AFTER the text —
+      // hearing it is also the model for the learner's own read-
+      // aloud proof (voice-in). Never blocks, never errors the
+      // send: sendPassageVoice swallows its own failures.
+      await sendPassageVoice(chatId, passage)
       // Event names (Doc 16 §8): passage_sent is the R0 send event;
       // reading_opened belongs to the R1 Mini App and is NOT logged here.
       await logEvent(link.user_id, 'passage_sent', {
@@ -706,6 +836,10 @@ serve(async (req: Request) => {
         // Starter sends are flagged so the funnel can tell the
         // on-ramp from fitted reads (Doc 16 §5 amendment #2).
         ...(coldStart ? { coldStart: true } : {}),
+        // Dispatch sends are tagged so the next morning's due
+        // check can see them (and the funnel can tell a pushed
+        // passage from a pulled one).
+        ...(opts.kind === 'morning' ? { kind: 'morning' } : {}),
       })
     }
 
@@ -967,6 +1101,13 @@ serve(async (req: Request) => {
         }
       } else if (kind === 'up') {
         await answer(after.effect === 'max' ? 'Already at full stretch' : '🔥 Pushing you')
+        // CONTINUATION (2026-11-06 late): a push is a request for
+        // the harder passage, not for a promise of one — serve it
+        // now, at the step just written. At 'max' nothing moved, so
+        // there is nothing new to serve: the toast alone is honest.
+        if (after.effect !== 'max') {
+          await handleRead(chatId)
+        }
       } else if (kind === 'hard') {
         await answer('Stepping back to your level')
         // THE OVERSHOOT PROTOCOL (Doc 16 §5 amendment #4): the step
@@ -982,32 +1123,330 @@ serve(async (req: Request) => {
           .select('id, band, topic, text, tokens, new_word_candidates')
           .eq('id', passageId)
           .maybeSingle()
-        let wordLines: string[] = []
+        // The explanation block, three tiers (v2, 2026-11-06 late):
+        //   1. the passage's unknown candidates for this learner
+        //      (the amendment-#4 behaviour);
+        //   2. when that list is EMPTY — the live-test case: the
+        //      passage's difficulty was register (keigo), invisible
+        //      to the word gate, so its candidate list carried
+        //      nothing to explain — fall back to the words the
+        //      learner has not personally MET: passage content
+        //      tokens whose headword is not among their QUEUE
+        //      fronts. The deck credit is deliberately ignored
+        //      here: credit is an assumption (graded-reader
+        //      convention); the queue is fact (words they actually
+        //      mined, drilled, met). Hardest first, cap 12;
+        //   3. when even that is empty — every content word has
+        //      crossed their queue and it was STILL too hard — the
+        //      original honest line: the difficulty was register,
+        //      not vocabulary, and no word list can show it.
+        let explainBlock = 'It ran ahead of the words you know — that one is on me, not on you.'
         if (passage) {
           const stateRow = await loadState(link.user_id)
           const fbState = (stateRow?.state ?? {}) as Record<string, unknown>
-          const { known } = knownFor(fbState, link.declared_band ?? null)
+          const { known, queue } = knownFor(fbState, link.declared_band ?? null)
+          const lineFor = (word: string, reading?: string, meaning?: string) => {
+            const bits = [esc(word)]
+            if (reading && reading !== word) bits.push(esc(reading))
+            if (meaning) bits.push(esc(meaning))
+            return bits.join(' — ')
+          }
           const unknownCands = withCandidateLevels(passage as Record<string, unknown>)
             .filter((c) => c.word && !known.has(c.h || c.word))
-          wordLines = capCandidates(unknownCands).map((c) => {
-            const bits = [esc(c.word)]
-            if (c.reading && c.reading !== c.word) bits.push(esc(c.reading))
-            if (c.meaning) bits.push(esc(c.meaning))
-            return bits.join(' — ')
-          })
+          if (unknownCands.length > 0) {
+            const wordLines = capCandidates(unknownCands).map((c) => lineFor(c.word, c.reading, c.meaning))
+            explainBlock = `What was in it — the new words that made it a stretch:\n${wordLines.join('\n')}`
+          } else {
+            const queueSet = buildKnownSet(queue)
+            const unmetHeads = unknownContentHeadwords(passage.tokens, queueSet)
+            const deck = DECK_LEVELS as Record<string, string>
+            const gloss = DECK_GLOSS as Record<string, { reading: string; meaning: string }>
+            const toks = Array.isArray(passage.tokens) ? passage.tokens : []
+            const items = unmetHeads.map((head, i) => {
+              const tok = toks.find((t) => {
+                const tt = t as { s?: string; h?: string; l?: string | null }
+                return tt && (tt.h || tt.s) === head
+              }) as { s?: string; h?: string; l?: string | null } | undefined
+              const level = tok?.l ?? deck[head] ?? null
+              return {
+                word: tok?.s ?? head,
+                reading: gloss[head]?.reading ?? '',
+                meaning: gloss[head]?.meaning ?? '',
+                // Hardest first: deck rank descending; a word with
+                // no resolvable level sorts after the levelled ones
+                // (likely a name or a fragment the deck never
+                // carried — real deck-hard words lead the list).
+                rank: level ? bandRank(level) : 0,
+                i,
+              }
+            })
+            items.sort((a, b) => (b.rank - a.rank) || (a.i - b.i))
+            const top = items.slice(0, 12)
+            if (top.length > 0) {
+              const wordLines = top.map((it) => lineFor(it.word, it.reading, it.meaning))
+              explainBlock = `What was in it — the words in it that have not crossed your queue yet:\n${wordLines.join('\n')}`
+            }
+          }
         }
         const parts = [
           '🔍 Sorry — I got ahead of myself with that one.',
-          wordLines.length > 0
-            ? `What was in it — the new words that made it a stretch:\n${wordLines.join('\n')}`
-            : 'It ran ahead of the words you know — that one is on me, not on you.',
+          explainBlock,
           'We are back at the level that fits you, and it will harden again gradually — a little stretch at a time, never a leap.',
         ]
         await sendMessage(botToken, chatId, parts.join('\n\n'))
+        // CONTINUATION (2026-11-06 late): the gracious return must
+        // DELIVER, not promise. The live test's silence after the
+        // apology is the bug this line fixes: the next passage —
+        // fitted at the stepped-back state just written — arrives
+        // now, as this tap's own answer. If nothing can be served,
+        // handleRead's own copy says so: never silence.
+        await handleRead(chatId)
       }
     }
 
-    // ---------- dispatch ----------
+    // ---------- voice in: the read-aloud proof (R2 v1) ----------
+    // A voice note from a linked learner is a READ, performed out
+    // loud — the receipt the feedback taps cannot be (Doc 16, 2026-
+    // 11-06 late). v1 measures DURATION only (Telegram puts it in
+    // the update; the audio file is never downloaded): a duration
+    // inside voiceReadWindow's plausible window for the current
+    // passage counts as that passage's comfy 'read', through the
+    // SAME applyFeedback transition and the SAME hasFeedbackFor
+    // dedupe as the Read It ✓ tap — a passage is proven once, by
+    // voice or by tap, never twice. Every attempt logs
+    // shadow_attempted { passageId, durationSec, expectedSec,
+    // plausible } — the event name predates the STT decision
+    // (00009 admitted it); shadow_scored stays unwritten until
+    // transcription exists to score WITH.
+    //
+    // STT slot: when a transcription key lands (env
+    // READER_STT_API_KEY — not built, no key, no call), the audio
+    // gets downloaded via getFile and transcribed HERE, and Nao's
+    // one-fix scoring joins on the transcript. Until then the bot
+    // says plainly that it heard the reading but cannot score it
+    // word by word yet — no transcript, no score claim, ever.
+    const handleVoiceNote = async (voiceMsg: Record<string, unknown>) => {
+      const vChat = (voiceMsg.chat ?? {}) as Record<string, unknown>
+      const vFrom = (voiceMsg.from ?? {}) as Record<string, unknown>
+      const chatId = Number(vChat.id)
+      const voice = (voiceMsg.voice ?? {}) as Record<string, unknown>
+      const durationSec = Number(voice.duration ?? 0)
+
+      // Same ownership standard as every callback: the note must be
+      // in the linked private chat, from the person who owns it.
+      const link = Number.isFinite(chatId) ? await linkByChat(chatId) : null
+      if (!link || Number(vFrom.id) !== chatId) {
+        if (Number.isFinite(chatId)) await sendMessage(botToken, chatId, LINK_EXPLAINER)
+        return
+      }
+
+      // The current passage: the LATEST passage_sent for this
+      // learner inside the last 24h (the same metrics-lookup
+      // pattern as the 14-day exclusion).
+      const dayAgo = new Date(Date.now() - 24 * 3600 * 1000).toISOString()
+      const { data: sentRows } = await supabaseAdmin
+        .from('metrics_events')
+        .select('payload, created_at')
+        .eq('user_id', link.user_id)
+        .eq('type', 'passage_sent')
+        .gte('created_at', dayAgo)
+        .order('created_at', { ascending: false })
+        .limit(1)
+      const currentId = (sentRows?.[0]?.payload as Record<string, unknown> | undefined)?.passageId
+      if (typeof currentId !== 'string' || !currentId) {
+        await sendMessage(botToken, chatId, '🔍 No passage from me in the last day to read back — send /read first, then read the passage aloud back to me. Your voice is the receipt.')
+        return
+      }
+      const { data: passage } = await supabaseAdmin
+        .from('reading_passages')
+        .select('id, text')
+        .eq('id', currentId)
+        .maybeSingle()
+      if (!passage) {
+        await sendMessage(botToken, chatId, '🔍 That passage is no longer on my shelf, so I cannot take your reading of it — send /read and read the new one aloud back to me.')
+        return
+      }
+
+      const chars = [...String(passage.text)].length
+      const win = voiceReadWindow(chars, durationSec)
+      await logEvent(link.user_id, 'shadow_attempted', {
+        passageId: currentId,
+        durationSec,
+        expectedSec: Math.round(win.expectedSec * 10) / 10,
+        plausible: win.plausible,
+      })
+      if (!win.plausible) {
+        await sendMessage(
+          botToken,
+          chatId,
+          durationSec > win.maxSec
+            ? '🔍 That ran long for this passage — a reading that long is usually the passage twice, or a pause in the middle. Once through, out loud, at your own pace is the receipt I can count.'
+            : '🔍 That was quick for this passage — shorter than a read-aloud of it runs. Read it aloud once through and send it again; your voice is the receipt.',
+        )
+        return
+      }
+
+      // Plausible: the read counts. If a feedback tap (or an
+      // earlier voice read) already proved this passage, the voice
+      // is thanked but never double-counted — dedupe first.
+      const { data: priorRows } = await supabaseAdmin
+        .from('metrics_events')
+        .select('payload')
+        .eq('user_id', link.user_id)
+        .eq('type', 'reading_feedback')
+        .order('created_at', { ascending: false })
+        .limit(100)
+      const priorPayloads = (priorRows || []).map((r) => r.payload as Record<string, unknown>)
+      let trialUp = false
+      if (!hasFeedbackFor(priorPayloads, currentId)) {
+        const after = applyFeedback(
+          {
+            fit_step: link.fit_step ?? 0,
+            last_good_step: link.last_good_step ?? 0,
+            comfy_streak: link.comfy_streak ?? 0,
+          },
+          'read',
+        )
+        const { error } = await supabaseAdmin
+          .from('telegram_links')
+          .update({
+            fit_step: after.fit_step,
+            last_good_step: after.last_good_step,
+            comfy_streak: after.comfy_streak,
+          })
+          .eq('user_id', link.user_id)
+        if (error) {
+          console.error('reader-bot: voice-read fit state write failed')
+        } else {
+          await logEvent(link.user_id, 'reading_feedback', {
+            kind: 'read',
+            passageId: currentId,
+            fitStepAfter: after.fit_step,
+            via: 'voice',
+          })
+          trialUp = after.effect === 'trial_up'
+        }
+      }
+      await sendMessage(
+        botToken,
+        chatId,
+        '🔍 Heard you — that is a real read, proven out loud, and it counts here as one. ' +
+          'What I cannot do yet is score it word by word: that arrives when transcription joins. ' +
+          'Until then, your voice is the receipt — and the fit treats it exactly like one.',
+      )
+      if (trialUp) {
+        await sendMessage(
+          botToken,
+          chatId,
+          '🔍 Three comfortable reads in a row — that level is properly yours now. ' +
+            'The next passage stretches a little past it; that is the fit hardening, one notch at a time. ' +
+            'If it overshoots, Too Hard brings us straight back.',
+        )
+      }
+    }
+
+    // ---------- morning dispatch (R1) ----------
+    // Fired by pg_cron (READER_CRON_SECRET header — authorised in
+    // the route check above, before the webhook secret is even
+    // consulted). Serves every due learner their morning passage
+    // through the UNCHANGED read flow: the fitting logic is not
+    // forked, the serve is just tagged kind:'morning' and preceded
+    // by the greeting (both inside handleRead). Due = inside
+    // [morning_time, +30min) in the learner's own tz AND no morning
+    // passage already sent on their tz date. Learners without a
+    // band basis are skipped SILENTLY — a dispatch must never nag a
+    // stranger into declaring a level (§9); their /read asks the
+    // question when THEY come.
+    const handleDispatch = async () => {
+      const { data: links, error } = await supabaseAdmin
+        .from('telegram_links')
+        .select('user_id, chat_id, declared_band, morning_time, tz')
+        .not('chat_id', 'is', null)
+      if (error || !links) {
+        console.error('reader-bot: dispatch link scan failed')
+        return json({ ok: false, due: 0, sent: 0 }, 500)
+      }
+      let due = 0
+      let sent = 0
+      for (const link of links) {
+        try {
+          const chatId = Number(link.chat_id)
+          if (!Number.isFinite(chatId)) continue
+          // Band basis gate: diagnosis or declared — nothing else
+          // is dispatched to. The diagnosis lives in learner_state
+          // (resolveBand input); the declared band rides the row.
+          const row = await loadState(link.user_id)
+          const state = (row?.state ?? {}) as Record<string, unknown>
+          const { bandSource } = knownFor(state, link.declared_band ?? null)
+          if (bandSource === 'none') continue
+
+          // The learner's local clock, from their tz. Intl does the
+          // tz maths; a bad tz string falls back to Asia/Tokyo (the
+          // column default) rather than breaking the run.
+          const tz = typeof link.tz === 'string' && link.tz ? link.tz : 'Asia/Tokyo'
+          let parts: Record<string, string> = {}
+          try {
+            parts = Object.fromEntries(
+              new Intl.DateTimeFormat('en-CA', {
+                timeZone: tz, hour12: false,
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+              }).formatToParts(new Date()).map((p) => [p.type, p.value]),
+            )
+          } catch {
+            parts = {}
+          }
+          const hh = Number(parts.hour ?? NaN) % 24
+          const mm = Number(parts.minute ?? NaN)
+          const ss = Number(parts.second ?? 0)
+          if (!Number.isFinite(hh) || !Number.isFinite(mm)) continue
+          const nowMinutes = hh * 60 + mm + (Number.isFinite(ss) ? ss / 60 : 0)
+          const [mh, mmin] = String(link.morning_time ?? '07:30').split(':').map(Number)
+          const morningMinutes = (Number.isFinite(mh) ? mh : 7) * 60 + (Number.isFinite(mmin) ? mmin : 30)
+          if (!isDispatchDue({ morningMinutes, nowMinutes, sentMorningToday: false })) continue
+
+          // Already served this morning (their tz date)? The window
+          // check above can't know — the events can. "Today" for
+          // the learner begins at their local midnight, which is
+          // `now - nowMinutes` in real time.
+          const dayStartUtc = new Date(Date.now() - nowMinutes * 60000).toISOString()
+          const { data: morningRows } = await supabaseAdmin
+            .from('metrics_events')
+            .select('id')
+            .eq('user_id', link.user_id)
+            .eq('type', 'passage_sent')
+            .eq('payload->>kind', 'morning')
+            .gte('created_at', dayStartUtc)
+            .limit(1)
+          if (!isDispatchDue({ morningMinutes, nowMinutes, sentMorningToday: !!morningRows && morningRows.length > 0 })) continue
+
+          due++
+          // Served == a morning-tagged passage_sent exists now that
+          // did not before (handleRead's failure paths send honest
+          // copy instead of a passage, and must not count).
+          await handleRead(chatId, { kind: 'morning' })
+          const { data: checkRows } = await supabaseAdmin
+            .from('metrics_events')
+            .select('id')
+            .eq('user_id', link.user_id)
+            .eq('type', 'passage_sent')
+            .eq('payload->>kind', 'morning')
+            .gte('created_at', dayStartUtc)
+            .limit(1)
+          if (checkRows && checkRows.length > 0) sent++
+        } catch (err) {
+          console.error('reader-bot: dispatch serve failed for one learner', err)
+        }
+      }
+      return json({ ok: true, due, sent })
+    }
+
+    // A dispatch call has no Telegram update — serve and return.
+    if (dispatchMode) {
+      return await handleDispatch()
+    }
+
+    // ---------- update routing ----------
     if (update.callback_query) {
       const cb = update.callback_query as Record<string, unknown>
       if (String(cb.data ?? '').startsWith('mine:')) {
@@ -1026,7 +1465,16 @@ serve(async (req: Request) => {
     const chat = (msg?.chat ?? {}) as Record<string, unknown>
     const from = (msg?.from ?? {}) as Record<string, unknown>
     // Reader is a private-chat surface; group chats are ignored politely.
-    if (!msg || chat.type !== 'private' || typeof msg.text !== 'string') {
+    if (!msg || chat.type !== 'private') {
+      return json({ ok: true })
+    }
+    // Voice notes route BEFORE the text gate: a voice message has
+    // no .text at all, and it is the read-aloud proof (R2 v1).
+    if (msg.voice) {
+      try { await handleVoiceNote(msg) } catch (err) { console.error('reader-bot: voice note handling failed', err) }
+      return json({ ok: true })
+    }
+    if (typeof msg.text !== 'string') {
       return json({ ok: true })
     }
     const chatId = Number(chat.id)

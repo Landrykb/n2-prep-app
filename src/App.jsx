@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } fro
 import {
   LayoutDashboard,
   BookOpen,
+  BookOpenText,
   Dumbbell,
   Map,
   AlertCircle,
@@ -74,6 +75,7 @@ const Mining = lazy(() => import('./components/Mining.jsx'))
 const OneSession = lazy(() => import('./components/OneSession.jsx'))
 const SenseiCall = lazy(() => import('./components/SenseiCall.jsx'))
 const TwinView = lazy(() => import('./components/TwinView.jsx'))
+const Reader = lazy(() => import('./components/Reader.jsx'))
 const CoachLetter = lazy(() => import('./components/CoachLetter.jsx'))
 const PrivacyPolicy = lazy(() => import('./components/PrivacyPolicy.jsx'))
 const Terms = lazy(() => import('./components/Terms.jsx'))
@@ -108,6 +110,7 @@ const nav = [
   { id: 'speed', label: 'Speed Cards', icon: Zap , group: 'library' },
   { id: 'dictionary', label: 'Dictionary', icon: Search , group: 'library' },
   { id: 'reading', label: 'Daily Reading', icon: Eye , group: 'library' },
+  { id: 'reader', label: 'Reader', short: 'Reader', icon: BookOpenText , group: 'library' },
   { id: 'ai', label: 'AI Tutor', icon: Bot , group: 'library' },
   { id: 'plan', label: 'Study Plan', icon: Map , group: 'library' },
   { id: 'resources', label: 'Resources', icon: Library , group: 'library' },
@@ -1568,6 +1571,14 @@ function App() {
   const [dictionary, setDictionary] = useState(localDictionary)
   const { nextExam, daysToExam, examLabel, setting: examSetting, setSetting: setExamSetting } = useExamDate()
 
+  // The literal /reader path (Doc 16 §2): the Telegram "Open in
+  // Reader" button points at https://jpn2easy.vercel.app/reader, and
+  // vercel.json's SPA fallback serves this app there — open on the
+  // Reader view when we land on that path.
+  useEffect(() => {
+    if (window.location.pathname.replace(/\/+$/, '') === '/reader') setActive('reader')
+  }, [setActive])
+
   // P1-5: the ~1 MB deck used to download on every cold start for the
   // selection popup alone. It now loads lazily — the first time the
   // learner actually selects text (localDictionary covers lesson words
@@ -1675,6 +1686,7 @@ function App() {
     speed: <SpeedCards />,
     dictionary: <DictionaryView />,
     reading: <ReadingView />,
+    reader: <Reader />,
     ai: <AiTutor context={active} />,
     plan: <StudyPlan daysToExam={daysToExam} />,
     resources: <Resources />,

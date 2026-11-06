@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Download, Trash2, Mail, ChevronRight, X, Send } from 'lucide-react'
+import { Download, Trash2, Mail, ChevronRight, X, Send, BookOpenText } from 'lucide-react'
 import { brand } from '../lib/brand.js'
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient.js'
 import {
@@ -50,7 +50,7 @@ function makeLinkCode() {
   return [...bytes].map((b) => LINK_CODE_ALPHABET[b % LINK_CODE_ALPHABET.length]).join('')
 }
 
-function ReaderLinkCard({ user }) {
+function ReaderLinkCard({ user, setActive }) {
   const [status, setStatus] = useState('loading') // loading | setup | unlinked | pending | linked
   const [link, setLink] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -143,6 +143,12 @@ function ReaderLinkCard({ user }) {
             Connected{link?.username ? <> as <span className="text-slate-100 font-medium">@{link.username}</span></> : ''} — your chat is linked. Send <span className="text-slate-100 font-medium">/read</span> there any time and Hori digs up your next passage.
           </p>
           <button onClick={unlink} disabled={busy} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 disabled:opacity-40 text-slate-100 text-sm font-medium">Unlink</button>
+        </div>
+      )}
+      {status !== 'loading' && (
+        <div className="flex flex-wrap items-center gap-3 pt-1">
+          <p className="text-sm text-slate-400 flex-1 min-w-[220px]">The same shelf lives here in the app, too — fitted to your words, every word tappable.</p>
+          <button onClick={() => setActive?.('reader')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1.5"><BookOpenText size={15} /> Open The Reader Here</button>
         </div>
       )}
     </Section>
@@ -285,7 +291,7 @@ export default function TwinView({ setActive }) {
         </div>
       </section>
 
-      <ReaderLinkCard user={user} />
+      <ReaderLinkCard user={user} setActive={setActive} />
 
       <Section title="Where Your Japanese Stands" hint="Section scores come only from your health checks (estimates from short samples — never official scores). Speaking and register are labelled heuristic: patterns counted, not sounds judged.">
         {Object.keys(twin.sections || {}).length ? (

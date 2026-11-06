@@ -499,3 +499,73 @@ export function parseFitCallback(data) {
 export function hasFeedbackFor(payloads, passageId) {
   return (payloads || []).some((p) => p && p.passageId === passageId)
 }
+
+// ---------- voice proof + morning dispatch (Doc 16, 2026-11-06 late) ----------
+//
+// Two more deterministic predicates join the spine; neither is AI.
+//
+// VOICE-IN (R2 pulled forward, v1): a learner proves a read by
+// reading the passage ALOUD as a Telegram voice note. v1 does NOT
+// transcribe (no STT key yet — the bot says so plainly); the only
+// measurement is DURATION, which Telegram puts in the update
+// payload. A passage read aloud at natural pace takes roughly
+// chars / CHARS_PER_SECOND seconds; a note inside the plausible
+// window counts as the comfy 'read' for that passage (through
+// applyFeedback, deduped by hasFeedbackFor exactly like the tap).
+// The window is wide on purpose — reading speeds vary, and a false
+// "too fast" accuses an honest learner; duration is a receipt, not
+// a measurement of quality, and the copy never claims otherwise.
+//   0.35× catches a genuine skim-or-partial read being passed off;
+//   2.75× still admits a slow, careful, twice-through read.
+//
+// MORNING DISPATCH (R1 pulled forward): the bot's ONE sanctioned
+// proactive message (Doc 16 §9) — a fitted passage at the learner's
+// own morning_time, in their own tz. isDispatchDue is the whole
+// decision, pure over plain numbers so pg_cron timing, timezone
+// maths and the dedupe rule stay testable off the wire.
+
+/** Expected seconds for a passage read aloud ≈ chars / this. */
+export const VOICE_READ_CHARS_PER_SEC = 6.5
+export const VOICE_READ_MIN_FACTOR = 0.35
+export const VOICE_READ_MAX_FACTOR = 2.75
+
+/**
+ * The voice-read window for a passage of `chars` characters.
+ * Returns { expectedSec, minSec, maxSec, plausible(durationSec) }.
+ * A non-positive char count or a non-positive/non-finite duration
+ * is never plausible — a receipt with no numbers on it proves
+ * nothing.
+ */
+export function voiceReadWindow(chars, durationSec) {
+  const n = Number(chars)
+  const expectedSec = Number.isFinite(n) && n > 0 ? n / VOICE_READ_CHARS_PER_SEC : 0
+  const minSec = expectedSec * VOICE_READ_MIN_FACTOR
+  const maxSec = expectedSec * VOICE_READ_MAX_FACTOR
+  const d = Number(durationSec)
+  const plausible = expectedSec > 0 && Number.isFinite(d) && d > 0 && d >= minSec && d <= maxSec
+  return { expectedSec, minSec, maxSec, plausible }
+}
+
+/** The morning send window: [morning_time, morning_time + 30min). */
+export const DISPATCH_WINDOW_MIN = 30
+
+/**
+ * Is this linked learner due their morning passage?
+ *   morningMinutes — their morning_time as minutes since midnight
+ *   nowMinutes     — the current time IN THEIR tz, minutes since
+ *                    midnight (the caller computes it from `tz`;
+ *                    fractional minutes are fine)
+ *   sentMorningToday — a passage_sent event with payload.kind =
+ *                    'morning' already exists for their tz date
+ *                    (the caller looks it up; one morning passage
+ *                    per day, ever — Doc 16 §9)
+ * Both clocks wrap at midnight by construction of the caller; the
+ * window itself never wraps (07:30 + 30min stays inside the day).
+ */
+export function isDispatchDue({ morningMinutes, nowMinutes, sentMorningToday } = {}) {
+  const m = Number(morningMinutes)
+  const n = Number(nowMinutes)
+  if (!Number.isFinite(m) || !Number.isFinite(n)) return false
+  if (sentMorningToday) return false
+  return n >= m && n < m + DISPATCH_WINDOW_MIN
+}

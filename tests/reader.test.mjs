@@ -769,4 +769,97 @@ check('twin parity: adaptive-fit APIs agree (serve band, transitions, callbacks,
   assert.equal(port.hasFeedbackFor(rows, 'p-x'), fit.hasFeedbackFor(rows, 'p-x'))
 })
 
+// ---------- voice proof + morning dispatch (Doc 16, 2026-11-06 late) ----------
+// R1/R2 pulled forward on Landry's "build everything": the voice-
+// note read-aloud is the performed proof of a read (duration only —
+// no transcription in v1), and the morning dispatch is the bot's
+// one sanctioned proactive send. Both decisions are pure spine
+// logic in the twins; the wire code (Edge TTS, Telegram, pg_cron)
+// stays untested by design, exactly like generation's model call.
+
+check('voiceReadWindow: expected seconds are chars / 6.5, window 0.35×–2.75×', () => {
+  const w = fit.voiceReadWindow(650, 100)
+  assert.equal(w.expectedSec, 100)
+  assert.equal(w.minSec, 35)
+  assert.equal(w.maxSec, 275)
+  assert.equal(w.plausible, true) // exactly at the expected pace
+  assert.equal(fit.VOICE_READ_CHARS_PER_SEC, 6.5)
+})
+
+check('voiceReadWindow: the window edges are inclusive; just outside is not a read', () => {
+  assert.equal(fit.voiceReadWindow(650, 35).plausible, true) // fast but complete
+  assert.equal(fit.voiceReadWindow(650, 275).plausible, true) // slow, careful, twice-through
+  assert.equal(fit.voiceReadWindow(650, 34.9).plausible, false) // a skim, not a read
+  assert.equal(fit.voiceReadWindow(650, 275.1).plausible, false) // ran long — not one read
+  assert.equal(fit.voiceReadWindow(65, 4).plausible, true) // a short passage, read fast (min 3.5s)
+})
+
+check('voiceReadWindow: no numbers, no proof — degenerate inputs are never plausible', () => {
+  assert.equal(fit.voiceReadWindow(0, 30).plausible, false) // no passage
+  assert.equal(fit.voiceReadWindow(0, 30).expectedSec, 0)
+  assert.equal(fit.voiceReadWindow(-5, 30).plausible, false)
+  assert.equal(fit.voiceReadWindow(650, 0).plausible, false) // a zero-length note
+  assert.equal(fit.voiceReadWindow(650, -10).plausible, false)
+  assert.equal(fit.voiceReadWindow(650, NaN).plausible, false)
+  assert.equal(fit.voiceReadWindow(650, undefined).plausible, false)
+  assert.equal(fit.voiceReadWindow('650', '100').plausible, true) // payload-shaped strings coerce
+})
+
+check('voice proof trace: a plausible voice read counts ONCE, through the tap machinery', () => {
+  // The handler's composition, on fixtures: two Read It taps are on
+  // file (streak 2); a plausible voice read of a third passage runs
+  // the window check, then applyFeedback('read') — the same
+  // transition as a tap — and the logged payload dedupes any later
+  // tap or second voice note for that passage.
+  let s = { fit_step: 0, last_good_step: 0, comfy_streak: 2 }
+  const win = fit.voiceReadWindow(390, 58) // expected 60s — a real read-aloud
+  assert.equal(win.plausible, true)
+  s = fit.applyFeedback(s, 'read')
+  assert.deepEqual(s, { fit_step: 1, last_good_step: 0, comfy_streak: 0, effect: 'trial_up' })
+  const logged = [{ kind: 'read', passageId: 'p-voice', fitStepAfter: 1, via: 'voice' }]
+  assert.equal(fit.hasFeedbackFor(logged, 'p-voice'), true) // a tap after the voice read cannot double-count
+  // And an implausible note changes nothing: no transition is run.
+  assert.equal(fit.voiceReadWindow(390, 10).plausible, false)
+})
+
+check('isDispatchDue: inside [morning, morning+30min) is due; the edges behave', () => {
+  const base = { morningMinutes: 450, sentMorningToday: false } // 07:30
+  assert.equal(fit.isDispatchDue({ ...base, nowMinutes: 450 }), true) // the minute itself
+  assert.equal(fit.isDispatchDue({ ...base, nowMinutes: 465.5 }), true) // mid-window, fractional
+  assert.equal(fit.isDispatchDue({ ...base, nowMinutes: 479.99 }), true)
+  assert.equal(fit.isDispatchDue({ ...base, nowMinutes: 480 }), false) // window end is exclusive
+  assert.equal(fit.isDispatchDue({ ...base, nowMinutes: 449.99 }), false) // not yet
+  assert.equal(fit.isDispatchDue({ ...base, nowMinutes: 600 }), false) // long past
+  assert.equal(fit.DISPATCH_WINDOW_MIN, 30)
+})
+
+check('isDispatchDue: an already-sent morning blocks the day; junk inputs never dispatch', () => {
+  assert.equal(fit.isDispatchDue({ morningMinutes: 450, nowMinutes: 455, sentMorningToday: true }), false)
+  assert.equal(fit.isDispatchDue({ morningMinutes: 450, nowMinutes: 455, sentMorningToday: 1 }), false) // truthy blocks
+  assert.equal(fit.isDispatchDue({ morningMinutes: NaN, nowMinutes: 455, sentMorningToday: false }), false)
+  assert.equal(fit.isDispatchDue({ morningMinutes: 450, nowMinutes: undefined, sentMorningToday: false }), false)
+  assert.equal(fit.isDispatchDue({}), false)
+  assert.equal(fit.isDispatchDue(), false)
+  // A midnight morning_time is a real (if unusual) setting, not junk.
+  assert.equal(fit.isDispatchDue({ morningMinutes: 0, nowMinutes: 0, sentMorningToday: false }), true)
+})
+
+check('twin parity: voice + dispatch APIs agree (window, due, constants)', () => {
+  assert.equal(port.VOICE_READ_CHARS_PER_SEC, fit.VOICE_READ_CHARS_PER_SEC)
+  assert.equal(port.VOICE_READ_MIN_FACTOR, fit.VOICE_READ_MIN_FACTOR)
+  assert.equal(port.VOICE_READ_MAX_FACTOR, fit.VOICE_READ_MAX_FACTOR)
+  assert.equal(port.DISPATCH_WINDOW_MIN, fit.DISPATCH_WINDOW_MIN)
+  for (const [chars, dur] of [[650, 100], [650, 35], [650, 276], [0, 10], [120, 3], [120, 40]]) {
+    assert.deepEqual(port.voiceReadWindow(chars, dur), fit.voiceReadWindow(chars, dur))
+  }
+  const dues = [
+    { morningMinutes: 450, nowMinutes: 450, sentMorningToday: false },
+    { morningMinutes: 450, nowMinutes: 480, sentMorningToday: false },
+    { morningMinutes: 450, nowMinutes: 455, sentMorningToday: true },
+    { morningMinutes: 0, nowMinutes: 29, sentMorningToday: false },
+    { morningMinutes: NaN, nowMinutes: 10, sentMorningToday: false },
+  ]
+  for (const d of dues) assert.equal(port.isDispatchDue(d), fit.isDispatchDue(d))
+})
+
 console.log(`reader: ${passed} checks passed`)
