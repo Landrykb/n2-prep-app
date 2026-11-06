@@ -662,3 +662,59 @@ export function isDispatchDue({ morningMinutes, nowMinutes, sentMorningToday } =
   if (sentMorningToday) return false
   return n >= m && n < m + DISPATCH_WINDOW_MIN
 }
+
+// ---------- kanji readings breakdown (Doc 16 §5 amendment #9) ----------
+//
+// The passage arrives CLEAN — the learner reads unaided first. But a
+// word can sit in the "known" set by below-band deck credit while
+// its KANJI was never actually learned: the credit certifies the
+// word, not the glyphs, and the learner ends up staring at a kanji
+// they cannot read inside a passage that supposedly fits them. So
+// the breakdown covers EVERY kanji-bearing word in the passage, not
+// just the new-word candidates — collapsed inside the message (the
+// formatter wraps it in an expandable blockquote), one tap away,
+// never in the way of the clean read. Readings ONLY: meanings live
+// in the Mine / new-word sections; this block answers exactly one
+// question — "how do I read this?".
+
+/** Cap on the breakdown: passages are short, so this only ever
+ *  bites on a degenerate bank row; the first entries by appearance
+ *  win — the ones the learner meets first while reading. */
+export const KANJI_READINGS_CAP = 40
+
+/**
+ * The readings breakdown for a passage's tokens: [{ word, reading }]
+ * in order of first appearance, deduped by surface word. A token
+ * qualifies when its SURFACE carries at least one kanji character,
+ * readingOf(headword) yields a reading, and that reading differs
+ * from the surface (a "reading" identical to the word itself is no
+ * aid). String tokens (legacy bank rows) read as { s: token,
+ * h: token } — the same normalisation as tokenIsKnown. readingOf is
+ * INJECTED: the bot passes the DECK_GLOSS lookup, the app passes its
+ * own gloss source, and the rule stays identical either way. Junk
+ * (non-array tokens, empty surfaces, a missing or throwing
+ * readingOf) yields fewer entries, never a crash.
+ */
+export function kanjiReadings(tokens, readingOf) {
+  const out = []
+  if (!Array.isArray(tokens) || typeof readingOf !== 'function') return out
+  const seen = new Set()
+  for (const token of tokens) {
+    if (out.length >= KANJI_READINGS_CAP) break
+    const t = typeof token === 'string' ? { s: token, h: token } : token
+    const surface = typeof t?.s === 'string' ? t.s : ''
+    if (!surface || seen.has(surface)) continue
+    seen.add(surface)
+    if (!KANJI_RE.test(surface)) continue
+    const headword = typeof t?.h === 'string' && t.h ? t.h : surface
+    let reading = null
+    try {
+      reading = readingOf(headword)
+    } catch {
+      reading = null
+    }
+    if (typeof reading !== 'string' || !reading || reading === surface) continue
+    out.push({ word: surface, reading })
+  }
+  return out
+}

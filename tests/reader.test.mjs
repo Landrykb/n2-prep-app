@@ -1119,6 +1119,140 @@ check('levelKeyboard: bands, the N7+ joke, Not sure — identical in both twins,
   }
 })
 
+// ---------- kanji readings breakdown (Doc 16 §5 amendment #9) ----------
+//
+// The block inside the passage message: EVERY kanji-bearing word,
+// not just the new-word candidates — kanjiReadings takes no known
+// set at all, so a word credited as "known" still earns its
+// reading. The gloss book here is a fixture; the seeded-bank check
+// at the end runs the production DECK_GLOSS over a real row.
+
+const glossOf = (book) => (h) => book[h]
+
+check('kanjiReadings: first-appearance order; lookup by headword, display by surface', () => {
+  const toks = [
+    { s: '猫', h: '猫', l: 'N5' },
+    { s: 'は', h: 'は', l: null },
+    { s: '学校', h: '学校', l: 'N4' },
+    { s: 'へ', h: 'へ', l: null },
+    { s: '行き', h: '行く', l: 'N5' },
+    { s: 'ます', h: 'ます', l: null },
+  ]
+  const book = { '猫': 'ねこ', '学校': 'がっこう', '行く': 'いく' }
+  assert.deepEqual(fit.kanjiReadings(toks, glossOf(book)), [
+    { word: '猫', reading: 'ねこ' },
+    { word: '学校', reading: 'がっこう' },
+    { word: '行き', reading: 'いく' },
+  ])
+})
+
+check('kanjiReadings: a repeated word collapses to its first appearance', () => {
+  const toks = [
+    { s: '犬', h: '犬', l: 'N5' },
+    { s: 'と', h: 'と', l: null },
+    { s: '猫', h: '猫', l: 'N5' },
+    { s: '犬', h: '犬', l: 'N5' },
+    { s: '猫', h: '猫', l: 'N5' },
+  ]
+  assert.deepEqual(fit.kanjiReadings(toks, glossOf({ '犬': 'いぬ', '猫': 'ねこ' })), [
+    { word: '犬', reading: 'いぬ' },
+    { word: '猫', reading: 'ねこ' },
+  ])
+})
+
+check('kanjiReadings: kana-only words never qualify — kanji is the whole point', () => {
+  const toks = [
+    { s: 'カタカナ', h: 'カタカナ', l: null },
+    { s: 'ひらがな', h: 'ひらがな', l: null },
+    { s: '鳥', h: '鳥', l: 'N5' },
+  ]
+  // Even a differing "reading" cannot save a kanji-less surface.
+  const book = { 'カタカナ': 'かたかな', 'ひらがな': 'ヒラガナ', '鳥': 'とり' }
+  assert.deepEqual(fit.kanjiReadings(toks, glossOf(book)), [
+    { word: '鳥', reading: 'とり' },
+  ])
+})
+
+check('kanjiReadings: no gloss, an empty reading, or reading == surface — no entry', () => {
+  const toks = [
+    { s: '龍', h: '龍', l: 'N1' },
+    { s: '心', h: '心', l: 'N3' },
+    { s: '空', h: '空', l: 'N4' },
+  ]
+  const book = { '心': '心', '空': '' }
+  assert.deepEqual(fit.kanjiReadings(toks, glossOf(book)), [])
+})
+
+check('kanjiReadings: the cap keeps the first 40 by appearance', () => {
+  const toks = Array.from({ length: 45 }, (_, i) => ({ s: `漢${i}`, h: `漢${i}`, l: 'N1' }))
+  const out = fit.kanjiReadings(toks, (h) => `よみ${h.slice(1)}`)
+  assert.equal(fit.KANJI_READINGS_CAP, 40)
+  assert.equal(out.length, 40)
+  assert.deepEqual(out[0], { word: '漢0', reading: 'よみ0' })
+  assert.deepEqual(out[39], { word: '漢39', reading: 'よみ39' })
+})
+
+check('kanjiReadings: legacy string tokens work; junk yields nothing, never a crash', () => {
+  const book = { '猫': 'ねこ' }
+  assert.deepEqual(fit.kanjiReadings(['猫', 'は', '猫'], glossOf(book)), [
+    { word: '猫', reading: 'ねこ' },
+  ])
+  assert.deepEqual(fit.kanjiReadings(null, glossOf(book)), [])
+  assert.deepEqual(fit.kanjiReadings(undefined, glossOf(book)), [])
+  assert.deepEqual(fit.kanjiReadings([{ s: '猫', h: '猫', l: 'N5' }], null), [])
+  assert.deepEqual(fit.kanjiReadings([{ s: '猫', h: '猫', l: 'N5' }], () => { throw new Error('boom') }), [])
+  assert.deepEqual(fit.kanjiReadings([null, 42, {}, { s: 7 }, { s: '', h: '猫' }], glossOf(book)), [])
+})
+
+check('twin parity: kanjiReadings agrees across the twins (fixtures, cap, constant)', () => {
+  const book = { '猫': 'ねこ', '学校': 'がっこう', '行く': 'いく', '鳥': 'とり', '心': '心' }
+  const toks = [
+    { s: '猫', h: '猫', l: 'N5' },
+    { s: 'は', h: 'は', l: null },
+    { s: '学校', h: '学校', l: 'N4' },
+    { s: '行き', h: '行く', l: 'N5' },
+    { s: '心', h: '心', l: 'N3' },
+    { s: '鳥', h: '鳥', l: 'N5' },
+    { s: '学校', h: '学校', l: 'N4' },
+  ]
+  assert.deepEqual(port.kanjiReadings(toks, glossOf(book)), fit.kanjiReadings(toks, glossOf(book)))
+  const many = Array.from({ length: 45 }, (_, i) => ({ s: `漢${i}`, h: `漢${i}`, l: 'N1' }))
+  const byIndex = (h) => `よみ${h.slice(1)}`
+  assert.deepEqual(port.kanjiReadings(many, byIndex), fit.kanjiReadings(many, byIndex))
+  assert.equal(port.KANJI_READINGS_CAP, fit.KANJI_READINGS_CAP)
+})
+
+const deckGloss = (await import('../supabase/functions/reader-bot/gloss.ts')).DECK_GLOSS
+
+check('kanjiReadings (seeded bank): the school-teacher letter carries its full breakdown', () => {
+  const rows = parseSeedRows(new URL('../supabase/seed/reading_passages.sql', import.meta.url))
+  const row = rows.get('scene-school-teacher')
+  assert.ok(row, 'seeded row scene-school-teacher exists')
+  const readingOf = (h) => deckGloss[h]?.reading
+  const out = fit.kanjiReadings(row.tokens, readingOf)
+  // The exact breakdown of the passage Landry actually received —
+  // including words far below candidacy (本, 日): the block serves
+  // the staring-at-a-kanji moment, not the new-word list.
+  assert.deepEqual(out, [
+    { word: '面', reading: 'めん' },
+    { word: '時間', reading: 'じかん' },
+    { word: '本', reading: 'ほん' },
+    { word: '日', reading: 'ひ' },
+    { word: '国語', reading: 'こくご' },
+    { word: '授業', reading: 'じゅぎょう' },
+    { word: '友達', reading: 'ともだち' },
+    { word: '心配', reading: 'しんぱいする' },
+  ])
+  // Every entry is a word of the text, in reading order.
+  let last = -1
+  for (const e of out) {
+    const at = row.text.indexOf(e.word)
+    assert.ok(at > last, `${e.word} appears in order`)
+    last = at
+  }
+  assert.deepEqual(port.kanjiReadings(row.tokens, readingOf), out)
+})
+
 // ---------------------------------------------------------------
 // Telegram Mini App identity validation: the suite imports the
 // PRODUCTION module used by supabase/functions/telegram-auth —

@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { applyFeedback, BANDS, bandRank, buildKnownSet, capCandidates, countKnownContent, deckCreditSet, evaluateDraft, fitCallback, FOUNDATIONS_COMFY_TARGET, hasFeedbackFor, isColdStart, isDispatchDue, levelKeyboard, nextForbiddenList, parseFitCallback, passageRatio, pickGentle, pickPassage, pickStarter, resolveBand, serveBandFor, shouldAskLevel, shouldGenerate, unknownContentHeadwords, voiceReadWindow } from './fit.ts'
+import { applyFeedback, BANDS, bandRank, buildKnownSet, capCandidates, countKnownContent, deckCreditSet, evaluateDraft, fitCallback, FOUNDATIONS_COMFY_TARGET, hasFeedbackFor, isColdStart, isDispatchDue, kanjiReadings, levelKeyboard, nextForbiddenList, parseFitCallback, passageRatio, pickGentle, pickPassage, pickStarter, resolveBand, serveBandFor, shouldAskLevel, shouldGenerate, unknownContentHeadwords, voiceReadWindow } from './fit.ts'
 import { DECK_LEVELS } from './deck.ts'
 import { DECK_GLOSS } from './gloss.ts'
 import { segmentText } from './segment.ts'
@@ -92,6 +92,13 @@ import { READ_ALOUD_PASS_SCORE, firstMissedCandidate, scoreReadAloud } from './s
 // · MINI APP: every passage keyboard gains an "Open in Yonde" row
 //   (web_app → the PWA /reader route) — tap-a-word lives there,
 //   where per-word taps are possible; chat stays fully readable.
+// · KANJI READINGS (amendment #9): every passage message carries a
+//   collapsed breakdown of EVERY kanji-bearing word in the passage
+//   (kanjiReadings in fit.ts, readings from DECK_GLOSS) — not just
+//   the new words: a word known by deck credit can still hide a
+//   kanji the learner never learned. Expandable blockquote after
+//   the passage text; the passage itself stays clean, and the
+//   stored text (voice-out, scoring) is untouched.
 //
 // The bot never nags (Doc 16 §9): it sends when asked, greets once
 // each morning when due, and is silent otherwise. There is no
@@ -1038,10 +1045,30 @@ serve(async (req: Request) => {
           ? `\nStretching you a little past ${basisLabel} today — Push Me works both ways: Too Hard brings us back.`
           : `\nKeeping it a notch gentler than ${basisLabel} while it settles.`
       }
+      // Kanji readings breakdown (amendment #9): EVERY kanji-bearing
+      // word in the passage, not just the new words — a word can be
+      // "known" by deck credit while its kanji was never learned,
+      // and the learner stares at glyphs, not headwords. Collapsed
+      // in an expandable blockquote between the passage and the
+      // footer, so the clean read comes first and help is one tap
+      // away; omitted entirely when nothing qualifies. The stored
+      // passage text is untouched — voice-out and scoring read it
+      // raw, exactly as before.
+      const glossBook = DECK_GLOSS as Record<string, { reading: string; meaning: string }>
+      const readings = kanjiReadings(
+        Array.isArray(passage.tokens) ? passage.tokens : [],
+        (h: string) => glossBook[h]?.reading,
+      )
+      const readingsBlock = readings.length > 0
+        ? '<blockquote expandable>📖 <b>Kanji readings</b> — tap to open\n' +
+          readings.map((r) => `${esc(r.word)} （${esc(r.reading)}）`).join('\n') +
+          '</blockquote>'
+        : null
       const lines = [
         `🔍 Hori dug this up for you — ${esc(String(passage.topic || 'Reading'))} · ${esc(String(passage.band))}`,
         '',
         renderPassage(String(passage.text), newWords),
+        ...(readingsBlock ? ['', readingsBlock] : []),
         '',
         footerText,
       ]
