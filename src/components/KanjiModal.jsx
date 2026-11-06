@@ -1,76 +1,10 @@
-import { useEffect, useState, useMemo } from 'react'
-import { X, Brain, Eye, BookOpen, Play, Search, Loader2, AlertCircle } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { X, Brain, Eye, Play, Search, Loader2, AlertCircle } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient.js'
 import TtsButton from './TtsButton.jsx'
 import KanjiTapText from './KanjiTapText.jsx'
+import KanjiLens from './KanjiLens.jsx'
 import { kanjiReadings } from '../lib/kanjiReadings.js'
-const DOODLE_DATA_URL = '/data/doodleData.json'
-
-function useDoodleData() {
-  const [data, setData] = useState(null)
-  useEffect(() => {
-    let cancelled = false
-    fetch(DOODLE_DATA_URL)
-      .then((r) => r.json())
-      .then((d) => { if (!cancelled) setData(d) })
-      .catch(() => { if (!cancelled) setData(null) })
-    return () => { cancelled = true }
-  }, [])
-  return data
-}
-
-function generateDoodle(item, data) {
-  if (item?.doodle) return item.doodle
-  if (!data) return '✨'
-
-  const { meaningEmoji, kanjiEmoji } = data
-  const emojis = []
-  if (item?.meaning) {
-    const words = item.meaning.split(/[^a-zA-Z]+/).filter(Boolean)
-    for (const w of words) {
-      const e = meaningEmoji[w.toLowerCase()]
-      if (e && !emojis.includes(e)) emojis.push(e)
-      if (emojis.length >= 3) break
-    }
-  }
-  if (emojis.length > 0) return emojis.join('')
-
-  if (item?.radicals?.length) return item.radicals.map((r) => r.icon).join('')
-
-  const target = item?.word || item?.char || ''
-  const parts = []
-  for (const ch of target) {
-    const e = kanjiEmoji[ch]
-    if (e && !parts.includes(e)) parts.push(e)
-    if (parts.length >= 3) break
-  }
-  if (parts.length > 0) return parts.join('')
-  return '✨'
-}
-
-function useDoodle(item, data) {
-  const key = useMemo(() => {
-    const id = item?._key || item?.word || item?.pattern || item?.char || item?.front || ''
-    return id ? `n2:mnemonic:${id}` : ''
-  }, [item])
-
-  const doodle = useMemo(() => {
-    if (item?.doodle) return item.doodle
-    if (!data || !key) return '✨✨'
-    const saved = localStorage.getItem(key)
-    const base = saved || generateDoodle(item, data) || '✨'
-    const parts = Array.from(base)
-    return parts.length < 2 ? base + '✨' : base
-  }, [key, item, data])
-
-  useEffect(() => {
-    if (!key) return
-    if (doodle === '✨' || doodle === '✨✨') return
-    if (localStorage.getItem(key) !== doodle) localStorage.setItem(key, doodle)
-  }, [key, doodle])
-
-  return doodle
-}
 
 function Glossary({ items }) {
   return (
@@ -80,71 +14,6 @@ function Glossary({ items }) {
           {g.word} · {g.reading}
         </span>
       ))}
-    </div>
-  )
-}
-
-function DoodleStory({ doodle }) {
-  const parts = Array.from(doodle)
-  const [step, setStep] = useState(0)
-
-  useEffect(() => {
-    if (parts.length <= 1) return
-    const id = setInterval(() => {
-      setStep((s) => (s + 1) % parts.length)
-    }, 700)
-    return () => clearInterval(id)
-  }, [parts.length])
-
-  return (
-    <div className="rounded-xl bg-gradient-to-r from-amber-900/20 to-orange-900/20 border border-amber-500/20 p-4">
-      <h4 className="text-xs uppercase tracking-wider text-amber-300 mb-4 flex items-center gap-2"><Eye size={14} /> Visual story</h4>
-      <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
-        {parts.map((c, i) => (
-          <div
-            key={i}
-            className={`text-3xl sm:text-5xl transition-all duration-500 ${i === step ? 'opacity-100 scale-125 -translate-y-2' : 'opacity-40 scale-90'}`}
-          >
-            {c}
-          </div>
-        ))}
-      </div>
-      <p className="text-center text-xs text-slate-400 mt-4">{step + 1} / {parts.length} · the mnemonic comes alive</p>
-    </div>
-  )
-}
-
-function RadicalStory({ radicals, title }) {
-  const [step, setStep] = useState(0)
-
-  useEffect(() => {
-    if (radicals.length <= 1) return
-    const id = setInterval(() => {
-      setStep((s) => (s < radicals.length - 1 ? s + 1 : 0))
-    }, 1200)
-    return () => clearInterval(id)
-  }, [radicals])
-
-  return (
-    <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4">
-      <h4 className="text-xs uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2"><BookOpen size={14} /> Component story</h4>
-      <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4">
-        {radicals.map((r, i) => (
-          <div
-            key={i}
-            className={`text-center transition-all duration-500 ${i <= step ? 'opacity-100 scale-100' : 'opacity-35 scale-90'}`}
-          >
-            <div className="text-3xl sm:text-5xl mb-1 transition-transform duration-500" style={{ transform: i === step ? 'translateY(-4px)' : 'none' }}>
-              {r.icon}
-            </div>
-            <p className="text-xs font-bold text-white">{r.part}</p>
-            <p className="text-[10px] text-slate-400">{r.name}</p>
-          </div>
-        ))}
-      </div>
-      <p className="text-center text-xs text-slate-400 mt-4">
-        {step + 1} / {radicals.length}: <span className="text-slate-200">{radicals[step]?.name}</span> builds into <span className="text-[#FF8A75]">{title}</span>
-      </p>
     </div>
   )
 }
@@ -251,9 +120,6 @@ function VideoBox({ keyword, type }) {
 }
 
 export default function KanjiModal({ item, onClose }) {
-  const doodleData = useDoodleData()
-  const doodle = useDoodle(item, doodleData)
-
   if (!item) return null
 
   const type = item.type || item._type || (item.char ? 'Kanji' : item.pattern ? 'Grammar' : item.word ? 'Vocab' : 'Common')
@@ -263,12 +129,12 @@ export default function KanjiModal({ item, onClose }) {
   const kun = item.kun || fallback.kun || ''
   const subtitle = item.reading || (on && kun ? `${on} · ${kun}` : on || kun || '')
   const meaning = item.meaning || ''
-  const topIcon = item.image || item.emoji || (doodle ? Array.from(doodle)[0] : '') || '字'
+  const topIcon = item.image || item.emoji || item.char || '字'
   const image = topIcon
   const story = item.story || item.scene || item.mnemonic || ''
   const example = item.example || ''
   const exampleGlossary = item.exampleGlossary || []
-  const radicals = item.radicals || []
+  const lensChar = item.char && [...item.char].length === 1 ? item.char : null
   const form = item.form || ''
   const nuance = item.nuance || ''
   const collocation = item.collocation || ''
@@ -306,7 +172,7 @@ export default function KanjiModal({ item, onClose }) {
             {item.meaningFr && <span className="text-slate-400 text-sm">/ {item.meaningFr}</span>}
           </div>
 
-          {doodle && <DoodleStory doodle={doodle} />}
+          {lensChar && <KanjiLens char={lensChar} item={item} />}
 
           {form && (
             <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4">
@@ -314,8 +180,6 @@ export default function KanjiModal({ item, onClose }) {
               <KanjiTapText text={form} className="text-slate-200 text-sm font-medium" />
             </div>
           )}
-
-          {radicals.length > 0 && <RadicalStory radicals={radicals} title={title} />}
 
           {videoUrl ? (
             <div className="rounded-xl overflow-hidden border border-bun-600/30">

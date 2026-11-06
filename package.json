@@ -16,7 +16,8 @@
     "preview": "vite preview",
     "test:readiness": "TZ=UTC node tests/readiness.test.mjs",
     "test:reader": "TZ=UTC node tests/reader.test.mjs",
-    "test:tts": "TZ=UTC node tests/tts.test.mjs"
+    "test:tts": "TZ=UTC node tests/tts.test.mjs",
+    "test:lens": "TZ=UTC node tests/lens.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.109.0",

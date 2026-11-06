@@ -1,0 +1,415 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Play, Pause, RotateCcw, Loader2 } from 'lucide-react'
+import { getKanjiMeta, getKanjiStrokes, loadComponents, loadKanjiIndex, getRadicals } from '../lib/kanjiDb.js'
+import { flattenComponents, captionFor, strokeAnchor, familyFor, positionWords } from '../lib/kanjiLens.js'
+import { recordMetric } from '../lib/metrics.js'
+
+// Kanji Lens — the evidence-based kanji visualization (docs/18).
+// Components assemble first, with the job the data supports named for
+// each; strokes then draw in order; the kanji is anchored to a real word;
+// and Draw mode is a draw-from-memory self-check — the learner's own eyes
+// are the judge, no score is computed. No emoji, no invented stories:
+// every label traces to KanjiVG / KANJIDIC2 data.
+
+const INK = '#F1F5F9'
+const INK_ACTIVE = '#FF8A75'
+const GUIDE = '#5B4A6B'
+
+function useReducedMotion() {
+  return useMemo(
+    () => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    [],
+  )
+}
+
+const DRAW_CSS = `
+@keyframes lensDraw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+.lens-draw { stroke-dasharray: 1; animation-name: lensDraw; animation-timing-function: ease-in-out; animation-fill-mode: forwards; }
+`
+
+function DrawPad({ paths, char }) {
+  const wrapRef = useRef(null)
+  const canvasRef = useRef(null)
+  const drawingRef = useRef(false)
+  const lastRef = useRef(null)
+  const [revealed, setRevealed] = useState(false)
+  const [marked, setMarked] = useState(null)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    const wrap = wrapRef.current
+    if (!canvas || !wrap) return
+    const size = wrap.clientWidth
+    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
+    canvas.width = size * dpr
+    canvas.height = size * dpr
+    const ctx = canvas.getContext('2d')
+    if (ctx) {
+      ctx.lineWidth = 5 * dpr
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+      ctx.strokeStyle = '#FF8A75'
+    }
+  }, [])
+
+  const point = (e) => {
+    const rect = canvasRef.current.getBoundingClientRect()
+    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
+    return { x: (e.clientX - rect.left) * dpr, y: (e.clientY - rect.top) * dpr }
+  }
+  const onDown = (e) => {
+    e.preventDefault()
+    canvasRef.current.setPointerCapture?.(e.pointerId)
+    drawingRef.current = true
+    lastRef.current = point(e)
+  }
+  const onMove = (e) => {
+    if (!drawingRef.current) return
+    const ctx = canvasRef.current.getContext('2d')
+    const p = point(e)
+    ctx.beginPath()
+    ctx.moveTo(lastRef.current.x, lastRef.current.y)
+    ctx.lineTo(p.x, p.y)
+    ctx.stroke()
+    lastRef.current = p
+  }
+  const onUp = () => { drawingRef.current = false }
+  const clear = () => {
+    const canvas = canvasRef.current
+    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height)
+    setMarked(null)
+  }
+  const mark = (result) => {
+    recordMetric('kanji_draw_attempt', { char, result })
+    setMarked(result)
+  }
+
+  return (
+    <div>
+      <div ref={wrapRef} className="relative w-full aspect-square rounded-xl bg-bun-900/60 border border-bun-600/20 overflow-hidden">
+        <svg viewBox="0 0 109 109" className="absolute inset-0 w-full h-full" aria-hidden="true">
+          <line x1="54.5" y1="0" x2="54.5" y2="109" stroke={GUIDE} strokeWidth="0.5" strokeDasharray="3 3" opacity="0.6" />
+          <line x1="0" y1="54.5" x2="109" y2="54.5" stroke={GUIDE} strokeWidth="0.5" strokeDasharray="3 3" opacity="0.6" />
+          <rect x="0.5" y="0.5" width="108" height="108" fill="none" stroke={GUIDE} strokeWidth="0.5" opacity="0.6" />
+        </svg>
+        {revealed && paths && (
+          <svg viewBox="0 0 109 109" className="absolute inset-0 w-full h-full pointer-events-none">
+            <style>{DRAW_CSS}</style>
+            {paths.map((d, i) => (
+              <path key={i} d={d} pathLength={1} className="lens-draw" style={{ animationDuration: '0.45s', animationDelay: `${i * 0.45}s` }}
+                fill="none" stroke={INK} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" opacity="0.35" />
+            ))}
+          </svg>
+        )}
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 w-full h-full touch-none cursor-crosshair"
+          onPointerDown={onDown}
+          onPointerMove={onMove}
+          onPointerUp={onUp}
+          onPointerLeave={onUp}
+        />
+      </div>
+      <p className="text-xs text-slate-400 mt-3">
+        Draw it from memory. Then Reveal and compare with your own eyes — no score is computed here; your eyes are the check.
+      </p>
+      <div className="flex flex-wrap gap-2 mt-3">
+        <button onClick={() => setRevealed((v) => !v)} className="px-3 py-1.5 rounded-lg bg-bun-700 text-slate-200 text-sm font-medium hover:text-white">{revealed ? 'Hide' : 'Reveal'}</button>
+        <button onClick={clear} className="px-3 py-1.5 rounded-lg bg-bun-700 text-slate-200 text-sm font-medium hover:text-white">Clear</button>
+        <button onClick={() => mark('got')} className={`px-3 py-1.5 rounded-lg text-sm font-medium ${marked === 'got' ? 'bg-emerald-600 text-white' : 'bg-bun-700 text-slate-200 hover:text-white'}`}>I Got It</button>
+        <button onClick={() => mark('not_yet')} className={`px-3 py-1.5 rounded-lg text-sm font-medium ${marked === 'not_yet' ? 'bg-[#FF6B57] text-white' : 'bg-bun-700 text-slate-200 hover:text-white'}`}>Not Yet</button>
+      </div>
+      {marked && <p className="text-xs text-slate-400 mt-2">{marked === 'got' ? 'Marked as yours. It will keep coming back in your reviews until it is proven.' : 'Marked honestly — it stays in your current batch and comes back soon.'}</p>}
+    </div>
+  )
+}
+
+export default function KanjiLens({ char, item }) {
+  const reduced = useReducedMotion()
+  const [lensChar, setLensChar] = useState(char)
+  const [data, setData] = useState(null)
+  const [compMeta, setCompMeta] = useState({})
+  const [familyData, setFamilyData] = useState(null)
+  const [mode, setMode] = useState('assemble')
+  const [step, setStep] = useState(0)
+  const [playing, setPlaying] = useState(false)
+  const [playKey, setPlayKey] = useState(0)
+  const [showNumbers, setShowNumbers] = useState(false)
+  const [strokeStep, setStrokeStep] = useState(0)
+
+  useEffect(() => { setLensChar(char) }, [char])
+
+  useEffect(() => {
+    let cancelled = false
+    setData(null)
+    setCompMeta({})
+    setStep(0)
+    setStrokeStep(0)
+    setMode('assemble')
+    setPlaying(!reduced)
+    Promise.all([getKanjiMeta(lensChar), getKanjiStrokes(lensChar)]).then(([meta, strokes]) => {
+      if (cancelled) return
+      setData({ meta, strokes })
+      const elements = new Set()
+      const collect = (n) => { if (!n) return; if (n.element) elements.add(n.element); (n.children || []).forEach(collect) }
+      collect(strokes?.tree)
+      elements.delete(lensChar)
+      for (const el of elements) {
+        if ([...el].length !== 1) continue
+        getKanjiMeta(el).then((m) => { if (!cancelled && m) setCompMeta((prev) => ({ ...prev, [el]: m })) }).catch(() => {})
+      }
+    }).catch(() => { if (!cancelled) setData({ meta: null, strokes: null }) })
+    return () => { cancelled = true }
+  }, [lensChar, reduced])
+
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([loadComponents(), loadKanjiIndex(), getRadicals()]).then(([components, index, radicals]) => {
+      if (!cancelled) setFamilyData({ components, index, radicals })
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
+  const meta = data?.meta || null
+  const strokes = data?.strokes || null
+  const paths = strokes?.paths || null
+  const flat = useMemo(() => flattenComponents(strokes?.tree || null, meta), [strokes, meta])
+  const topComps = useMemo(() => {
+    const tops = flat.filter((n) => n.depth === 1)
+    return tops.length ? tops : flat.filter((n) => n.depth === 0)
+  }, [flat])
+  const strokeComp = useMemo(() => {
+    const map = new Map()
+    topComps.forEach((node, ci) => node.strokes.forEach((si) => map.set(si, ci)))
+    return map
+  }, [topComps])
+
+  const family = useMemo(() => {
+    if (!familyData || !meta) return null
+    const byChar = new Map(familyData.index.map((r) => [r.char, r]))
+    const radicalMembers = meta.radical != null ? familyData.index.filter((r) => r.radical === meta.radical).map((r) => r.char) : []
+    return familyFor(lensChar, meta, strokes?.tree || null, {
+      components: familyData.components,
+      metaOf: (c) => byChar.get(c) || null,
+      radicalMembers,
+    })
+  }, [familyData, meta, strokes, lensChar])
+
+  // Assemble playback: advance one component at a time while playing.
+  useEffect(() => {
+    if (mode !== 'assemble' || !playing || !paths) return
+    if (step >= topComps.length) { setPlaying(false); return }
+    const count = topComps[step]?.strokes.length || 1
+    const id = setTimeout(() => setStep((s) => s + 1), 320 + count * 300)
+    return () => clearTimeout(id)
+  }, [mode, playing, step, topComps, paths])
+
+  if (!data) {
+    return (
+      <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4 flex items-center gap-2 text-sm text-slate-400">
+        <Loader2 size={16} className="animate-spin" /> Loading kanji data…
+      </div>
+    )
+  }
+  if (!meta && !strokes) {
+    return (
+      <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4 text-sm text-slate-400">
+        {lensChar} is not in the kanji database yet.
+      </div>
+    )
+  }
+
+  const radicalInfo = familyData?.radicals?.find((r) => r.n === meta?.radical) || null
+  const currentComp = mode === 'assemble' && topComps.length ? topComps[Math.min(step, topComps.length - 1)] : null
+  const currentCaption = currentComp
+    ? captionFor(currentComp, {
+        meaning: compMeta[currentComp.element]?.meanings?.[0] || '',
+        soundOn: currentComp.role === 'sound' ? (family?.soundOn || familyData?.components?.[currentComp.element]?.[1] || '') : '',
+      })
+    : ''
+
+  const wordExample = (() => {
+    if (!item) return null
+    let word = item.word || ''
+    if (!word && Array.isArray(item.examples) && item.examples[0]) {
+      const e = item.examples[0]
+      word = e.reading ? `${e.word}（${e.reading}）` : e.word || ''
+    }
+    const sentence = item.example || ''
+    if (!word && !sentence) return null
+    return { word, sentence }
+  })()
+
+  const swap = (el) => { if (el && el !== lensChar) setLensChar(el) }
+
+  const renderPath = (d, i) => {
+    if (!paths) return null
+    if (mode === 'assemble') {
+      const ci = strokeComp.get(i) ?? 0
+      if (ci < step) return <path key={i} d={d} pathLength={1} style={{ strokeDasharray: 1, strokeDashoffset: 0 }} fill="none" stroke={INK} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+      if (ci === step) {
+        const within = topComps[ci].strokes.indexOf(i)
+        return (
+          <path key={`${playKey}-${step}-${i}`} d={d} pathLength={1}
+            className={playing && !reduced ? 'lens-draw' : undefined}
+            style={{ strokeDasharray: 1, strokeDashoffset: playing && !reduced ? undefined : 1, animationDuration: '0.3s', animationDelay: `${within * 0.3}s`, animationPlayState: playing ? 'running' : 'paused' }}
+            fill="none" stroke={INK_ACTIVE} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+        )
+      }
+      return <path key={i} d={d} pathLength={1} style={{ strokeDasharray: 1, strokeDashoffset: 1 }} fill="none" stroke={INK} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+    }
+    // Stroke Order mode
+    if (reduced) {
+      const shown = i < strokeStep
+      return <path key={i} d={d} pathLength={1} style={{ strokeDasharray: 1, strokeDashoffset: shown ? 0 : 1 }} fill="none" stroke={INK} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+    }
+    return (
+      <path key={`${playKey}-${i}`} d={d} pathLength={1}
+        className={playing ? 'lens-draw' : undefined}
+        style={{ strokeDasharray: 1, strokeDashoffset: playing ? undefined : 0, animationDuration: '0.45s', animationDelay: `${i * 0.45}s` }}
+        fill="none" stroke={INK} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+    )
+  }
+
+  return (
+    <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4">
+      <style>{DRAW_CSS}</style>
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <h4 className="text-xs uppercase tracking-wider text-slate-400">Kanji Lens</h4>
+        {lensChar !== char && (
+          <button onClick={() => setLensChar(char)} className="text-xs px-2 py-1 rounded-lg bg-bun-700 text-slate-300 hover:text-white">Back To {char}</button>
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-4">
+        {[['assemble', 'Assemble'], ['strokes', 'Stroke Order'], ['draw', 'Draw']].map(([m, label]) => (
+          <button key={m} onClick={() => { setMode(m); if (m !== 'draw') { setPlaying(!reduced); setPlayKey((k) => k + 1) } }}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium ${mode === m ? 'bg-[#FF6B57] text-white' : 'bg-bun-700 text-slate-300 hover:text-white'}`}>
+            {label}
+          </button>
+        ))}
+        {mode === 'strokes' && (
+          <button onClick={() => setShowNumbers((v) => !v)} aria-pressed={showNumbers}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium ${showNumbers ? 'bg-[#71368A] text-white' : 'bg-bun-700 text-slate-300 hover:text-white'}`}>
+            Numbers
+          </button>
+        )}
+      </div>
+
+      {mode === 'draw' ? (
+        <div className="max-w-[320px] mx-auto w-full">
+          <DrawPad key={lensChar} paths={paths} char={lensChar} />
+        </div>
+      ) : paths ? (
+        <div>
+          <div className="max-w-[320px] mx-auto w-full rounded-xl bg-bun-900/60 border border-bun-600/20">
+            <svg viewBox="0 0 109 109" className="w-full h-auto block">
+              {paths.map((d, i) => (
+                <path key={`g-${i}`} d={d} fill="none" stroke={GUIDE} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" opacity="0.35" />
+              ))}
+              {paths.map((d, i) => renderPath(d, i))}
+              {mode === 'strokes' && showNumbers && paths.map((d, i) => {
+                const a = strokeAnchor(d)
+                if (!a) return null
+                return <text key={`n-${i}`} x={Math.max(1, a.x - 4)} y={Math.max(6, a.y - 2)} fontSize="6" fill="#94A3B8">{i + 1}</text>
+              })}
+            </svg>
+          </div>
+          <p className="text-center text-sm text-slate-300 mt-3 min-h-[1.25rem]">
+            {mode === 'assemble'
+              ? (step >= topComps.length ? `${lensChar} — assembled from ${topComps.length} component${topComps.length === 1 ? '' : 's'}.` : currentCaption)
+              : `${paths.length} strokes — watch the order${showNumbers ? '; each number sits where its stroke starts' : ''}.`}
+          </p>
+          <div className="flex flex-wrap justify-center gap-2 mt-2">
+            {reduced ? (
+              <button onClick={() => { if (mode === 'assemble') setStep((s) => Math.min(s + 1, topComps.length)); else setStrokeStep((s) => Math.min(s + 1, paths.length)) }}
+                className="px-3 py-1.5 rounded-lg bg-bun-700 text-slate-200 text-sm font-medium hover:text-white">Step Forward</button>
+            ) : (
+              <button onClick={() => setPlaying((p) => !p)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bun-700 text-slate-200 text-sm font-medium hover:text-white">
+                {playing ? <Pause size={14} /> : <Play size={14} />} {playing ? 'Pause' : 'Play'}
+              </button>
+            )}
+            <button onClick={() => { setStep(0); setStrokeStep(0); setPlayKey((k) => k + 1); setPlaying(!reduced) }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bun-700 text-slate-200 text-sm font-medium hover:text-white">
+              <RotateCcw size={14} /> Replay
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="text-center py-4">
+          <p className="text-7xl font-bold text-white">{lensChar}</p>
+          <p className="text-xs text-slate-400 mt-3">No stroke data for this kanji yet — the breakdown below comes from its dictionary entry.</p>
+        </div>
+      )}
+
+      {wordExample && (
+        <p className="text-sm text-slate-300 mt-4 text-center">
+          <span className="text-slate-500">In a word:</span>{' '}
+          <span className="text-slate-100 font-medium">{wordExample.word}</span>
+          {wordExample.sentence && <span className="block text-xs text-slate-400 mt-1">{wordExample.sentence}</span>}
+        </p>
+      )}
+
+      {flat.length > 1 && (
+        <div className="mt-5">
+          <h5 className="text-xs uppercase tracking-wider text-slate-400 mb-2">What It Is Built From</h5>
+          <div className="space-y-1.5">
+            {flat.filter((n) => n.depth >= 1).map((n, i) => {
+              const cm = compMeta[n.element]
+              const shared = family?.parts?.[n.element]?.count || 0
+              return (
+                <button key={i} onClick={() => swap(n.element)} disabled={[...String(n.element || '')].length !== 1}
+                  className="w-full text-left flex items-baseline gap-2 rounded-lg px-2 py-1.5 hover:bg-bun-700/60 disabled:hover:bg-transparent"
+                  style={{ marginLeft: `${(n.depth - 1) * 18}px` }}>
+                  <span className="text-xl font-bold text-white">{n.element}</span>
+                  {n.role === 'radical' && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#71368A] text-white">Radical</span>}
+                  {n.role === 'sound' && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#FF6B57] text-white">Sound</span>}
+                  <span className="text-xs text-slate-400">
+                    {[positionWords(n.position), cm?.meanings?.[0] || '', cm?.on?.[0] || '', shared > 1 ? `${shared} kanji share this part` : ''].filter(Boolean).join(' · ')}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {family?.soundComponent && family.sound.length > 0 && (
+        <div className="mt-5">
+          <h5 className="text-xs uppercase tracking-wider text-slate-400 mb-2">
+            Sound Family — {family.soundComponent}{family.soundOn ? ` gives ${family.soundOn}` : ''}
+          </h5>
+          <div className="flex flex-wrap gap-2">
+            {family.sound.map((m) => (
+              <button key={m.char} onClick={() => swap(m.char)}
+                className={`px-2.5 py-1.5 rounded-lg bg-bun-700/60 text-left ${m.matches ? '' : 'opacity-45'}`}>
+                <span className="text-lg font-bold text-white">{m.char}</span>
+                {m.on && <span className="block text-[10px] text-slate-400">{m.on}</span>}
+              </button>
+            ))}
+          </div>
+          {family.sound.some((m) => !m.matches) && (
+            <p className="text-[11px] text-slate-500 mt-2">Dimmed members drifted to a different sound — the component is a clue, not a promise.</p>
+          )}
+        </div>
+      )}
+
+      {family && family.radical.length > 0 && (
+        <div className="mt-5">
+          <h5 className="text-xs uppercase tracking-wider text-slate-400 mb-2">
+            Same Radical{radicalInfo ? ` — ${radicalInfo.char} (No. ${meta.radical})` : ''}
+          </h5>
+          <div className="flex flex-wrap gap-2">
+            {family.radical.map((c) => (
+              <button key={c} onClick={() => swap(c)} className="px-2.5 py-1.5 rounded-lg bg-bun-700/60">
+                <span className="text-lg font-bold text-white">{c}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <p className="text-[10px] text-slate-500 mt-5">Strokes &amp; components: KanjiVG (CC BY-SA 3.0) · Readings &amp; meanings: KANJIDIC2 (EDRDG)</p>
+    </div>
+  )
+}
