@@ -1,17 +1,17 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { BANDS, buildKnownSet, capCandidates, countKnownContent, deckCreditSet, evaluateDraft, isColdStart, nextForbiddenList, passageRatio, pickPassage, pickStarter, resolveBand, shouldAskLevel, shouldGenerate } from './fit.ts'
+import { applyFeedback, BANDS, buildKnownSet, capCandidates, countKnownContent, deckCreditSet, evaluateDraft, fitCallback, hasFeedbackFor, isColdStart, nextForbiddenList, parseFitCallback, passageRatio, pickPassage, pickStarter, resolveBand, serveBandFor, shouldAskLevel, shouldGenerate } from './fit.ts'
 import { DECK_LEVELS } from './deck.ts'
 import { DECK_GLOSS } from './gloss.ts'
 import { segmentText } from './segment.ts'
 
 // Yonde Reader bot (Doc 16 §6/§7 R0, Doc 12 step 3.6).
 //
-// One function, two routes:
+// One route only:
 //   POST /functions/v1/reader-bot            — the Telegram webhook.
-//   POST /functions/v1/reader-bot?setup=1    — operator setup: registers
-//     the webhook (with its secret) and the bot's command list with
-//     Telegram, so the bot token never leaves Supabase env.
+// Operator setup (webhook + command registration) lives in the
+// separate reader-admin function, so the bot token never leaves
+// Supabase env and this function carries no dead admin door.
 //
 // R0 scope (Doc 16 §7): linking via one-time codes the app mints,
 // /read on demand with passages spine-fitted per learner (fit.ts — the
@@ -33,6 +33,16 @@ import { segmentText } from './segment.ts'
 // a starting belief the learner states, overridden by a real
 // diagnosis whenever one exists, and labelled as declared in every
 // footer. /level re-opens the question at any time.
+// Adaptive fit (Doc 16 §5 amendment #4): even a stated level is a
+// snapshot, so the fit ADAPTS ITSELF around the basis band. Every
+// passage send carries a feedback row — [Read It ✓] [Push Me 🔥]
+// [Too Hard] — whose taps move a step state on the link row
+// (fit_step / last_good_step / comfy_streak, migration 00012) via
+// applyFeedback in fit.ts: comfortable reads ratchet the previous
+// known level and trial a stretch, Push Me steps up for fun, and
+// Too Hard runs the overshoot protocol (apologize, explain what
+// was sent, step back to the previous known level — never a crash
+// below it). /read aims at serveBandFor(basis, fit_step).
 // No morning dispatch (R1), no Mini App (R1), no voice (R2).
 //
 // The bot never nags (Doc 16 §9): it sends when asked, and is silent
@@ -338,38 +348,13 @@ serve(async (req: Request) => {
   try {
     const url = new URL(req.url)
 
-    // ---------- setup route (operator only) ----------
-    if (url.searchParams.get('setup') === '1') {
-      // Admin pattern from call-scheduler: the shared admin secret, or
-      // the runtime service key as bearer. (call-scheduler's third path,
-      // a gateway-verified legacy service_role JWT, is deliberately not
-      // replicated: setup is a rare operator call and the admin secret
-      // is the documented route.)
-      const adminSecret = Deno.env.get('PUSH_ADMIN_SECRET') ?? ''
-      const providedSecret = req.headers.get('X-Admin-Secret') ?? ''
-      const bearer = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '')
-      const authorised = (providedSecret !== '' && providedSecret === adminSecret)
-        || (bearer !== '' && bearer === serviceKey)
-      if (!authorised) return json({ error: 'Unauthorized' }, 401)
-      if (!botToken || !webhookSecret) {
-        return json({ error: 'READER_BOT_TOKEN / READER_WEBHOOK_SECRET are not set on this function' }, 500)
-      }
-      const webhookUrl = `${supabaseUrl}/functions/v1/reader-bot`
-      const setWebhook = await tg(botToken, 'setWebhook', {
-        url: webhookUrl,
-        secret_token: webhookSecret,
-        allowed_updates: ['message', 'callback_query'],
-      })
-      const setMyCommands = await tg(botToken, 'setMyCommands', {
-        commands: [
-          { command: 'read', description: 'Send me a passage at my level' },
-          { command: 'level', description: 'Tell Hori your level (one tap)' },
-          { command: 'unlink', description: 'Disconnect this chat from Yonde' },
-          { command: 'start', description: 'Link this chat to your Yonde account' },
-        ],
-      })
-      return json({ ok: true, webhookUrl, setWebhook, setMyCommands })
-    }
+    // ---------- no setup route here — on purpose ----------
+    // Registration (webhook + command list) lives in the separate
+    // reader-admin function (verify_jwt = true + the service_role
+    // claims check). This function's earlier ?setup=1 route accepted
+    // only the unrecoverable admin secret or the gateway-rejected
+    // runtime key, so it could never be used — a dead door is attack
+    // surface, and it was removed 2026-11-06 (Doc 16).
 
     // ---------- webhook route ----------
     // Fail closed: no configured secret, no service.
@@ -394,7 +379,7 @@ serve(async (req: Request) => {
     const linkByChat = async (chatId: number) => {
       const { data } = await supabaseAdmin
         .from('telegram_links')
-        .select('user_id, chat_id, username, declared_band')
+        .select('user_id, chat_id, username, declared_band, fit_step, last_good_step, comfy_streak')
         .eq('chat_id', chatId)
         .maybeSingle()
       return data
@@ -434,7 +419,10 @@ serve(async (req: Request) => {
       const band = resolvedBand ?? 'N4' // gentle default; the footer says so
       const credit = resolvedBand ? deckCreditSet(DECK_LEVELS, resolvedBand) : null
       const known = buildKnownSet(queue, [], credit)
-      return { queue, known, hasDiagnosis, band, bandSource }
+      // basisBand is the resolved band itself (null when 'none'):
+      // adaptive fit (amendment #4) shifts the SERVE band from it,
+      // while credit above keeps following the basis untouched.
+      return { queue, known, hasDiagnosis, band, bandSource, basisBand: resolvedBand }
     }
 
     // ---------- R0.5 generation fallback ----------
@@ -529,7 +517,18 @@ serve(async (req: Request) => {
       const declaredBand = opts.declaredBand !== undefined ? opts.declaredBand : (link.declared_band ?? null)
       const row = await loadState(link.user_id)
       const state = (row?.state ?? {}) as Record<string, unknown>
-      const { queue, known, hasDiagnosis, band, bandSource } = knownFor(state, declaredBand)
+      const { queue, known, hasDiagnosis, band, bandSource, basisBand } = knownFor(state, declaredBand)
+
+      // Adaptive fit (Doc 16 §5 amendment #4): /read aims at the
+      // SERVE band — the basis band shifted by the learner's fit
+      // step (serveBandFor, both fitting twins). The ±1 pick window
+      // and the generation prompt follow the serve band; the deck
+      // credit inside knownFor keeps following the BASIS band,
+      // because credit certifies what the learner knows — the step
+      // only chooses where in the window to aim. No basis → no
+      // serve band → the gentle N4 default in `band` stands.
+      const fitStep = Number(link.fit_step ?? 0) || 0
+      const serveBand = serveBandFor(basisBand, fitStep) ?? band
 
       // The level ask (Doc 16 §5 amendment #3): a linked learner
       // with NO band basis gets one question before any passage —
@@ -578,7 +577,12 @@ serve(async (req: Request) => {
         // amendment #2): a labelled low-band passage whose mined
         // words become the first real known set. The gate is not
         // consulted — with ~no known words it cannot pass anything,
-        // which is the dead end this track exists to end.
+        // which is the dead end this track exists to end. Starter
+        // SELECTION also ignores the adaptive fit step in v1
+        // (amendment #4): the starter shelf is the floor, not a
+        // stretch target — but starter sends carry the feedback
+        // row like every send, and their taps move the same step
+        // state the fitted path reads.
         const starter = pickStarter(bank, known, recentIds)
         if (starter) {
           picked = {
@@ -589,7 +593,7 @@ serve(async (req: Request) => {
         }
       }
       if (!picked) {
-        const fit = pickPassage(bank, known, band, recentIds)
+        const fit = pickPassage(bank, known, serveBand, recentIds)
         if (fit) picked = { passage: fit.passage as Record<string, unknown>, ratio: fit.ratio }
       }
       if (!picked && !cold) {
@@ -600,7 +604,7 @@ serve(async (req: Request) => {
         // cold: generation validates drafts against the known set,
         // and against ~nothing every verdict is meaningless — the
         // spend buys rejections, not passages.
-        picked = await tryGenerate(link, state, known, band)
+        picked = await tryGenerate(link, state, known, serveBand)
       }
       if (!picked) {
         const nothingFits = queue.length === 0
@@ -639,36 +643,60 @@ serve(async (req: Request) => {
       const newWords = candidates.filter((c) => c.word && !known.has(c.h || c.word))
       const pct = Math.round(picked.ratio * 100)
 
+      // The footer names the fitting basis (Doc 16 §5 labelling):
+      // with a diagnosis, the learner's level (via below-band deck
+      // credit) and their queue; with a declared band, the level
+      // THEY stated and their queue — the wording says the band
+      // came from their tap, never from a measurement; with no
+      // basis, the queue only. The copy must never claim level
+      // fitting that did not happen, on a basis that did not
+      // happen. A starter gets its own footer for the same reason:
+      // no fit was measured, so none is claimed (amendment #2).
+      let footerText = coldStart
+        ? STARTER_FOOTER
+        : bandSource === 'diagnosis'
+        ? `Fitted to your ${esc(band)} level and your queue: about ${pct}% of its words should already be familiar (an estimate) · ${newWords.length} new word${newWords.length === 1 ? '' : 's'}`
+        : bandSource === 'declared'
+        ? `Fitted to the ${esc(band)} you told me and your queue: about ${pct}% of its words should already be familiar (an estimate) · ${newWords.length} new word${newWords.length === 1 ? '' : 's'}` +
+          '\nYour checkup in Yonde sharpens this whenever you want it.'
+        : `Fitted to your queue: about ${pct}% of its words should already be familiar (an estimate) · ${newWords.length} new word${newWords.length === 1 ? '' : 's'}` +
+          '\nBand N4 is a gentle default — take the 10-minute checkup in Yonde and I will fit to your real level.'
+      // Adaptive fit (amendment #4): when the step is off zero the
+      // footer says so in plain language — a stretch is named as a
+      // stretch (with the way back named too), a gentler notch as
+      // settling. Basis labelling above stays the basis; this line
+      // is about where the fit AIMED today. Starters never claim
+      // it: their selection ignores the step in v1.
+      if (!coldStart && fitStep !== 0) {
+        const basisLabel = esc(basisBand ?? band)
+        footerText += fitStep > 0
+          ? `\nStretching you a little past ${basisLabel} today — Push Me works both ways: Too Hard brings us back.`
+          : `\nKeeping it a notch gentler than ${basisLabel} while it settles.`
+      }
       const lines = [
         `🔍 Hori dug this up for you — ${esc(String(passage.topic || 'Reading'))} · ${esc(String(passage.band))}`,
         '',
         renderPassage(String(passage.text), newWords),
         '',
-        // The footer names the fitting basis (Doc 16 §5 labelling):
-        // with a diagnosis, the learner's level (via below-band deck
-        // credit) and their queue; with a declared band, the level
-        // THEY stated and their queue — the wording says the band
-        // came from their tap, never from a measurement; with no
-        // basis, the queue only. The copy must never claim level
-        // fitting that did not happen, on a basis that did not
-        // happen. A starter gets its own footer for the same reason:
-        // no fit was measured, so none is claimed (amendment #2).
-        (coldStart
-          ? STARTER_FOOTER
-          : bandSource === 'diagnosis'
-          ? `Fitted to your ${esc(band)} level and your queue: about ${pct}% of its words should already be familiar (an estimate) · ${newWords.length} new word${newWords.length === 1 ? '' : 's'}`
-          : bandSource === 'declared'
-          ? `Fitted to the ${esc(band)} you told me and your queue: about ${pct}% of its words should already be familiar (an estimate) · ${newWords.length} new word${newWords.length === 1 ? '' : 's'}` +
-            '\nYour checkup in Yonde sharpens this whenever you want it.'
-          : `Fitted to your queue: about ${pct}% of its words should already be familiar (an estimate) · ${newWords.length} new word${newWords.length === 1 ? '' : 's'}` +
-            '\nBand N4 is a gentle default — take the 10-minute checkup in Yonde and I will fit to your real level.'),
+        footerText,
       ]
-      const extra: Record<string, unknown> = {}
+      // Every passage send carries the adaptive-fit feedback row
+      // (amendment #4) under Mine: [Read It ✓] [Push Me 🔥]
+      // [Too Hard]. The payloads carry the passage id (fitCallback)
+      // so the handler can dedupe — one tap per passage counts —
+      // and so Too Hard can explain THAT passage. Read It ✓ is
+      // self-report, honestly: chat cannot verify a read (the
+      // voice-note proof belongs to R2, §5 amendment #4).
+      const keyboardRows: Record<string, string>[][] = []
       if (newWords.length > 0) {
-        extra.reply_markup = {
-          inline_keyboard: [[{ text: 'Mine the New Words', callback_data: `mine:${String(passage.id)}` }]],
-        }
+        keyboardRows.push([{ text: 'Mine the New Words', callback_data: `mine:${String(passage.id)}` }])
       }
+      keyboardRows.push([
+        { text: 'Read It ✓', callback_data: fitCallback('read', String(passage.id)) },
+        { text: 'Push Me 🔥', callback_data: fitCallback('up', String(passage.id)) },
+        { text: 'Too Hard', callback_data: fitCallback('hard', String(passage.id)) },
+      ])
+      const extra: Record<string, unknown> = { reply_markup: { inline_keyboard: keyboardRows } }
       await sendMessage(botToken, chatId, lines.join('\n'), extra)
       // Event names (Doc 16 §8): passage_sent is the R0 send event;
       // reading_opened belongs to the R1 Mini App and is NOT logged here.
@@ -851,6 +879,135 @@ serve(async (req: Request) => {
       await handleRead(chatId, { fromLevelTap: true, declaredBand: choice })
     }
 
+    // ---------- feedback callback (adaptive fit, amendment #4) ----------
+    const handleFeedback = async (cb: Record<string, unknown>) => {
+      const cbId = String(cb.id ?? '')
+      const from = (cb.from ?? {}) as Record<string, unknown>
+      const message = (cb.message ?? {}) as Record<string, unknown>
+      const chat = (message.chat ?? {}) as Record<string, unknown>
+      const chatId = Number(chat.id)
+      const parsed = parseFitCallback(String(cb.data ?? ''))
+
+      const answer = (text: string) =>
+        tg(botToken, 'answerCallbackQuery', { callback_query_id: cbId, text })
+
+      if (!parsed) {
+        await answer('')
+        return
+      }
+      const { kind, passageId } = parsed
+
+      // The SAME ownership verification as Mine and level: the tap
+      // must be in the linked private chat, from its owner — a
+      // feedback tap moves the learner's fit state, so it is held
+      // to exactly the same standard.
+      const link = Number.isFinite(chatId) ? await linkByChat(chatId) : null
+      if (!link || Number(from.id) !== chatId) {
+        await answer('This chat is not linked to a Yonde account.')
+        return
+      }
+
+      // One feedback tap per passage is enough: the first tap for a
+      // passage id counts, later ones are acknowledged and dropped.
+      // The dedupe source is the reading_feedback events themselves
+      // (the same metrics-lookup pattern as the 14-day exclusion).
+      const { data: priorRows } = await supabaseAdmin
+        .from('metrics_events')
+        .select('payload')
+        .eq('user_id', link.user_id)
+        .eq('type', 'reading_feedback')
+        .order('created_at', { ascending: false })
+        .limit(100)
+      const priorPayloads = (priorRows || []).map((r) => r.payload as Record<string, unknown>)
+      if (hasFeedbackFor(priorPayloads, passageId)) {
+        await answer('Already noted ✓')
+        return
+      }
+
+      const after = applyFeedback(
+        {
+          fit_step: link.fit_step ?? 0,
+          last_good_step: link.last_good_step ?? 0,
+          comfy_streak: link.comfy_streak ?? 0,
+        },
+        kind,
+      )
+      const { error } = await supabaseAdmin
+        .from('telegram_links')
+        .update({
+          fit_step: after.fit_step,
+          last_good_step: after.last_good_step,
+          comfy_streak: after.comfy_streak,
+        })
+        .eq('user_id', link.user_id)
+      if (error) {
+        console.error('reader-bot: fit state write failed')
+        await answer('That did not save on my side — try again.')
+        return
+      }
+      await logEvent(link.user_id, 'reading_feedback', {
+        kind,
+        passageId,
+        fitStepAfter: after.fit_step,
+      })
+
+      if (kind === 'read') {
+        await answer('Logged ✓')
+        if (after.effect === 'trial_up') {
+          // The ratchet just fired: the step was proven comfortable
+          // AND the fit trials up one. Hori says so out loud — a
+          // silent difficulty jump would read as the bot drifting,
+          // and the way back is named in the same breath.
+          await sendMessage(
+            botToken,
+            chatId,
+            '🔍 Three comfortable reads in a row — that level is properly yours now. ' +
+              'The next passage stretches a little past it; that is the fit hardening, one notch at a time. ' +
+              'If it overshoots, Too Hard brings us straight back.',
+          )
+        }
+      } else if (kind === 'up') {
+        await answer(after.effect === 'max' ? 'Already at full stretch' : '🔥 Pushing you')
+      } else if (kind === 'hard') {
+        await answer('Stepping back to your level')
+        // THE OVERSHOOT PROTOCOL (Doc 16 §5 amendment #4): the step
+        // has already returned to last_good_step above — the
+        // previous known level, never a crash below it. What the
+        // learner SEES is the protocol, in order: Hori apologizes,
+        // EXPLAINS WHAT WAS SENT (this passage's new words for this
+        // learner — word — reading — meaning, capped at 12), and
+        // closes by naming where the fit now stands and how it
+        // hardens again: gradually.
+        const { data: passage } = await supabaseAdmin
+          .from('reading_passages')
+          .select('id, band, topic, text, tokens, new_word_candidates')
+          .eq('id', passageId)
+          .maybeSingle()
+        let wordLines: string[] = []
+        if (passage) {
+          const stateRow = await loadState(link.user_id)
+          const fbState = (stateRow?.state ?? {}) as Record<string, unknown>
+          const { known } = knownFor(fbState, link.declared_band ?? null)
+          const unknownCands = withCandidateLevels(passage as Record<string, unknown>)
+            .filter((c) => c.word && !known.has(c.h || c.word))
+          wordLines = capCandidates(unknownCands).map((c) => {
+            const bits = [esc(c.word)]
+            if (c.reading && c.reading !== c.word) bits.push(esc(c.reading))
+            if (c.meaning) bits.push(esc(c.meaning))
+            return bits.join(' — ')
+          })
+        }
+        const parts = [
+          '🔍 Sorry — I got ahead of myself with that one.',
+          wordLines.length > 0
+            ? `What was in it — the new words that made it a stretch:\n${wordLines.join('\n')}`
+            : 'It ran ahead of the words you know — that one is on me, not on you.',
+          'We are back at the level that fits you, and it will harden again gradually — a little stretch at a time, never a leap.',
+        ]
+        await sendMessage(botToken, chatId, parts.join('\n\n'))
+      }
+    }
+
     // ---------- dispatch ----------
     if (update.callback_query) {
       const cb = update.callback_query as Record<string, unknown>
@@ -858,6 +1015,8 @@ serve(async (req: Request) => {
         try { await handleMine(cb) } catch (err) { console.error('reader-bot: mine failed', err) }
       } else if (String(cb.data ?? '').startsWith('level:')) {
         try { await handleLevel(cb) } catch (err) { console.error('reader-bot: level failed', err) }
+      } else if (String(cb.data ?? '').startsWith('fit:')) {
+        try { await handleFeedback(cb) } catch (err) { console.error('reader-bot: feedback failed', err) }
       } else if (cb.id) {
         await tg(botToken, 'answerCallbackQuery', { callback_query_id: String(cb.id), text: '' })
       }

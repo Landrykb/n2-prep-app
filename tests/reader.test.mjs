@@ -638,4 +638,135 @@ check('twin parity: band resolution and the ask agree (resolveBand, shouldAskLev
   }
 })
 
+// ---------- adaptive fit: the step state (Doc 16 §5 amendment #4) ----------
+// Landry's design: the fit adapts itself. Push Me steps up for fun;
+// Too Hard steps back to the PREVIOUS KNOWN level (last_good_step),
+// never a crash below it; three comfortable reads ratchet the known
+// level and trial a stretch — progression hardens from time to time,
+// earned by comfort. All spine logic; the gate is untouched.
+
+check('serveBandFor: shifts the basis by the step and clamps at both ends of the ladder', () => {
+  assert.equal(fit.serveBandFor('N3', 0), 'N3')
+  assert.equal(fit.serveBandFor('N3', 1), 'N2') // a stretch aims one band up
+  assert.equal(fit.serveBandFor('N3', -1), 'N4') // a gentler notch aims one down
+  assert.equal(fit.serveBandFor('N5', 1), 'N4')
+  assert.equal(fit.serveBandFor('N1', 1), 'N1') // clamped at the top
+  assert.equal(fit.serveBandFor('N5', -1), 'N5') // clamped at the bottom
+  assert.equal(fit.serveBandFor('N3', 5), 'N2') // an out-of-range step clamps to ±1 first
+  assert.equal(fit.serveBandFor('N3', -5), 'N4')
+})
+
+check('serveBandFor: no basis, no serve band — a step never invents a level', () => {
+  assert.equal(fit.serveBandFor(null, 1), null)
+  assert.equal(fit.serveBandFor(undefined, -1), null)
+  assert.equal(fit.serveBandFor('', 0), null)
+  assert.equal(fit.serveBandFor('N9', 1), null)
+})
+
+check('applyFeedback: comfortable reads log — and the third ratchets last_good and trials up', () => {
+  const s0 = { fit_step: 0, last_good_step: 0, comfy_streak: 0 }
+  const r1 = fit.applyFeedback(s0, 'read')
+  assert.deepEqual(r1, { fit_step: 0, last_good_step: 0, comfy_streak: 1, effect: 'logged' })
+  const r2 = fit.applyFeedback(r1, 'read')
+  assert.deepEqual(r2, { fit_step: 0, last_good_step: 0, comfy_streak: 2, effect: 'logged' })
+  const r3 = fit.applyFeedback(r2, 'read')
+  // Third in a row: step 0 is PROVEN (last_good ratchets to it), the
+  // fit trials one step up, and the streak resets.
+  assert.deepEqual(r3, { fit_step: 1, last_good_step: 0, comfy_streak: 0, effect: 'trial_up' })
+})
+
+check('applyFeedback: at full stretch, the third read proves the stretch instead of overshooting', () => {
+  let s = { fit_step: 1, last_good_step: 0, comfy_streak: 0 }
+  s = fit.applyFeedback(s, 'read')
+  s = fit.applyFeedback(s, 'read')
+  const r = fit.applyFeedback(s, 'read')
+  // No +2 exists: the ratchet moves last_good UP to the proven
+  // stretch, the step stays, the effect says proven, not trial_up.
+  assert.deepEqual(r, { fit_step: 1, last_good_step: 1, comfy_streak: 0, effect: 'proven' })
+})
+
+check('applyFeedback: Push Me steps up once, clamps at max, and clears the streak', () => {
+  const pushed = fit.applyFeedback({ fit_step: 0, last_good_step: 0, comfy_streak: 2 }, 'up')
+  assert.deepEqual(pushed, { fit_step: 1, last_good_step: 0, comfy_streak: 0, effect: 'pushed' })
+  const maxed = fit.applyFeedback({ fit_step: 1, last_good_step: 0, comfy_streak: 0 }, 'up')
+  assert.deepEqual(maxed, { fit_step: 1, last_good_step: 0, comfy_streak: 0, effect: 'max' })
+})
+
+check('applyFeedback: Too Hard returns to the previous known level — never a crash below it', () => {
+  // Stretched by Push Me, unproven: back to the known level 0.
+  const back = fit.applyFeedback({ fit_step: 1, last_good_step: 0, comfy_streak: 1 }, 'hard')
+  assert.deepEqual(back, { fit_step: 0, last_good_step: 0, comfy_streak: 0, effect: 'step_back' })
+  // The stretch was PROVEN (last_good ratcheted to 1): Too Hard
+  // stays at the proven level — proven ground is not lost.
+  const stays = fit.applyFeedback({ fit_step: 1, last_good_step: 1, comfy_streak: 0 }, 'hard')
+  assert.deepEqual(stays, { fit_step: 1, last_good_step: 1, comfy_streak: 0, effect: 'step_back' })
+  // At the floor already: nothing moves (the explanation still
+  // sends — that is the handler's half of the protocol).
+  const floor = fit.applyFeedback({ fit_step: 0, last_good_step: 0, comfy_streak: 0 }, 'hard')
+  assert.deepEqual(floor, { fit_step: 0, last_good_step: 0, comfy_streak: 0, effect: 'step_back' })
+  // An unknown kind never moves the state.
+  const untouched = fit.applyFeedback({ fit_step: 1, last_good_step: 0, comfy_streak: 2 }, 'meh')
+  assert.deepEqual(untouched, { fit_step: 1, last_good_step: 0, comfy_streak: 2, effect: 'ignored' })
+})
+
+check('fit callbacks: payloads round-trip and stay ≤64 bytes even with a uuid passage id', () => {
+  const uuid = '123e4567-e89b-12d3-a456-426614174000' // 36 chars — the longest id shape
+  assert.equal(fit.fitCallback('read', 'scene-city-address'), 'fit:read:scene-city-address')
+  for (const kind of fit.FEEDBACK_KINDS) {
+    const data = fit.fitCallback(kind, uuid)
+    assert.ok(Buffer.byteLength(data, 'utf8') <= 64, `${data} is ${Buffer.byteLength(data, 'utf8')} bytes`)
+    assert.deepEqual(fit.parseFitCallback(data), { kind, passageId: uuid })
+  }
+  assert.equal(Buffer.byteLength(fit.fitCallback('hard', uuid), 'utf8'), 45)
+  // Malformed payloads parse to null, never to a guess.
+  assert.equal(fit.parseFitCallback('mine:abc'), null)
+  assert.equal(fit.parseFitCallback('fit:meh:abc'), null)
+  assert.equal(fit.parseFitCallback('fit:read:'), null)
+  assert.equal(fit.parseFitCallback('fit:read'), null)
+  assert.equal(fit.parseFitCallback(null), null)
+  assert.deepEqual(fit.parseFitCallback('fit:up:foundry-abc-def'), { kind: 'up', passageId: 'foundry-abc-def' })
+})
+
+check('hasFeedbackFor: the first tap for a passage counts; later taps dedupe', () => {
+  const rows = [
+    { kind: 'read', passageId: 'p-1', fitStepAfter: 0 },
+    { kind: 'up', passageId: 'p-2', fitStepAfter: 1 },
+    null,
+    {},
+  ]
+  assert.equal(fit.hasFeedbackFor(rows, 'p-1'), true)
+  assert.equal(fit.hasFeedbackFor(rows, 'p-2'), true) // any kind — one tap per passage, total
+  assert.equal(fit.hasFeedbackFor(rows, 'p-3'), false)
+  assert.equal(fit.hasFeedbackFor([], 'p-1'), false)
+  assert.equal(fit.hasFeedbackFor(null, 'p-1'), false)
+})
+
+check('twin parity: adaptive-fit APIs agree (serve band, transitions, callbacks, dedupe, constants)', () => {
+  assert.equal(port.FIT_STEP_MIN, fit.FIT_STEP_MIN)
+  assert.equal(port.FIT_STEP_MAX, fit.FIT_STEP_MAX)
+  assert.equal(port.COMFY_STREAK_TARGET, fit.COMFY_STREAK_TARGET)
+  assert.deepEqual(port.FEEDBACK_KINDS, fit.FEEDBACK_KINDS)
+  for (const band of ['N5', 'N4', 'N3', 'N2', 'N1', null, 'N9']) {
+    for (const step of [-5, -1, 0, 1, 5]) {
+      assert.equal(port.serveBandFor(band, step), fit.serveBandFor(band, step))
+    }
+  }
+  const states = [
+    { fit_step: 0, last_good_step: 0, comfy_streak: 0 },
+    { fit_step: 0, last_good_step: 0, comfy_streak: 2 },
+    { fit_step: 1, last_good_step: 0, comfy_streak: 2 },
+    { fit_step: 1, last_good_step: 1, comfy_streak: 1 },
+  ]
+  for (const s of states) {
+    for (const kind of ['read', 'up', 'hard', 'meh']) {
+      assert.deepEqual(port.applyFeedback(s, kind), fit.applyFeedback(s, kind))
+    }
+  }
+  assert.equal(port.fitCallback('up', 'p-9'), fit.fitCallback('up', 'p-9'))
+  assert.deepEqual(port.parseFitCallback('fit:hard:p-9'), fit.parseFitCallback('fit:hard:p-9'))
+  const rows = [{ kind: 'read', passageId: 'p-9', fitStepAfter: 0 }]
+  assert.equal(port.hasFeedbackFor(rows, 'p-9'), fit.hasFeedbackFor(rows, 'p-9'))
+  assert.equal(port.hasFeedbackFor(rows, 'p-x'), fit.hasFeedbackFor(rows, 'p-x'))
+})
+
 console.log(`reader: ${passed} checks passed`)

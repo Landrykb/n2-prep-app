@@ -351,3 +351,151 @@ export function capCandidates(candidates, max = 12) {
     .slice(0, Math.max(0, max))
     .map((d) => d.c)
 }
+
+// ---------- adaptive fit: the step state (Doc 16 §5 amendment #4) ----------
+//
+// Landry, live-designing after the declared level shipped: a static
+// level is wrong even as a starting belief — the fit must ADAPT
+// ITSELF. The mechanism is deterministic spine logic (this section,
+// never AI; the 0.93–0.97 gate does not move):
+//
+//   state (on telegram_links, migration 00012):
+//     fit_step       — where /read aims relative to the basis band,
+//                      in [-1, 1]. The pick/generation band is
+//                      serveBandFor(basis, fit_step). Below-band deck
+//                      credit follows the BASIS band, not the serve
+//                      band: credit certifies what the learner
+//                      knows; the step only chooses where in the
+//                      window to aim.
+//     last_good_step — the PREVIOUS KNOWN level: the highest step
+//                      proven comfortable. Too Hard returns fit_step
+//                      to exactly this — back to proven ground,
+//                      never a crash below it.
+//     comfy_streak   — consecutive comfortable reads at the current
+//                      step.
+//
+//   feedback (one tap per passage counts; the bot dedupes):
+//     'read' (Read It ✓): streak + 1. At COMFY_STREAK_TARGET the
+//            step is PROVEN — last_good_step ratchets to it — and,
+//            unless already at full stretch, fit_step trials up one
+//            ('trial_up'): progression hardens from time to time,
+//            earned by comfort, never by calendar. The streak
+//            resets either way once it hits the target.
+//     'up'   (Push Me 🔥): the fun button — fit_step + 1 right now,
+//            clamped at +1 ('max' when already there), streak reset.
+//     'hard' (Too Hard): fit_step = last_good_step ('step_back');
+//            streak reset. The handler pairs this with the
+//            overshoot protocol: apologize, explain what was sent,
+//            step back — the copy carries it, this only moves state.
+//
+// 'read' is SELF-REPORT, honestly labelled (Doc 16 §5 amendment #4):
+// chat cannot know the learner actually read. The rich proof is the
+// voice-note read-aloud, which converges with R2 shadowing and stays
+// gated — v1 never pretends a tap is a measurement.
+
+export const FIT_STEP_MIN = -1
+export const FIT_STEP_MAX = 1
+/** Comfortable reads at one step that prove it (and earn a stretch). */
+export const COMFY_STREAK_TARGET = 3
+
+const clampStep = (n) => {
+  const v = Math.trunc(Number(n) || 0)
+  return Math.max(FIT_STEP_MIN, Math.min(FIT_STEP_MAX, v))
+}
+
+/**
+ * The band /read actually aims at: the basis band shifted by the
+ * fit step, clamped to the N5..N1 ladder. No basis → null (the
+ * caller falls back to its display default; a step never invents
+ * a basis).
+ */
+export function serveBandFor(basisBand, fitStep) {
+  if (!BANDS.includes(basisBand)) return null
+  const idx = BANDS.indexOf(basisBand) + clampStep(fitStep)
+  return BANDS[Math.max(0, Math.min(BANDS.length - 1, idx))]
+}
+
+/**
+ * One feedback tap applied to the step state. Pure: state in,
+ * { ...newState, effect } out, where effect is one of:
+ *   'logged'    — a comfortable read, streak growing
+ *   'trial_up'  — third comfortable read: step proven AND stepped up
+ *   'proven'    — third comfortable read at full stretch: ratcheted
+ *   'pushed'    — Push Me stepped the fit up
+ *   'max'       — Push Me at full stretch already: nothing moved
+ *   'step_back' — Too Hard: back to the previous known level
+ *   'ignored'   — an unknown kind: state returned untouched
+ * A 'hard' tap at fit_step == last_good_step (e.g. both 0) leaves
+ * the step where it is — the overshoot explanation still sends;
+ * the step-back is a floor, not a penalty.
+ */
+export function applyFeedback(state, kind) {
+  let fit_step = clampStep(state?.fit_step)
+  let last_good_step = clampStep(state?.last_good_step)
+  let comfy_streak = Math.max(0, Math.trunc(Number(state?.comfy_streak) || 0))
+  let effect = 'ignored'
+  if (kind === 'read') {
+    comfy_streak += 1
+    if (comfy_streak >= COMFY_STREAK_TARGET) {
+      last_good_step = fit_step // proven — the ratchet
+      comfy_streak = 0
+      if (fit_step < FIT_STEP_MAX) {
+        fit_step += 1
+        effect = 'trial_up'
+      } else {
+        effect = 'proven'
+      }
+    } else {
+      effect = 'logged'
+    }
+  } else if (kind === 'up') {
+    comfy_streak = 0
+    if (fit_step < FIT_STEP_MAX) {
+      fit_step += 1
+      effect = 'pushed'
+    } else {
+      effect = 'max'
+    }
+  } else if (kind === 'hard') {
+    fit_step = last_good_step // the previous known level — never below
+    comfy_streak = 0
+    effect = 'step_back'
+  }
+  return { fit_step, last_good_step, comfy_streak, effect }
+}
+
+/** The feedback kinds the passage-send row carries, in row order. */
+export const FEEDBACK_KINDS = ['read', 'up', 'hard']
+
+/**
+ * Feedback callback payload: `fit:<kind>:<passageId>`. The passage
+ * id rides along so the handler can dedupe (one tap per passage
+ * counts) and so Too Hard can explain THAT passage. Passage ids are
+ * uuids or slugs (≤36 chars here), so the whole payload stays
+ * ≤46 bytes — far under Telegram's 64-byte callback limit, which
+ * rejects oversize silently.
+ */
+export function fitCallback(kind, passageId) {
+  return `fit:${kind}:${passageId}`
+}
+
+/** Inverse of fitCallback; anything malformed parses to null. */
+export function parseFitCallback(data) {
+  if (typeof data !== 'string' || !data.startsWith('fit:')) return null
+  const rest = data.slice('fit:'.length)
+  const sep = rest.indexOf(':')
+  if (sep === -1) return null
+  const kind = rest.slice(0, sep)
+  const passageId = rest.slice(sep + 1)
+  if (!FEEDBACK_KINDS.includes(kind) || !passageId) return null
+  return { kind, passageId }
+}
+
+/**
+ * Dedupe decision, pure: has this passage already had its one
+ * feedback tap? `payloads` are the reading_feedback payloads on
+ * file for the learner ({ kind, passageId, fitStepAfter }).
+ */
+export function hasFeedbackFor(payloads, passageId) {
+  return (payloads || []).some((p) => p && p.passageId === passageId)
+}
