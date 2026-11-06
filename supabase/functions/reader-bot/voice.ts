@@ -29,6 +29,13 @@
 // Deliberately written in plain-JS syntax (no TS-only constructs)
 // like fit.ts / segment.ts, so the node test suite can load it.
 
+// The Edge read-aloud TRUSTED CLIENT TOKEN below is a PUBLIC constant:
+// it ships in Microsoft's own Edge client and in every open-source
+// edge-tts implementation, is identical for every user worldwide, is
+// not issued to anyone, and cannot be rotated or revoked — it only
+// feeds the Sec-MS-GEC checksum. It is not a credential.
+// (GitGuardian flagged it as a generic high-entropy secret on
+// 2026-11-06; resolved as a false positive.) gitguardian:ignore
 const TRUSTED_CLIENT_TOKEN = '6A5AA1D4EAFF4E9FB37E23D68491D6F4'
 const WSS_URL = 'speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1'
 const GEC_VERSION = '1-130.0.2849.68'
