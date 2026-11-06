@@ -5,24 +5,65 @@ import { initTwinSync, stopTwinSync } from '../lib/twinSync.js'
 import { initStateSync, stopStateSync } from '../lib/stateSync.js'
 import { adoptAnonKeys } from '../lib/anonMerge.js'
 import { syncCallWindows } from '../lib/callSync.js'
+import { bridgeTelegramSession, getTelegramInitData } from '../lib/telegramAuth.js'
 
 export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(isSupabaseConfigured)
+  const [telegramBridgeStatus, setTelegramBridgeStatus] = useState('not-telegram')
 
   useEffect(() => {
     if (!supabase) return
 
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session)
-      setLoading(false)
-    })
-
+    let active = true
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, next) => {
-      setSession(next)
+      if (active) setSession(next)
     })
 
-    return () => subscription.unsubscribe()
+    const bootstrap = async () => {
+      const { data } = await supabase.auth.getSession()
+      if (!active) return
+
+      let currentSession = data.session
+
+      // Telegram Mini App only (Doc 16 §5 amendment #8): the
+      // webview's own storage starts empty even for a linked
+      // learner, so exchange Telegram's signed launch identity for
+      // the linked account's session BEFORE the initial loading
+      // state resolves — a linked learner never sees the sign-in
+      // screen flash. The bridge also runs when a session already
+      // exists in the webview, so a different account is corrected
+      // to the account this Telegram chat is linked to. With no
+      // initData, this branch is skipped and bootstrap is exactly
+      // the ordinary getSession path.
+      if (getTelegramInitData()) {
+        const status = await bridgeTelegramSession({
+          client: supabase,
+          currentSession,
+        })
+        if (!active) return
+        setTelegramBridgeStatus(status)
+        if (status === 'bridged' || status === 'already') {
+          const refreshed = await supabase.auth.getSession()
+          if (!active) return
+          currentSession = refreshed.data.session
+        }
+      }
+
+      if (active) {
+        setSession(currentSession)
+        setLoading(false)
+      }
+    }
+
+    bootstrap().catch(() => {
+      if (active) setLoading(false)
+    })
+
+    return () => {
+      active = false
+      subscription.unsubscribe()
+    }
   }, [])
 
   // Phase 2 cloud sync (Doc 02 §5, Doc 04 §7): a signed-in learner gets
@@ -52,6 +93,7 @@ export const AuthProvider = ({ children }) => {
     session,
     user: session?.user ?? null,
     loading,
+    telegramBridgeStatus,
     isSupabaseConfigured,
     signUp: (email, password) => supabase?.auth.signUp({ email, password }),
     signIn: (email, password) => supabase?.auth.signInWithPassword({ email, password }),

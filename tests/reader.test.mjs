@@ -13,6 +13,7 @@ const port = await import('../supabase/functions/reader-bot/fit.ts')
 
 let passed = 0
 const check = (name, fn) => { fn(); passed++; console.log(`  ok ${name}`) }
+const checkAsync = async (name, fn) => { await fn(); passed++; console.log(`  ok ${name}`) }
 
 // '猫' is the known kanji token (placed in the known set); '龍' is a
 // kanji token nobody knows; kana/punctuation tokens carry no kanji.
@@ -1116,6 +1117,69 @@ check('levelKeyboard: bands, the N7+ joke, Not sure — identical in both twins,
   for (const btn of rows.flat()) {
     assert.ok(Buffer.byteLength(btn.callback_data, 'utf8') <= 64, btn.callback_data)
   }
+})
+
+// ---------------------------------------------------------------
+// Telegram Mini App identity validation: the suite imports the
+// PRODUCTION module used by supabase/functions/telegram-auth —
+// validate.ts, WebCrypto only — rather than reimplementing the
+// HMAC here. The signed strings below are fixed known vectors for
+// a test-only token; changing any signed byte must break them.
+const telegramValidate = await import('../supabase/functions/telegram-auth/validate.ts')
+const TELEGRAM_TEST_TOKEN = 'test-only-bot-token'
+const TELEGRAM_NOW = 1_700_000_060
+const TELEGRAM_INIT_DATA =
+  'auth_date=1700000000&query_id=AAHdF6IQAAAAAN0XohDhrOrc&user=%7B%22id%22%3A123456789%2C%22first_name%22%3A%22Test%22%2C%22username%22%3A%22tester%22%7D&hash=b6b89131485477a9da50cc85fdbd8fef3dee4961b2b9336a5caeab9dfa65cc25'
+
+await checkAsync('telegram initData: the production validator accepts the known vector', async () => {
+  const result = await telegramValidate.validateTelegramInitData(
+    TELEGRAM_INIT_DATA,
+    TELEGRAM_TEST_TOKEN,
+    TELEGRAM_NOW,
+  )
+  assert.equal(result.ok, true)
+  assert.equal(result.telegramUserId, 123456789)
+  assert.equal(result.authDate, 1700000000)
+})
+
+await checkAsync('telegram initData: altered signed content fails the HMAC', async () => {
+  const altered = TELEGRAM_INIT_DATA.replace('%22Test%22', '%22Best%22')
+  const result = await telegramValidate.validateTelegramInitData(
+    altered,
+    TELEGRAM_TEST_TOKEN,
+    TELEGRAM_NOW,
+  )
+  assert.deepEqual(result, { ok: false, reason: 'bad_signature' })
+})
+
+await checkAsync('telegram initData: a tampered hash fails closed', async () => {
+  const tampered = TELEGRAM_INIT_DATA.replace(/5$/, '4')
+  const result = await telegramValidate.validateTelegramInitData(
+    tampered,
+    TELEGRAM_TEST_TOKEN,
+    TELEGRAM_NOW,
+  )
+  assert.deepEqual(result, { ok: false, reason: 'bad_signature' })
+})
+
+await checkAsync('telegram initData: auth_date older than 24h is stale', async () => {
+  const result = await telegramValidate.validateTelegramInitData(
+    TELEGRAM_INIT_DATA,
+    TELEGRAM_TEST_TOKEN,
+    TELEGRAM_NOW + telegramValidate.TELEGRAM_INIT_DATA_MAX_AGE_SECONDS,
+  )
+  assert.deepEqual(result, { ok: false, reason: 'stale' })
+})
+
+await checkAsync('telegram initData: a signed but malformed user payload is rejected', async () => {
+  const malformedUser =
+    'auth_date=1700000000&query_id=AAHdF6IQAAAAAN0XohDhrOrc&user=not-json&hash=c539abbdfee23acf1364077e40aff4a4c6fc778808b726bab472e3fcba0f81cf'
+  const result = await telegramValidate.validateTelegramInitData(
+    malformedUser,
+    TELEGRAM_TEST_TOKEN,
+    TELEGRAM_NOW,
+  )
+  assert.deepEqual(result, { ok: false, reason: 'bad_user' })
 })
 
 console.log(`reader: ${passed} checks passed`)

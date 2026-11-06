@@ -5,7 +5,7 @@ import { brand } from '../lib/brand.js'
 import Mascot from './Mascot.jsx'
 
 export default function AuthModal() {
-  const { signUp, signIn, isSupabaseConfigured } = useAuth()
+  const { signUp, signIn, isSupabaseConfigured, telegramBridgeStatus } = useAuth()
   const [mode, setMode] = useState('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -53,6 +53,12 @@ export default function AuthModal() {
           <h2 className="text-2xl font-bold text-white mt-1">{mode === 'signin' ? 'Welcome Back' : 'Create Your Account'}</h2>
           <p className="text-slate-400 text-sm mt-1">Your progress stays private to your account.</p>
         </div>
+
+        {telegramBridgeStatus === 'not-linked' && (
+          <p className="mb-5 rounded-xl border border-sky-400/20 bg-sky-400/10 px-3 py-2 text-sm text-sky-200">
+            This Telegram chat is not linked yet — link it from the bot chat first, or sign in once here and this Mini App will stay signed in.
+          </p>
+        )}
 
         <form onSubmit={submit} className="space-y-4">
           <div>

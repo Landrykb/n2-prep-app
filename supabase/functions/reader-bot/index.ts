@@ -2127,6 +2127,13 @@ serve(async (req: Request) => {
               .from('telegram_links')
               .update({
                 chat_id: chatId,
+                // Migration 00017: Telegram's signed Mini App
+                // identity is the user, not the conversation.
+                // Private chats make the two numbers equal today;
+                // storing from.id explicitly keeps the identity
+                // bridge correct if that ever stops being the
+                // only shape this surface serves.
+                telegram_user_id: typeof from.id === 'number' ? from.id : chatId,
                 username: typeof from.username === 'string' ? from.username : null,
                 linked_at: new Date().toISOString(),
                 link_code: null,
@@ -2173,7 +2180,7 @@ serve(async (req: Request) => {
       } else if (cmd === '/unlink') {
         const { data: cleared } = await supabaseAdmin
           .from('telegram_links')
-          .update({ chat_id: null, username: null, linked_at: null })
+          .update({ chat_id: null, telegram_user_id: null, username: null, linked_at: null })
           .eq('chat_id', chatId)
           .select('user_id')
         await sendMessage(

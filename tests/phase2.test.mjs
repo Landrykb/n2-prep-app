@@ -314,4 +314,43 @@ check('basis: a junk diagnosis falls through to the declaration', () => {
   assert.equal(r.band, 'N4')
 })
 
+// ---------------------------------------------------------------
+// Telegram Mini App bridge decision (src/lib/telegramAuth.js):
+// signed Telegram identity is a door key, never a second account
+// system. The exchange happens only when the function's linked
+// account differs from the webview's current session.
+const telegramAuth = await import('../src/lib/telegramAuth.js')
+
+check('telegram bridge: no signed Telegram launch → ordinary web behaviour', () => {
+  assert.equal(
+    telegramAuth.telegramBridgeDecision({ hasInitData: false, functionUserId: 'user-1', sessionUserId: null }),
+    'not-telegram',
+  )
+  assert.equal(telegramAuth.getTelegramInitData({ Telegram: { WebApp: {} } }), '')
+})
+check('telegram bridge: signed launch with no linked account → not-linked', () => {
+  assert.equal(
+    telegramAuth.telegramBridgeDecision({ hasInitData: true, functionUserId: null, sessionUserId: null }),
+    'not-linked',
+  )
+})
+check('telegram bridge: the linked account is already signed in → no exchange', () => {
+  assert.equal(
+    telegramAuth.telegramBridgeDecision({ hasInitData: true, functionUserId: 'user-1', sessionUserId: 'user-1' }),
+    'already',
+  )
+})
+check('telegram bridge: an empty webview session → bridge', () => {
+  assert.equal(
+    telegramAuth.telegramBridgeDecision({ hasInitData: true, functionUserId: 'user-1', sessionUserId: null }),
+    'bridge',
+  )
+})
+check('telegram bridge: a different webview account → bridge to the linked account', () => {
+  assert.equal(
+    telegramAuth.telegramBridgeDecision({ hasInitData: true, functionUserId: 'user-1', sessionUserId: 'user-2' }),
+    'bridge',
+  )
+})
+
 console.log(`\nphase2: ${passed} checks passed (incl. scheduler-auth)`)
