@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { BookOpenText, CheckCircle2, Pickaxe, RefreshCw } from 'lucide-react'
+import { BookOpenText, CheckCircle2, Mic, Pickaxe, RefreshCw, Square } from 'lucide-react'
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient.js'
 import { useAuth } from '../hooks/useAuth.js'
 import { useFurigana } from '../hooks/useFurigana.js'
@@ -10,8 +10,11 @@ import { recordMetric } from '../lib/metrics.js'
 import {
   BANDS, bandRank, buildKnownSet, countKnownContent, deckCreditSet,
   isColdStart, passageRatio, pickPassage, pickStarter, capCandidates,
-  resolveBand, serveBandFor,
+  resolveBand, serveBandFor, applyFeedback,
 } from '../lib/readerFit.js'
+import {
+  READ_ALOUD_PASS_SCORE, normalizeSpeechText, scoreReadAloud, firstMissedCandidate,
+} from '../lib/readAloud.js'
 import KanjiTapText from './KanjiTapText.jsx'
 import Mascot from './Mascot.jsx'
 
@@ -155,6 +158,30 @@ export default function Reader() {
   const ctxRef = useRef(null)
   const excludedRef = useRef([])
 
+  // Read-aloud proof (Doc 16 §5 amendment #5): the browser's free Web
+  // Speech API transcribes on-device; readAloud.js scores the
+  // transcript against the passage in code. One recognition session
+  // per passage — present() aborts it, so a stale transcript can
+  // never be scored against a new passage.
+  const [aloud, setAloud] = useState(null) // listening | scored | empty | error
+  const recogRef = useRef(null)
+  const finalTextRef = useRef('')
+  const listeningRef = useRef(false)
+  const discardRef = useRef(false) // an aborted session's onend must not score
+  const creditedRef = useRef(new Set()) // passages a voice proof already comfy-credited
+  const completedRef = useRef(new Set()) // passages already logged passage_completed
+  const speechSupported = typeof window !== 'undefined'
+    && !!(window.SpeechRecognition || window.webkitSpeechRecognition)
+
+  function stopListening() {
+    discardRef.current = true
+    listeningRef.current = false
+    try { recogRef.current?.abort() } catch { /* not running */ }
+    recogRef.current = null
+  }
+
+  useEffect(() => () => stopListening(), [])
+
   const doPick = (ctx, excluded) => {
     const recent = [...(ctx.recentIds || []), ...(excluded || [])]
     if (ctx.cold) {
@@ -183,6 +210,8 @@ export default function Reader() {
   }
 
   const present = (next) => {
+    stopListening()
+    setAloud(null)
     setPick(next)
     setFinished(false)
     setMineNote('')
@@ -222,21 +251,44 @@ export default function Reader() {
         // declaration and no step — never to a block.
         let declaredBand = null
         let fitStep = 0
+        let fitState = { fit_step: 0, last_good_step: 0, comfy_streak: 0 }
+        let hasLink = false
         const linkRes = await supabase
           .from('telegram_links')
-          .select('declared_band, fit_step')
+          .select('declared_band, fit_step, last_good_step, comfy_streak')
           .eq('user_id', user.id)
           .maybeSingle()
         if (!linkRes.error && linkRes.data) {
+          hasLink = true
           declaredBand = linkRes.data.declared_band ?? null
           fitStep = Number(linkRes.data.fit_step ?? 0) || 0
+          fitState = {
+            fit_step: fitStep,
+            last_good_step: Number(linkRes.data.last_good_step ?? 0) || 0,
+            comfy_streak: Number(linkRes.data.comfy_streak ?? 0) || 0,
+          }
         } else {
           const fallback = await supabase
             .from('telegram_links')
-            .select('declared_band')
+            .select('declared_band, fit_step')
             .eq('user_id', user.id)
             .maybeSingle()
-          if (!fallback.error && fallback.data) declaredBand = fallback.data.declared_band ?? null
+          if (!fallback.error && fallback.data) {
+            hasLink = true
+            declaredBand = fallback.data.declared_band ?? null
+            fitStep = Number(fallback.data.fit_step ?? 0) || 0
+            fitState = { fit_step: fitStep, last_good_step: 0, comfy_streak: 0 }
+          } else {
+            const lastResort = await supabase
+              .from('telegram_links')
+              .select('declared_band')
+              .eq('user_id', user.id)
+              .maybeSingle()
+            if (!lastResort.error && lastResort.data) {
+              hasLink = true
+              declaredBand = lastResort.data.declared_band ?? null
+            }
+          }
         }
 
         const dict = await loadDictionary()
@@ -280,7 +332,7 @@ export default function Reader() {
         } catch { recentIds = [] }
 
         if (cancelled) return
-        const ctx = { bank, known, deckLevels, serveBand, band, resolvedBand, fitStep, source, cold, recentIds, queueLength: queue.length }
+        const ctx = { bank, known, deckLevels, serveBand, band, resolvedBand, fitStep, fitState, hasLink, source, cold, recentIds, queueLength: queue.length }
         ctxRef.current = ctx
         excludedRef.current = []
         setBandSource(source)
@@ -346,10 +398,123 @@ export default function Reader() {
       : 'Nothing new to mine — you already know, or have already queued, every bolded word in that passage.')
   }
 
+  // passage_completed is logged once per passage per session, from
+  // whichever door earned it — the Finished Reading tap or a passed
+  // read-aloud — never twice for the same read.
+  const logCompleted = (passage, method) => {
+    const id = String(passage.id)
+    if (!completedRef.current.has(id)) {
+      completedRef.current.add(id)
+      recordMetric('passage_completed', {
+        passageId: id,
+        band: String(passage.band),
+        surface: 'web',
+        ...(method ? { method } : {}),
+      })
+    }
+    setFinished(true)
+  }
+
   const finish = () => {
     if (!pick || finished) return
-    recordMetric('passage_completed', { passageId: String(pick.passage.id), band: String(pick.passage.band), surface: 'web' })
-    setFinished(true)
+    logCompleted(pick.passage)
+  }
+
+  // A passed web read-aloud earns exactly what a plausible Telegram
+  // voice note earns (Doc 16 §5 amendments #4/#5): the comfy 'read'
+  // transition on the fit step, once per passage, through the same
+  // applyFeedback the bot runs — persisted to the learner's own
+  // telegram_links row (owner RLS allows the write). Any failure
+  // degrades quietly: the passage_completed metric already landed,
+  // and the step simply moves next time on the surface that can.
+  const applyComfyRead = async (passage) => {
+    const id = String(passage.id)
+    if (creditedRef.current.has(id)) return
+    creditedRef.current.add(id)
+    const ctx = ctxRef.current
+    if (!ctx?.hasLink || !ctx.fitState) return
+    const next = applyFeedback(ctx.fitState, 'read')
+    ctx.fitState = { fit_step: next.fit_step, last_good_step: next.last_good_step, comfy_streak: next.comfy_streak }
+    recordMetric('reading_feedback', { passageId: id, kind: 'read', via: 'webspeech', fitStepAfter: next.fit_step })
+    if (isSupabaseConfigured && supabase && user) {
+      try {
+        await supabase
+          .from('telegram_links')
+          .update({ fit_step: next.fit_step, last_good_step: next.last_good_step, comfy_streak: next.comfy_streak })
+          .eq('user_id', user.id)
+      } catch { /* best effort — the metric above is this session's record */ }
+    }
+  }
+
+  const scoreTranscript = (target, transcript) => {
+    const passage = target.passage
+    const text = String(transcript || '')
+    if (!normalizeSpeechText(text)) { setAloud({ status: 'empty' }); return }
+    const { score } = scoreReadAloud(String(passage.text), text)
+    recordMetric('shadow_attempted', {
+      passageId: String(passage.id),
+      score: Math.round(score * 1000) / 1000,
+      method: 'webspeech',
+    })
+    const passed = score >= READ_ALOUD_PASS_SCORE
+    if (passed) {
+      logCompleted(passage, 'webspeech')
+      void applyComfyRead(passage)
+    }
+    // Nao's one fix: the first new word the voice never reached.
+    setAloud({ status: 'scored', pct: Math.round(score * 100), passed, fix: firstMissedCandidate(target.newWords, text) })
+  }
+
+  const startAloud = () => {
+    if (!pick || listeningRef.current) return
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SR) return // unsupported browsers render the plain note instead of this button
+    const target = pick // the session is bound to THIS passage; present() aborts it on change
+    finalTextRef.current = ''
+    discardRef.current = false
+    const recog = new SR()
+    recog.lang = 'ja-JP'
+    recog.continuous = true
+    recog.interimResults = false
+    recog.onresult = (e) => {
+      let finals = ''
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) finals += e.results[i][0].transcript
+      }
+      if (finals) finalTextRef.current += finals
+    }
+    recog.onerror = (e) => {
+      if (e?.error === 'aborted') return
+      listeningRef.current = false
+      recogRef.current = null
+      setAloud({
+        status: 'error',
+        message: e?.error === 'not-allowed'
+          ? 'The microphone was blocked. Allow microphone access in your browser settings, then try again — nothing was scored.'
+          : 'Speech recognition stopped before it heard a full read — nothing was scored. Try again in a quieter spot.',
+      })
+    }
+    recog.onend = () => {
+      recogRef.current = null
+      if (discardRef.current) { discardRef.current = false; return }
+      if (!listeningRef.current) return
+      listeningRef.current = false
+      scoreTranscript(target, finalTextRef.current)
+    }
+    recogRef.current = recog
+    listeningRef.current = true
+    setAloud({ status: 'listening' })
+    try {
+      recog.start()
+    } catch {
+      listeningRef.current = false
+      recogRef.current = null
+      setAloud({ status: 'error', message: 'Speech recognition could not start — nothing was scored.' })
+    }
+  }
+
+  const stopAndScore = () => {
+    try { recogRef.current?.stop() } catch { /* onend does the scoring */ }
   }
 
   // The footer names the fitting basis — the reader-bot's three
@@ -453,6 +618,53 @@ export default function Reader() {
           </div>
           {mineNote && <p className="text-sm text-emerald-300 flex items-center gap-2"><CheckCircle2 size={15} /> {mineNote}</p>}
           {note && <p className="text-sm text-slate-400">{note}</p>}
+
+          <section className="rounded-3xl glass p-6 card-glow space-y-3">
+            <h3 className="text-base font-bold text-white">Read It Aloud</h3>
+            <p className="text-sm text-slate-400">Read the passage out loud and your browser turns your voice into text — the free speech recognition built into browsers like Chrome. Yonde itself sends nothing anywhere: the matching happens here, in code, and only your score is kept. <span className="text-slate-200">It is a reading match, not a pronunciation grade.</span></p>
+            {!speechSupported ? (
+              <p className="text-sm text-slate-300">Read-aloud scoring needs a browser with speech recognition — Chrome has it built in. Your voice note to Hori in Telegram still counts as a read.</p>
+            ) : aloud?.status === 'listening' ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <button onClick={stopAndScore} className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold flex items-center gap-1.5">
+                  <Square size={15} /> Stop And Score
+                </button>
+                <span className="text-sm text-slate-300">Listening… read the whole passage, then stop.</span>
+              </div>
+            ) : (
+              <button onClick={startAloud} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1.5">
+                <Mic size={15} /> Read Aloud
+              </button>
+            )}
+            {aloud?.status === 'empty' && (
+              <p className="text-sm text-slate-300">I could not hear any words that time — nothing was scored. Try once more, a little closer to the microphone.</p>
+            )}
+            {aloud?.status === 'error' && <p className="text-sm text-rose-300">{aloud.message}</p>}
+            {aloud?.status === 'scored' && (
+              <div className="space-y-3">
+                <p className="text-sm text-slate-300">
+                  Reading match: <span className="text-lg font-bold text-white">{aloud.pct}%</span> of the passage text your voice covered
+                  {aloud.passed ? ' — that counts as a comfortable read, the same as a voice note in Telegram.' : '.'}
+                </p>
+                {aloud.fix ? (
+                  <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4 flex items-start gap-3">
+                    <span className="mt-0.5"><Mascot agent="nao" size={28} showName={false} /></span>
+                    <div className="space-y-1">
+                      <p className="text-sm font-bold text-white">One Fix From Nao</p>
+                      <p className="text-sm text-slate-200">
+                        <span className="font-semibold text-white">{aloud.fix.h || aloud.fix.word}</span>
+                        {aloud.fix.reading && aloud.fix.reading !== (aloud.fix.h || aloud.fix.word) && <span className="text-cyan-300"> （{aloud.fix.reading}）</span>}
+                        {aloud.fix.meaning && <span className="text-slate-400"> — {aloud.fix.meaning}</span>}
+                      </p>
+                      <p className="text-sm text-slate-300">This word did not reach your read. Say its line once more: 「{sentenceWith(String(pick.passage.text), aloud.fix.word)}」</p>
+                    </div>
+                  </div>
+                ) : !aloud.passed ? (
+                  <p className="text-sm text-slate-400">No single word stood out as missed — the match was spread thin across the passage. One more full read, a little slower, usually lifts it.</p>
+                ) : null}
+              </div>
+            )}
+          </section>
         </>
       )}
     </div>

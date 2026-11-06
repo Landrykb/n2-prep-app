@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Phone, PhoneOff, Mic, MicOff, CheckCircle2, RotateCcw, Clock, Bell, Inbox, X, Volume2, VolumeX, ChevronDown } from 'lucide-react'
 import { loadProfile } from '../lib/profile.js'
 import { micErrorCopy } from '../lib/speechErrors.js'
-import { speakText, primeSpeech, ttsAvailable } from '../lib/tts.js'
+import { primeSpeech, ttsAvailable } from '../lib/tts.js'
+import { speakSenseiLine, stopNeuralSpeech } from '../lib/neuralVoice.js'
 import { useFurigana } from '../hooks/useFurigana.js'
 import { segmentFurigana, cleanReading } from '../lib/furigana.js'
 import { localDictionary, lookup } from '../lib/dictionary.js'
@@ -177,7 +178,14 @@ export default function SenseiCall() {
   const clearTimers = () => { timersRef.current.forEach(clearTimeout); timersRef.current = [] }
   const clearSpotTimers = () => { spotTimersRef.current.forEach(clearTimeout); spotTimersRef.current = [] }
 
-  const stopSpeech = () => { try { window.speechSynthesis?.cancel() } catch { /* no speech engine */ } }
+  const stopSpeech = () => {
+    // Both voices stop: the neural audio (if a line is playing from the
+    // tts function) and the device speech engine. stopNeuralSpeech
+    // completes the pending line exactly once, like a cancelled
+    // utterance does, so the turn machine steps on by itself.
+    stopNeuralSpeech()
+    try { window.speechSynthesis?.cancel() } catch { /* no speech engine */ }
+  }
   const stopRecognition = () => {
     listenSessionRef.current += 1 // invalidate any pending recognition callbacks
     const rec = recogRef.current
@@ -207,11 +215,16 @@ export default function SenseiCall() {
   // Every Sensei utterance in the call goes through here: mic closed
   // first (half-duplex), spotlight running, and a muted Sensei voice
   // simply steps the flow on after a beat instead of speaking.
+  // Voice source order (Doc 06 §5.1, Doc 17 decision 2026-11-06):
+  // speakSenseiLine tries the neural voice first (the free Edge TTS
+  // `tts` function, signed-in users) and falls back to the device
+  // voice (speakText) on any failure — its onEnd contract is the
+  // same exactly-once one the state machine already relies on.
   const speakLine = (text, { rate = 0.95, onEnd } = {}) => {
     stopRecognition()
     if (senseiMutedRef.current) { if (onEnd) later(onEnd, 450); return }
     runSpotlight(text)
-    speakText(text, {
+    speakSenseiLine(text, {
       rate,
       onEnd: () => { clearSpotTimers(); setSpotActive(-1); if (onEnd) onEnd() },
     })

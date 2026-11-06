@@ -103,4 +103,95 @@ check('non-JWT values are rejected', () => {
   assert.equal(port.isServiceRoleJwtForProject('', 'rcckuxwvqgtyvovwpxaw'), false)
   assert.equal(port.isServiceRoleJwtForProject('a.b.c', 'rcckuxwvqgtyvovwpxaw'), false)
 })
+// 5. Twin working-level estimate (src/lib/twinEstimate.js, Doc 04 §5
+// note): a weighted-median vote over the evidence the Twin already
+// holds. Pure and deterministic; it must NEVER be able to outvote the
+// diagnosis into the promise — these checks pin the vote maths, the
+// conservative tie-break, and the confidence volume labels.
+const est = await import('../src/lib/twinEstimate.js')
+const gradItems = (band, n) => Array.from({ length: n }, (_, i) => ({ front: `${band}-${i}`, level: band, fsrs: { reps: 3 } }))
+
+console.log('twin working-level estimate (weighted median over evidence):')
+check('no evidence at all: no band, low confidence — never a guess', () => {
+  const r = est.estimateWorkingLevel({})
+  assert.equal(r.band, null)
+  assert.equal(r.confidence, 'low')
+  assert.deepEqual(r.signals, { diagnosis: null, queue: null, reader: null, speaking: null })
+  assert.equal(est.estimateWorkingLevel().band, null)
+  assert.equal(est.estimateWorkingLevel(null).band, null)
+})
+check('diagnosis alone: its band, but low confidence (a snapshot is not volume)', () => {
+  const r = est.estimateWorkingLevel({ diagnosisBand: 'N2' })
+  assert.equal(r.band, 'N2')
+  assert.equal(r.confidence, 'low') // 2 points: a snapshot alone is not volume
+  assert.equal(r.signals.diagnosis, 'N2')
+})
+check('junk bands are ignored everywhere — not-a-level never votes', () => {
+  const r = est.estimateWorkingLevel({ diagnosisBand: 'N9', declaredBand: 'beginner', queueItems: gradItems('N7', 30) })
+  assert.equal(r.band, null)
+  assert.equal(r.confidence, 'low')
+})
+check('queue mastery: the highest band with >=10 graduated items votes', () => {
+  const queue = [...gradItems('N5', 40), ...gradItems('N4', 12), ...gradItems('N3', 9)]
+  const r = est.estimateWorkingLevel({ queueItems: queue })
+  assert.equal(r.signals.queue, 'N4') // N3 has only 9 graduated — not proven
+  assert.equal(r.band, 'N4')
+  assert.equal(r.counts.graduatedLevelled, 61)
+})
+check('queue mastery: fresh or unlevelled items cast no vote', () => {
+  const fresh = Array.from({ length: 20 }, (_, i) => ({ front: `f${i}`, level: 'N2', fsrs: { reps: 0 } }))
+  const unlevelled = Array.from({ length: 20 }, (_, i) => ({ front: `u${i}`, level: '', fsrs: { reps: 5 } }))
+  const r = est.estimateWorkingLevel({ queueItems: [...fresh, ...unlevelled] })
+  assert.equal(r.signals.queue, null)
+  assert.equal(r.band, null)
+})
+check('weighted median: a lone strong signal cannot outvote the rest', () => {
+  // Diagnosis N1 (w3) vs queue N4 (w2) + reader N4 (w2): total 7, half
+  // 3.5 — cumulative reaches it only AT N1 (2+2=4 ≥ 3.5 after N4…
+  // sorted ascending: N4 cum 4 ≥ 3.5 → N4 wins). The median holds.
+  const r = est.estimateWorkingLevel({
+    diagnosisBand: 'N1',
+    declaredBand: 'N4', lastGoodStep: 0,
+    queueItems: gradItems('N4', 15),
+  })
+  assert.equal(r.band, 'N4')
+})
+check('weighted median: an exact tie resolves DOWNWARD (conservative)', () => {
+  // Queue N4 (w2) vs reader N2 (w2): total 4, half 2 — N4's cumulative
+  // reaches half first in ascending order, so the lower band wins.
+  const r = est.estimateWorkingLevel({ declaredBand: 'N2', lastGoodStep: 0, queueItems: gradItems('N4', 12) })
+  assert.equal(r.signals.reader, 'N2')
+  assert.equal(r.band, 'N4')
+})
+check('reader vote: the PROVEN step (last_good_step), never the trial step', () => {
+  const proven = est.estimateWorkingLevel({ declaredBand: 'N3', lastGoodStep: 1 })
+  assert.equal(proven.signals.reader, 'N2') // declared N3, proven one notch up
+  const settled = est.estimateWorkingLevel({ declaredBand: 'N3', lastGoodStep: -1 })
+  assert.equal(settled.signals.reader, 'N4')
+  const clamped = est.estimateWorkingLevel({ declaredBand: 'N1', lastGoodStep: 1 })
+  assert.equal(clamped.signals.reader, 'N1') // the ladder clamps
+  const junkStep = est.estimateWorkingLevel({ declaredBand: 'N3', lastGoodStep: 'soon' })
+  assert.equal(junkStep.signals.reader, 'N3') // a junk step shifts nothing
+})
+check('speaking vote: sustained decent attempts corroborate the served band', () => {
+  const r = est.estimateWorkingLevel({ diagnosisBand: 'N3', speaking: { attempts: 6, avgBest: 72 } })
+  assert.equal(r.signals.speaking, 'N3')
+  assert.equal(r.band, 'N3')
+  // Too few attempts, too low an average, or no served band: silent.
+  assert.equal(est.estimateWorkingLevel({ diagnosisBand: 'N3', speaking: { attempts: 4, avgBest: 90 } }).signals.speaking, null)
+  assert.equal(est.estimateWorkingLevel({ diagnosisBand: 'N3', speaking: { attempts: 9, avgBest: 40 } }).signals.speaking, null)
+  assert.equal(est.estimateWorkingLevel({ speaking: { attempts: 9, avgBest: 90 } }).signals.speaking, null)
+})
+check('confidence grows with independent evidence volume', () => {
+  const rich = est.estimateWorkingLevel({
+    diagnosisBand: 'N3',
+    declaredBand: 'N3', lastGoodStep: 0,
+    queueItems: gradItems('N3', 35),
+    speaking: { attempts: 12, avgBest: 80 },
+  })
+  assert.equal(rich.confidence, 'high') // 2 + 2 (deep queue) + 1 + 1 = 6 points
+  assert.equal(rich.band, 'N3')
+  const mid = est.estimateWorkingLevel({ diagnosisBand: 'N3', declaredBand: 'N3', lastGoodStep: 0 })
+  assert.equal(mid.confidence, 'medium') // diagnosis 2 + reader 1 = 3 points
+})
 console.log(`\nphase2: ${passed} checks passed (incl. scheduler-auth)`)

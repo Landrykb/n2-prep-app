@@ -862,4 +862,74 @@ check('twin parity: voice + dispatch APIs agree (window, due, constants)', () =>
   for (const d of dues) assert.equal(port.isDispatchDue(d), fit.isDispatchDue(d))
 })
 
+// ---------- web read-aloud scoring (Doc 16 §5 amendment #5) ----------
+// The free Web Speech route: the browser transcribes on-device, and
+// src/lib/readAloud.js scores the transcript against the passage in
+// code. The score is a TEXT MATCH (coverage, in order) — never a
+// pronunciation grade — and the one-fix rule is Hick's Law: exactly
+// one card, the first missed new word, nothing else competes.
+
+const aloud = await import('../src/lib/readAloud.js')
+
+check('normalizeSpeechText: punctuation and spacing vanish; NFKC folds width variants', () => {
+  assert.equal(aloud.normalizeSpeechText('猫は、ご飯を 食べる。'), '猫はご飯を食べる')
+  assert.equal(aloud.normalizeSpeechText('「明日」は ９時！'), '明日は9時')
+  assert.equal(aloud.normalizeSpeechText('ｶﾀｶﾅ'), 'カタカナ') // half-width kana fold to full
+  assert.equal(aloud.normalizeSpeechText(''), '')
+  assert.equal(aloud.normalizeSpeechText(null), '')
+  assert.equal(aloud.normalizeSpeechText('、。！？'), '') // punctuation alone is not speech
+})
+
+check('scoreReadAloud: a verbatim read scores 1; insertions cost nothing', () => {
+  const text = '猫はご飯を食べる。'
+  assert.deepEqual(aloud.scoreReadAloud(text, '猫はご飯を食べる'), { score: 1, matchedChars: 8, targetChars: 8 })
+  // A restart / self-correction in the transcript leaves coverage whole.
+  assert.equal(aloud.scoreReadAloud(text, '猫は、えーと、猫はご飯を食べる').score, 1)
+})
+
+check('scoreReadAloud: coverage is the fraction voiced, in order', () => {
+  const text = '猫はご飯を食べる' // 8 chars
+  assert.equal(aloud.scoreReadAloud(text, '猫はご飯').score, 0.5) // half read, half scored
+  assert.equal(aloud.scoreReadAloud(text, '食べる').score, 0.375) // only the tail (3 of 8), in order
+  assert.equal(aloud.scoreReadAloud(text, '犬は水を飲む').score, 0.25) // only the particles は・を coincide
+})
+
+check('scoreReadAloud: no text, no proof — empty inputs score 0', () => {
+  assert.equal(aloud.scoreReadAloud('猫はご飯を食べる', '').score, 0)
+  assert.equal(aloud.scoreReadAloud('猫はご飯を食べる', '。。。').score, 0) // punctuation is not a read
+  assert.equal(aloud.scoreReadAloud('', '猫').score, 0)
+  assert.equal(aloud.scoreReadAloud(null, null).score, 0)
+})
+
+check('scoreReadAloud: ASR noise dents an honest read but stays above the pass line', () => {
+  // Homophone swap （飯→はん sound kept, kanji wrong) + a dropped
+  // particle: 2 of 20 normalised chars lost — an honest full read.
+  const text = '今日は天気がいいので、駅まで歩いて行きます。'
+  const heard = '今日天気いいので駅まで歩いて行きます'
+  const { score } = aloud.scoreReadAloud(text, heard)
+  assert.ok(score >= aloud.READ_ALOUD_PASS_SCORE, `honest read ${score} must pass`)
+  assert.ok(score < 1)
+  assert.equal(aloud.READ_ALOUD_PASS_SCORE, 0.7) // pinned: below honest noise, above any partial read
+})
+
+check('firstMissedCandidate: the first unvoiced new word, in passage order', () => {
+  const cands = [
+    { word: 'ご飯', h: 'ご飯', reading: 'ごはん', meaning: 'cooked rice; a meal' },
+    { word: '散歩', h: '散歩', reading: 'さんぽ', meaning: 'a walk' },
+    { word: '天気', h: '天気', reading: 'てんき', meaning: 'weather' },
+  ]
+  assert.equal(aloud.firstMissedCandidate(cands, '猫はご飯を食べる'), cands[1]) // 散歩 is the first miss
+  assert.equal(aloud.firstMissedCandidate(cands, 'ご飯と散歩と天気'), null) // all voiced — no fix
+})
+
+check('firstMissedCandidate: the headword counts — voicing the dictionary form is voicing the word', () => {
+  const cands = [{ word: '引っ越し', h: '引っ越す', reading: 'ひっこし', meaning: 'moving house' }]
+  assert.equal(aloud.firstMissedCandidate(cands, '来月引っ越す予定です'), null)
+  assert.equal(aloud.firstMissedCandidate(cands, '来月引っ越しました'), null) // surface form
+  assert.equal(aloud.firstMissedCandidate(cands, '来月旅行します'), cands[0])
+  assert.equal(aloud.firstMissedCandidate(cands, ''), null) // no transcript — no fix claimed
+  assert.equal(aloud.firstMissedCandidate([], '猫'), null)
+  assert.equal(aloud.firstMissedCandidate(null, '猫'), null)
+})
+
 console.log(`reader: ${passed} checks passed`)

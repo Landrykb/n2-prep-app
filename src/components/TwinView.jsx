@@ -16,6 +16,8 @@ import { getTwinSyncState, subscribeTwinSync, TWIN_SYNC_EVENT } from '../lib/twi
 import { getStateSyncState, subscribeStateSync } from '../lib/stateSync.js'
 import { validateExport, planRestore } from '../lib/restore.js'
 import { loadMetrics, summariseMetrics } from '../lib/metrics.js'
+import { estimateWorkingLevel } from '../lib/twinEstimate.js'
+import { collectLearnerState } from '../lib/learnerState.js'
 import FeedbackBox from './FeedbackBox.jsx'
 import { Upload } from 'lucide-react'
 
@@ -151,6 +153,71 @@ function ReaderLinkCard({ user, setActive }) {
           <button onClick={() => setActive?.('reader')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1.5"><BookOpenText size={15} /> Open The Reader Here</button>
         </div>
       )}
+    </Section>
+  )
+}
+
+// Working level (Doc 04 §5 note; src/lib/twinEstimate.js): between
+// checkups, the learner's activity — queue mastery by level, call
+// scores, the Reader's proven fit — adds up to a working level. It is
+// computed on read from evidence already held, stored NOWHERE, and it
+// never overwrites the diagnosis, the promise, or any stored band:
+// those stay exactly what their own code paths wrote.
+function WorkingLevelCard({ user }) {
+  const [readerEvidence, setReaderEvidence] = useState({ declaredBand: null, lastGoodStep: 0 })
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      if (!isSupabaseConfigured || !supabase || !user) return
+      const res = await supabase
+        .from('telegram_links')
+        .select('declared_band, last_good_step')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (cancelled) return
+      if (!res.error && res.data) {
+        setReaderEvidence({ declaredBand: res.data.declared_band ?? null, lastGoodStep: Number(res.data.last_good_step ?? 0) || 0 })
+        return
+      }
+      const fallback = await supabase
+        .from('telegram_links')
+        .select('declared_band')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (!cancelled && !fallback.error && fallback.data) {
+        setReaderEvidence({ declaredBand: fallback.data.declared_band ?? null, lastGoodStep: 0 })
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [user])
+
+  const state = collectLearnerState()
+  const twinNow = loadTwin()
+  const est = estimateWorkingLevel({
+    diagnosisBand: typeof state.diagnosis?.jlptEstimate === 'string' ? state.diagnosis.jlptEstimate : null,
+    queueItems: state.queue,
+    speaking: twinNow.speaking,
+    declaredBand: readerEvidence.declaredBand,
+    lastGoodStep: readerEvidence.lastGoodStep,
+  })
+  const confidenceLine = {
+    low: 'early days — little activity behind it so far',
+    medium: 'forming — a fair amount of activity behind it',
+    high: 'well-grounded — a lot of activity behind it',
+  }[est.confidence]
+
+  return (
+    <Section title="Working Level (Estimate)" hint="Between checkups, your activity keeps talking. This is what it adds up to — worked out on this device, from your own record, in plain code.">
+      {est.band ? (
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+          <p className="text-3xl font-bold text-white">{est.band}</p>
+          <p className="text-sm text-slate-300">Confidence: <span className="text-[#FF8A75] font-medium">{est.confidence}</span> — {confidenceLine}.</p>
+        </div>
+      ) : (
+        <p className="text-sm text-slate-300">Not enough signal yet — finish a checkup, master some queue cards, take a few calls, or read with Hori, and a working level starts to form here.</p>
+      )}
+      <p className="text-xs text-slate-500">This is an estimate from your activity, not a diagnosis. Your diagnosis and your promise are unchanged by it — this number never overwrites them.</p>
     </Section>
   )
 }
@@ -316,6 +383,8 @@ export default function TwinView({ setActive }) {
         </div>
         {deltas && <p className="text-xs text-slate-500">Latest movement between checks: total {deltas.total > 0 ? `+${deltas.total}` : deltas.total} — the full trend lives in Diagnosis and in Michi’s letters.</p>}
       </Section>
+
+      <WorkingLevelCard user={user} />
 
       <Section title="What Trips You Up" hint="Your error fingerprint — counted from your own attempts by simple local rules (a heuristic: it spots likely patterns, it does not grade like a teacher). Wrong about one? Remove it; your correction outranks the counting, permanently.">
         {patterns.length ? (
