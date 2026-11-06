@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Download, Trash2, Mail, ChevronRight, X } from 'lucide-react'
+import { Download, Trash2, Mail, ChevronRight, X, Send } from 'lucide-react'
 import { brand } from '../lib/brand.js'
+import { supabase, isSupabaseConfigured } from '../lib/supabaseClient.js'
 import {
   refreshTwin, loadTwin, deleteTwin, topPatterns, removePattern,
   learningStyleRows, diagnosisDeltas, patternById,
@@ -31,6 +32,121 @@ const METHOD_LABELS = {
   mining: 'Cards from your own documents',
   listening: 'Listening bites',
   reading: 'Reading checks',
+}
+
+// Yonde Reader on Telegram (Doc 16, R0). The working bot name from
+// Doc 16 §6 — Landry still owes the handle confirmation, so it lives in
+// exactly one constant. Linking flow: this card mints a one-time code
+// into telegram_links (owner-only RLS, migration 00009); the reader-bot
+// function claims it when the learner taps the deep link and presses
+// Start. Honest scope copy: R0 is /read on demand — the morning passage
+// is R1 and is NOT promised here.
+const READER_BOT_USERNAME = 'YondeReaderBot'
+const LINK_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789' // no 0/O/1/I/L — codes get read aloud
+
+function makeLinkCode() {
+  const bytes = new Uint8Array(10)
+  crypto.getRandomValues(bytes)
+  return [...bytes].map((b) => LINK_CODE_ALPHABET[b % LINK_CODE_ALPHABET.length]).join('')
+}
+
+function ReaderLinkCard({ user }) {
+  const [status, setStatus] = useState('loading') // loading | setup | unlinked | pending | linked
+  const [link, setLink] = useState(null)
+  const [busy, setBusy] = useState(false)
+
+  const refresh = async () => {
+    if (!isSupabaseConfigured || !supabase || !user) { setStatus('setup'); return }
+    const { data, error } = await supabase
+      .from('telegram_links')
+      .select('chat_id, username, link_code, link_expires_at')
+      .eq('user_id', user.id)
+      .maybeSingle()
+    if (error) { setStatus('setup'); return } // table not migrated yet, or unreachable — stay quiet
+    setLink(data)
+    if (data?.chat_id) setStatus('linked')
+    else if (data?.link_code && data.link_expires_at && new Date(data.link_expires_at) > new Date()) setStatus('pending')
+    else setStatus('unlinked')
+  }
+
+  useEffect(() => {
+    let cancelled = false
+    Promise.resolve().then(() => { if (!cancelled) refresh() })
+    return () => { cancelled = true }
+  }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
+  // While a code is waiting, re-check when the learner comes back from
+  // Telegram — the claim happens there, not here.
+  useEffect(() => {
+    if (status !== 'pending') return undefined
+    const onFocus = () => { refresh() }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [status]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const connect = async () => {
+    if (!user || busy) return
+    setBusy(true)
+    const code = makeLinkCode()
+    const expires = new Date(Date.now() + 30 * 60000).toISOString()
+    const { error } = await supabase
+      .from('telegram_links')
+      .upsert({ user_id: user.id, link_code: code, link_expires_at: expires }, { onConflict: 'user_id' })
+    setBusy(false)
+    if (error) { setStatus('setup'); return }
+    setLink({ chat_id: null, username: null, link_code: code, link_expires_at: expires })
+    setStatus('pending')
+  }
+
+  const unlink = async () => {
+    if (!user || busy) return
+    setBusy(true)
+    const { error } = await supabase
+      .from('telegram_links')
+      .update({ chat_id: null, username: null, linked_at: null })
+      .eq('user_id', user.id)
+    setBusy(false)
+    if (!error) { setLink(null); setStatus('unlinked') }
+  }
+
+  return (
+    <Section title="Yonde Reader on Telegram" hint="Hori, your Miner, in the app that is already open every day.">
+      {status === 'loading' && <p className="text-sm text-slate-400">Checking your Telegram link…</p>}
+      {status === 'setup' && (
+        <p className="text-sm text-slate-300">
+          {user
+            ? 'Reader is still being set up on our side — the Telegram door is being finished. Nothing for you to do; this card wakes up when it is ready.'
+            : 'Sign in first — the Reader link belongs to your account, so your fitted passages and mined words land in your queue, not a stranger’s.'}
+        </p>
+      )}
+      {status === 'unlinked' && (
+        <div className="space-y-3">
+          <div className="flex items-start gap-2.5">
+            <span className="mt-0.5"><Mascot agent="hori" size={28} showName={false} /></span>
+            <p className="text-sm text-slate-300">Connect Telegram and Hori will send you a short passage fitted to the words you actually know — new words in bold, one tap to mine them into your one queue. For now he answers when you ask, with <span className="text-slate-100 font-medium">/read</span>; the morning passage arrives in the next stage. No streaks, no nagging, ever.</p>
+          </div>
+          <button onClick={connect} disabled={busy} className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] disabled:opacity-40 text-white text-sm font-semibold flex items-center gap-1.5"><Send size={15} /> Connect Telegram</button>
+        </div>
+      )}
+      {status === 'pending' && link?.link_code && (
+        <div className="space-y-3">
+          <p className="text-sm text-slate-300">Tap <span className="text-slate-100 font-medium">Open Telegram</span>, then press <span className="text-slate-100 font-medium">Start</span> in the bot — that finishes the link. The code expires in 30 minutes; if Telegram does not open, start @{READER_BOT_USERNAME} yourself and send <span className="font-mono text-slate-100">/start {link.link_code}</span>.</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <a href={`https://t.me/${READER_BOT_USERNAME}?start=${link.link_code}`} target="_blank" rel="noreferrer" className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold flex items-center gap-1.5"><Send size={15} /> Open Telegram</a>
+            <span className="font-mono text-sm text-slate-200 bg-bun-800 border border-bun-600/40 rounded-lg px-2.5 py-1.5">{link.link_code}</span>
+            <button onClick={refresh} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium">Refresh Status</button>
+          </div>
+        </div>
+      )}
+      {status === 'linked' && (
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-sm text-slate-300 flex-1 min-w-[220px]">
+            Connected{link?.username ? <> as <span className="text-slate-100 font-medium">@{link.username}</span></> : ''} — your chat is linked. Send <span className="text-slate-100 font-medium">/read</span> there any time and Hori digs up your next passage.
+          </p>
+          <button onClick={unlink} disabled={busy} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 disabled:opacity-40 text-slate-100 text-sm font-medium">Unlink</button>
+        </div>
+      )}
+    </Section>
+  )
 }
 
 function Section({ title, children, hint }) {
@@ -168,6 +284,8 @@ export default function TwinView({ setActive }) {
           ))}
         </div>
       </section>
+
+      <ReaderLinkCard user={user} />
 
       <Section title="Where Your Japanese Stands" hint="Section scores come only from your health checks (estimates from short samples — never official scores). Speaking and register are labelled heuristic: patterns counted, not sounds judged.">
         {Object.keys(twin.sections || {}).length ? (
