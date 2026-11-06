@@ -217,6 +217,31 @@ export async function componentOnReading(component) {
   return components[component]?.[1] || ''
 }
 
+/**
+ * Pure multi-part intersection over the components map (Shirabe-style
+ * find-by-parts): the kanji whose KanjiVG tree contains EVERY given part.
+ * An empty parts list returns [] by design (no selection, no results),
+ * and a part with no data empties the result.
+ */
+export function intersectComponents(parts, componentsMap) {
+  if (!parts?.length || !componentsMap) return []
+  let acc = null
+  for (const part of parts) {
+    const entry = componentsMap[part]
+    if (!entry) return []
+    const chars = new Set([...entry[0]])
+    acc = acc === null ? chars : new Set([...acc].filter((c) => chars.has(c)))
+    if (!acc.size) return []
+  }
+  return [...acc]
+}
+
+/** Kanji containing every given part, resolved against the loaded index data. */
+export async function kanjiByComponents(parts) {
+  const components = await loadComponents()
+  return intersectComponents(parts, components)
+}
+
 export function getRadicals() {
   if (!radicalsPromise) {
     radicalsPromise = fetch(`${BASE}/radicals.json`)

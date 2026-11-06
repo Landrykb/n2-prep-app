@@ -1,0 +1,144 @@
+{
+ "generatedAt": "2026-11-06T23:36:32.673Z",
+ "sources": {
+  "jmdict": {
+   "via": "jmdict-simplified (github.com/scriptin/jmdict-simplified)",
+   "release": "3.6.2",
+   "formatVersion": "3.6.2",
+   "dictDate": "2026-11-02",
+   "build": "jmdict-eng-common (English, common words only)",
+   "commonOnly": true,
+   "licence": "CC BY-SA 4.0",
+   "holder": "EDRDG (Electronic Dictionary Research and Development Group)",
+   "licenceUrl": "http://www.edrdg.org/edrdg/licence.html"
+  },
+  "kanjium": {
+   "file": "data/source_files/raw/accents.txt",
+   "lines": 108021,
+   "licence": "CC BY-SA 4.0",
+   "credit": "The pitch accent notation, verb particle data, phonetics, homonyms and other additions or modifications to EDICT, KANJIDIC or KRADFILE were provided by Uros O. through his free database."
+  }
+ },
+ "counts": {
+  "entries": 22650,
+  "kanaOnlyEntries": 4467,
+  "kanjiCovered": 3548,
+  "kanjiWordRefs": 40146,
+  "entriesWithAccent": 17105,
+  "accentCoveragePct": 75.5,
+  "accentKeys": 21897
+ },
+ "ordering": "kanji-words.json lists per kanji are ordered by: (1) the written form containing the kanji is flagged common in JMdict, (2) shorter written form first, (3) kana reading A-Z, (4) entry id. This is a heuristic built on the source common flag — jmdict-simplified drops the original JMdict priority tags (news1/ichi1/nfXX), so no true frequency ranking exists in this build.",
+ "shards": {
+  "pattern": "words/words-{first two digits of the zero-padded JMdict id}.json",
+  "files": [
+   {
+    "file": "words/words-10.json",
+    "entries": 2922,
+    "bytes": 306331
+   },
+   {
+    "file": "words/words-11.json",
+    "entries": 2889,
+    "bytes": 319327
+   },
+   {
+    "file": "words/words-12.json",
+    "entries": 3497,
+    "bytes": 421382
+   },
+   {
+    "file": "words/words-13.json",
+    "entries": 3425,
+    "bytes": 415014
+   },
+   {
+    "file": "words/words-14.json",
+    "entries": 3379,
+    "bytes": 409238
+   },
+   {
+    "file": "words/words-15.json",
+    "entries": 3336,
+    "bytes": 410092
+   },
+   {
+    "file": "words/words-16.json",
+    "entries": 1540,
+    "bytes": 190872
+   },
+   {
+    "file": "words/words-17.json",
+    "entries": 351,
+    "bytes": 43187
+   },
+   {
+    "file": "words/words-18.json",
+    "entries": 172,
+    "bytes": 20981
+   },
+   {
+    "file": "words/words-19.json",
+    "entries": 208,
+    "bytes": 25035
+   },
+   {
+    "file": "words/words-20.json",
+    "entries": 209,
+    "bytes": 26111
+   },
+   {
+    "file": "words/words-21.json",
+    "entries": 212,
+    "bytes": 25698
+   },
+   {
+    "file": "words/words-22.json",
+    "entries": 107,
+    "bytes": 12798
+   },
+   {
+    "file": "words/words-23.json",
+    "entries": 13,
+    "bytes": 1711
+   },
+   {
+    "file": "words/words-24.json",
+    "entries": 27,
+    "bytes": 3310
+   },
+   {
+    "file": "words/words-25.json",
+    "entries": 15,
+    "bytes": 2023
+   },
+   {
+    "file": "words/words-26.json",
+    "entries": 40,
+    "bytes": 5008
+   },
+   {
+    "file": "words/words-27.json",
+    "entries": 46,
+    "bytes": 5864
+   },
+   {
+    "file": "words/words-28.json",
+    "entries": 262,
+    "bytes": 31972
+   }
+  ]
+ },
+ "sizes": {
+  "wordsBytes": 2675954,
+  "kanjiWordsBytes": 342460,
+  "accentsBytes": 320624,
+  "searchIndexBytes": 899975,
+  "totalBytes": 4239013
+ },
+ "validation": {
+  "kanjiWordsRefsResolve": true,
+  "searchRowsMatchEntries": true
+ },
+ "attribution": "Word entries: JMdict (EDRDG, CC BY-SA 4.0, http://www.edrdg.org/edrdg/licence.html), via jmdict-simplified. Pitch accents: Kanjium (CC BY-SA 4.0). The pitch accent notation, verb particle data, phonetics, homonyms and other additions or modifications to EDICT, KANJIDIC or KRADFILE were provided by Uros O. through his free database."
+}

@@ -49,7 +49,10 @@ import { findStudyItem } from './lib/findStudyItem.js'
 import { localDictionary, loadDictionary, lookup } from './lib/dictionary.js'
 import { loadDiagnosis } from './lib/profile.js'
 import { loadPromise } from './lib/promise.js'
-import { KANJI_LEVELS, loadKanjiLevel } from './lib/kanjiData.js'
+import { KANJI_LEVELS, loadKanjiLevel, loadAllKanji } from './lib/kanjiData.js'
+import { getKanjiMeta, getKanjiStrokes } from './lib/kanjiDb.js'
+import { wordsForKanji, wordDisplayForm } from './lib/wordsDb.js'
+import ComponentSearch from './components/ComponentSearch.jsx'
 import { useHashRoute } from './hooks/useHashRoute.js'
 import { useSwipeNav } from './hooks/useSwipeNav.js'
 import { useExamDate } from './hooks/useExamDate.js'
@@ -498,8 +501,73 @@ function BottomNav({ active, setActive, onMenu, menuOpen }) {
   )
 }
 
+// Card gradients, mirroring scripts/build-kanji.mjs so an item built from
+// KanjiDB for a kanji outside the JLPT lists looks like a generated entry.
+const KANJI_CARD_GRADIENTS = [
+  'from-violet-500 to-fuchsia-600', 'from-cyan-500 to-blue-600',
+  'from-emerald-500 to-teal-600', 'from-amber-500 to-orange-600',
+  'from-rose-500 to-pink-600', 'from-indigo-500 to-violet-600',
+  'from-sky-500 to-cyan-600', 'from-teal-500 to-emerald-600',
+  'from-orange-500 to-red-600', 'from-fuchsia-500 to-purple-600',
+]
+
+/**
+ * Build a KanjiDetail item for a kanji that has no JLPT level entry, from
+ * KanjiDB v2 + the Words Layer only — the same fields scripts/build-kanji
+ * .mjs assembles for level entries (component names = each component's own
+ * KANJIDIC2 meaning; examples = JMdict common words). Nothing is invented:
+ * fields with no source stay empty and their blocks simply do not render.
+ */
+async function buildDbKanjiItem(char) {
+  const [meta, strokes] = await Promise.all([getKanjiMeta(char), getKanjiStrokes(char)])
+  if (!meta) return null
+  const topParts = [...new Set((strokes?.tree?.children || []).map((c) => c.element).filter((el) => el && el !== char))]
+  const radicals = []
+  for (const part of topParts) {
+    const partMeta = await getKanjiMeta(part).catch(() => null)
+    const name = partMeta?.meanings?.[0] || ''
+    if (name) radicals.push({ part, name, icon: part })
+  }
+  const named = radicals.map((r) => `${r.part} (${r.name})`).join(' + ')
+  const story = named
+    ? `${char} is built from ${named}.`
+    : `${char} has no simpler parts to break down — learn it as one shape.`
+  const wordEntries = await wordsForKanji(char, 5).catch(() => [])
+  const examples = wordEntries.map((e) => ({
+    word: wordDisplayForm(e, char),
+    reading: e.kana,
+    meaning: e.gloss[0] || '',
+  }))
+  const formatKun = (raw) => {
+    if (raw.startsWith('-') || raw.endsWith('-')) return null
+    const [stem, tail] = raw.split('.')
+    return tail ? `${stem}(${tail})` : stem
+  }
+  return {
+    char,
+    level: meta.level || '',
+    on: (meta.on || []).join('・'),
+    kun: (meta.kun || []).map(formatKun).filter(Boolean).join('・'),
+    meaning: (meta.meanings || []).slice(0, 4).join(', ') || '(no gloss)',
+    meaningFr: (meta.meaningsFr || []).slice(0, 3).join(', ') || '',
+    strokes: meta.strokes,
+    freq: meta.freq,
+    grade: meta.grade,
+    radicals,
+    story,
+    storyFr: '',
+    word: examples[0] ? (examples[0].reading ? `${examples[0].word}（${examples[0].reading}）` : examples[0].word) : '',
+    examples,
+    emoji: '',
+    doodle: topParts.join(''),
+    gradient: KANJI_CARD_GRADIENTS[char.codePointAt(0) % KANJI_CARD_GRADIENTS.length],
+    source: 'KANJIDIC2 / KanjiVG / JMdict',
+  }
+}
+
 function Lessons() {
   const [mode, setMode] = useState('kanji')
+  const [kanjiBrowse, setKanjiBrowse] = useState('level')
   const [activeItem, setActiveItem] = useState(null)
   const [showBack, setShowBack] = useState(false)
   const [kanjiLevel, setKanjiLevel] = useState('N2')
@@ -521,6 +589,17 @@ function Lessons() {
   const kanjiList = kanjiByLevel[kanjiLevel] || []
   const list = mode === 'kanji' ? kanjiList : mode === 'grammar' ? grammarLessons : vocabLessons
 
+  // Find By Parts results open exactly like level-list cards: the level
+  // entry itself when the kanji has one, otherwise an item built from
+  // KanjiDB + the Words Layer (buildDbKanjiItem above).
+  const openFromParts = async (char) => {
+    const all = await loadAllKanji().catch(() => [])
+    const found = all.find((k) => k.char === char)
+    if (found) { setActiveItem(found); setShowBack(false); return }
+    const built = await buildDbKanjiItem(char).catch(() => null)
+    if (built) { setActiveItem(built); setShowBack(false) }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -539,6 +618,26 @@ function Lessons() {
       </div>
 
       {mode === 'kanji' && !activeItem && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-500">Browse:</span>
+          <div className="flex gap-1.5">
+            {[['level', 'By Level'], ['parts', 'By Parts']].map(([b, label]) => (
+              <button
+                key={b}
+                onClick={() => setKanjiBrowse(b)}
+                aria-pressed={kanjiBrowse === b}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium border transition ${
+                  kanjiBrowse === b ? 'bg-[#71368A] text-white border-[#71368A]' : 'bg-bun-800 text-slate-400 border-bun-600/40 hover:text-white'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {mode === 'kanji' && !activeItem && kanjiBrowse === 'level' && (
         <div className="flex items-center gap-2">
           <span className="text-xs text-slate-500">Level:</span>
           <div className="flex flex-wrap gap-1.5">
@@ -569,6 +668,8 @@ function Lessons() {
           {mode === 'grammar' && <GrammarDetail item={activeItem} showBack={showBack} setShowBack={setShowBack} />}
           {mode === 'vocab' && <VocabDetail item={activeItem} showBack={showBack} setShowBack={setShowBack} />}
         </div>
+      ) : mode === 'kanji' && kanjiBrowse === 'parts' ? (
+        <ComponentSearch onOpenKanji={openFromParts} />
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {list.map((item, i) => (

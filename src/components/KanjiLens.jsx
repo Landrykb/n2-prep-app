@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Play, Pause, RotateCcw, Loader2 } from 'lucide-react'
 import { getKanjiMeta, getKanjiStrokes, loadComponents, loadKanjiIndex, getRadicals } from '../lib/kanjiDb.js'
 import { flattenComponents, captionFor, strokeAnchor, familyFor, positionWords } from '../lib/kanjiLens.js'
+import { wordsForKanji, getAccent, wordDisplayForm } from '../lib/wordsDb.js'
 import { recordMetric } from '../lib/metrics.js'
 
 // Kanji Lens — the evidence-based kanji visualization (docs/18).
@@ -130,6 +131,7 @@ export default function KanjiLens({ char, item }) {
   const [data, setData] = useState(null)
   const [compMeta, setCompMeta] = useState({})
   const [familyData, setFamilyData] = useState(null)
+  const [words, setWords] = useState(null)
   const [mode, setMode] = useState('assemble')
   const [step, setStep] = useState(0)
   const [playing, setPlaying] = useState(false)
@@ -169,6 +171,17 @@ export default function KanjiLens({ char, item }) {
     }).catch(() => {})
     return () => { cancelled = true }
   }, [])
+
+  // Words Layer (JMdict common words + Kanjium pitch accents, docs/19).
+  useEffect(() => {
+    let cancelled = false
+    setWords(null)
+    wordsForKanji(lensChar, 10).then(async (entries) => {
+      const withAccents = await Promise.all(entries.map(async (entry) => ({ entry, accent: await getAccent(entry) })))
+      if (!cancelled) setWords(withAccents)
+    }).catch(() => { if (!cancelled) setWords([]) })
+    return () => { cancelled = true }
+  }, [lensChar])
 
   const meta = data?.meta || null
   const strokes = data?.strokes || null
@@ -350,6 +363,27 @@ export default function KanjiLens({ char, item }) {
         </p>
       )}
 
+      {words && words.length > 0 && (
+        <div className="mt-5">
+          <h5 className="text-xs uppercase tracking-wider text-slate-400 mb-2">Words With This Kanji</h5>
+          <div className="space-y-1.5">
+            {words.map(({ entry, accent }) => (
+              <div key={entry.id} className="flex flex-wrap items-baseline gap-x-2 rounded-lg px-2 py-1.5 bg-bun-700/30">
+                <span className="text-base font-bold text-white">{wordDisplayForm(entry, lensChar)}</span>
+                <span className="text-sm text-slate-300">
+                  {entry.kana}
+                  {accent != null && <sup className="ml-0.5 text-[10px] text-[#FF8A75] font-semibold">{accent}</sup>}
+                </span>
+                {entry.gloss[0] && <span className="text-xs text-slate-400">{entry.gloss[0]}</span>}
+              </div>
+            ))}
+          </div>
+          {words.some((w) => w.accent != null) && (
+            <p className="text-[11px] text-slate-500 mt-2">Pitch accent number: Kanjium (CC BY-SA 4.0)</p>
+          )}
+        </div>
+      )}
+
       {flat.length > 1 && (
         <div className="mt-5">
           <h5 className="text-xs uppercase tracking-wider text-slate-400 mb-2">What It Is Built From</h5>
@@ -409,7 +443,7 @@ export default function KanjiLens({ char, item }) {
         </div>
       )}
 
-      <p className="text-[10px] text-slate-500 mt-5">Strokes &amp; components: KanjiVG (CC BY-SA 3.0) · Readings &amp; meanings: KANJIDIC2 (EDRDG)</p>
+      <p className="text-[10px] text-slate-500 mt-5">Strokes &amp; components: KanjiVG (CC BY-SA 3.0) · Readings &amp; meanings: KANJIDIC2 (EDRDG) · Words: JMdict (EDRDG, CC BY-SA 4.0) · Pitch accent: Kanjium / Uros O. (CC BY-SA 4.0)</p>
     </div>
   )
 }

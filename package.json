@@ -17,7 +17,9 @@
     "test:readiness": "TZ=UTC node tests/readiness.test.mjs",
     "test:reader": "TZ=UTC node tests/reader.test.mjs",
     "test:tts": "TZ=UTC node tests/tts.test.mjs",
-    "test:lens": "TZ=UTC node tests/lens.test.mjs"
+    "test:lens": "TZ=UTC node tests/lens.test.mjs",
+    "build:wordsdb": "node scripts/build-wordsdb.mjs",
+    "test:wordsdb": "TZ=UTC node tests/wordsdb.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.109.0",

@@ -142,4 +142,16 @@ check('radicals: 214 entries, all with a character, provenance kept', () => {
   assert.equal(manifest.validation.componentsIntegrity, true)
 })
 
+check('intersectComponents: 日 + 月 finds 明； empty or unknown parts give []', () => {
+  const components = readJson(path.join(DB, 'components.json'))
+  const both = db.intersectComponents(['日', '月'], components)
+  assert.ok(both.includes('明'), '明 must be built from both 日 and 月')
+  assert.ok(both.every((c) => components['日'][0].includes(c) && components['月'][0].includes(c)))
+  const gon = db.intersectComponents(['言'], components)
+  assert.ok(gon.includes('語'))
+  assert.deepEqual(db.intersectComponents([], components), [])
+  assert.deepEqual(db.intersectComponents(['龘龘'], components), [])
+  assert.deepEqual(db.intersectComponents(['日', '龘龘'], components), [])
+})
+
 console.log(`\nkanjidb: ${passed} checks passed`)
