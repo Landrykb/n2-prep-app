@@ -346,8 +346,6 @@ serve(async (req: Request) => {
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
   try {
-    const url = new URL(req.url)
-
     // ---------- no setup route here — on purpose ----------
     // Registration (webhook + command list) lives in the separate
     // reader-admin function (verify_jwt = true + the service_role
