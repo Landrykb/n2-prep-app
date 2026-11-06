@@ -154,4 +154,87 @@ check('intersectComponents: 日 + 月 finds 明； empty or unknown parts give [
   assert.deepEqual(db.intersectComponents(['日', '龘龘'], components), [])
 })
 
+console.log('french layer — curriculum merge (build-french-merge.mjs, docs/18):')
+{
+  const french = readJson(path.join(DB, 'french.json'))
+  const { meaningFrCheckFor, frTokens } = await import('../scripts/build-french-merge.mjs')
+  const FR_DIR = path.join(root, '..', '..', 'jpn2easy', 'french-curriculum')
+  const booklet = readJson(path.join(FR_DIR, 'entries-L19-L25.json'))
+  const bookletByChar = new Map(booklet.map((e) => [e.char, e]))
+  const metaFor = (ch) => {
+    const shard = readJson(path.join(DB, db.metaShardPath(ch).replace('/data/kanjidb/', '')))
+    return shard[ch] || null
+  }
+
+  check('french.json: every kanji exists in the index; only tag/check fields ship', () => {
+    const chars = new Set(index.map((r) => r.char))
+    const entries = french.entries
+    assert.equal(Object.keys(entries).length, 814)
+    assert.equal(french.manifest.counts.kanji, 814)
+    assert.equal(french.manifest.counts.notInKanjidbIndex, 0)
+    for (const [ch, row] of Object.entries(entries)) {
+      assert.ok(chars.has(ch), `${ch} missing from the kanjidb index`)
+      // Rights rule, structurally: tags + check signal only — no
+      // booklet compounds, examples, or gloss lines may ship.
+      assert.deepEqual(Object.keys(row).sort(), ['lesson', 'meaningFrCheck', 'radicalChar', 'radicalNameFr', 'themes'])
+    }
+    const recount = { withThemes: 0, withLesson: 0, withRadicalNameFr: 0, checkAgrees: 0, checkDiffers: 0, checkNull: 0 }
+    for (const row of Object.values(entries)) {
+      if (row.themes.length) recount.withThemes++
+      if (row.lesson != null) recount.withLesson++
+      if (row.radicalNameFr) recount.withRadicalNameFr++
+      if (row.meaningFrCheck === 'agrees') recount.checkAgrees++
+      else if (row.meaningFrCheck === 'differs') recount.checkDiffers++
+      else recount.checkNull++
+    }
+    assert.deepEqual(
+      Object.fromEntries(Object.keys(recount).map((k) => [k, french.manifest.counts[k]])),
+      recount,
+    )
+  })
+
+  check('french.json: theme tags reference the real S5/S6 lists', () => {
+    const valid = new Set()
+    for (const list of ['S5', 'S6']) {
+      const src = readJson(path.join(FR_DIR, `themes-${list}.json`))
+      for (const t of src.themes) {
+        for (const k of t.kanji) valid.add(`${list}|${t.theme}|${k.char}|${k.n}`)
+      }
+    }
+    let tagged = 0
+    for (const [ch, row] of Object.entries(french.entries)) {
+      for (const t of row.themes) {
+        assert.ok(valid.has(`${t.list}|${t.theme}|${ch}|${t.n}`), `${ch} theme ${t.theme} (${t.list} #${t.n}) not in the source list`)
+        tagged++
+      }
+    }
+    assert.ok(tagged > 0)
+  })
+
+  check('meaningFrCheckFor: hand-verified examples from the real data', () => {
+    // Verified by eye against the booklet extraction + KANJIDIC2 FR:
+    // 回 booklet « tourner, tour » — the dictionary FR list contains
+    // both words → full overlap → agrees.
+    assert.equal(meaningFrCheckFor(bookletByChar.get('回').meaningFr, metaFor('回').meaningsFr), 'agrees')
+    // 勝 booklet « triompher, vaincre, supérieur, excellent » vs
+    // dictionary « victoire, gagner, l'emporter, surpasser » — same
+    // meaning, zero shared content tokens → differs. This is the
+    // rule working as documented: a QA signal, not a verdict.
+    assert.equal(meaningFrCheckFor(bookletByChar.get('勝').meaningFr, metaFor('勝').meaningsFr), 'differs')
+    // 皮 booklet « peau, ce qui couvre la surface, superficiel » vs
+    // dictionary « peau, cuir, fourrure, … » — only « peau » shared,
+    // coefficient 0.25 < 0.5 → differs.
+    assert.equal(meaningFrCheckFor(bookletByChar.get('皮').meaningFr, metaFor('皮').meaningsFr), 'differs')
+    // The stored layer agrees with the rule on the same kanji.
+    assert.equal(french.entries['回'].meaningFrCheck, 'agrees')
+    assert.equal(french.entries['勝'].meaningFrCheck, 'differs')
+    assert.equal(french.entries['皮'].meaningFrCheck, 'differs')
+    // No French text on a side → no signal.
+    assert.equal(meaningFrCheckFor('', ['peau']), null)
+    assert.equal(meaningFrCheckFor('peau', []), null)
+    assert.equal(meaningFrCheckFor(null, null), null)
+    assert.deepEqual([...frTokens('L’emporter, c’est gagner!')].sort(), ['emporter', 'gagner'])
+  })
+}
+
 console.log(`\nkanjidb: ${passed} checks passed`)

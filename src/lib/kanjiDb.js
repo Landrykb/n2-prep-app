@@ -259,3 +259,19 @@ export function loadManifest() {
   }
   return manifestPromise
 }
+
+// ------------------------------------------------------------ french layer
+// The French curriculum layer (scripts/build-french-merge.mjs, docs/18):
+// per-kanji theme tags + lesson + the booklet radical's French name +
+// a meaning cross-check signal, for the 814 kanji of the Licence lists.
+// Reference data only — no booklet text ships in it.
+let frenchPromise = null
+export function loadFrenchLayer() {
+  if (!frenchPromise) {
+    frenchPromise = fetch(`${BASE}/french.json`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d?.entries || {})
+      .catch(() => ({}))
+  }
+  return frenchPromise
+}

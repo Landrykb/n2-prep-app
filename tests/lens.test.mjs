@@ -16,6 +16,18 @@ const readJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'))
 
 const db = await import('../src/lib/kanjiDb.js')
 const lens = await import('../src/lib/kanjiLens.js')
+const wdb = await import('../src/lib/wordsDb.js')
+
+const WDB = path.join(root, 'public/data/wordsdb')
+const wordShardCache = new Map()
+function wordsForKanjiDisk(char, limit = 10) {
+  const kanjiWords = readJson(path.join(WDB, 'kanji-words.json'))
+  return (kanjiWords[char] || []).slice(0, limit).map((id) => {
+    const rel = wdb.wordShardPath(id).replace('/data/wordsdb/', '')
+    if (!wordShardCache.has(rel)) wordShardCache.set(rel, readJson(path.join(WDB, rel)))
+    return wordShardCache.get(rel)[String(id)] || null
+  }).filter(Boolean)
+}
 
 let passed = 0
 const check = (name, fn) => { fn(); passed++; console.log(`  ok ${name}`) }
@@ -118,6 +130,52 @@ check('a kanji without KanjiVG coverage degrades honestly', () => {
   assert.deepEqual(fam.radical, [])
   assert.equal(lens.captionFor(null), '')
   assert.equal(lens.captionFor({ element: '木', role: 'part', position: 'left' }), '木 · on the left')
+})
+
+check('pickQueueWord prefers the first 2-kanji compound containing the char', () => {
+  const entries = [
+    { id: 1, kanji: ['語る'], kana: 'かたる', gloss: ['to talk'] },
+    { id: 2, kanji: ['日本語'], kana: 'にほんご', gloss: ['Japanese language'] },
+    { id: 3, kanji: ['英語'], kana: 'えいご', gloss: ['English'] },
+    { id: 4, kanji: ['語学'], kana: 'ごがく', gloss: ['linguistics'] },
+  ]
+  // 日本語 is 3 kanji — skipped; 英語 is the first true 2-kanji compound.
+  assert.equal(lens.pickQueueWord('語', entries).front, '英語')
+  // Forms are scanned in order inside an entry too.
+  const multi = [{ id: 5, kanji: ['御言葉', '言葉'], kana: 'ことば', gloss: ['word'] }]
+  assert.equal(lens.pickQueueWord('葉', multi).front, '言葉')
+})
+
+check('pickQueueWord falls back to the first entry, honestly null when wordless', () => {
+  const entries = [
+    { id: 1, kanji: ['語る'], kana: 'かたる', gloss: ['to talk'] },
+    { id: 2, kanji: ['日本語'], kana: 'にほんご', gloss: ['Japanese language'] },
+  ]
+  assert.equal(lens.pickQueueWord('語', entries).front, '語る')
+  const kanaOnly = [{ id: 3, kanji: [], kana: 'テスト', gloss: ['test'] }]
+  assert.equal(lens.pickQueueWord('語', kanaOnly).front, 'テスト')
+  assert.equal(lens.pickQueueWord('語', []), null)
+  assert.equal(lens.pickQueueWord('語', null), null)
+  assert.equal(lens.pickQueueWord('', entries), null)
+})
+
+check('pickQueueWord on real data: 語 picks a real 2-kanji compound', () => {
+  const entries = wordsForKanjiDisk('語', 50)
+  assert.ok(entries.length > 0)
+  const pick = lens.pickQueueWord('語', entries)
+  assert.ok(pick)
+  assert.ok(pick.front.includes('語'))
+  assert.equal(lens.kanjiCountOf(pick.front), 2)
+  assert.equal(pick.front, '隠語')
+})
+
+check('queueHasFront matches by front under any source', () => {
+  const q = [{ front: '英語', source: 'reader' }, { front: '猫', source: 'manual' }]
+  assert.equal(lens.queueHasFront(q, '英語'), true)
+  assert.equal(lens.queueHasFront(q, '語学'), false)
+  assert.equal(lens.queueHasFront([], '英語'), false)
+  assert.equal(lens.queueHasFront(null, '英語'), false)
+  assert.equal(lens.queueHasFront(q, ''), false)
 })
 
 console.log(`\nlens: ${passed} checks passed`)

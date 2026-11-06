@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Play, Pause, RotateCcw, Loader2 } from 'lucide-react'
-import { getKanjiMeta, getKanjiStrokes, loadComponents, loadKanjiIndex, getRadicals } from '../lib/kanjiDb.js'
-import { flattenComponents, captionFor, strokeAnchor, familyFor, positionWords } from '../lib/kanjiLens.js'
+import { getKanjiMeta, getKanjiStrokes, loadComponents, loadKanjiIndex, getRadicals, loadFrenchLayer } from '../lib/kanjiDb.js'
+import { flattenComponents, captionFor, strokeAnchor, familyFor, positionWords, pickQueueWord, queueHasFront } from '../lib/kanjiLens.js'
 import { wordsForKanji, getAccent, wordDisplayForm } from '../lib/wordsDb.js'
+import { addToQueue, loadQueue } from '../lib/queue.js'
+import { recordLensEncounters } from '../lib/encounters.js'
 import { recordMetric } from '../lib/metrics.js'
 
 // Kanji Lens — the evidence-based kanji visualization (docs/18).
@@ -28,7 +30,7 @@ const DRAW_CSS = `
 .lens-draw { stroke-dasharray: 1; animation-name: lensDraw; animation-timing-function: ease-in-out; animation-fill-mode: forwards; }
 `
 
-function DrawPad({ paths, char }) {
+function DrawPad({ paths, char, queueFront, queued, onAddToQueue, onSelfMark }) {
   const wrapRef = useRef(null)
   const canvasRef = useRef(null)
   const drawingRef = useRef(false)
@@ -83,6 +85,7 @@ function DrawPad({ paths, char }) {
   const mark = (result) => {
     recordMetric('kanji_draw_attempt', { char, result })
     setMarked(result)
+    onSelfMark?.(result)
   }
 
   return (
@@ -120,7 +123,24 @@ function DrawPad({ paths, char }) {
         <button onClick={() => mark('got')} className={`px-3 py-1.5 rounded-lg text-sm font-medium ${marked === 'got' ? 'bg-emerald-600 text-white' : 'bg-bun-700 text-slate-200 hover:text-white'}`}>I Got It</button>
         <button onClick={() => mark('not_yet')} className={`px-3 py-1.5 rounded-lg text-sm font-medium ${marked === 'not_yet' ? 'bg-[#FF6B57] text-white' : 'bg-bun-700 text-slate-200 hover:text-white'}`}>Not Yet</button>
       </div>
-      {marked && <p className="text-xs text-slate-400 mt-2">{marked === 'got' ? 'Marked as yours. It will keep coming back in your reviews until it is proven.' : 'Marked honestly — it stays in your current batch and comes back soon.'}</p>}
+      {marked && <p className="text-xs text-slate-400 mt-2">{marked === 'got' ? 'Marked as yours. It will keep coming back in your reviews until it is proven.' : 'Marked honestly — its word can join your queue below, and it comes back in your reviews.'}</p>}
+      {marked === 'not_yet' && (
+        <div className="mt-3">
+          {queued ? (
+            <button disabled className="px-3 py-1.5 rounded-lg bg-bun-700/50 text-slate-400 text-sm font-medium cursor-default">Already In Your Queue</button>
+          ) : queueFront ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <button onClick={onAddToQueue} className="px-3 py-1.5 rounded-lg bg-[#71368A] text-white text-sm font-medium">Add Its Word To My Queue</button>
+              <span className="text-xs text-slate-400">Adds {queueFront} — a word this kanji lives in.</span>
+            </div>
+          ) : (
+            <div>
+              <button disabled className="px-3 py-1.5 rounded-lg bg-bun-700/50 text-slate-400 text-sm font-medium cursor-default">Add Its Word To My Queue</button>
+              <p className="text-xs text-slate-500 mt-1.5">No common word with this kanji in the dictionary yet — nothing honest to add.</p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -132,6 +152,9 @@ export default function KanjiLens({ char, item }) {
   const [compMeta, setCompMeta] = useState({})
   const [familyData, setFamilyData] = useState(null)
   const [words, setWords] = useState(null)
+  const [wordEntries, setWordEntries] = useState(null)
+  const [frenchMap, setFrenchMap] = useState(null)
+  const [queueVersion, setQueueVersion] = useState(0)
   const [mode, setMode] = useState('assemble')
   const [step, setStep] = useState(0)
   const [playing, setPlaying] = useState(false)
@@ -173,15 +196,29 @@ export default function KanjiLens({ char, item }) {
   }, [])
 
   // Words Layer (JMdict common words + Kanjium pitch accents, docs/19).
+  // Loads a deep list (50): the first 10 are displayed, and the full
+  // list feeds pickQueueWord — the word the loop-closing actions use.
   useEffect(() => {
     let cancelled = false
     setWords(null)
-    wordsForKanji(lensChar, 10).then(async (entries) => {
-      const withAccents = await Promise.all(entries.map(async (entry) => ({ entry, accent: await getAccent(entry) })))
+    setWordEntries(null)
+    wordsForKanji(lensChar, 50).then(async (entries) => {
+      if (cancelled) return
+      setWordEntries(entries)
+      const shown = entries.slice(0, 10)
+      const withAccents = await Promise.all(shown.map(async (entry) => ({ entry, accent: await getAccent(entry) })))
       if (!cancelled) setWords(withAccents)
-    }).catch(() => { if (!cancelled) setWords([]) })
+    }).catch(() => { if (!cancelled) { setWords([]); setWordEntries([]) } })
     return () => { cancelled = true }
   }, [lensChar])
+
+  // French curriculum layer (docs/18): theme tags + radical French
+  // names for the 814 Licence-list kanji. Reference data, loaded once.
+  useEffect(() => {
+    let cancelled = false
+    loadFrenchLayer().then((map) => { if (!cancelled) setFrenchMap(map) }).catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   const meta = data?.meta || null
   const strokes = data?.strokes || null
@@ -207,6 +244,55 @@ export default function KanjiLens({ char, item }) {
       radicalMembers,
     })
   }, [familyData, meta, strokes, lensChar])
+
+  // Loop-closing (docs/18): the word this kanji acts through, chosen
+  // by the pure preference rule (first 2-kanji compound containing
+  // the char, else the first entry). Opening the Lens records that
+  // word as an encounter — it was on the screen in front of the
+  // learner — and a Draw self-mark records it again (the union store
+  // dedupes). A Not Yet offers the same word to the one queue.
+  const queuePick = useMemo(() => pickQueueWord(lensChar, wordEntries), [lensChar, wordEntries])
+  const queued = useMemo(
+    () => (queuePick ? queueHasFront(loadQueue(), queuePick.front) : false),
+    // queueVersion is the refresh tick bumped after a queue add.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [queuePick, queueVersion],
+  )
+
+  useEffect(() => {
+    if (queuePick?.front) recordLensEncounters([queuePick.front])
+  }, [queuePick])
+
+  const addWordToQueue = () => {
+    if (!queuePick || queued) return
+    addToQueue([{
+      front: queuePick.front,
+      back: queuePick.entry.gloss?.[0] || '',
+      reading: queuePick.entry.kana || '',
+      note: `From the Kanji Lens: ${lensChar} — marked Not Yet in Draw, so its word joins the queue.`,
+      source: 'lens',
+      level: meta?.level ? String(meta.level) : '',
+    }])
+    setQueueVersion((v) => v + 1)
+  }
+
+  const onDrawSelfMark = () => {
+    if (queuePick?.front) recordLensEncounters([queuePick.front])
+  }
+
+  // French layer display facts: this kanji's curriculum row, and the
+  // breakdown row its booklet radical name belongs to (the row whose
+  // element IS the booklet radical char; else the radical-flagged
+  // row). French glosses ride as secondary annotations in this app
+  // (KanjiModal shows item.meaningFr the same way) — there is no
+  // UI-language switch to gate on, so the name shows the same way.
+  const fr = frenchMap?.[lensChar] || null
+  const frRadicalTarget = useMemo(() => {
+    if (!fr?.radicalNameFr) return null
+    const rows = flat.filter((n) => n.depth >= 1)
+    if (fr.radicalChar && rows.some((n) => n.element === fr.radicalChar)) return fr.radicalChar
+    return rows.find((n) => n.role === 'radical')?.element || null
+  }, [fr, flat])
 
   // Assemble playback: advance one component at a time while playing.
   useEffect(() => {
@@ -294,6 +380,17 @@ export default function KanjiLens({ char, item }) {
         )}
       </div>
 
+      {fr?.themes?.length > 0 && (
+        <div className="mb-4">
+          <div className="flex flex-wrap gap-1.5">
+            {fr.themes.map((t, i) => (
+              <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-bun-700/60 border border-bun-600/30 text-slate-300">{t.theme}</span>
+            ))}
+          </div>
+          <p className="text-[10px] text-slate-500 mt-1">Theme tags from the Licence curriculum lists (S5/S6) — reference data.</p>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2 mb-4">
         {[['assemble', 'Assemble'], ['strokes', 'Stroke Order'], ['draw', 'Draw']].map(([m, label]) => (
           <button key={m} onClick={() => { setMode(m); if (m !== 'draw') { setPlaying(!reduced); setPlayKey((k) => k + 1) } }}
@@ -311,7 +408,9 @@ export default function KanjiLens({ char, item }) {
 
       {mode === 'draw' ? (
         <div className="max-w-[320px] mx-auto w-full">
-          <DrawPad key={lensChar} paths={paths} char={lensChar} />
+          <DrawPad key={lensChar} paths={paths} char={lensChar}
+            queueFront={queuePick?.front || null} queued={queued}
+            onAddToQueue={addWordToQueue} onSelfMark={onDrawSelfMark} />
         </div>
       ) : paths ? (
         <div>
@@ -401,6 +500,9 @@ export default function KanjiLens({ char, item }) {
                   <span className="text-xs text-slate-400">
                     {[positionWords(n.position), cm?.meanings?.[0] || '', cm?.on?.[0] || '', shared > 1 ? `${shared} kanji share this part` : ''].filter(Boolean).join(' · ')}
                   </span>
+                  {fr?.radicalNameFr && n.element === frRadicalTarget && (
+                    <span className="text-[11px] text-slate-500">FR · {fr.radicalNameFr}</span>
+                  )}
                 </button>
               )
             })}

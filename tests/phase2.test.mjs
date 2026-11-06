@@ -395,6 +395,40 @@ console.log('encounters — collect derivations + union merge (Fit v2, amendment
     assert.deepEqual(merged.encounters, ['猫', '犬'])
     assert.deepEqual(mergeLearnerState({}, {}).encounters, [])
   })
+
+  check('lensEncounterWords: the Lens store derivation is a plain cleaned list', () => {
+    assert.deepEqual(enc.lensEncounterWords([' 語る ', '語る', '', 42, '日本語']), ['語る', '日本語'])
+    assert.deepEqual(enc.lensEncounterWords(null), [])
+    assert.deepEqual(enc.lensEncounterWords('語る'), [])
+    assert.deepEqual(enc.loadLensEncounters(), []) // storage-safe with nothing stored
+  })
+
+  check('recordLensEncounters unions into its own store, never shrinks, and collect sees Lens words', () => {
+    const store = new Map()
+    const prev = globalThis.localStorage
+    globalThis.localStorage = {
+      getItem: (k) => (store.has(k) ? store.get(k) : null),
+      setItem: (k, v) => store.set(k, String(v)),
+      removeItem: (k) => store.delete(k),
+    }
+    try {
+      assert.deepEqual(enc.recordLensEncounters(['日本語']), ['日本語'])
+      assert.deepEqual(enc.recordLensEncounters(['日本語', '語る']), ['日本語', '語る'])
+      assert.deepEqual(enc.recordLensEncounters([]), ['日本語', '語る']) // a later, smaller write never shrinks it
+      assert.deepEqual(enc.recordLensEncounters(['日本語']), ['日本語', '語る'])
+      assert.deepEqual(enc.loadLensEncounters(), ['日本語', '語る'])
+      // The collector — the exact output learnerState puts in the
+      // document and buildKnownSet reads — carries the Lens words.
+      const collected = enc.collectEncounterWords()
+      assert.ok(collected.includes('日本語') && collected.includes('語る'))
+      // And the merged document keeps them (union slice, above).
+      const merged = mergeLearnerState({ encounters: collected }, { encounters: [] })
+      assert.ok(merged.encounters.includes('日本語') && merged.encounters.includes('語る'))
+    } finally {
+      if (prev === undefined) delete globalThis.localStorage
+      else globalThis.localStorage = prev
+    }
+  })
 }
 
 console.log(`\nphase2: ${passed} checks passed (incl. scheduler-auth)`)

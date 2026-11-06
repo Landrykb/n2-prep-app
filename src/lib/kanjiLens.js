@@ -108,6 +108,49 @@ export function strokeAnchor(d) {
   return { x, y }
 }
 
+const KANJI_CHAR = /[㐀-鿿豈-﫿]/
+/** How many kanji characters a written form contains. */
+export function kanjiCountOf(form) {
+  let n = 0
+  for (const ch of String(form || '')) if (KANJI_CHAR.test(ch)) n++
+  return n
+}
+
+/**
+ * The word the Lens acts on for a kanji (queue adds + encounters):
+ * the FIRST 2-kanji compound among the kanji's JMdict common words
+ * (wordsDb.wordsForKanji order) whose written form contains the
+ * char — a true compound teaches the kanji in company, which is
+ * how it will actually be met in text. Falls back to the first
+ * entry, preferring a written form that contains the char. Returns
+ * { entry, front } or null when the dictionary has no word for the
+ * kanji at all — the caller must then disable the action honestly,
+ * never invent a word.
+ */
+export function pickQueueWord(char, entries) {
+  if (!char || !Array.isArray(entries) || entries.length === 0) return null
+  for (const entry of entries) {
+    const form = (entry?.kanji || []).find((f) => f.includes(char) && kanjiCountOf(f) === 2)
+    if (form) return { entry, front: form }
+  }
+  const first = entries[0]
+  if (!first) return null
+  const front = (first.kanji || []).find((f) => f.includes(char)) || first.kanji?.[0] || first.kana || ''
+  return front ? { entry: first, front } : null
+}
+
+/**
+ * Is this front already in the one queue — under ANY source? The
+ * queue dedupes adds by (source, front) id, so a word mined from
+ * the Reader and later offered by the Lens would otherwise land
+ * twice under two ids. Front presence is the honest check for the
+ * "Already In Your Queue" state.
+ */
+export function queueHasFront(queueItems, front) {
+  if (!front) return false
+  return (queueItems || []).some((i) => i?.front === front)
+}
+
 const asList = (v) => (Array.isArray(v) ? v : v ? [v] : [])
 const onListOf = (entry) => {
   const raw = asList(entry?.on).join('・')

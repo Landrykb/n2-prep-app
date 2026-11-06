@@ -19,6 +19,7 @@
     "test:tts": "TZ=UTC node tests/tts.test.mjs",
     "test:lens": "TZ=UTC node tests/lens.test.mjs",
     "build:wordsdb": "node scripts/build-wordsdb.mjs",
+ "build:french": "node scripts/build-french-merge.mjs",
     "test:wordsdb": "TZ=UTC node tests/wordsdb.test.mjs"
   },
   "dependencies": {

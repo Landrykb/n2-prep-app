@@ -17,6 +17,13 @@
 //   · Speed Cards (drills): speedStats persists { m, h } per
 //     `word|reading` key; a key exists only after the learner
 //     ANSWERED that prompt. Derived live at collect time.
+//   · Kanji Lens (loop-closing, Doc 18): opening the Lens for a
+//     kanji, or completing a Draw self-mark in it, puts that
+//     kanji's chosen dictionary word (kanjiLens.pickQueueWord over
+//     JMdict common words) on the screen in front of the learner;
+//     the word is recorded into the Lens store below at that
+//     moment. Stored separately like the Anki store and unioned
+//     at collect time, so the slice can only grow.
 // NOT sources (inspected, excluded — no per-word record exists):
 //   · Grammar lessons: no persisted per-word progress store at all.
 //   · VoiceLoop: its mastered store is keyed by SCENE, not by word.
@@ -31,6 +38,7 @@ import { emitLearnerStateSaved } from './stateEvents.js'
 import { loadStats } from './speedStats.js'
 
 export const ENCOUNTERS_KEY = 'jpn:encounters:v1'
+export const LENS_ENCOUNTERS_KEY = 'jpn:encounters:lens:v1'
 const ENCOUNTERS_CAP = 12000
 
 const cleanWords = (words) => {
@@ -102,11 +110,51 @@ export function speedEncounterWords(stats) {
 }
 
 /**
+ * Lens encounter words from the persisted Lens store: the plain
+ * word list KanjiLens records when a kanji is opened or draw-
+ * marked. Pure derivation over the stored list, like the Speed
+ * Cards derivation over its stats.
+ */
+export function lensEncounterWords(stored) {
+  return cleanWords(Array.isArray(stored) ? stored : [])
+}
+
+export function loadLensEncounters() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(LENS_ENCOUNTERS_KEY) || '[]')
+    return lensEncounterWords(parsed)
+  } catch { return [] }
+}
+
+/**
+ * Union words into the Lens encounter store. Emits the state-saved
+ * event ONLY when something was actually added (same contract as
+ * recordEncounters), so the Lens can call it on every open/mark
+ * without churn. Returns the full Lens list.
+ */
+export function recordLensEncounters(words) {
+  const current = loadLensEncounters()
+  const seen = new Set(current)
+  const fresh = cleanWords(words).filter((w) => !seen.has(w))
+  if (fresh.length === 0) return current
+  const next = [...current, ...fresh].slice(0, ENCOUNTERS_CAP)
+  try {
+    localStorage.setItem(LENS_ENCOUNTERS_KEY, JSON.stringify(next))
+    emitLearnerStateSaved()
+  } catch { /* storage unavailable — encounters simply stay local-session */ }
+  return next
+}
+
+/**
  * The full encounter list for the state document: the recorded
  * store (Anki derivations land there) unioned with the live Speed
  * Cards derivation, so a drill word counts from the moment it is
- * answered even before anything records it anywhere else.
+ * answered even before anything records it anywhere else — plus
+ * the Lens store, unioned the same way. This collector is what
+ * buildKnownSet's proven set ultimately reads (via the synced
+ * learner_state document), so a Lens-met word earns full credit
+ * with no fit-code changes.
  */
 export function collectEncounterWords() {
-  return cleanWords([...loadEncounters(), ...speedEncounterWords(loadStats())])
+  return cleanWords([...loadEncounters(), ...speedEncounterWords(loadStats()), ...loadLensEncounters()])
 }
