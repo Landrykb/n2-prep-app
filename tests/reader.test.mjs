@@ -995,4 +995,127 @@ check('score twin: firstMissedCandidate agrees — same fix, same order', () => 
   assert.equal(scorePort.firstMissedCandidate(cands, ''), null)
 })
 
+// ---------- amendment #7: N7+, foundations pace, doors (2026-11-07) ----------
+
+check('resolveBand: raw N7 resolves to N5 with the joke remembered — and only there', () => {
+  assert.deepEqual(fit.resolveBand({ declaredBand: 'N7' }), { band: 'N5', source: 'declared', joke: true })
+  assert.deepEqual(port.resolveBand({ declaredBand: 'N7' }), { band: 'N5', source: 'declared', joke: true })
+  // A diagnosis overrides band AND joke: no joke key survives.
+  assert.deepEqual(fit.resolveBand({ diagnosisBand: 'N3', declaredBand: 'N7' }), { band: 'N3', source: 'diagnosis' })
+  // Downstream only ever sees a real band: the step ladder works.
+  const resolved = fit.resolveBand({ declaredBand: 'N7' })
+  assert.equal(fit.serveBandFor(resolved.band, 0), 'N5')
+  assert.equal(fit.serveBandFor(resolved.band, 1), 'N4')
+})
+
+check('resolveBand: the latest declaration wins across the two stores; the Telegram row is the incumbent', () => {
+  const older = '2026-11-01T00:00:00.000Z'
+  const newer = '2026-11-05T00:00:00.000Z'
+  // App-side declaration strictly fresher → it takes over.
+  assert.deepEqual(
+    fit.resolveBand({ declaredBand: 'N4', declaredAt: older, stateDeclaredBand: 'N2', stateDeclaredAt: newer }),
+    { band: 'N2', source: 'declared' },
+  )
+  // Telegram declaration fresher → it stands.
+  assert.deepEqual(
+    fit.resolveBand({ declaredBand: 'N4', declaredAt: newer, stateDeclaredBand: 'N2', stateDeclaredAt: older }),
+    { band: 'N4', source: 'declared' },
+  )
+  // A tie keeps the incumbent (the Telegram row).
+  assert.deepEqual(
+    fit.resolveBand({ declaredBand: 'N4', declaredAt: newer, stateDeclaredBand: 'N2', stateDeclaredAt: newer }),
+    { band: 'N4', source: 'declared' },
+  )
+  // A fresher app-side N7 carries the joke with it.
+  assert.deepEqual(
+    fit.resolveBand({ declaredBand: 'N3', declaredAt: older, stateDeclaredBand: 'N7', stateDeclaredAt: newer }),
+    { band: 'N5', source: 'declared', joke: true },
+  )
+  // Junk in the fresher store is ignored, never guessed at.
+  assert.deepEqual(
+    fit.resolveBand({ declaredBand: 'N3', declaredAt: older, stateDeclaredBand: 'beginner', stateDeclaredAt: newer }),
+    { band: 'N3', source: 'declared' },
+  )
+  // A state-only declaration still speaks.
+  assert.deepEqual(
+    fit.resolveBand({ stateDeclaredBand: 'N2', stateDeclaredAt: newer }),
+    { band: 'N2', source: 'declared' },
+  )
+  // The port resolves identically.
+  assert.deepEqual(
+    port.resolveBand({ declaredBand: 'N4', declaredAt: older, stateDeclaredBand: 'N2', stateDeclaredAt: newer }),
+    fit.resolveBand({ declaredBand: 'N4', declaredAt: older, stateDeclaredBand: 'N2', stateDeclaredAt: newer }),
+  )
+})
+
+check('applyFeedback: foundations pace needs SIX comfortable reads before the ratchet dares', () => {
+  assert.equal(fit.COMFY_STREAK_TARGET, 3)
+  assert.equal(fit.FOUNDATIONS_COMFY_TARGET, 6)
+  assert.equal(port.FOUNDATIONS_COMFY_TARGET, 6)
+  let s = { fit_step: 0, last_good_step: 0, comfy_streak: 0 }
+  for (let i = 0; i < 5; i++) {
+    s = fit.applyFeedback(s, 'read', fit.FOUNDATIONS_COMFY_TARGET)
+    assert.equal(s.effect, 'logged')
+    assert.equal(s.fit_step, 0)
+  }
+  assert.equal(s.comfy_streak, 5)
+  s = fit.applyFeedback(s, 'read', fit.FOUNDATIONS_COMFY_TARGET)
+  assert.equal(s.effect, 'trial_up')
+  assert.deepEqual(
+    { fit_step: s.fit_step, last_good_step: s.last_good_step, comfy_streak: s.comfy_streak },
+    { fit_step: 1, last_good_step: 0, comfy_streak: 0 },
+  )
+  // At full stretch the sixth read proves instead of overshooting.
+  const proven = fit.applyFeedback(
+    { fit_step: 1, last_good_step: 1, comfy_streak: 5 },
+    'read',
+    fit.FOUNDATIONS_COMFY_TARGET,
+  )
+  assert.equal(proven.effect, 'proven')
+  // Push Me and Too Hard never wait for the target, at any pace.
+  assert.equal(fit.applyFeedback({ fit_step: 0, last_good_step: 0, comfy_streak: 0 }, 'up', 6).effect, 'pushed')
+  assert.equal(fit.applyFeedback({ fit_step: 1, last_good_step: 0, comfy_streak: 4 }, 'hard', 6).effect, 'step_back')
+  // The port walks the same six steps.
+  let p = { fit_step: 0, last_good_step: 0, comfy_streak: 0 }
+  for (let i = 0; i < 6; i++) p = port.applyFeedback(p, 'read', port.FOUNDATIONS_COMFY_TARGET)
+  assert.equal(p.effect, 'trial_up')
+})
+
+check('pickGentle: same gate, starter order — easiest band, then fewest new words', () => {
+  const toks = (knownCount, ...unknownWords) => [...Array(knownCount).fill('猫'), ...unknownWords]
+  const onTarget = passage('a-target', 'N4', toks(95, '龍', '鳥', '犬', '馬', '魚')) // ratio .95
+  const gentler = passage('b-gentle', 'N5', toks(47, '龍', '鳥', '犬')) // ratio .94, lower band
+  const bank = [onTarget, gentler]
+  // pickPassage takes the closest-to-target; pickGentle takes the kindest.
+  assert.equal(fit.pickPassage(bank, knownNeko, 'N4').passage.id, 'a-target')
+  assert.equal(fit.pickGentle(bank, knownNeko, 'N4').passage.id, 'b-gentle')
+  // Within one band, fewest distinct new words wins over ratio closeness.
+  const fewerNew = passage('c-fewer', 'N5', toks(47, '龍', '鳥', '犬')) // .94, 3 new
+  const closerMore = passage('d-closer', 'N5', toks(95, '龍', '鳥', '犬', '馬', '魚')) // .95, 5 new
+  assert.equal(fit.pickGentle([closerMore, fewerNew], knownNeko, 'N4').passage.id, 'c-fewer')
+  // The gate never moves for gentle picks: below it, above it, and
+  // outside the ±1 window all return null — exactly like pickPassage.
+  assert.equal(fit.pickGentle([passage('e-low', 'N5', toks(92, '龍', '鳥', '犬', '馬', '魚', '牛', '羊', '豚'))], knownNeko, 'N4'), null)
+  assert.equal(fit.pickGentle([passage('f-easy', 'N5', toks(99, '龍'))], knownNeko, 'N4'), null)
+  assert.equal(fit.pickGentle([passage('g-far', 'N2', toks(95, '龍', '鳥', '犬', '馬', '魚'))], knownNeko, 'N4'), null)
+  // The 14-day exclusion binds gentle picks too.
+  assert.equal(fit.pickGentle([gentler], knownNeko, 'N4', ['b-gentle']), null)
+  // The port picks identically.
+  assert.equal(port.pickGentle(bank, knownNeko, 'N4').passage.id, 'b-gentle')
+  assert.equal(port.pickGentle([closerMore, fewerNew], knownNeko, 'N4').passage.id, 'c-fewer')
+})
+
+check('levelKeyboard: bands, the N7+ joke, Not sure — identical in both twins, callbacks tiny', () => {
+  const kb = fit.levelKeyboard()
+  assert.deepEqual(port.levelKeyboard(), kb)
+  const rows = kb.inline_keyboard
+  assert.deepEqual(rows[0].map((b) => b.callback_data), fit.BANDS.map((b) => `level:${b}`))
+  const joke = rows.flat().find((b) => b.callback_data === 'level:N7')
+  assert.equal(joke.text, 'N7+ 😂')
+  assert.ok(rows.flat().some((b) => b.callback_data === 'level:none'))
+  for (const btn of rows.flat()) {
+    assert.ok(Buffer.byteLength(btn.callback_data, 'utf8') <= 64, btn.callback_data)
+  }
+})
+
 console.log(`reader: ${passed} checks passed`)

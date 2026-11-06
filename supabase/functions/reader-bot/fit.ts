@@ -53,14 +53,41 @@ export function deckCreditSet(deckLevels, band) {
  * states in one tap inside Telegram — it exists so the Reader never
  * gates fitting on the in-app checkup — and a real diagnosis in
  * learner_state overrides it whenever one exists:
- *   diagnosis > declared > none.
+ *   diagnosis > latest declaration > none.
+ * A declaration lives in TWO stores that share one shape:
+ * telegram_links.declared_band (with declared_at) and
+ * learner_state.state.declaredLevel = { band, at } (the app writes
+ * the same shape). The later timestamp wins; the Telegram row is
+ * the incumbent on a tie. The raw joke band 'N7' (below N5, the
+ * learners' own joke) is stored AS-IS in both stores and normalized
+ * HERE, the one choke point: it resolves to N5 with joke: true so
+ * copy can laugh WITH the learner — downstream code only ever sees
+ * real bands. A diagnosis overrides band AND the joke (pace too).
  * Returns { band, source } with source 'diagnosis' | 'declared' |
- * 'none'; band is null exactly when source is 'none'. Anything that
- * is not a real band string is ignored, never guessed at.
+ * 'none'; band is null exactly when source is 'none'; joke is
+ * present (true) only when the winning declaration is raw 'N7'.
+ * Anything that is not a real band string (or 'N7') is ignored,
+ * never guessed at.
  */
-export function resolveBand({ diagnosisBand, declaredBand } = {}) {
+export function resolveBand({ diagnosisBand, declaredBand, declaredAt, stateDeclaredBand, stateDeclaredAt } = {}) {
   if (BANDS.includes(diagnosisBand)) return { band: diagnosisBand, source: 'diagnosis' }
-  if (BANDS.includes(declaredBand)) return { band: declaredBand, source: 'declared' }
+  // The two declaration stores, freshest first. Timestamps compare
+  // as instants; a missing/unparseable one counts as the epoch, and
+  // the Telegram row is the incumbent — the app-side declaration
+  // must be STRICTLY fresher to take over.
+  const at = (v) => {
+    const t = Date.parse(v ?? '')
+    return Number.isFinite(t) ? t : 0
+  }
+  const usable = (raw) => BANDS.includes(raw) || raw === 'N7'
+  let winner = usable(declaredBand) ? declaredBand : null
+  if (usable(stateDeclaredBand) && at(stateDeclaredAt) > at(declaredAt)) {
+    winner = stateDeclaredBand
+  } else if (!winner && usable(stateDeclaredBand)) {
+    winner = stateDeclaredBand
+  }
+  if (winner === 'N7') return { band: 'N5', source: 'declared', joke: true }
+  if (winner) return { band: winner, source: 'declared' }
   return { band: null, source: 'none' }
 }
 
@@ -129,6 +156,44 @@ export function passageRatio(tokens, knownSet) {
  * closest to RATIO_TARGET wins; ties break on fewer tokens, then id,
  * so the pick is deterministic. Returns { passage, ratio } or null.
  */
+/**
+ * Gentlest-first pick over the SAME window + gate as pickPassage —
+ * foundations pace (the N7+ declaration) serves fitted passages in
+ * starter order (band ascending, then fewest unknowns) until the
+ * first ratchet completes, so the earliest reads are the kindest
+ * ones that honestly fit. The gate never moves: this only reorders
+ * CANDIDATES THAT PASS. Returns null under exactly the conditions
+ * pickPassage does. Same { passage, ratio } shape.
+ */
+export function pickGentle(passages, knownSet, band, recentIds = []) {
+  const rank = bandRank(band)
+  if (rank === -1) return null
+  const recent = new Set(recentIds || [])
+  let best = null
+  for (const passage of passages || []) {
+    if (!passage || recent.has(passage.id)) continue
+    const pRank = bandRank(passage.band)
+    if (pRank === -1 || Math.abs(pRank - rank) > 1) continue
+    const ratio = passageRatio(passage.tokens, knownSet)
+    if (ratio < RATIO_MIN || ratio > RATIO_MAX) continue
+    // Starter order: easiest band first, then fewest new words,
+    // then shortest, then id — the pick stays deterministic.
+    const unknowns = unknownContentHeadwords(passage.tokens, knownSet).length
+    if (
+      !best ||
+      pRank < best.pRank ||
+      (pRank === best.pRank &&
+        (unknowns < best.unknowns ||
+          (unknowns === best.unknowns &&
+            (passage.tokens.length < best.passage.tokens.length ||
+              (passage.tokens.length === best.passage.tokens.length && passage.id < best.passage.id)))))
+    ) {
+      best = { passage, ratio, pRank, unknowns }
+    }
+  }
+  return best ? { passage: best.passage, ratio: best.ratio } : null
+}
+
 /** Max unknown CONTENT headwords a generated draft may carry (R0.5).
  *  A draft inside the ratio gate but stuffed with distinct new words
  *  is a vocabulary list wearing a passage's clothes — the cap keeps
@@ -397,6 +462,13 @@ export const FIT_STEP_MIN = -1
 export const FIT_STEP_MAX = 1
 /** Comfortable reads at one step that prove it (and earn a stretch). */
 export const COMFY_STREAK_TARGET = 3
+/**
+ * Foundations pace (the N7+ declaration): double the proof before
+ * the ratchet dares a trial step up. Everything else about the
+ * state machine is identical — Push Me still trials +1 on demand,
+ * Too Hard still steps back to last_good_step.
+ */
+export const FOUNDATIONS_COMFY_TARGET = 6
 
 const clampStep = (n) => {
   const v = Math.trunc(Number(n) || 0)
@@ -419,8 +491,8 @@ export function serveBandFor(basisBand, fitStep) {
  * One feedback tap applied to the step state. Pure: state in,
  * { ...newState, effect } out, where effect is one of:
  *   'logged'    — a comfortable read, streak growing
- *   'trial_up'  — third comfortable read: step proven AND stepped up
- *   'proven'    — third comfortable read at full stretch: ratcheted
+ *   'trial_up'  — target-th comfortable read: step proven AND stepped up
+ *   'proven'    — target-th comfortable read at full stretch: ratcheted
  *   'pushed'    — Push Me stepped the fit up
  *   'max'       — Push Me at full stretch already: nothing moved
  *   'step_back' — Too Hard: back to the previous known level
@@ -429,14 +501,15 @@ export function serveBandFor(basisBand, fitStep) {
  * the step where it is — the overshoot explanation still sends;
  * the step-back is a floor, not a penalty.
  */
-export function applyFeedback(state, kind) {
+export function applyFeedback(state, kind, comfyTarget = COMFY_STREAK_TARGET) {
+  const target = Math.max(1, Math.trunc(Number(comfyTarget)) || COMFY_STREAK_TARGET)
   let fit_step = clampStep(state?.fit_step)
   let last_good_step = clampStep(state?.last_good_step)
   let comfy_streak = Math.max(0, Math.trunc(Number(state?.comfy_streak) || 0))
   let effect = 'ignored'
   if (kind === 'read') {
     comfy_streak += 1
-    if (comfy_streak >= COMFY_STREAK_TARGET) {
+    if (comfy_streak >= target) {
       last_good_step = fit_step // proven — the ratchet
       comfy_streak = 0
       if (fit_step < FIT_STEP_MAX) {
@@ -498,6 +571,26 @@ export function parseFitCallback(data) {
  */
 export function hasFeedbackFor(payloads, passageId) {
   return (payloads || []).some((p) => p && p.passageId === passageId)
+}
+
+/**
+ * The one-tap level question's keyboard (Doc 16 §5 amendment #7):
+ * every band, the learners' own joke "N7+ 😂" (below N5 — stored
+ * RAW as 'N7' and normalized at resolveBand, the one choke point),
+ * and Not sure (the starter track). Shared by both twins so the bot
+ * and its tests can never drift apart. Every callback stays far
+ * under Telegram's 64-byte limit ('level:N7' is 8 bytes).
+ */
+export function levelKeyboard() {
+  return {
+    inline_keyboard: [
+      BANDS.map((b) => ({ text: b, callback_data: `level:${b}` })),
+      [
+        { text: 'N7+ 😂', callback_data: 'level:N7' },
+        { text: 'Not sure', callback_data: 'level:none' },
+      ],
+    ],
+  }
 }
 
 // ---------- voice proof + morning dispatch (Doc 16, 2026-11-06 late) ----------

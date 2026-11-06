@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { applyFeedback, BANDS, bandRank, buildKnownSet, capCandidates, countKnownContent, deckCreditSet, evaluateDraft, fitCallback, hasFeedbackFor, isColdStart, isDispatchDue, nextForbiddenList, parseFitCallback, passageRatio, pickPassage, pickStarter, resolveBand, serveBandFor, shouldAskLevel, shouldGenerate, unknownContentHeadwords, voiceReadWindow } from './fit.ts'
+import { applyFeedback, BANDS, bandRank, buildKnownSet, capCandidates, countKnownContent, deckCreditSet, evaluateDraft, fitCallback, FOUNDATIONS_COMFY_TARGET, hasFeedbackFor, isColdStart, isDispatchDue, levelKeyboard, nextForbiddenList, parseFitCallback, passageRatio, pickGentle, pickPassage, pickStarter, resolveBand, serveBandFor, shouldAskLevel, shouldGenerate, unknownContentHeadwords, voiceReadWindow } from './fit.ts'
 import { DECK_LEVELS } from './deck.ts'
 import { DECK_GLOSS } from './gloss.ts'
 import { segmentText } from './segment.ts'
@@ -125,6 +125,17 @@ const RECENT_DAYS = 14
 // every Reader chat is private by design.
 const MINI_APP_READER_URL = 'https://jpn2easy.vercel.app/reader'
 
+// The doors to the app itself (Doc 16 §5 amendment #7): the app
+// root, not just /reader. Every status and dead-end reply carries
+// the Open Yonde button, the chat Menu button opens the same door
+// (registered by reader-admin via setChatMenuButton), and /app is
+// the typed route to it.
+const MINI_APP_URL = 'https://jpn2easy.vercel.app'
+const APP_BUTTON = { text: 'Open Yonde', web_app: { url: MINI_APP_URL } }
+const appKeyboard = (rows: Record<string, unknown>[][] = []) => ({
+  inline_keyboard: [...rows, [APP_BUTTON]],
+})
+
 // The morning greeting (Doc 16 R1/§9): the one line that precedes a
 // dispatched passage. Warm, short, and free of streak/nag language —
 // it greets the day; it never comments on yesterday.
@@ -176,14 +187,32 @@ function topicFor(state: Record<string, unknown>, userId: string): string {
   return ROTATION_TOPICS[Math.abs(day + h) % ROTATION_TOPICS.length]
 }
 
+// Trim an overlong draft at a sentence boundary instead of
+// discarding it (Doc 16 §5 amendment #7): the free model often runs
+// past the length guard, and the 93–97% gate judges whatever
+// survives the trim — nothing unjudged is ever sent. Returns null
+// when there is no sentence boundary late enough to keep a real
+// passage (≥400 chars): a stub is not a passage.
+function trimDraftToFit(text: string, max = 1200): string | null {
+  if (text.length <= max) return text
+  const cut = text.slice(0, max)
+  const boundary = Math.max(cut.lastIndexOf('。'), cut.lastIndexOf('！'), cut.lastIndexOf('？'))
+  if (boundary < 400) return null
+  return cut.slice(0, boundary + 1)
+}
+
 // One OpenRouter draft (the chat function's call shape: same base,
-// same headers, OPENROUTER_API_KEY env). Returns the cleaned passage
-// text, or null on ANY failure — no key, HTTP error, timeout, empty
-// completion. Generation failure must degrade to the honest reply,
-// never break the webhook.
-async function generateDraft(band: string, topic: string, chars: number, forbidden: string[]): Promise<string | null> {
+// same headers, OPENROUTER_API_KEY env). Returns { text, reason }:
+// text is the cleaned passage or null, and reason NAMES the
+// outcome — 'ok', 'no_key', 'http_<status>', 'timeout', 'network',
+// 'bad_response', 'too_short', 'too_long'. Until amendment #7 every
+// failure collapsed into the same silent null, and production
+// logged generation_failed { attempts: 0 } forever with no way to
+// tell which door was closed. Generation failure must degrade to
+// the honest reply, never break the webhook.
+async function generateDraft(band: string, topic: string, chars: number, forbidden: string[]): Promise<{ text: string | null; reason: string }> {
   const key = Deno.env.get('OPENROUTER_API_KEY') ?? ''
-  if (!key) return null
+  if (!key) return { text: null, reason: 'no_key' }
   const model = Deno.env.get('READER_MODEL') ?? 'openrouter/free'
   const system =
     'You write short, natural Japanese reading passages for a language-learning app. ' +
@@ -219,16 +248,20 @@ async function generateDraft(band: string, topic: string, chars: number, forbidd
     })
     if (!res.ok) {
       console.error(`reader-bot: generation HTTP ${res.status}`)
-      return null
+      return { text: null, reason: `http_${res.status}` }
     }
     const data = await res.json().catch(() => null)
     const raw = data?.choices?.[0]?.message?.content
-    if (typeof raw !== 'string') return null
-    const text = raw.replace(/```[a-z]*\n?/gi, '').replace(/```/g, '').trim()
-    if (text.length < 30 || text.length > 1200) return null
-    return text
-  } catch {
-    return null
+    if (typeof raw !== 'string') return { text: null, reason: 'bad_response' }
+    const cleaned = raw.replace(/```[a-z]*\n?/gi, '').replace(/```/g, '').trim()
+    if (cleaned.length < 30) return { text: null, reason: 'too_short' }
+    const text = trimDraftToFit(cleaned)
+    if (text === null) return { text: null, reason: 'too_long' }
+    return { text, reason: 'ok' }
+  } catch (err) {
+    const reason = (err as Error)?.name === 'AbortError' ? 'timeout' : 'network'
+    console.error(`reader-bot: generation draft failed reason=${reason}`)
+    return { text: null, reason }
   } finally {
     clearTimeout(timer)
   }
@@ -292,7 +325,33 @@ const WELCOME =
   'New words come <b>bold</b>, and one tap mines them into your review queue.\n' +
   'No streaks, no nagging — reading when you feel like it is the whole design.'
 
-const HELP = 'I only know two tricks so far: /read (a passage at your level) and /unlink (disconnect this chat).'
+const HELP =
+  'Here is what I do:\n' +
+  '/read — a passage fitted to your words\n' +
+  '/app — open Yonde: sessions, the checkup, Koe\'s calls\n' +
+  '/level — tell me your level in one tap\n' +
+  '/unlink — disconnect this chat\n' +
+  'Reading when you feel like it is the whole design — no streaks, no nagging.'
+
+// The reply to the N7+ 😂 tap (Doc 16 §5 amendment #7): Hori laughs
+// WITH the learner — the joke is theirs, the warmth is real, and
+// the pace consequence is named in the same breath (foundations
+// pace: bases first, double the proof before any stretch).
+const N7_JOKE_REPLY =
+  'N7+ 😂 — the legendary level: below the test, above giving up.\n' +
+  'Deal — we start at the very beginning. Every N1 alive started below N5.\n' +
+  'And I will slow my steps down — bases first: it takes double the comfortable reads before I dare to stretch you.'
+
+// The ratchet announcement, shared by the feedback tap and both
+// voice-proof paths. The count word follows the learner's pace:
+// Three at the standard pace, Six at foundations pace — the copy
+// must never claim a count the state machine did not use.
+const trialUpCopy = (streakWord: string) =>
+  `🔍 ${streakWord} comfortable reads in a row — that level is properly yours now. ` +
+  'The next passage stretches a little past it; that is the fit hardening, one notch at a time. ' +
+  'If it overshoots, Too Hard brings us straight back.'
+const streakWordFor = (target?: number | null) =>
+  target === FOUNDATIONS_COMFY_TARGET ? 'Six' : 'Three'
 
 // The one-tap level ask (Doc 16 §5 amendment #3). It is the /read
 // response when the learner has no band basis at all — never a
@@ -306,25 +365,25 @@ const LEVEL_ASK =
   'Tap yours and reading starts now. No forms, no homework: this tap is just where we start, ' +
   'and your checkup in Yonde is the sharper measure whenever you want it.'
 
-const levelKeyboard = {
-  inline_keyboard: [
-    BANDS.map((b) => ({ text: b, callback_data: `level:${b}` })),
-    [{ text: 'Not sure', callback_data: 'level:none' }],
-  ],
-}
-
 // The /level intro line names the CURRENT basis before offering the
 // buttons (Doc 16 §5 amendment #3) — a learner re-asking the
-// question should be told what is in charge right now.
-const levelIntro = (source: string, band: string | null) =>
+// question should be told what is in charge right now. The keyboard
+// itself is levelKeyboard() from the fitting twins (pinned there so
+// the bot and the app-side tests can never drift apart). An N7
+// declarer hears the joke remembered (amendment #7): the raw 'N7'
+// resolved to N5, and the intro says what Hori made of it.
+const levelIntro = (source: string, band: string | null, joke = false) =>
   source === 'diagnosis'
     ? `Your checkup put you at ${band}, and a checkup always outranks a tap — I fit to it. ` +
       'If that feels wrong, a fresh checkup in Yonde is the way to change it. ' +
       'A tap below only sets your starting level for if no checkup were on file.'
-    : source === 'declared'
-      ? `You told me ${band} — that is the level I fit to. Tap to change it, ` +
-        'or take the checkup in Yonde for the sharper measure.'
-      : LEVEL_ASK
+    : source === 'declared' && joke
+      ? 'You told me N7+ 😂 — I read that as: start me at the very beginning, at an easy pace. ' +
+        'Tap to change it, or take the checkup in Yonde for the sharper measure.'
+      : source === 'declared'
+        ? `You told me ${band} — that is the level I fit to. Tap to change it, ` +
+          'or take the checkup in Yonde for the sharper measure.'
+        : LEVEL_ASK
 
 // The starter footer (cold start, Doc 16 §5 amendment #2). It must
 // never claim fitting that did not happen: it says plainly this is a
@@ -468,11 +527,17 @@ serve(async (req: Request) => {
     const linkByChat = async (chatId: number) => {
       const { data } = await supabaseAdmin
         .from('telegram_links')
-        .select('user_id, chat_id, username, declared_band, fit_step, last_good_step, comfy_streak')
+        .select('user_id, chat_id, username, declared_band, declared_at, fit_step, last_good_step, comfy_streak')
         .eq('chat_id', chatId)
         .maybeSingle()
       return data
     }
+
+    // The Telegram-side declaration in resolveBand's input shape.
+    const declaredOf = (link: { declared_band?: string | null; declared_at?: string | null } | null | undefined) => ({
+      band: link?.declared_band ?? null,
+      at: link?.declared_at ?? null,
+    })
 
     const loadState = async (userId: string) => {
       const { data } = await supabaseAdmin
@@ -497,21 +562,41 @@ serve(async (req: Request) => {
     // (Personal vocab has no stored list yet — twin.vocab is derived
     // stats — so it contributes nothing today; the parameter stays
     // plumbed for when the Twin grows one.)
-    const knownFor = (state: Record<string, unknown>, declaredBand?: string | null) => {
+    const knownFor = (
+      state: Record<string, unknown>,
+      declared?: { band?: string | null; at?: string | null } | string | null,
+    ) => {
       const queue = Array.isArray(state.queue) ? state.queue : []
       const estimate = (state.diagnosis as Record<string, unknown> | undefined)?.jlptEstimate
-      const { band: resolvedBand, source: bandSource } = resolveBand({
+      // Amendment #7: the declaration has TWO stores (the Telegram
+      // row passed in here, and learner_state.state.declaredLevel,
+      // the app's same-shaped write) and resolveBand is the one
+      // choke point that reconciles them — latest timestamp wins,
+      // raw 'N7' normalizes to N5 + joke there and only there.
+      const stateDeclared = (state.declaredLevel ?? null) as { band?: unknown; at?: unknown } | null
+      const { band: resolvedBand, source: bandSource, joke: isJoke } = resolveBand({
         diagnosisBand: typeof estimate === 'string' ? estimate : null,
-        declaredBand: declaredBand ?? null,
+        declaredBand: typeof declared === 'string' ? declared : (declared?.band ?? null),
+        declaredAt: declared && typeof declared === 'object' ? (declared.at ?? null) : null,
+        stateDeclaredBand: typeof stateDeclared?.band === 'string' ? stateDeclared.band : null,
+        stateDeclaredAt: typeof stateDeclared?.at === 'string' ? stateDeclared.at : null,
       })
+      const joke = isJoke === true
       const hasDiagnosis = bandSource === 'diagnosis'
       const band = resolvedBand ?? 'N4' // gentle default; the footer says so
       const credit = resolvedBand ? deckCreditSet(DECK_LEVELS, resolvedBand) : null
       const known = buildKnownSet(queue, [], credit)
+      // Foundations pace is DERIVED, never stored: the winning
+      // declaration is raw 'N7' AND no diagnosis exists (a diagnosis
+      // overrides band, joke AND pace — resolveBand already put it
+      // in charge). While it holds, the ratchet needs double the
+      // proof (FOUNDATIONS_COMFY_TARGET) and fitted serves run
+      // gentlest-first until the first ratchet completes.
+      const pace = bandSource === 'declared' && joke ? 'foundations' : 'standard'
       // basisBand is the resolved band itself (null when 'none'):
       // adaptive fit (amendment #4) shifts the SERVE band from it,
       // while credit above keeps following the basis untouched.
-      return { queue, known, hasDiagnosis, band, bandSource, basisBand: resolvedBand }
+      return { queue, known, hasDiagnosis, band, bandSource, basisBand: resolvedBand, joke, pace }
     }
 
     // ---------- R0.5 generation fallback ----------
@@ -524,7 +609,7 @@ serve(async (req: Request) => {
       state: Record<string, unknown>,
       known: Set<string>,
       band: string,
-    ): Promise<{ passage: Record<string, unknown>; ratio: number } | null> => {
+    ): Promise<{ picked: { passage: Record<string, unknown>; ratio: number } | null; attempted: boolean; reason: string | null }> => {
       const since = new Date(Date.now() - GEN_COOLDOWN_MS).toISOString()
       const { data: recentGen } = await supabaseAdmin
         .from('metrics_events')
@@ -533,15 +618,29 @@ serve(async (req: Request) => {
         .in('type', ['passage_generated', 'generation_failed'])
         .gte('created_at', since)
         .limit(1)
-      if (!shouldGenerate(null, !recentGen || recentGen.length === 0)) return null
+      if (!shouldGenerate(null, !recentGen || recentGen.length === 0)) {
+        return { picked: null, attempted: false, reason: 'cooldown' }
+      }
 
       const topic = topicFor(state, link.user_id)
       const chars = GEN_LENGTH_BY_BAND[band] ?? 200
       let forbidden: string[] = []
       let calls = 0
+      let lastReason: string | null = null
       for (let attempt = 1; attempt <= GEN_MAX_ATTEMPTS; attempt++) {
-        const draft = await generateDraft(band, topic, chars, forbidden)
-        if (draft === null) break // OpenRouter unreachable — stop, degrade honestly
+        const { text: draft, reason } = await generateDraft(band, topic, chars, forbidden)
+        if (draft === null) {
+          // Amendment #7: a failed draft CONSUMES the attempt and
+          // the loop retries — the old code broke on the first null,
+          // so one bad response (an overlong draft, a hiccup) ended
+          // the whole sequence and production never produced a
+          // single foundry passage. Only a missing key is hopeless:
+          // it stops at once instead of burning the sequence.
+          lastReason = reason
+          console.error(`reader-bot: generation attempt ${attempt} produced no draft reason=${reason}`)
+          if (reason === 'no_key') break
+          continue
+        }
         calls++
         const tokens = segmentText(draft)
         const verdict = evaluateDraft(tokens, known)
@@ -578,12 +677,15 @@ serve(async (req: Request) => {
           await logEvent(link.user_id, 'passage_generated', {
             passageId, band, topic, attempts: attempt, ratio: Math.round(verdict.ratio * 1000) / 1000,
           })
-          return { passage, ratio: verdict.ratio }
+          return { picked: { passage, ratio: verdict.ratio }, attempted: true, reason: null }
         }
         forbidden = nextForbiddenList(forbidden, verdict.unknowns)
+        lastReason = 'gate_rejected'
       }
-      await logEvent(link.user_id, 'generation_failed', { band, topic, attempts: calls })
-      return null
+      // The reason rides the event (amendment #7): the NEXT silent
+      // failure must be diagnosable from the metrics alone.
+      await logEvent(link.user_id, 'generation_failed', { band, topic, attempts: calls, reason: lastReason })
+      return { picked: null, attempted: true, reason: lastReason }
     }
 
     // ---------- voice out ----------
@@ -678,10 +780,13 @@ serve(async (req: Request) => {
     // timing). opts.kind = 'morning': a dispatch serve (R1) — the
     // caller has already verified basis + due-ness, the greeting
     // line precedes the passage, and the passage_sent payload is
-    // tagged so tomorrow's dispatch can see today's.
+    // tagged so tomorrow's dispatch can see today's. opts
+    // .againPassageId (amendment #7): re-serve THIS passage — the
+    // learner tapped Read It Again on the no-fit reply; the gate
+    // re-verifies it below before anything is sent.
     const handleRead = async (
       chatId: number,
-      opts: { declaredBand?: string | null; fromLevelTap?: boolean; forceStarter?: boolean; kind?: string } = {},
+      opts: { declaredBand?: string | null; declaredAt?: string | null; fromLevelTap?: boolean; forceStarter?: boolean; kind?: string; againPassageId?: string } = {},
     ) => {
       const link = await linkByChat(chatId)
       if (!link) {
@@ -689,9 +794,13 @@ serve(async (req: Request) => {
         return
       }
       const declaredBand = opts.declaredBand !== undefined ? opts.declaredBand : (link.declared_band ?? null)
+      const declaredAt = opts.declaredAt !== undefined ? opts.declaredAt : (link.declared_at ?? null)
       const row = await loadState(link.user_id)
       const state = (row?.state ?? {}) as Record<string, unknown>
-      const { queue, known, hasDiagnosis, band, bandSource, basisBand } = knownFor(state, declaredBand)
+      const { queue, known, hasDiagnosis, band, bandSource, basisBand, joke, pace } = knownFor(state, {
+        band: declaredBand,
+        at: declaredAt,
+      })
 
       // Adaptive fit (Doc 16 §5 amendment #4): /read aims at the
       // SERVE band — the basis band shifted by the learner's fit
@@ -711,7 +820,7 @@ serve(async (req: Request) => {
       // response in this state (never a standalone nag), and it
       // stops the moment a basis exists.
       if (!opts.fromLevelTap && shouldAskLevel({ ...link, declared_band: declaredBand }, bandSource)) {
-        await sendMessage(botToken, chatId, LEVEL_ASK, { reply_markup: levelKeyboard })
+        await sendMessage(botToken, chatId, LEVEL_ASK, { reply_markup: levelKeyboard() })
         return
       }
 
@@ -746,7 +855,41 @@ serve(async (req: Request) => {
 
       let picked: { passage: Record<string, unknown>; ratio: number } | null = null
       let coldStart = false
-      if (cold) {
+      let again = false
+      if (opts.againPassageId) {
+        // Read It Again (amendment #7): re-serving a passage the
+        // 14-day freshness exclusion benched is the LEARNER's
+        // choice, never a gate change — the passage still has to
+        // pass the SAME gate against today's known set and serve
+        // band before it is sent. If the learner's words have moved
+        // past it, /read says so and falls through to the normal
+        // flow.
+        const againRow = bank.find((p) => String(p.id) === opts.againPassageId)
+        const verified = againRow
+          ? pickPassage([againRow as unknown as Record<string, unknown>], known, serveBand, [])
+          : null
+        if (againRow && verified) {
+          picked = { passage: againRow as unknown as Record<string, unknown>, ratio: verified.ratio }
+          again = true
+        } else {
+          await sendMessage(
+            botToken,
+            chatId,
+            'That one no longer fits your words — your set has moved since it was sent. Let me find what fits today:',
+          )
+        }
+      }
+      // Foundations pace (amendment #7): until the first ratchet
+      // completes, fitted serves run GENTLEST-FIRST (pickGentle —
+      // same window, same gate, starter order), so the earliest
+      // reads are the kindest ones that honestly fit. The first
+      // ratchet is visible in the step state itself: any step
+      // movement (a trial fit_step, a settled last_good_step) means
+      // it has fired and normal closest-to-target order resumes.
+      const gentleActive = pace === 'foundations'
+        && fitStep <= 0
+        && (Number(link.last_good_step ?? 0) || 0) <= 0
+      if (!picked && cold) {
         // Starter track FIRST for a cold learner (Doc 16 §5
         // amendment #2): a labelled low-band passage whose mined
         // words become the first real known set. The gate is not
@@ -767,9 +910,12 @@ serve(async (req: Request) => {
         }
       }
       if (!picked) {
-        const fit = pickPassage(bank, known, serveBand, recentIds)
+        const fit = gentleActive
+          ? (pickGentle(bank, known, serveBand, recentIds) ?? pickPassage(bank, known, serveBand, recentIds))
+          : pickPassage(bank, known, serveBand, recentIds)
         if (fit) picked = { passage: fit.passage as Record<string, unknown>, ratio: fit.ratio }
       }
+      let genOutcome: { attempted: boolean; reason: string | null } = { attempted: false, reason: null }
       if (!picked && !cold) {
         // R0.5: fitted generation — the bank was never written to
         // the 95% rule, so most learners fit nothing in it. A draft
@@ -778,25 +924,67 @@ serve(async (req: Request) => {
         // cold: generation validates drafts against the known set,
         // and against ~nothing every verdict is meaningless — the
         // spend buys rejections, not passages.
-        picked = await tryGenerate(link, state, known, serveBand)
+        const gen = await tryGenerate(link, state, known, serveBand)
+        genOutcome = { attempted: gen.attempted, reason: gen.reason }
+        if (gen.picked) picked = gen.picked
       }
       if (!picked) {
-        const nothingFits = queue.length === 0
-          ? 'I do not have your synced words yet, so I cannot fit a passage to you. Open Yonde signed in once — your queue syncs on its own — then send /read again.'
-          : 'Nothing in the bank fits your words today. Every passage is checked against what you know before it is sent, and I would rather send nothing than the wrong level. New words from your next session change the fit — try /read again after it.'
-        await sendMessage(
-          botToken,
-          chatId,
-          // Not cold, has words, still nothing fits, and NO band
-          // basis at all (bandSource 'none': no diagnosis, no
-          // declaration): name the checkup as the switch that turns
-          // level-fitting on (the starter track above already covers
-          // the truly cold; this line is for the in-between). A
-          // declared learner already has a basis — for them the
-          // checkup is a sharpening, named in the fitted footers,
-          // not a switch that is off.
-          !cold && bandSource === 'none' ? nothingFits + CHECKUP_SWITCH_LINE : nothingFits,
-        )
+        // Amendment #7: the no-fit reply names the TRUE reason,
+        // computed from the same facts the pick just saw — never
+        // the old generic dead end. Case one: the 14-day freshness
+        // exclusion is itself the blocker — an in-gate passage
+        // exists, but the learner read it recently. The exclusion
+        // exists for freshness, not safety, so the learner can
+        // lift it for that one passage: Read It Again.
+        const recentFit = !cold && queue.length > 0
+          ? pickPassage(
+            bank.filter((p) => recentIds.includes(String(p.id))),
+            known,
+            serveBand,
+            [],
+          )
+          : null
+        if (recentFit) {
+          const againPassage = recentFit.passage as Record<string, unknown>
+          await sendMessage(
+            botToken,
+            chatId,
+            `One passage does fit your words — 「${esc(String(againPassage.topic || 'Reading'))}」 — but you read it in the last two weeks, and I hold recent reads back so /read stays fresh.\n` +
+              'It is yours again whenever you want it: tap below. And a study session in Yonde grows your words, so fresh fits follow.',
+            {
+              reply_markup: appKeyboard([
+                [{ text: 'Read It Again', callback_data: `again:${String(againPassage.id)}` }],
+              ]),
+            },
+          )
+          return
+        }
+        if (queue.length === 0) {
+          await sendMessage(
+            botToken,
+            chatId,
+            'I do not have your synced words yet, so I cannot fit a passage to you. Open Yonde signed in once — your queue syncs on its own — then send /read again.',
+            { reply_markup: appKeyboard() },
+          )
+          return
+        }
+        // Case two: the bank genuinely runs ahead of this learner's
+        // words at their band. Say exactly that, own the generation
+        // outcome when one was attempted, and name the nearest
+        // useful action. (Not cold, has words, still nothing fits,
+        // and NO band basis at all — bandSource 'none': no
+        // diagnosis, no declaration — the checkup is named as the
+        // switch that turns level-fitting on; the starter track
+        // above already covers the truly cold, and a declared
+        // learner already has a basis.)
+        let noFit =
+          'Nothing on the shelf fits your words today — every passage in reach runs ahead of them, and I would rather send nothing than the wrong level.'
+        if (genOutcome.attempted && genOutcome.reason !== 'cooldown') {
+          noFit += ' I also tried writing a fresh one for you just now, and my writer could not manage it this time.'
+        }
+        noFit += '\nThe nearest way forward: a study session in Yonde — new words change the fit — then /read again.'
+        if (!cold && bandSource === 'none') noFit += CHECKUP_SWITCH_LINE
+        await sendMessage(botToken, chatId, noFit, { reply_markup: appKeyboard() })
         return
       }
 
@@ -830,6 +1018,9 @@ serve(async (req: Request) => {
         ? STARTER_FOOTER
         : bandSource === 'diagnosis'
         ? `Fitted to your ${esc(band)} level and your queue: about ${pct}% of its words should already be familiar (an estimate) · ${newWords.length} new word${newWords.length === 1 ? '' : 's'}`
+        : bandSource === 'declared' && joke
+        ? `Fitted from the very beginning — your N7+ 😂 tap — and your queue: about ${pct}% of its words should already be familiar (an estimate) · ${newWords.length} new word${newWords.length === 1 ? '' : 's'}` +
+          '\nFrom the bases, at an easy pace — we climb when your reads get comfortable, a little slower than usual.'
         : bandSource === 'declared'
         ? `Fitted to the ${esc(band)} you told me and your queue: about ${pct}% of its words should already be familiar (an estimate) · ${newWords.length} new word${newWords.length === 1 ? '' : 's'}` +
           '\nYour checkup in Yonde sharpens this whenever you want it.'
@@ -901,11 +1092,61 @@ serve(async (req: Request) => {
         // Starter sends are flagged so the funnel can tell the
         // on-ramp from fitted reads (Doc 16 §5 amendment #2).
         ...(coldStart ? { coldStart: true } : {}),
+        // Read It Again re-serves are flagged too: a freshness
+        // exclusion the learner chose to lift (amendment #7).
+        ...(again ? { again: true } : {}),
         // Dispatch sends are tagged so the next morning's due
         // check can see them (and the funnel can tell a pushed
         // passage from a pulled one).
         ...(opts.kind === 'morning' ? { kind: 'morning' } : {}),
       })
+    }
+
+    // ---------- read-again + door callbacks (amendment #7) ----------
+    // Read It Again rides the no-fit reply: the passage was benched
+    // only by the 14-day freshness exclusion, and re-serving it is
+    // the learner's choice — handleRead re-verifies it against the
+    // unchanged gate before sending. The door callback is the
+    // /start status reply's "Send Me a Passage" button: same serve
+    // as /read, no new logic. Both verify ownership to the same
+    // standard as every other callback.
+    const handleAgain = async (cb: Record<string, unknown>) => {
+      const cbId = String(cb.id ?? '')
+      const from = (cb.from ?? {}) as Record<string, unknown>
+      const message = (cb.message ?? {}) as Record<string, unknown>
+      const chat = (message.chat ?? {}) as Record<string, unknown>
+      const chatId = Number(chat.id)
+      const passageId = String(cb.data ?? '').slice('again:'.length)
+
+      const answer = (text: string) =>
+        tg(botToken, 'answerCallbackQuery', { callback_query_id: cbId, text })
+
+      const link = Number.isFinite(chatId) ? await linkByChat(chatId) : null
+      if (!link || Number(from.id) !== chatId) {
+        await answer('This chat is not linked to a Yonde account.')
+        return
+      }
+      await answer('Sending it again ✓')
+      await handleRead(chatId, { againPassageId: passageId })
+    }
+
+    const handleDoorRead = async (cb: Record<string, unknown>) => {
+      const cbId = String(cb.id ?? '')
+      const from = (cb.from ?? {}) as Record<string, unknown>
+      const message = (cb.message ?? {}) as Record<string, unknown>
+      const chat = (message.chat ?? {}) as Record<string, unknown>
+      const chatId = Number(chat.id)
+
+      const answer = (text: string) =>
+        tg(botToken, 'answerCallbackQuery', { callback_query_id: cbId, text })
+
+      const link = Number.isFinite(chatId) ? await linkByChat(chatId) : null
+      if (!link || Number(from.id) !== chatId) {
+        await answer('This chat is not linked to a Yonde account.')
+        return
+      }
+      await answer('')
+      await handleRead(chatId)
     }
 
     // ---------- mine callback ----------
@@ -952,7 +1193,7 @@ serve(async (req: Request) => {
       // is mined only when it is genuinely new to this learner — not
       // queued, and not credited below their resolved band (diagnosis
       // or declared, amendment #3).
-      const { known } = knownFor(state, link.declared_band ?? null)
+      const { known } = knownFor(state, declaredOf(link))
       // Mine works from the same capped, level-ordered candidate list
       // a starter send bolds (Doc 16 §5 amendment #2): stored lists
       // are builder-capped at 12 today, so for fitted passages the
@@ -1054,27 +1295,68 @@ serve(async (req: Request) => {
         await handleRead(chatId, { fromLevelTap: true, forceStarter: true })
         return
       }
-      if (!(BANDS as string[]).includes(choice)) {
+      // 'N7' is a real answer too (amendment #7): the learners' own
+      // joke band — below N5, the lowest real level. It is stored
+      // RAW, exactly as tapped; resolveBand is the one place that
+      // normalizes it (to N5, with the joke remembered).
+      if (choice !== 'N7' && !(BANDS as string[]).includes(choice)) {
         await answer('')
         return
       }
 
+      const declaredAtIso = new Date().toISOString()
       const { error } = await supabaseAdmin
         .from('telegram_links')
-        .update({ declared_band: choice, declared_at: new Date().toISOString() })
+        .update({ declared_band: choice, declared_at: declaredAtIso })
         .eq('user_id', link.user_id)
       if (error) {
         console.error('reader-bot: declared band write failed')
         await answer('That did not save on my side — try again.')
         return
       }
-      await answer(`${choice} — got it.`)
+      // The shared declaration contract (amendment #7): mirror the
+      // declaration into learner_state.state.declaredLevel — the
+      // same { band, at } shape the app writes — so resolveBand's
+      // timestamp precedence sees this tap from both surfaces.
+      // Conservative write-back in handleMine's pattern: only when
+      // a state row already exists (never fabricate one), and
+      // best-effort — the telegram_links write above is the record.
+      const declRow = await loadState(link.user_id)
+      if (declRow?.state) {
+        const nextState = {
+          ...(declRow.state as Record<string, unknown>),
+          declaredLevel: { band: choice, at: declaredAtIso },
+        }
+        const { error: declError } = await supabaseAdmin
+          .from('learner_state')
+          .upsert(
+            { user_id: link.user_id, state: nextState, updated_at: new Date().toISOString() },
+            { onConflict: 'user_id' },
+          )
+        if (declError) console.error('reader-bot: declaredLevel mirror write failed')
+      }
+      // The metric carries the RAW value, N7 included.
       await logEvent(link.user_id, 'level_declared', { band: choice })
+      if (choice === 'N7') {
+        await answer('N7+ 😂 — noted')
+        await sendMessage(botToken, chatId, N7_JOKE_REPLY)
+        // The gentlest start, served like Not sure: the starter
+        // track, immediately. Foundations pace (derived in
+        // knownFor) governs everything after this first serve.
+        await handleRead(chatId, {
+          fromLevelTap: true,
+          forceStarter: true,
+          declaredBand: 'N7',
+          declaredAt: declaredAtIso,
+        })
+        return
+      }
+      await answer(`${choice} — got it.`)
       // Serve immediately through the normal /read flow: the tap
       // should feel like the passage just arrives. If nothing fits
       // even with the declared credit, the normal nothing-fits copy
       // follows — the declaration is saved either way.
-      await handleRead(chatId, { fromLevelTap: true, declaredBand: choice })
+      await handleRead(chatId, { fromLevelTap: true, declaredBand: choice, declaredAt: declaredAtIso })
     }
 
     // ---------- feedback callback (adaptive fit, amendment #4) ----------
@@ -1122,6 +1404,13 @@ serve(async (req: Request) => {
         return
       }
 
+      // Foundations pace (amendment #7): an N7 declarer's ratchet
+      // needs double the proof — the pace is derived from the same
+      // resolveBand choke point as everything else.
+      const paceRow = await loadState(link.user_id)
+      const paceState = (paceRow?.state ?? {}) as Record<string, unknown>
+      const { pace } = knownFor(paceState, declaredOf(link))
+      const comfyTarget = pace === 'foundations' ? FOUNDATIONS_COMFY_TARGET : undefined
       const after = applyFeedback(
         {
           fit_step: link.fit_step ?? 0,
@@ -1129,6 +1418,7 @@ serve(async (req: Request) => {
           comfy_streak: link.comfy_streak ?? 0,
         },
         kind,
+        comfyTarget,
       )
       const { error } = await supabaseAdmin
         .from('telegram_links')
@@ -1155,14 +1445,9 @@ serve(async (req: Request) => {
           // The ratchet just fired: the step was proven comfortable
           // AND the fit trials up one. Hori says so out loud — a
           // silent difficulty jump would read as the bot drifting,
-          // and the way back is named in the same breath.
-          await sendMessage(
-            botToken,
-            chatId,
-            '🔍 Three comfortable reads in a row — that level is properly yours now. ' +
-              'The next passage stretches a little past it; that is the fit hardening, one notch at a time. ' +
-              'If it overshoots, Too Hard brings us straight back.',
-          )
+          // and the way back is named in the same breath. The count
+          // word follows the pace that was actually applied.
+          await sendMessage(botToken, chatId, trialUpCopy(streakWordFor(comfyTarget)))
         }
       } else if (kind === 'up') {
         await answer(after.effect === 'max' ? 'Already at full stretch' : '🔥 Pushing you')
@@ -1209,7 +1494,7 @@ serve(async (req: Request) => {
         if (passage) {
           const stateRow = await loadState(link.user_id)
           const fbState = (stateRow?.state ?? {}) as Record<string, unknown>
-          const { known, queue } = knownFor(fbState, link.declared_band ?? null)
+          const { known, queue } = knownFor(fbState, declaredOf(link))
           const lineFor = (word: string, reading?: string, meaning?: string) => {
             const bits = [esc(word)]
             if (reading && reading !== word) bits.push(esc(reading))
@@ -1299,13 +1584,14 @@ serve(async (req: Request) => {
     // by voice or by tap, never twice), apply the same
     // applyFeedback 'read' transition the Read It ✓ tap uses, and
     // write the resulting fit state back to the link row. Returns
-    // whether the ratchet trialled the learner up a step (callers
-    // say so out loud when it fires).
+    // { trialUp, target }: whether the ratchet trialled the learner
+    // up a step (callers say so out loud when it fires, with the
+    // count word for the pace that was actually applied).
     const applyVoiceReadEffect = async (
-      link: { user_id: string; fit_step?: number | null; last_good_step?: number | null; comfy_streak?: number | null },
+      link: { user_id: string; fit_step?: number | null; last_good_step?: number | null; comfy_streak?: number | null; declared_band?: string | null; declared_at?: string | null },
       passageId: string,
       via: string,
-    ): Promise<boolean> => {
+    ): Promise<{ trialUp: boolean; target?: number }> => {
       const { data: priorRows } = await supabaseAdmin
         .from('metrics_events')
         .select('payload')
@@ -1314,7 +1600,13 @@ serve(async (req: Request) => {
         .order('created_at', { ascending: false })
         .limit(100)
       const priorPayloads = (priorRows || []).map((r) => r.payload as Record<string, unknown>)
-      if (hasFeedbackFor(priorPayloads, passageId)) return false
+      if (hasFeedbackFor(priorPayloads, passageId)) return { trialUp: false }
+      // Foundations pace applies here exactly as on the tap path:
+      // double the proof before the ratchet dares a step up.
+      const voiceStateRow = await loadState(link.user_id)
+      const voiceState = (voiceStateRow?.state ?? {}) as Record<string, unknown>
+      const { pace: voicePace } = knownFor(voiceState, declaredOf(link))
+      const voiceTarget = voicePace === 'foundations' ? FOUNDATIONS_COMFY_TARGET : undefined
       const after = applyFeedback(
         {
           fit_step: link.fit_step ?? 0,
@@ -1322,6 +1614,7 @@ serve(async (req: Request) => {
           comfy_streak: link.comfy_streak ?? 0,
         },
         'read',
+        voiceTarget,
       )
       const { error } = await supabaseAdmin
         .from('telegram_links')
@@ -1333,7 +1626,7 @@ serve(async (req: Request) => {
         .eq('user_id', link.user_id)
       if (error) {
         console.error('reader-bot: voice-read fit state write failed')
-        return false
+        return { trialUp: false }
       }
       await logEvent(link.user_id, 'reading_feedback', {
         kind: 'read',
@@ -1341,7 +1634,7 @@ serve(async (req: Request) => {
         fitStepAfter: after.fit_step,
         via,
       })
-      return after.effect === 'trial_up'
+      return { trialUp: after.effect === 'trial_up', target: voiceTarget ?? 3 }
     }
 
     // ---------- voice in: Groq transcription (amendment #6) ----------
@@ -1360,7 +1653,7 @@ serve(async (req: Request) => {
     const tryTranscribeAndScore = async (
       voice: Record<string, unknown>,
       passage: Record<string, unknown>,
-      link: { user_id: string; declared_band?: string | null },
+      link: { user_id: string; declared_band?: string | null; declared_at?: string | null },
     ): Promise<{ score: number; missed: Record<string, unknown> | null } | null> => {
       const key = Deno.env.get('READER_STT_API_KEY') ?? ''
       if (!key) return null
@@ -1407,7 +1700,7 @@ serve(async (req: Request) => {
         // order, checked by surface then headword.
         const stateRow = await loadState(link.user_id)
         const sttState = (stateRow?.state ?? {}) as Record<string, unknown>
-        const { known } = knownFor(sttState, link.declared_band ?? null)
+        const { known } = knownFor(sttState, declaredOf(link))
         const newWords = withCandidateLevels(passage).filter((c) => c.word && !known.has(c.h || c.word))
         const missed = firstMissedCandidate(newWords, transcript) as unknown as Record<string, unknown> | null
         return { score, missed }
@@ -1490,7 +1783,7 @@ serve(async (req: Request) => {
             `.\nIt lives in this sentence: 「${esc(sentenceWith(String(passage.text), missedWord))}」 — say that sentence once more, with the word in it.`
           : ''
         if (scored.score >= READ_ALOUD_PASS_SCORE) {
-          const trialUpScored = await applyVoiceReadEffect(link, currentId, 'voice')
+          const voiceEffect = await applyVoiceReadEffect(link, currentId, 'voice')
           await sendMessage(
             botToken,
             chatId,
@@ -1498,14 +1791,8 @@ serve(async (req: Request) => {
               'That is a match against the text, not a pronunciation grade — and at that level it counts here as a comfortable read, proven out loud.' +
               fixLine,
           )
-          if (trialUpScored) {
-            await sendMessage(
-              botToken,
-              chatId,
-              '🔍 Three comfortable reads in a row — that level is properly yours now. ' +
-                'The next passage stretches a little past it; that is the fit hardening, one notch at a time. ' +
-                'If it overshoots, Too Hard brings us straight back.',
-            )
+          if (voiceEffect.trialUp) {
+            await sendMessage(botToken, chatId, trialUpCopy(streakWordFor(voiceEffect.target)))
           }
         } else {
           await sendMessage(
@@ -1545,7 +1832,7 @@ serve(async (req: Request) => {
       // is thanked but never double-counted — the shared effect
       // helper dedupes first, then applies the same transition the
       // scored path uses.
-      const trialUp = await applyVoiceReadEffect(link, currentId, 'voice')
+      const voiceEffect = await applyVoiceReadEffect(link, currentId, 'voice')
       await sendMessage(
         botToken,
         chatId,
@@ -1553,14 +1840,8 @@ serve(async (req: Request) => {
           'What I cannot do yet is score it word by word: that arrives when transcription joins. ' +
           'Until then, your voice is the receipt — and the fit treats it exactly like one.',
       )
-      if (trialUp) {
-        await sendMessage(
-          botToken,
-          chatId,
-          '🔍 Three comfortable reads in a row — that level is properly yours now. ' +
-            'The next passage stretches a little past it; that is the fit hardening, one notch at a time. ' +
-            'If it overshoots, Too Hard brings us straight back.',
-        )
+      if (voiceEffect.trialUp) {
+        await sendMessage(botToken, chatId, trialUpCopy(streakWordFor(voiceEffect.target)))
       }
     }
 
@@ -1661,7 +1942,7 @@ serve(async (req: Request) => {
 
       const { data: links, error } = await supabaseAdmin
         .from('telegram_links')
-        .select('user_id, chat_id, declared_band, morning_time, tz')
+        .select('user_id, chat_id, declared_band, declared_at, morning_time, tz')
         .not('chat_id', 'is', null)
       if (error || !links) {
         console.error('reader-bot: dispatch link scan failed')
@@ -1678,7 +1959,7 @@ serve(async (req: Request) => {
           // (resolveBand input); the declared band rides the row.
           const row = await loadState(link.user_id)
           const state = (row?.state ?? {}) as Record<string, unknown>
-          const { bandSource } = knownFor(state, link.declared_band ?? null)
+          const { bandSource } = knownFor(state, declaredOf(link))
           if (bandSource === 'none') continue
 
           // The learner's local clock, from their tz. Intl does the
@@ -1758,6 +2039,10 @@ serve(async (req: Request) => {
       const cb = update.callback_query as Record<string, unknown>
       if (String(cb.data ?? '').startsWith('mine:')) {
         try { await handleMine(cb) } catch (err) { console.error('reader-bot: mine failed', err) }
+      } else if (String(cb.data ?? '').startsWith('again:')) {
+        try { await handleAgain(cb) } catch (err) { console.error('reader-bot: again failed', err) }
+      } else if (String(cb.data ?? '') === 'door:read') {
+        try { await handleDoorRead(cb) } catch (err) { console.error('reader-bot: door read failed', err) }
       } else if (String(cb.data ?? '').startsWith('level:')) {
         try { await handleLevel(cb) } catch (err) { console.error('reader-bot: level failed', err) }
       } else if (String(cb.data ?? '').startsWith('fit:')) {
@@ -1793,7 +2078,40 @@ serve(async (req: Request) => {
       if (cmd === '/start') {
         const code = (rest[0] ?? '').trim()
         if (!code) {
-          await sendMessage(botToken, chatId, LINK_EXPLAINER)
+          // Amendment #7 (Bug 1): /start used to send the link
+          // explainer to EVERY plain /start — including chats that
+          // were already linked, which read as "you lost the
+          // connection" when nothing was lost. The link is checked
+          // FIRST now: a linked chat gets its true status (linked,
+          // the basis in charge, and the doors); only a stranger
+          // gets the explainer.
+          const link = await linkByChat(chatId)
+          if (!link) {
+            await sendMessage(botToken, chatId, LINK_EXPLAINER)
+          } else {
+            const row = await loadState(link.user_id)
+            const state = (row?.state ?? {}) as Record<string, unknown>
+            const { band, bandSource, joke } = knownFor(state, declaredOf(link))
+            const basisLine =
+              bandSource === 'diagnosis'
+                ? `I fit your reading to your checkup level, ${band}.`
+                : bandSource === 'declared' && joke
+                  ? 'You told me N7+ 😂 — so we are building from the very beginning, at an easy pace.'
+                  : bandSource === 'declared'
+                    ? `I fit your reading to the ${band} you told me.`
+                    : 'You have not told me your level yet — /level asks in one tap.'
+            await sendMessage(
+              botToken,
+              chatId,
+              `🔍 Hori here — this chat IS linked to your Yonde.\n${basisLine}\n` +
+                'Send /read any time for a passage at your level. Everything you mine lands in your one review queue in Yonde.',
+              {
+                reply_markup: appKeyboard([
+                  [{ text: 'Send Me a Passage', callback_data: 'door:read' }],
+                ]),
+              },
+            )
+          }
         } else {
           const { data: pending } = await supabaseAdmin
             .from('telegram_links')
@@ -1820,12 +2138,22 @@ serve(async (req: Request) => {
               console.error('reader-bot: link claim failed')
               await sendMessage(botToken, chatId, 'Linking failed on my side — try the fresh link from the app once more.')
             } else {
-              await sendMessage(botToken, chatId, WELCOME)
+              await sendMessage(botToken, chatId, WELCOME, { reply_markup: appKeyboard() })
             }
           }
         }
       } else if (cmd === '/read') {
         await handleRead(chatId)
+      } else if (cmd === '/app') {
+        // The typed door (amendment #7): the whole app, one tap —
+        // the chat stays the reading shelf; sessions, the checkup
+        // and Koe's calls live in Yonde itself.
+        await sendMessage(
+          botToken,
+          chatId,
+          'Your whole Yonde is one tap away — sessions, the checkup, Koe\'s calls, and your queue live in the app. This chat stays your reading shelf.',
+          { reply_markup: appKeyboard() },
+        )
       } else if (cmd === '/level') {
         // Re-opens the one-tap question at any time (Doc 16 §5
         // amendment #3), with the intro line naming the basis
@@ -1837,9 +2165,9 @@ serve(async (req: Request) => {
         } else {
           const row = await loadState(link.user_id)
           const state = (row?.state ?? {}) as Record<string, unknown>
-          const { band, bandSource } = knownFor(state, link.declared_band ?? null)
-          await sendMessage(botToken, chatId, levelIntro(bandSource, bandSource === 'none' ? null : band), {
-            reply_markup: levelKeyboard,
+          const { band, bandSource, joke } = knownFor(state, declaredOf(link))
+          await sendMessage(botToken, chatId, levelIntro(bandSource, bandSource === 'none' ? null : band, joke), {
+            reply_markup: levelKeyboard(),
           })
         }
       } else if (cmd === '/unlink') {
@@ -1856,7 +2184,7 @@ serve(async (req: Request) => {
             : 'This chat is not linked to a Yonde account, so there was nothing to unlink.',
         )
       } else {
-        await sendMessage(botToken, chatId, HELP)
+        await sendMessage(botToken, chatId, HELP, { reply_markup: appKeyboard() })
       }
     } catch (err) {
       console.error('reader-bot: message handling failed', err)

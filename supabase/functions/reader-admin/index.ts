@@ -14,10 +14,11 @@
 // calls this function — reader-bot (verify_jwt = false + its webhook
 // secret header) remains the only Telegram surface.
 //
-// What it does, and all it does: registers reader-bot's webhook and
-// command list with Telegram using the project secrets, then returns
-// Telegram's own read-backs (getMe / getWebhookInfo / getMyCommands)
-// so registration is verified, never assumed. The bot token never
+// What it does, and all it does: registers reader-bot's webhook,
+// command list and chat menu button with Telegram using the project
+// secrets, then returns Telegram's own read-backs (getMe /
+// getWebhookInfo / getMyCommands / getChatMenuButton) so
+// registration is verified, never assumed. The bot token never
 // leaves Supabase env.
 
 function isServiceRoleJwtForProject(token: string, projectRef: string): boolean {
@@ -64,21 +65,36 @@ Deno.serve(async (req) => {
   const setMyCommands = await tg('setMyCommands', {
     commands: [
       { command: 'read', description: 'Send me a passage at my level' },
+      { command: 'app', description: 'Open Yonde — sessions, checkup, calls' },
       { command: 'unlink', description: 'Disconnect this chat from Yonde' },
       { command: 'start', description: 'Link this chat to your Yonde account' },
       { command: 'level', description: 'Tell Hori your level (one tap)' },
     ],
   })
+  // The chat Menu button opens Yonde itself (Doc 16 §5 amendment
+  // #7): set WITHOUT a chat_id, it is the default for every private
+  // chat — the app becomes one tap from the chat's own chrome, not
+  // only from buttons inside messages.
+  const setChatMenuButton = await tg('setChatMenuButton', {
+    menu_button: {
+      type: 'web_app',
+      text: 'Open Yonde',
+      web_app: { url: 'https://jpn2easy.vercel.app' },
+    },
+  })
   const getMe = await tg('getMe', {})
   const getWebhookInfo = await tg('getWebhookInfo', {})
   const getMyCommands = await tg('getMyCommands', {})
+  const getChatMenuButton = await tg('getChatMenuButton', {})
   return json({
     ok: true,
     webhookUrl,
     setWebhook,
     setMyCommands,
+    setChatMenuButton,
     bot: getMe?.result ? { id: getMe.result.id, username: getMe.result.username, first_name: getMe.result.first_name } : getMe,
     webhookInfo: getWebhookInfo?.result ?? getWebhookInfo,
     commands: getMyCommands?.result ?? getMyCommands,
+    menuButton: getChatMenuButton?.result ?? getChatMenuButton,
   })
 })
