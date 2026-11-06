@@ -8,6 +8,8 @@
     "build": "node scripts/decode-fleet.mjs && vite build",
     "build:anki": "node scripts/build-anki.mjs",
     "build:kanji": "node scripts/build-kanji.mjs",
+    "build:kanjidb": "node scripts/build-kanjidb.mjs",
+    "test:kanjidb": "TZ=UTC node tests/kanjidb.test.mjs",
     "lint": "oxlint",
     "test:phase2": "TZ=UTC node tests/phase2.test.mjs",
     "validate": "node scripts/validate-data.mjs",

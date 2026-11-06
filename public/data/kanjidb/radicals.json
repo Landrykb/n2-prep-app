@@ -1,0 +1,3990 @@
+[
+ {
+  "n": 1,
+  "char": "一",
+  "kangxiChar": "⼀",
+  "nameEn": "one",
+  "nameJa": null,
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "one"
+  ],
+  "strokes": 1,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 2,
+  "char": "丨",
+  "kangxiChar": "⼁",
+  "nameEn": "rod",
+  "nameJa": "ぼう",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "number one",
+   "line"
+  ],
+  "strokes": 1,
+  "forms": [
+   {
+    "char": "丨",
+    "radName": "ぼう"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 3,
+  "char": "丶",
+  "kangxiChar": "⼂",
+  "nameEn": "tick or dot",
+  "nameJa": "てん",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "dot"
+  ],
+  "strokes": 1,
+  "forms": [
+   {
+    "char": "丶",
+    "radName": "てん"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 4,
+  "char": "丿",
+  "kangxiChar": "⼃",
+  "nameEn": "katakana no",
+  "nameJa": "ノ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [],
+  "strokes": 1,
+  "forms": [
+   {
+    "char": "丿",
+    "radName": "ノ"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 5,
+  "char": "乙",
+  "kangxiChar": "⼄",
+  "nameEn": "fishhook",
+  "nameJa": "れ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "the latter",
+   "duplicate",
+   "strange"
+  ],
+  "strokes": 1,
+  "forms": [
+   {
+    "char": "乚",
+    "radName": "れ"
+   }
+  ],
+  "variants": [
+   "乚"
+  ]
+ },
+ {
+  "n": 6,
+  "char": "亅",
+  "kangxiChar": "⼅",
+  "nameEn": "barb",
+  "nameJa": "はねぼう",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "feathered stick"
+  ],
+  "strokes": 1,
+  "forms": [
+   {
+    "char": "亅",
+    "radName": "はねぼう"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 7,
+  "char": "二",
+  "kangxiChar": "⼆",
+  "nameEn": "two",
+  "nameJa": null,
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "two"
+  ],
+  "strokes": 2,
+  "forms": [],
+  "variants": [
+   "冫"
+  ]
+ },
+ {
+  "n": 8,
+  "char": "亠",
+  "kangxiChar": "⼇",
+  "nameEn": "kettle lid",
+  "nameJa": "なべぶた",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [],
+  "strokes": 2,
+  "forms": [
+   {
+    "char": "亠",
+    "radName": "なべぶた"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 9,
+  "char": "人",
+  "kangxiChar": "⼈",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification+variant-resolved",
+  "meanings": [
+   "person"
+  ],
+  "strokes": 2,
+  "forms": [],
+  "variants": [
+   "亻",
+   "乂",
+   "𠆢"
+  ]
+ },
+ {
+  "n": 10,
+  "char": "儿",
+  "kangxiChar": "⼉",
+  "nameEn": "legs",
+  "nameJa": "にんにょう",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [],
+  "strokes": 2,
+  "forms": [
+   {
+    "char": "儿",
+    "radName": "にんにょう"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 11,
+  "char": "入",
+  "kangxiChar": "⼊",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "enter",
+   "insert"
+  ],
+  "strokes": 2,
+  "forms": [],
+  "variants": [
+   "人",
+   "乂",
+   "𠆢"
+  ]
+ },
+ {
+  "n": 12,
+  "char": "八",
+  "kangxiChar": "⼋",
+  "nameEn": "eight",
+  "nameJa": "はちがしら",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "eight"
+  ],
+  "strokes": 2,
+  "forms": [
+   {
+    "char": "八",
+    "radName": "はちがしら"
+   }
+  ],
+  "variants": [
+   "儿"
+  ]
+ },
+ {
+  "n": 13,
+  "char": "冂",
+  "kangxiChar": "⼌",
+  "nameEn": "upside-down box",
+  "nameJa": "まきがまえ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [],
+  "strokes": 2,
+  "forms": [
+   {
+    "char": "冂",
+    "radName": "まきがまえ"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 14,
+  "char": "冖",
+  "kangxiChar": "⼍",
+  "nameEn": "wa-shaped crown",
+  "nameJa": "わかんむり",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [],
+  "strokes": 2,
+  "forms": [
+   {
+    "char": "冖",
+    "radName": "わかんむり"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 15,
+  "char": "冫",
+  "kangxiChar": "⼎",
+  "nameEn": "two-stroke water radical or ice",
+  "nameJa": "にすい",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [],
+  "strokes": 2,
+  "forms": [
+   {
+    "char": "冫",
+    "radName": "にすい"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 16,
+  "char": "几",
+  "kangxiChar": "⼏",
+  "nameEn": "table or windy",
+  "nameJa": "つくえ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "table",
+   "table enclosure"
+  ],
+  "strokes": 2,
+  "forms": [
+   {
+    "char": "几",
+    "radName": "つくえ"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 17,
+  "char": "凵",
+  "kangxiChar": "⼐",
+  "nameEn": "open box",
+  "nameJa": "うけばこ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "open box enclosure"
+  ],
+  "strokes": 2,
+  "forms": [
+   {
+    "char": "凵",
+    "radName": "うけばこ"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 18,
+  "char": "刀",
+  "kangxiChar": "⼑",
+  "nameEn": "standing sword",
+  "nameJa": "りっとう",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note+variant-resolved",
+  "meanings": [
+   "sword",
+   "saber",
+   "knife"
+  ],
+  "strokes": 2,
+  "forms": [
+   {
+    "char": "刂",
+    "radName": "りっとう"
+   }
+  ],
+  "variants": [
+   "刂",
+   "⺉"
+  ]
+ },
+ {
+  "n": 19,
+  "char": "力",
+  "kangxiChar": "⼒",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "power",
+   "strength",
+   "strong"
+  ],
+  "strokes": 2,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 20,
+  "char": "勹",
+  "kangxiChar": "⼓",
+  "nameEn": "wrapping",
+  "nameJa": "つつみがまえ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "wrapping enclosure"
+  ],
+  "strokes": 2,
+  "forms": [
+   {
+    "char": "勹",
+    "radName": "つつみがまえ"
+   }
+  ],
+  "variants": [
+   "𠂊",
+   "刀"
+  ]
+ },
+ {
+  "n": 21,
+  "char": "匕",
+  "kangxiChar": "⼔",
+  "nameEn": "spoon or katakana hi",
+  "nameJa": "さじのひ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "spoon"
+  ],
+  "strokes": 2,
+  "forms": [
+   {
+    "char": "匕",
+    "radName": "さじのひ"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 22,
+  "char": "匚",
+  "kangxiChar": "⼕",
+  "nameEn": "box-on-side enclosure",
+  "nameJa": "はこがまえ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [],
+  "strokes": 2,
+  "forms": [
+   {
+    "char": "匚",
+    "radName": "はこがまえ"
+   }
+  ],
+  "variants": [
+   "匸"
+  ]
+ },
+ {
+  "n": 23,
+  "char": "匸",
+  "kangxiChar": "⼖",
+  "nameEn": "hiding enclosure",
+  "nameJa": "かくしがまえ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [],
+  "strokes": 2,
+  "forms": [
+   {
+    "char": "匸",
+    "radName": "かくしがまえ"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 24,
+  "char": "十",
+  "kangxiChar": "⼗",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "ten"
+  ],
+  "strokes": 2,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 25,
+  "char": "卜",
+  "kangxiChar": "⼘",
+  "nameEn": "divination or katakana to",
+  "nameJa": "ぼくのと",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "divining",
+   "fortune-telling"
+  ],
+  "strokes": 2,
+  "forms": [
+   {
+    "char": "卜",
+    "radName": "ぼくのと"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 26,
+  "char": "卩",
+  "kangxiChar": "⼙",
+  "nameEn": "seal",
+  "nameJa": "ふしづくり",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [],
+  "strokes": 2,
+  "forms": [
+   {
+    "char": "卩",
+    "radName": "ふしづくり"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 27,
+  "char": "厂",
+  "kangxiChar": "⼚",
+  "nameEn": "trailing cliff",
+  "nameJa": "がんだれ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "wild goose"
+  ],
+  "strokes": 2,
+  "forms": [
+   {
+    "char": "厂",
+    "radName": "がんだれ"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 28,
+  "char": "厶",
+  "kangxiChar": "⼛",
+  "nameEn": "katakana mu",
+  "nameJa": "む",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note+variant-resolved",
+  "meanings": [
+   "I",
+   "myself"
+  ],
+  "strokes": 2,
+  "forms": [
+   {
+    "char": "厶",
+    "radName": "む"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 29,
+  "char": "又",
+  "kangxiChar": "⼜",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "or again",
+   "furthermore",
+   "on the other hand"
+  ],
+  "strokes": 2,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 30,
+  "char": "口",
+  "kangxiChar": "⼝",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "mouth"
+  ],
+  "strokes": 3,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 31,
+  "char": "囗",
+  "kangxiChar": "⼞",
+  "nameEn": "box or enclosure",
+  "nameJa": "くにがまえ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "box"
+  ],
+  "strokes": 3,
+  "forms": [
+   {
+    "char": "囗",
+    "radName": "くにがまえ"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 32,
+  "char": "土",
+  "kangxiChar": "⼟",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "soil",
+   "earth",
+   "ground"
+  ],
+  "strokes": 3,
+  "forms": [],
+  "variants": [
+   "士"
+  ]
+ },
+ {
+  "n": 33,
+  "char": "士",
+  "kangxiChar": "⼠",
+  "nameEn": "samurai",
+  "nameJa": "さむらい",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "gentleman",
+   "scholar",
+   "samurai"
+  ],
+  "strokes": 3,
+  "forms": [
+   {
+    "char": "士",
+    "radName": "さむらい"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 34,
+  "char": "夂",
+  "kangxiChar": "⼡",
+  "nameEn": "winter",
+  "nameJa": "ふゆがしら",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "late",
+   "delayed"
+  ],
+  "strokes": 3,
+  "forms": [
+   {
+    "char": "夂",
+    "radName": "ふゆがしら"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 35,
+  "char": "夊",
+  "kangxiChar": "⼢",
+  "nameEn": null,
+  "nameJa": "すいにょう",
+  "nameSourced": true,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [],
+  "strokes": 3,
+  "forms": [
+   {
+    "char": "夊",
+    "radName": "すいにょう"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 36,
+  "char": "夕",
+  "kangxiChar": "⼣",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "evening"
+  ],
+  "strokes": 3,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 37,
+  "char": "大",
+  "kangxiChar": "⼤",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "large",
+   "big"
+  ],
+  "strokes": 3,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 38,
+  "char": "女",
+  "kangxiChar": "⼥",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "woman",
+   "female"
+  ],
+  "strokes": 3,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 39,
+  "char": "子",
+  "kangxiChar": "⼦",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "child",
+   "sign of the rat",
+   "11PM-1AM"
+  ],
+  "strokes": 3,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 40,
+  "char": "宀",
+  "kangxiChar": "⼧",
+  "nameEn": "katakana u",
+  "nameJa": "うかんむり",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "shaped crown"
+  ],
+  "strokes": 3,
+  "forms": [
+   {
+    "char": "宀",
+    "radName": "うかんむり"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 41,
+  "char": "寸",
+  "kangxiChar": "⼨",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "measurement",
+   "tenth of a shaku",
+   "a little"
+  ],
+  "strokes": 3,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 42,
+  "char": "小",
+  "kangxiChar": "⼩",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "little",
+   "small"
+  ],
+  "strokes": 3,
+  "forms": [],
+  "variants": [
+   "⺌"
+  ]
+ },
+ {
+  "n": 43,
+  "char": "尢",
+  "kangxiChar": "⼪",
+  "nameEn": "crooked-big",
+  "nameJa": "だいのまげあし",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [],
+  "strokes": 3,
+  "forms": [
+   {
+    "char": "尢",
+    "radName": "だいのまげあし"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 44,
+  "char": "尸",
+  "kangxiChar": "⼫",
+  "nameEn": "flag",
+  "nameJa": "しかばね",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "corpse",
+   "remains"
+  ],
+  "strokes": 3,
+  "forms": [
+   {
+    "char": "尸",
+    "radName": "しかばね"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 45,
+  "char": "屮",
+  "kangxiChar": "⼬",
+  "nameEn": "old grass",
+  "nameJa": "ふるくさ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "left hand"
+  ],
+  "strokes": 3,
+  "forms": [
+   {
+    "char": "屮",
+    "radName": "ふるくさ"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 46,
+  "char": "山",
+  "kangxiChar": "⼭",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "mountain"
+  ],
+  "strokes": 3,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 47,
+  "char": "巛",
+  "kangxiChar": "⼮",
+  "nameEn": "curving river",
+  "nameJa": "まがりがわ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [],
+  "strokes": 3,
+  "forms": [
+   {
+    "char": "巛",
+    "radName": "まがりがわ"
+   },
+   {
+    "char": "川",
+    "radName": "さんぼんがわ"
+   }
+  ],
+  "variants": [
+   "川"
+  ]
+ },
+ {
+  "n": 48,
+  "char": "工",
+  "kangxiChar": "⼯",
+  "nameEn": "katakana e",
+  "nameJa": "たくみ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "craft",
+   "construction"
+  ],
+  "strokes": 3,
+  "forms": [
+   {
+    "char": "工",
+    "radName": "たくみ"
+   }
+  ],
+  "variants": [
+   "匚"
+  ]
+ },
+ {
+  "n": 49,
+  "char": "己",
+  "kangxiChar": "⼰",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "self"
+  ],
+  "strokes": 3,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 50,
+  "char": "巾",
+  "kangxiChar": "⼱",
+  "nameEn": "cloth",
+  "nameJa": "はば",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "towel",
+   "hanging scroll",
+   "width"
+  ],
+  "strokes": 3,
+  "forms": [
+   {
+    "char": "巾",
+    "radName": "はば"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 51,
+  "char": "干",
+  "kangxiChar": "⼲",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "dry",
+   "parch",
+   "ebb"
+  ],
+  "strokes": 3,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 52,
+  "char": "幺",
+  "kangxiChar": "⼳",
+  "nameEn": "short thread",
+  "nameJa": "いとがしら",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [],
+  "strokes": 3,
+  "forms": [
+   {
+    "char": "幺",
+    "radName": "いとがしら"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 53,
+  "char": "广",
+  "kangxiChar": "⼴",
+  "nameEn": "dotted cliff",
+  "nameJa": "まだれ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [],
+  "strokes": 3,
+  "forms": [
+   {
+    "char": "广",
+    "radName": "まだれ"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 54,
+  "char": "廴",
+  "kangxiChar": "⼵",
+  "nameEn": "long stride or stretching",
+  "nameJa": "いんにょう",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [],
+  "strokes": 3,
+  "forms": [
+   {
+    "char": "廴",
+    "radName": "いんにょう"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 55,
+  "char": "廾",
+  "kangxiChar": "⼶",
+  "nameEn": "twenty or letter H",
+  "nameJa": "にじゅうあし",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "twenty"
+  ],
+  "strokes": 3,
+  "forms": [
+   {
+    "char": "廾",
+    "radName": "にじゅうあし"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 56,
+  "char": "弋",
+  "kangxiChar": "⼷",
+  "nameEn": "ceremony",
+  "nameJa": "しきがまえ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "piling"
+  ],
+  "strokes": 3,
+  "forms": [
+   {
+    "char": "弋",
+    "radName": "しきがまえ"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 57,
+  "char": "弓",
+  "kangxiChar": "⼸",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "bow",
+   "bow (archery, violin)"
+  ],
+  "strokes": 3,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 58,
+  "char": "彑",
+  "kangxiChar": "⼹",
+  "nameEn": "pig's head",
+  "nameJa": "けいがしら",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note+variant-resolved",
+  "meanings": [
+   "pig's head radical variant (no. 58)"
+  ],
+  "strokes": 3,
+  "forms": [
+   {
+    "char": "彐",
+    "radName": "けいがしら"
+   },
+   {
+    "char": "彑",
+    "radName": "けいがしら"
+   }
+  ],
+  "variants": [
+   "彐",
+   "⺕"
+  ]
+ },
+ {
+  "n": 59,
+  "char": "彡",
+  "kangxiChar": "⼺",
+  "nameEn": "short hair or fur",
+  "nameJa": "さんづくり",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "three",
+   "hair ornament"
+  ],
+  "strokes": 3,
+  "forms": [
+   {
+    "char": "彡",
+    "radName": "さんづくり"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 60,
+  "char": "彳",
+  "kangxiChar": "⼻",
+  "nameEn": "going man",
+  "nameJa": "ぎょうにんべん",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "stop",
+   "linger",
+   "loiter"
+  ],
+  "strokes": 3,
+  "forms": [
+   {
+    "char": "彳",
+    "radName": "ぎょうにんべん"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 61,
+  "char": "心",
+  "kangxiChar": "⼼",
+  "nameEn": "heart",
+  "nameJa": "りっしんべん",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "heart",
+   "mind",
+   "spirit"
+  ],
+  "strokes": 4,
+  "forms": [
+   {
+    "char": "心",
+    "radName": "りっしんべん"
+   },
+   {
+    "char": "忄",
+    "radName": "りっしんべん"
+   }
+  ],
+  "variants": [
+   "忄",
+   "⺗"
+  ]
+ },
+ {
+  "n": 62,
+  "char": "戈",
+  "kangxiChar": "⼽",
+  "nameEn": "tasselled spear",
+  "nameJa": "かのほこ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "halberd",
+   "arms",
+   "festival car"
+  ],
+  "strokes": 4,
+  "forms": [
+   {
+    "char": "戈",
+    "radName": "かのほこ"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 63,
+  "char": "戸",
+  "kangxiChar": "⼾",
+  "nameEn": "door",
+  "nameJa": "とびらのと",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "door",
+   "counter for houses"
+  ],
+  "strokes": 4,
+  "forms": [
+   {
+    "char": "戸",
+    "radName": "とびらのと"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 64,
+  "char": "手",
+  "kangxiChar": "⼿",
+  "nameEn": "hand",
+  "nameJa": "てへん",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note+variant-resolved",
+  "meanings": [
+   "hand"
+  ],
+  "strokes": 4,
+  "forms": [
+   {
+    "char": "扌",
+    "radName": "てへん"
+   }
+  ],
+  "variants": [
+   "扌"
+  ]
+ },
+ {
+  "n": 65,
+  "char": "支",
+  "kangxiChar": "⽀",
+  "nameEn": "branch",
+  "nameJa": "しんよう",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "branch",
+   "support",
+   "sustain"
+  ],
+  "strokes": 4,
+  "forms": [
+   {
+    "char": "支",
+    "radName": "しんよう"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 66,
+  "char": "攴",
+  "kangxiChar": "⽁",
+  "nameEn": "folding chair",
+  "nameJa": "ぼくづくり",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "strike",
+   "hit"
+  ],
+  "strokes": 4,
+  "forms": [
+   {
+    "char": "攴",
+    "radName": "ぼくづくり"
+   },
+   {
+    "char": "攵",
+    "radName": "のぶん"
+   }
+  ],
+  "variants": [
+   "攵"
+  ]
+ },
+ {
+  "n": 67,
+  "char": "文",
+  "kangxiChar": "⽂",
+  "nameEn": "literary",
+  "nameJa": "ぶんにょう",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "sentence",
+   "literature",
+   "style"
+  ],
+  "strokes": 4,
+  "forms": [
+   {
+    "char": "文",
+    "radName": "ぶんにょう"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 68,
+  "char": "斗",
+  "kangxiChar": "⽃",
+  "nameEn": "dots and cross",
+  "nameJa": "とます",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "Big Dipper",
+   "ten sho (vol)",
+   "sake dipper"
+  ],
+  "strokes": 4,
+  "forms": [
+   {
+    "char": "斗",
+    "radName": "とます"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 69,
+  "char": "斤",
+  "kangxiChar": "⽄",
+  "nameEn": "axe",
+  "nameJa": "おの",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "axe",
+   "1.32 lb",
+   "catty"
+  ],
+  "strokes": 4,
+  "forms": [
+   {
+    "char": "斤",
+    "radName": "おの"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 70,
+  "char": "方",
+  "kangxiChar": "⽅",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "direction",
+   "person",
+   "alternative"
+  ],
+  "strokes": 4,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 71,
+  "char": "无",
+  "kangxiChar": "⽆",
+  "nameEn": "crooked heaven",
+  "nameJa": "むにょう",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "nothing",
+   "not exist"
+  ],
+  "strokes": 4,
+  "forms": [
+   {
+    "char": "无",
+    "radName": "むにょう"
+   },
+   {
+    "char": "旡",
+    "radName": "すでのつくり"
+   }
+  ],
+  "variants": [
+   "旡"
+  ]
+ },
+ {
+  "n": 72,
+  "char": "日",
+  "kangxiChar": "⽇",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "day",
+   "sun",
+   "Japan"
+  ],
+  "strokes": 4,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 73,
+  "char": "曰",
+  "kangxiChar": "⽈",
+  "nameEn": "flat sun",
+  "nameJa": "ひらび",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "say",
+   "reason",
+   "pretext"
+  ],
+  "strokes": 4,
+  "forms": [
+   {
+    "char": "曰",
+    "radName": "ひらび"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 74,
+  "char": "月",
+  "kangxiChar": "⽉",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "month",
+   "moon"
+  ],
+  "strokes": 4,
+  "forms": [],
+  "variants": [
+   "円"
+  ]
+ },
+ {
+  "n": 75,
+  "char": "木",
+  "kangxiChar": "⽊",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "tree",
+   "wood"
+  ],
+  "strokes": 4,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 76,
+  "char": "欠",
+  "kangxiChar": "⽋",
+  "nameEn": "yawning",
+  "nameJa": "あくび",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "lack",
+   "gap",
+   "fail"
+  ],
+  "strokes": 4,
+  "forms": [
+   {
+    "char": "欠",
+    "radName": "あくび"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 77,
+  "char": "止",
+  "kangxiChar": "⽌",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "stop",
+   "halt"
+  ],
+  "strokes": 4,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 78,
+  "char": "歹",
+  "kangxiChar": "⽍",
+  "nameEn": null,
+  "nameJa": "がつへん",
+  "nameSourced": true,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "bare bone",
+   "bad",
+   "wrong"
+  ],
+  "strokes": 4,
+  "forms": [
+   {
+    "char": "歹",
+    "radName": "がつへん"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 79,
+  "char": "殳",
+  "kangxiChar": "⽎",
+  "nameEn": "windy-again",
+  "nameJa": "ほこつくり",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "pike"
+  ],
+  "strokes": 4,
+  "forms": [
+   {
+    "char": "殳",
+    "radName": "ほこつくり"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 80,
+  "char": "母",
+  "kangxiChar": "⽏",
+  "nameEn": "mother",
+  "nameJa": "なかれ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note+variant-resolved",
+  "meanings": [
+   "mother"
+  ],
+  "strokes": 5,
+  "forms": [
+   {
+    "char": "毋",
+    "radName": "なかれ"
+   },
+   {
+    "char": "毌",
+    "radName": "はは"
+   }
+  ],
+  "variants": [
+   "毋",
+   "毌"
+  ]
+ },
+ {
+  "n": 81,
+  "char": "比",
+  "kangxiChar": "⽐",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "compare",
+   "race",
+   "ratio"
+  ],
+  "strokes": 4,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 82,
+  "char": "毛",
+  "kangxiChar": "⽑",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "fur",
+   "hair",
+   "feather"
+  ],
+  "strokes": 4,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 83,
+  "char": "氏",
+  "kangxiChar": "⽒",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "family name",
+   "surname",
+   "clan"
+  ],
+  "strokes": 4,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 84,
+  "char": "气",
+  "kangxiChar": "⽓",
+  "nameEn": "steam",
+  "nameJa": "きがまえ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "spirit"
+  ],
+  "strokes": 4,
+  "forms": [
+   {
+    "char": "气",
+    "radName": "きがまえ"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 85,
+  "char": "水",
+  "kangxiChar": "⽔",
+  "nameEn": "water",
+  "nameJa": "みず",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note+variant-resolved",
+  "meanings": [
+   "water"
+  ],
+  "strokes": 4,
+  "forms": [
+   {
+    "char": "氵",
+    "radName": "みず"
+   },
+   {
+    "char": "氺",
+    "radName": "したみず"
+   }
+  ],
+  "variants": [
+   "氵",
+   "氺",
+   "⺡",
+   "⺢"
+  ]
+ },
+ {
+  "n": 86,
+  "char": "火",
+  "kangxiChar": "⽕",
+  "nameEn": "fire",
+  "nameJa": "れっか",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note+variant-resolved",
+  "meanings": [
+   "fire"
+  ],
+  "strokes": 4,
+  "forms": [
+   {
+    "char": "灬",
+    "radName": "れっか"
+   }
+  ],
+  "variants": [
+   "灬"
+  ]
+ },
+ {
+  "n": 87,
+  "char": "爫",
+  "kangxiChar": "⽖",
+  "nameEn": "claw",
+  "nameJa": "つめかんむり",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [],
+  "strokes": 4,
+  "forms": [
+   {
+    "char": "爫",
+    "radName": "つめかんむり"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 88,
+  "char": "父",
+  "kangxiChar": "⽗",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "father"
+  ],
+  "strokes": 4,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 89,
+  "char": "爻",
+  "kangxiChar": "⽘",
+  "nameEn": "double X",
+  "nameJa": "めめ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "to mix with",
+   "to associate with",
+   "to join"
+  ],
+  "strokes": 4,
+  "forms": [
+   {
+    "char": "爻",
+    "radName": "めめ"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 90,
+  "char": "爿",
+  "kangxiChar": "⽙",
+  "nameEn": "left-side kata",
+  "nameJa": "しょうへん",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [],
+  "strokes": 4,
+  "forms": [
+   {
+    "char": "爿",
+    "radName": "しょうへん"
+   }
+  ],
+  "variants": [
+   "⺦"
+  ]
+ },
+ {
+  "n": 91,
+  "char": "片",
+  "kangxiChar": "⽚",
+  "nameEn": "right-side kata",
+  "nameJa": null,
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "one-sided",
+   "leaf",
+   "sheet"
+  ],
+  "strokes": 4,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 92,
+  "char": "牙",
+  "kangxiChar": "⽛",
+  "nameEn": "tusk",
+  "nameJa": "きばへん",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "tusk",
+   "fang"
+  ],
+  "strokes": 5,
+  "forms": [
+   {
+    "char": "牙",
+    "radName": "きばへん"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 93,
+  "char": "牜",
+  "kangxiChar": "⽜",
+  "nameEn": "cow",
+  "nameJa": "うしへん",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "ox",
+   "cow"
+  ],
+  "strokes": 4,
+  "forms": [
+   {
+    "char": "牜",
+    "radName": "うしへん"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 94,
+  "char": "犭",
+  "kangxiChar": "⽝",
+  "nameEn": "dog",
+  "nameJa": "ケモノ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "dog"
+  ],
+  "strokes": 3,
+  "forms": [
+   {
+    "char": "犭",
+    "radName": "ケモノ"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 95,
+  "char": "玄",
+  "kangxiChar": "⽞",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "mysterious",
+   "occultness",
+   "black"
+  ],
+  "strokes": 5,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 96,
+  "char": "玉",
+  "kangxiChar": "⽟",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "jewel",
+   "ball"
+  ],
+  "strokes": 5,
+  "forms": [],
+  "variants": [
+   "王"
+  ]
+ },
+ {
+  "n": 97,
+  "char": "瓜",
+  "kangxiChar": "⽠",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "melon"
+  ],
+  "strokes": 6,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 98,
+  "char": "瓦",
+  "kangxiChar": "⽡",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "tile",
+   "gram"
+  ],
+  "strokes": 5,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 99,
+  "char": "甘",
+  "kangxiChar": "⽢",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "sweet",
+   "coax",
+   "pamper"
+  ],
+  "strokes": 5,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 100,
+  "char": "生",
+  "kangxiChar": "⽣",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "life",
+   "genuine",
+   "birth"
+  ],
+  "strokes": 5,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 101,
+  "char": "用",
+  "kangxiChar": "⽤",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "utilize",
+   "business",
+   "service"
+  ],
+  "strokes": 5,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 102,
+  "char": "田",
+  "kangxiChar": "⽥",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "rice field",
+   "rice paddy"
+  ],
+  "strokes": 5,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 103,
+  "char": "疋",
+  "kangxiChar": "⽦",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "head",
+   "counter for animals"
+  ],
+  "strokes": 5,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 104,
+  "char": "疒",
+  "kangxiChar": "⽧",
+  "nameEn": "sick",
+  "nameJa": "やまいだれ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "trailing sickness"
+  ],
+  "strokes": 5,
+  "forms": [
+   {
+    "char": "疒",
+    "radName": "やまいだれ"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 105,
+  "char": "癶",
+  "kangxiChar": "⽨",
+  "nameEn": "dotted tent",
+  "nameJa": "はつがしら",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [],
+  "strokes": 5,
+  "forms": [
+   {
+    "char": "癶",
+    "radName": "はつがしら"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 106,
+  "char": "白",
+  "kangxiChar": "⽩",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "white"
+  ],
+  "strokes": 5,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 107,
+  "char": "皮",
+  "kangxiChar": "⽪",
+  "nameEn": "skin",
+  "nameJa": "けがわ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "pelt",
+   "skin",
+   "hide"
+  ],
+  "strokes": 5,
+  "forms": [
+   {
+    "char": "皮",
+    "radName": "けがわ"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 108,
+  "char": "皿",
+  "kangxiChar": "⽫",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "dish",
+   "a helping",
+   "plate"
+  ],
+  "strokes": 5,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 109,
+  "char": "目",
+  "kangxiChar": "⽬",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "eye",
+   "class",
+   "look"
+  ],
+  "strokes": 5,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 110,
+  "char": "矛",
+  "kangxiChar": "⽭",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "halberd",
+   "arms",
+   "festival float"
+  ],
+  "strokes": 5,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 111,
+  "char": "矢",
+  "kangxiChar": "⽮",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "dart",
+   "arrow"
+  ],
+  "strokes": 5,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 112,
+  "char": "石",
+  "kangxiChar": "⽯",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "stone"
+  ],
+  "strokes": 5,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 113,
+  "char": "示",
+  "kangxiChar": "⽰",
+  "nameEn": "showing",
+  "nameJa": "ねへん",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note+variant-resolved",
+  "meanings": [
+   "show",
+   "indicate",
+   "point out"
+  ],
+  "strokes": 5,
+  "forms": [
+   {
+    "char": "礻",
+    "radName": "ねへん"
+   }
+  ],
+  "variants": [
+   "礻",
+   "⺭"
+  ]
+ },
+ {
+  "n": 114,
+  "char": "禸",
+  "kangxiChar": "⽱",
+  "nameEn": "footprint",
+  "nameJa": "ぐうのあし",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "rump"
+  ],
+  "strokes": 5,
+  "forms": [
+   {
+    "char": "禸",
+    "radName": "ぐうのあし"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 115,
+  "char": "禾",
+  "kangxiChar": "⽲",
+  "nameEn": "two-branch tree",
+  "nameJa": "のぎ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [],
+  "strokes": 5,
+  "forms": [
+   {
+    "char": "禾",
+    "radName": "のぎ"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 116,
+  "char": "穴",
+  "kangxiChar": "⽳",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "hole",
+   "aperture",
+   "slit"
+  ],
+  "strokes": 5,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 117,
+  "char": "立",
+  "kangxiChar": "⽴",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "stand up",
+   "rise",
+   "set up"
+  ],
+  "strokes": 5,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 118,
+  "char": "竹",
+  "kangxiChar": "⽵",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "bamboo"
+  ],
+  "strokes": 6,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 119,
+  "char": "米",
+  "kangxiChar": "⽶",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "rice",
+   "USA",
+   "metre"
+  ],
+  "strokes": 6,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 120,
+  "char": "糸",
+  "kangxiChar": "⽷",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "thread"
+  ],
+  "strokes": 6,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 121,
+  "char": "缶",
+  "kangxiChar": "⽸",
+  "nameEn": "jar",
+  "nameJa": "ほとぎ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "tin can",
+   "container"
+  ],
+  "strokes": 6,
+  "forms": [
+   {
+    "char": "缶",
+    "radName": "ほとぎ"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 122,
+  "char": "网",
+  "kangxiChar": "⽹",
+  "nameEn": "net or net crown",
+  "nameJa": "あみがしら",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "net"
+  ],
+  "strokes": 6,
+  "forms": [
+   {
+    "char": "网",
+    "radName": "あみがしら"
+   },
+   {
+    "char": "罒",
+    "radName": "よんかしら"
+   },
+   {
+    "char": "罓",
+    "radName": "よんかしら"
+   }
+  ],
+  "variants": [
+   "罒",
+   "罓",
+   "四"
+  ]
+ },
+ {
+  "n": 123,
+  "char": "羊",
+  "kangxiChar": "⽺",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "sheep"
+  ],
+  "strokes": 6,
+  "forms": [],
+  "variants": [
+   "⺷"
+  ]
+ },
+ {
+  "n": 124,
+  "char": "羽",
+  "kangxiChar": "⽻",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "feathers",
+   "counter for birds, rabbits"
+  ],
+  "strokes": 6,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 125,
+  "char": "老",
+  "kangxiChar": "⽼",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "old man",
+   "old age",
+   "grow old"
+  ],
+  "strokes": 6,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 126,
+  "char": "而",
+  "kangxiChar": "⽽",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "and yet",
+   "and then",
+   "but"
+  ],
+  "strokes": 6,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 127,
+  "char": "耒",
+  "kangxiChar": "⽾",
+  "nameEn": "three-branch tree",
+  "nameJa": "らいすき",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "come",
+   "plough"
+  ],
+  "strokes": 6,
+  "forms": [
+   {
+    "char": "耒",
+    "radName": "らいすき"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 128,
+  "char": "耳",
+  "kangxiChar": "⽿",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "ear"
+  ],
+  "strokes": 6,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 129,
+  "char": "聿",
+  "kangxiChar": "⾀",
+  "nameEn": "writing brush",
+  "nameJa": "ふでづくり",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "brush",
+   "finally",
+   "self"
+  ],
+  "strokes": 6,
+  "forms": [
+   {
+    "char": "聿",
+    "radName": "ふでづくり"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 130,
+  "char": "肉",
+  "kangxiChar": "⾁",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "meat"
+  ],
+  "strokes": 6,
+  "forms": [],
+  "variants": [
+   "月"
+  ]
+ },
+ {
+  "n": 131,
+  "char": "臣",
+  "kangxiChar": "⾂",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "retainer",
+   "subject"
+  ],
+  "strokes": 7,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 132,
+  "char": "自",
+  "kangxiChar": "⾃",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "oneself"
+  ],
+  "strokes": 6,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 133,
+  "char": "至",
+  "kangxiChar": "⾄",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "climax",
+   "arrive",
+   "proceed"
+  ],
+  "strokes": 6,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 134,
+  "char": "臼",
+  "kangxiChar": "⾅",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "mortar"
+  ],
+  "strokes": 6,
+  "forms": [],
+  "variants": [
+   "𦥑"
+  ]
+ },
+ {
+  "n": 135,
+  "char": "舌",
+  "kangxiChar": "⾆",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "tongue",
+   "reed",
+   "clapper"
+  ],
+  "strokes": 6,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 136,
+  "char": "舛",
+  "kangxiChar": "⾇",
+  "nameEn": "dancing",
+  "nameJa": "まいあし",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [],
+  "strokes": 7,
+  "forms": [
+   {
+    "char": "舛",
+    "radName": "まいあし"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 137,
+  "char": "舟",
+  "kangxiChar": "⾈",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "boat",
+   "ship"
+  ],
+  "strokes": 6,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 138,
+  "char": "艮",
+  "kangxiChar": "⾉",
+  "nameEn": "good",
+  "nameJa": "ねづくり",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "northeast (Oriental zodiac)",
+   "stopping"
+  ],
+  "strokes": 6,
+  "forms": [
+   {
+    "char": "艮",
+    "radName": "ねづくり"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 139,
+  "char": "色",
+  "kangxiChar": "⾊",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "color"
+  ],
+  "strokes": 6,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 140,
+  "char": "艸",
+  "kangxiChar": "⾋",
+  "nameEn": "grass",
+  "nameJa": "くさかんむり",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "grass",
+   "plants"
+  ],
+  "strokes": 6,
+  "forms": [
+   {
+    "char": "艸",
+    "radName": "くさかんむり"
+   }
+  ],
+  "variants": [
+   "艹"
+  ]
+ },
+ {
+  "n": 141,
+  "char": "虍",
+  "kangxiChar": "⾌",
+  "nameEn": "tiger or tiger crown",
+  "nameJa": "とらかんむり",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "tiger spots",
+   "mottled"
+  ],
+  "strokes": 6,
+  "forms": [
+   {
+    "char": "虍",
+    "radName": "とらかんむり"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 142,
+  "char": "虫",
+  "kangxiChar": "⾍",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "insect",
+   "bug",
+   "temper"
+  ],
+  "strokes": 6,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 143,
+  "char": "血",
+  "kangxiChar": "⾎",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "blood"
+  ],
+  "strokes": 6,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 144,
+  "char": "行",
+  "kangxiChar": "⾏",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "going",
+   "journey",
+   "carry out"
+  ],
+  "strokes": 6,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 145,
+  "char": "衣",
+  "kangxiChar": "⾐",
+  "nameEn": null,
+  "nameJa": "ころもへん",
+  "nameSourced": true,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "garment",
+   "clothes",
+   "dressing"
+  ],
+  "strokes": 6,
+  "forms": [
+   {
+    "char": "衤",
+    "radName": "ころもへん"
+   }
+  ],
+  "variants": [
+   "衤"
+  ]
+ },
+ {
+  "n": 146,
+  "char": "襾",
+  "kangxiChar": "⾑",
+  "nameEn": null,
+  "nameJa": "にし",
+  "nameSourced": true,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "cover",
+   "place on top of",
+   "west radical variant (no. 146)"
+  ],
+  "strokes": 6,
+  "forms": [
+   {
+    "char": "襾",
+    "radName": "にし"
+   }
+  ],
+  "variants": [
+   "西",
+   "覀"
+  ]
+ },
+ {
+  "n": 147,
+  "char": "見",
+  "kangxiChar": "⾒",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "see",
+   "hopes",
+   "chances"
+  ],
+  "strokes": 7,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 148,
+  "char": "角",
+  "kangxiChar": "⾓",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "angle",
+   "corner",
+   "square"
+  ],
+  "strokes": 7,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 149,
+  "char": "言",
+  "kangxiChar": "⾔",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "say",
+   "word"
+  ],
+  "strokes": 7,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 150,
+  "char": "谷",
+  "kangxiChar": "⾕",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "valley"
+  ],
+  "strokes": 7,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 151,
+  "char": "豆",
+  "kangxiChar": "⾖",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "beans",
+   "pea",
+   "midget"
+  ],
+  "strokes": 7,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 152,
+  "char": "豕",
+  "kangxiChar": "⾗",
+  "nameEn": "pig",
+  "nameJa": "いのこ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "pig",
+   "hog"
+  ],
+  "strokes": 7,
+  "forms": [
+   {
+    "char": "豕",
+    "radName": "いのこ"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 153,
+  "char": "豸",
+  "kangxiChar": "⾘",
+  "nameEn": "badger or clawed dog",
+  "nameJa": "むじなへん",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "snake",
+   "legless insect"
+  ],
+  "strokes": 7,
+  "forms": [
+   {
+    "char": "豸",
+    "radName": "むじなへん"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 154,
+  "char": "貝",
+  "kangxiChar": "⾙",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "shellfish"
+  ],
+  "strokes": 7,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 155,
+  "char": "赤",
+  "kangxiChar": "⾚",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "red"
+  ],
+  "strokes": 7,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 156,
+  "char": "走",
+  "kangxiChar": "⾛",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "run"
+  ],
+  "strokes": 7,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 157,
+  "char": "足",
+  "kangxiChar": "⾜",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "leg",
+   "foot",
+   "be sufficient"
+  ],
+  "strokes": 7,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 158,
+  "char": "身",
+  "kangxiChar": "⾝",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "somebody",
+   "person",
+   "one's station in life"
+  ],
+  "strokes": 7,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 159,
+  "char": "車",
+  "kangxiChar": "⾞",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "car"
+  ],
+  "strokes": 7,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 160,
+  "char": "辛",
+  "kangxiChar": "⾟",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "spicy",
+   "bitter",
+   "hot"
+  ],
+  "strokes": 7,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 161,
+  "char": "辰",
+  "kangxiChar": "⾠",
+  "nameEn": "shin dragon",
+  "nameJa": "しんのたつ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "sign of the dragon",
+   "7-9AM",
+   "fifth sign of Chinese zodiac"
+  ],
+  "strokes": 7,
+  "forms": [
+   {
+    "char": "辰",
+    "radName": "しんのたつ"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 162,
+  "char": "辵",
+  "kangxiChar": "⾡",
+  "nameEn": "road",
+  "nameJa": "しんにょう",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "walk",
+   "walking"
+  ],
+  "strokes": 7,
+  "forms": [
+   {
+    "char": "辵",
+    "radName": "しんにょう"
+   },
+   {
+    "char": "辶",
+    "radName": "しんにょう"
+   }
+  ],
+  "variants": [
+   "辶"
+  ]
+ },
+ {
+  "n": 163,
+  "char": "邑",
+  "kangxiChar": "⾢",
+  "nameEn": "right village",
+  "nameJa": "おおざと",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "village",
+   "rural community"
+  ],
+  "strokes": 7,
+  "forms": [
+   {
+    "char": "邑",
+    "radName": "おおざと"
+   }
+  ],
+  "variants": [
+   "⻏"
+  ]
+ },
+ {
+  "n": 164,
+  "char": "酉",
+  "kangxiChar": "⾣",
+  "nameEn": "sake",
+  "nameJa": "ひよりのとり",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "west",
+   "bird",
+   "sign of the bird"
+  ],
+  "strokes": 7,
+  "forms": [
+   {
+    "char": "酉",
+    "radName": "ひよりのとり"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 165,
+  "char": "釆",
+  "kangxiChar": "⾤",
+  "nameEn": "topped rice",
+  "nameJa": "のごめ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "separate",
+   "divide"
+  ],
+  "strokes": 7,
+  "forms": [
+   {
+    "char": "釆",
+    "radName": "のごめ"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 166,
+  "char": "里",
+  "kangxiChar": "⾥",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "ri",
+   "village",
+   "parent's home"
+  ],
+  "strokes": 7,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 167,
+  "char": "金",
+  "kangxiChar": "⾦",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "gold"
+  ],
+  "strokes": 8,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 168,
+  "char": "镸",
+  "kangxiChar": "⾧",
+  "nameEn": "long",
+  "nameJa": "ながい",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [],
+  "strokes": 7,
+  "forms": [
+   {
+    "char": "镸",
+    "radName": "ながい"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 169,
+  "char": "門",
+  "kangxiChar": "⾨",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "gate",
+   "counter for cannons"
+  ],
+  "strokes": 8,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 170,
+  "char": "阜",
+  "kangxiChar": "⾩",
+  "nameEn": "left village",
+  "nameJa": "ぎふのふ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "hill",
+   "mound"
+  ],
+  "strokes": 8,
+  "forms": [
+   {
+    "char": "阜",
+    "radName": "ぎふのふ"
+   },
+   {
+    "char": "阝",
+    "radName": "こざとへん"
+   }
+  ],
+  "variants": [
+   "阝",
+   "⻖"
+  ]
+ },
+ {
+  "n": 171,
+  "char": "隶",
+  "kangxiChar": "⾪",
+  "nameEn": "slave",
+  "nameJa": "れいづくり",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "extend",
+   "give",
+   "cast"
+  ],
+  "strokes": 8,
+  "forms": [
+   {
+    "char": "隶",
+    "radName": "れいづくり"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 172,
+  "char": "隹",
+  "kangxiChar": "⾫",
+  "nameEn": "old bird",
+  "nameJa": "ふるとり",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "bird"
+  ],
+  "strokes": 8,
+  "forms": [
+   {
+    "char": "隹",
+    "radName": "ふるとり"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 173,
+  "char": "雨",
+  "kangxiChar": "⾬",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "rain"
+  ],
+  "strokes": 8,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 174,
+  "char": "青",
+  "kangxiChar": "⾭",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "blue",
+   "green"
+  ],
+  "strokes": 8,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 175,
+  "char": "非",
+  "kangxiChar": "⾮",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "un-",
+   "mistake",
+   "negative"
+  ],
+  "strokes": 8,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 176,
+  "char": "面",
+  "kangxiChar": "⾯",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "mask",
+   "face",
+   "features"
+  ],
+  "strokes": 9,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 177,
+  "char": "革",
+  "kangxiChar": "⾰",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "leather",
+   "skin",
+   "reform"
+  ],
+  "strokes": 9,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 178,
+  "char": "韋",
+  "kangxiChar": "⾱",
+  "nameEn": "tanned leather",
+  "nameJa": "なめしがわ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [],
+  "strokes": 10,
+  "forms": [
+   {
+    "char": "韋",
+    "radName": "なめしがわ"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 179,
+  "char": "韭",
+  "kangxiChar": "⾲",
+  "nameEn": "leek",
+  "nameJa": "にら",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [],
+  "strokes": 9,
+  "forms": [
+   {
+    "char": "韭",
+    "radName": "にら"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 180,
+  "char": "音",
+  "kangxiChar": "⾳",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "sound",
+   "noise"
+  ],
+  "strokes": 9,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 181,
+  "char": "頁",
+  "kangxiChar": "⾴",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "page",
+   "leaf"
+  ],
+  "strokes": 9,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 182,
+  "char": "風",
+  "kangxiChar": "⾵",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "wind",
+   "air",
+   "style"
+  ],
+  "strokes": 9,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 183,
+  "char": "飛",
+  "kangxiChar": "⾶",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "fly",
+   "skip (pages)",
+   "scatter"
+  ],
+  "strokes": 9,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 184,
+  "char": "飠",
+  "kangxiChar": "⾷",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "eat",
+   "food",
+   "radical number 184"
+  ],
+  "strokes": 8,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 185,
+  "char": "首",
+  "kangxiChar": "⾸",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "neck",
+   "counter for songs and poems"
+  ],
+  "strokes": 9,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 186,
+  "char": "香",
+  "kangxiChar": "⾹",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "incense",
+   "smell",
+   "perfume"
+  ],
+  "strokes": 9,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 187,
+  "char": "馬",
+  "kangxiChar": "⾺",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "horse"
+  ],
+  "strokes": 10,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 188,
+  "char": "骨",
+  "kangxiChar": "⾻",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "skeleton",
+   "bone",
+   "remains"
+  ],
+  "strokes": 10,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 189,
+  "char": "高",
+  "kangxiChar": "⾼",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "tall",
+   "high",
+   "expensive"
+  ],
+  "strokes": 10,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 190,
+  "char": "髟",
+  "kangxiChar": "⾽",
+  "nameEn": "long hair",
+  "nameJa": "かみがしら",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [
+   "hair hanging long",
+   "mane"
+  ],
+  "strokes": 10,
+  "forms": [
+   {
+    "char": "髟",
+    "radName": "かみがしら"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 191,
+  "char": "鬥",
+  "kangxiChar": "⾾",
+  "nameEn": "broken gate",
+  "nameJa": "とうがまえ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [],
+  "strokes": 10,
+  "forms": [
+   {
+    "char": "鬥",
+    "radName": "とうがまえ"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 192,
+  "char": "鬯",
+  "kangxiChar": "⾿",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "fragrant herbs",
+   "spiced liqueur",
+   "grow"
+  ],
+  "strokes": 10,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 193,
+  "char": "鬲",
+  "kangxiChar": "⿀",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "tripod"
+  ],
+  "strokes": 10,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 194,
+  "char": "鬼",
+  "kangxiChar": "⿁",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "ghost",
+   "devil"
+  ],
+  "strokes": 10,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 195,
+  "char": "魚",
+  "kangxiChar": "⿂",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "fish"
+  ],
+  "strokes": 11,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 196,
+  "char": "鳥",
+  "kangxiChar": "⿃",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "bird",
+   "chicken"
+  ],
+  "strokes": 11,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 197,
+  "char": "鹵",
+  "kangxiChar": "⿄",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "salt"
+  ],
+  "strokes": 11,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 198,
+  "char": "鹿",
+  "kangxiChar": "⿅",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "deer"
+  ],
+  "strokes": 11,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 199,
+  "char": "麥",
+  "kangxiChar": "⿆",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "wheat"
+  ],
+  "strokes": 11,
+  "forms": [],
+  "variants": [
+   "麦"
+  ]
+ },
+ {
+  "n": 200,
+  "char": "麻",
+  "kangxiChar": "⿇",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "hemp",
+   "flax",
+   "numb"
+  ],
+  "strokes": 11,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 201,
+  "char": "黄",
+  "kangxiChar": "⿈",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "yellow"
+  ],
+  "strokes": 11,
+  "forms": [],
+  "variants": [
+   "黃"
+  ]
+ },
+ {
+  "n": 202,
+  "char": "黍",
+  "kangxiChar": "⿉",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "millet"
+  ],
+  "strokes": 12,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 203,
+  "char": "黒",
+  "kangxiChar": "⿊",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification+variant-resolved",
+  "meanings": [
+   "black"
+  ],
+  "strokes": 11,
+  "forms": [],
+  "variants": [
+   "黑"
+  ]
+ },
+ {
+  "n": 204,
+  "char": "黹",
+  "kangxiChar": "⿋",
+  "nameEn": "sewing",
+  "nameJa": "ふつ",
+  "nameSourced": true,
+  "charSource": "kanjidic2-radical-note",
+  "meanings": [],
+  "strokes": 12,
+  "forms": [
+   {
+    "char": "黹",
+    "radName": "ふつ"
+   }
+  ],
+  "variants": []
+ },
+ {
+  "n": 205,
+  "char": "黽",
+  "kangxiChar": "⿌",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "green frog",
+   "industry"
+  ],
+  "strokes": 13,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 206,
+  "char": "鼎",
+  "kangxiChar": "⿍",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "three legged kettle"
+  ],
+  "strokes": 13,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 207,
+  "char": "鼓",
+  "kangxiChar": "⿎",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "drum",
+   "beat",
+   "rouse"
+  ],
+  "strokes": 13,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 208,
+  "char": "鼡",
+  "kangxiChar": "⿏",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification+variant-resolved",
+  "meanings": [
+   "rat",
+   "mouse",
+   "dark gray"
+  ],
+  "strokes": 8,
+  "forms": [],
+  "variants": [
+   "鼠"
+  ]
+ },
+ {
+  "n": 209,
+  "char": "鼻",
+  "kangxiChar": "⿐",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "nose",
+   "snout"
+  ],
+  "strokes": 14,
+  "forms": [],
+  "variants": []
+ },
+ {
+  "n": 210,
+  "char": "齊",
+  "kangxiChar": "⿑",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "alike",
+   "equal",
+   "similar"
+  ],
+  "strokes": 14,
+  "forms": [],
+  "variants": [
+   "斉"
+  ]
+ },
+ {
+  "n": 211,
+  "char": "齒",
+  "kangxiChar": "⿒",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "tooth",
+   "cog"
+  ],
+  "strokes": 15,
+  "forms": [],
+  "variants": [
+   "歯"
+  ]
+ },
+ {
+  "n": 212,
+  "char": "龍",
+  "kangxiChar": "⿓",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "dragon",
+   "imperial"
+  ],
+  "strokes": 16,
+  "forms": [],
+  "variants": [
+   "竜"
+  ]
+ },
+ {
+  "n": 213,
+  "char": "龜",
+  "kangxiChar": "⿔",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "turtle",
+   "tortoise"
+  ],
+  "strokes": 18,
+  "forms": [],
+  "variants": [
+   "亀"
+  ]
+ },
+ {
+  "n": 214,
+  "char": "龠",
+  "kangxiChar": "⿕",
+  "nameEn": null,
+  "nameJa": null,
+  "nameSourced": false,
+  "charSource": "kanjivg-radical-flag+kanjidic2-classification",
+  "meanings": [
+   "flute"
+  ],
+  "strokes": 17,
+  "forms": [],
+  "variants": []
+ }
+]

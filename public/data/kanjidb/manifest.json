@@ -1,0 +1,1687 @@
+{
+ "generatedAt": "2026-11-06T23:17:31.470Z",
+ "sources": {
+  "kanjidic2": {
+   "files": 13108,
+   "licence": "CC BY-SA 3.0",
+   "holder": "EDRDG"
+  },
+  "kanjivg": {
+   "release": "20260714",
+   "entries": 6703,
+   "licence": "CC BY-SA 3.0",
+   "holder": "KanjiVG / Ulrich Apel"
+  }
+ },
+ "counts": {
+  "kanjidicKanji": 13108,
+  "kanjivgEntries": 6703,
+  "kanjivgCovered": 6417,
+  "kanjivgOnlyChars": [
+   "!",
+   ",",
+   ".",
+   "0",
+   "1",
+   "2",
+   "3",
+   "4",
+   "5",
+   "6",
+   "7",
+   "8",
+   "9",
+   ":",
+   ";",
+   "?",
+   "A",
+   "B",
+   "C",
+   "D",
+   "E",
+   "F",
+   "G",
+   "H",
+   "I",
+   "J",
+   "K",
+   "L",
+   "M",
+   "N",
+   "O",
+   "P",
+   "Q",
+   "R",
+   "S",
+   "T",
+   "U",
+   "V",
+   "W",
+   "X",
+   "Y",
+   "Z",
+   "a",
+   "b",
+   "c",
+   "d",
+   "e",
+   "f",
+   "g",
+   "h",
+   "i",
+   "j",
+   "k",
+   "l",
+   "m",
+   "n",
+   "o",
+   "p",
+   "q",
+   "r",
+   "s",
+   "t",
+   "u",
+   "v",
+   "w",
+   "x",
+   "y",
+   "z",
+   "⺉",
+   "⺌",
+   "⺍",
+   "⺕",
+   "⺗",
+   "⺡",
+   "⺢",
+   "⺤",
+   "⺦",
+   "⺨",
+   "⺭",
+   "⻃",
+   "⻌",
+   "⻏",
+   "⻖",
+   "、",
+   "。",
+   "々",
+   "〆",
+   "ぁ",
+   "あ",
+   "ぃ",
+   "い",
+   "ぅ",
+   "う",
+   "ぇ",
+   "え",
+   "ぉ",
+   "お",
+   "か",
+   "が",
+   "き",
+   "ぎ",
+   "く",
+   "ぐ",
+   "け",
+   "げ",
+   "こ",
+   "ご",
+   "さ",
+   "ざ",
+   "し",
+   "じ",
+   "す",
+   "ず",
+   "せ",
+   "ぜ",
+   "そ",
+   "ぞ",
+   "た",
+   "だ",
+   "ち",
+   "ぢ",
+   "っ",
+   "つ",
+   "づ",
+   "て",
+   "で",
+   "と",
+   "ど",
+   "な",
+   "に",
+   "ぬ",
+   "ね",
+   "の",
+   "は",
+   "ば",
+   "ぱ",
+   "ひ",
+   "び",
+   "ぴ",
+   "ふ",
+   "ぶ",
+   "ぷ",
+   "へ",
+   "べ",
+   "ぺ",
+   "ほ",
+   "ぼ",
+   "ぽ",
+   "ま",
+   "み",
+   "む",
+   "め",
+   "も",
+   "ゃ",
+   "や",
+   "ゅ",
+   "ゆ",
+   "ょ",
+   "よ",
+   "ら",
+   "り",
+   "る",
+   "れ",
+   "ろ",
+   "ゎ",
+   "わ",
+   "ゐ",
+   "ゑ",
+   "を",
+   "ん",
+   "ゔ",
+   "ゕ",
+   "ゖ",
+   "゛",
+   "゜",
+   "ゝ",
+   "ゞ",
+   "ァ",
+   "ア",
+   "ィ",
+   "イ",
+   "ゥ",
+   "ウ",
+   "ェ",
+   "エ",
+   "ォ",
+   "オ",
+   "カ",
+   "ガ",
+   "キ",
+   "ギ",
+   "ク",
+   "グ",
+   "ケ",
+   "ゲ",
+   "コ",
+   "ゴ",
+   "サ",
+   "ザ",
+   "シ",
+   "ジ",
+   "ス",
+   "ズ",
+   "セ",
+   "ゼ",
+   "ソ",
+   "ゾ",
+   "タ",
+   "ダ",
+   "チ",
+   "ヂ",
+   "ッ",
+   "ツ",
+   "ヅ",
+   "テ",
+   "デ",
+   "ト",
+   "ド",
+   "ナ",
+   "ニ",
+   "ヌ",
+   "ネ",
+   "ノ",
+   "ハ",
+   "バ",
+   "パ",
+   "ヒ",
+   "ビ",
+   "ピ",
+   "フ",
+   "ブ",
+   "プ",
+   "ヘ",
+   "ベ",
+   "ペ",
+   "ホ",
+   "ボ",
+   "ポ",
+   "マ",
+   "ミ",
+   "ム",
+   "メ",
+   "モ",
+   "ャ",
+   "ヤ",
+   "ュ",
+   "ユ",
+   "ョ",
+   "ヨ",
+   "ラ",
+   "リ",
+   "ル",
+   "レ",
+   "ロ",
+   "ヮ",
+   "ワ",
+   "ヰ",
+   "ヱ",
+   "ヲ",
+   "ン",
+   "ヴ",
+   "ヵ",
+   "ヶ",
+   "ヷ",
+   "ヸ",
+   "ヹ",
+   "ヺ",
+   "・",
+   "ー",
+   "ヽ",
+   "ヾ",
+   "㔾",
+   "仝",
+   "喻",
+   "冷",
+   "令",
+   "嶺",
+   "玲",
+   "羚",
+   "聆",
+   "鈴",
+   "零",
+   "領",
+   "！",
+   "𠂊",
+   "𧒑"
+  ],
+  "components": 1462,
+  "radicals": 214,
+  "radicalsWithSourcedName": 100,
+  "soundComponentDerived": 2743
+ },
+ "shards": {
+  "meta": {
+   "pattern": "meta/meta-{hex(codepoint >> 10)}.json",
+   "files": [
+    {
+     "file": "meta/meta-10.json",
+     "kanji": 23,
+     "bytes": 5903
+    },
+    {
+     "file": "meta/meta-11.json",
+     "kanji": 28,
+     "bytes": 6713
+    },
+    {
+     "file": "meta/meta-12.json",
+     "kanji": 15,
+     "bytes": 3591
+    },
+    {
+     "file": "meta/meta-13.json",
+     "kanji": 356,
+     "bytes": 141934
+    },
+    {
+     "file": "meta/meta-14.json",
+     "kanji": 745,
+     "bytes": 276832
+    },
+    {
+     "file": "meta/meta-15.json",
+     "kanji": 611,
+     "bytes": 196627
+    },
+    {
+     "file": "meta/meta-16.json",
+     "kanji": 598,
+     "bytes": 214132
+    },
+    {
+     "file": "meta/meta-17.json",
+     "kanji": 650,
+     "bytes": 237618
+    },
+    {
+     "file": "meta/meta-18.json",
+     "kanji": 676,
+     "bytes": 242297
+    },
+    {
+     "file": "meta/meta-19.json",
+     "kanji": 668,
+     "bytes": 240606
+    },
+    {
+     "file": "meta/meta-1a.json",
+     "kanji": 652,
+     "bytes": 205977
+    },
+    {
+     "file": "meta/meta-1b.json",
+     "kanji": 609,
+     "bytes": 208724
+    },
+    {
+     "file": "meta/meta-1c.json",
+     "kanji": 536,
+     "bytes": 167690
+    },
+    {
+     "file": "meta/meta-1d.json",
+     "kanji": 663,
+     "bytes": 210845
+    },
+    {
+     "file": "meta/meta-1e.json",
+     "kanji": 622,
+     "bytes": 203461
+    },
+    {
+     "file": "meta/meta-1f.json",
+     "kanji": 593,
+     "bytes": 197720
+    },
+    {
+     "file": "meta/meta-20.json",
+     "kanji": 645,
+     "bytes": 211939
+    },
+    {
+     "file": "meta/meta-21.json",
+     "kanji": 611,
+     "bytes": 176334
+    },
+    {
+     "file": "meta/meta-22.json",
+     "kanji": 601,
+     "bytes": 204198
+    },
+    {
+     "file": "meta/meta-23.json",
+     "kanji": 546,
+     "bytes": 181762
+    },
+    {
+     "file": "meta/meta-24.json",
+     "kanji": 680,
+     "bytes": 217919
+    },
+    {
+     "file": "meta/meta-25.json",
+     "kanji": 476,
+     "bytes": 157555
+    },
+    {
+     "file": "meta/meta-26.json",
+     "kanji": 565,
+     "bytes": 172131
+    },
+    {
+     "file": "meta/meta-27.json",
+     "kanji": 462,
+     "bytes": 127200
+    },
+    {
+     "file": "meta/meta-3e.json",
+     "kanji": 82,
+     "bytes": 22073
+    },
+    {
+     "file": "meta/meta-80.json",
+     "kanji": 10,
+     "bytes": 2076
+    },
+    {
+     "file": "meta/meta-81.json",
+     "kanji": 5,
+     "bytes": 998
+    },
+    {
+     "file": "meta/meta-82.json",
+     "kanji": 8,
+     "bytes": 1584
+    },
+    {
+     "file": "meta/meta-83.json",
+     "kanji": 6,
+     "bytes": 1183
+    },
+    {
+     "file": "meta/meta-84.json",
+     "kanji": 12,
+     "bytes": 2389
+    },
+    {
+     "file": "meta/meta-85.json",
+     "kanji": 7,
+     "bytes": 1374
+    },
+    {
+     "file": "meta/meta-86.json",
+     "kanji": 2,
+     "bytes": 393
+    },
+    {
+     "file": "meta/meta-87.json",
+     "kanji": 15,
+     "bytes": 2982
+    },
+    {
+     "file": "meta/meta-88.json",
+     "kanji": 4,
+     "bytes": 833
+    },
+    {
+     "file": "meta/meta-89.json",
+     "kanji": 1,
+     "bytes": 198
+    },
+    {
+     "file": "meta/meta-8a.json",
+     "kanji": 8,
+     "bytes": 1615
+    },
+    {
+     "file": "meta/meta-8b.json",
+     "kanji": 3,
+     "bytes": 592
+    },
+    {
+     "file": "meta/meta-8c.json",
+     "kanji": 12,
+     "bytes": 2371
+    },
+    {
+     "file": "meta/meta-8d.json",
+     "kanji": 19,
+     "bytes": 3764
+    },
+    {
+     "file": "meta/meta-8e.json",
+     "kanji": 3,
+     "bytes": 620
+    },
+    {
+     "file": "meta/meta-8f.json",
+     "kanji": 9,
+     "bytes": 1772
+    },
+    {
+     "file": "meta/meta-90.json",
+     "kanji": 5,
+     "bytes": 984
+    },
+    {
+     "file": "meta/meta-91.json",
+     "kanji": 3,
+     "bytes": 590
+    },
+    {
+     "file": "meta/meta-92.json",
+     "kanji": 4,
+     "bytes": 789
+    },
+    {
+     "file": "meta/meta-93.json",
+     "kanji": 6,
+     "bytes": 1185
+    },
+    {
+     "file": "meta/meta-94.json",
+     "kanji": 8,
+     "bytes": 1581
+    },
+    {
+     "file": "meta/meta-95.json",
+     "kanji": 8,
+     "bytes": 1581
+    },
+    {
+     "file": "meta/meta-96.json",
+     "kanji": 6,
+     "bytes": 1185
+    },
+    {
+     "file": "meta/meta-97.json",
+     "kanji": 15,
+     "bytes": 2969
+    },
+    {
+     "file": "meta/meta-98.json",
+     "kanji": 7,
+     "bytes": 1403
+    },
+    {
+     "file": "meta/meta-99.json",
+     "kanji": 4,
+     "bytes": 793
+    },
+    {
+     "file": "meta/meta-9a.json",
+     "kanji": 10,
+     "bytes": 2017
+    },
+    {
+     "file": "meta/meta-9b.json",
+     "kanji": 9,
+     "bytes": 1783
+    },
+    {
+     "file": "meta/meta-9c.json",
+     "kanji": 6,
+     "bytes": 1189
+    },
+    {
+     "file": "meta/meta-9d.json",
+     "kanji": 10,
+     "bytes": 1977
+    },
+    {
+     "file": "meta/meta-9e.json",
+     "kanji": 5,
+     "bytes": 1011
+    },
+    {
+     "file": "meta/meta-9f.json",
+     "kanji": 4,
+     "bytes": 791
+    },
+    {
+     "file": "meta/meta-a0.json",
+     "kanji": 6,
+     "bytes": 1209
+    },
+    {
+     "file": "meta/meta-a1.json",
+     "kanji": 7,
+     "bytes": 1403
+    },
+    {
+     "file": "meta/meta-a2.json",
+     "kanji": 17,
+     "bytes": 3413
+    },
+    {
+     "file": "meta/meta-a3.json",
+     "kanji": 9,
+     "bytes": 1783
+    },
+    {
+     "file": "meta/meta-a4.json",
+     "kanji": 2,
+     "bytes": 397
+    },
+    {
+     "file": "meta/meta-a5.json",
+     "kanji": 6,
+     "bytes": 1230
+    },
+    {
+     "file": "meta/meta-a6.json",
+     "kanji": 2,
+     "bytes": 397
+    },
+    {
+     "file": "meta/meta-a7.json",
+     "kanji": 9,
+     "bytes": 1828
+    },
+    {
+     "file": "meta/meta-a8.json",
+     "kanji": 6,
+     "bytes": 1213
+    },
+    {
+     "file": "meta/meta-a9.json",
+     "kanji": 5,
+     "bytes": 991
+    },
+    {
+     "file": "meta/meta-d.json",
+     "kanji": 39,
+     "bytes": 9522
+    },
+    {
+     "file": "meta/meta-e.json",
+     "kanji": 29,
+     "bytes": 7325
+    },
+    {
+     "file": "meta/meta-f.json",
+     "kanji": 24,
+     "bytes": 5735
+    }
+   ]
+  },
+  "strokes": {
+   "pattern": "strokes/strokes-{hex(codepoint >> 8)}.json",
+   "files": [
+    {
+     "file": "strokes/strokes-200.json",
+     "kanji": 1,
+     "bytes": 753
+    },
+    {
+     "file": "strokes/strokes-201.json",
+     "kanji": 1,
+     "bytes": 250
+    },
+    {
+     "file": "strokes/strokes-20b.json",
+     "kanji": 1,
+     "bytes": 647
+    },
+    {
+     "file": "strokes/strokes-269.json",
+     "kanji": 1,
+     "bytes": 665
+    },
+    {
+     "file": "strokes/strokes-34.json",
+     "kanji": 2,
+     "bytes": 1534
+    },
+    {
+     "file": "strokes/strokes-4e.json",
+     "kanji": 116,
+     "bytes": 73976
+    },
+    {
+     "file": "strokes/strokes-4f.json",
+     "kanji": 92,
+     "bytes": 86302
+    },
+    {
+     "file": "strokes/strokes-50.json",
+     "kanji": 78,
+     "bytes": 102435
+    },
+    {
+     "file": "strokes/strokes-51.json",
+     "kanji": 117,
+     "bytes": 119644
+    },
+    {
+     "file": "strokes/strokes-52.json",
+     "kanji": 106,
+     "bytes": 115458
+    },
+    {
+     "file": "strokes/strokes-53.json",
+     "kanji": 113,
+     "bytes": 94633
+    },
+    {
+     "file": "strokes/strokes-54.json",
+     "kanji": 92,
+     "bytes": 84271
+    },
+    {
+     "file": "strokes/strokes-55.json",
+     "kanji": 65,
+     "bytes": 83612
+    },
+    {
+     "file": "strokes/strokes-56.json",
+     "kanji": 64,
+     "bytes": 96734
+    },
+    {
+     "file": "strokes/strokes-57.json",
+     "kanji": 69,
+     "bytes": 72088
+    },
+    {
+     "file": "strokes/strokes-58.json",
+     "kanji": 84,
+     "bytes": 119656
+    },
+    {
+     "file": "strokes/strokes-59.json",
+     "kanji": 90,
+     "bytes": 83923
+    },
+    {
+     "file": "strokes/strokes-5a.json",
+     "kanji": 45,
+     "bytes": 60175
+    },
+    {
+     "file": "strokes/strokes-5b.json",
+     "kanji": 104,
+     "bytes": 122286
+    },
+    {
+     "file": "strokes/strokes-5c.json",
+     "kanji": 89,
+     "bytes": 88642
+    },
+    {
+     "file": "strokes/strokes-5d.json",
+     "kanji": 66,
+     "bytes": 85842
+    },
+    {
+     "file": "strokes/strokes-5e.json",
+     "kanji": 102,
+     "bytes": 120790
+    },
+    {
+     "file": "strokes/strokes-5f.json",
+     "kanji": 111,
+     "bytes": 119067
+    },
+    {
+     "file": "strokes/strokes-60.json",
+     "kanji": 101,
+     "bytes": 103342
+    },
+    {
+     "file": "strokes/strokes-61.json",
+     "kanji": 96,
+     "bytes": 142837
+    },
+    {
+     "file": "strokes/strokes-62.json",
+     "kanji": 113,
+     "bytes": 113222
+    },
+    {
+     "file": "strokes/strokes-63.json",
+     "kanji": 81,
+     "bytes": 99336
+    },
+    {
+     "file": "strokes/strokes-64.json",
+     "kanji": 67,
+     "bytes": 108817
+    },
+    {
+     "file": "strokes/strokes-65.json",
+     "kanji": 95,
+     "bytes": 116936
+    },
+    {
+     "file": "strokes/strokes-66.json",
+     "kanji": 91,
+     "bytes": 111270
+    },
+    {
+     "file": "strokes/strokes-67.json",
+     "kanji": 113,
+     "bytes": 99751
+    },
+    {
+     "file": "strokes/strokes-68.json",
+     "kanji": 90,
+     "bytes": 105522
+    },
+    {
+     "file": "strokes/strokes-69.json",
+     "kanji": 95,
+     "bytes": 129895
+    },
+    {
+     "file": "strokes/strokes-6a.json",
+     "kanji": 69,
+     "bytes": 113827
+    },
+    {
+     "file": "strokes/strokes-6b.json",
+     "kanji": 85,
+     "bytes": 114640
+    },
+    {
+     "file": "strokes/strokes-6c.json",
+     "kanji": 85,
+     "bytes": 66183
+    },
+    {
+     "file": "strokes/strokes-6d.json",
+     "kanji": 78,
+     "bytes": 82287
+    },
+    {
+     "file": "strokes/strokes-6e.json",
+     "kanji": 83,
+     "bytes": 107688
+    },
+    {
+     "file": "strokes/strokes-6f.json",
+     "kanji": 73,
+     "bytes": 113947
+    },
+    {
+     "file": "strokes/strokes-70.json",
+     "kanji": 52,
+     "bytes": 69179
+    },
+    {
+     "file": "strokes/strokes-71.json",
+     "kanji": 60,
+     "bytes": 85872
+    },
+    {
+     "file": "strokes/strokes-72.json",
+     "kanji": 75,
+     "bytes": 79495
+    },
+    {
+     "file": "strokes/strokes-73.json",
+     "kanji": 56,
+     "bytes": 69368
+    },
+    {
+     "file": "strokes/strokes-74.json",
+     "kanji": 55,
+     "bytes": 77605
+    },
+    {
+     "file": "strokes/strokes-75.json",
+     "kanji": 111,
+     "bytes": 125838
+    },
+    {
+     "file": "strokes/strokes-76.json",
+     "kanji": 84,
+     "bytes": 116047
+    },
+    {
+     "file": "strokes/strokes-77.json",
+     "kanji": 64,
+     "bytes": 82390
+    },
+    {
+     "file": "strokes/strokes-78.json",
+     "kanji": 56,
+     "bytes": 79537
+    },
+    {
+     "file": "strokes/strokes-79.json",
+     "kanji": 77,
+     "bytes": 97559
+    },
+    {
+     "file": "strokes/strokes-7a.json",
+     "kanji": 95,
+     "bytes": 136678
+    },
+    {
+     "file": "strokes/strokes-7b.json",
+     "kanji": 84,
+     "bytes": 114099
+    },
+    {
+     "file": "strokes/strokes-7c.json",
+     "kanji": 87,
+     "bytes": 134102
+    },
+    {
+     "file": "strokes/strokes-7d.json",
+     "kanji": 105,
+     "bytes": 141307
+    },
+    {
+     "file": "strokes/strokes-7e.json",
+     "kanji": 65,
+     "bytes": 123406
+    },
+    {
+     "file": "strokes/strokes-7f.json",
+     "kanji": 70,
+     "bytes": 101247
+    },
+    {
+     "file": "strokes/strokes-80.json",
+     "kanji": 90,
+     "bytes": 101321
+    },
+    {
+     "file": "strokes/strokes-81.json",
+     "kanji": 85,
+     "bytes": 123702
+    },
+    {
+     "file": "strokes/strokes-82.json",
+     "kanji": 93,
+     "bytes": 106375
+    },
+    {
+     "file": "strokes/strokes-83.json",
+     "kanji": 74,
+     "bytes": 81761
+    },
+    {
+     "file": "strokes/strokes-84.json",
+     "kanji": 72,
+     "bytes": 98524
+    },
+    {
+     "file": "strokes/strokes-85.json",
+     "kanji": 76,
+     "bytes": 129014
+    },
+    {
+     "file": "strokes/strokes-86.json",
+     "kanji": 63,
+     "bytes": 85803
+    },
+    {
+     "file": "strokes/strokes-87.json",
+     "kanji": 64,
+     "bytes": 101630
+    },
+    {
+     "file": "strokes/strokes-88.json",
+     "kanji": 84,
+     "bytes": 117749
+    },
+    {
+     "file": "strokes/strokes-89.json",
+     "kanji": 70,
+     "bytes": 113876
+    },
+    {
+     "file": "strokes/strokes-8a.json",
+     "kanji": 105,
+     "bytes": 150406
+    },
+    {
+     "file": "strokes/strokes-8b.json",
+     "kanji": 56,
+     "bytes": 113021
+    },
+    {
+     "file": "strokes/strokes-8c.json",
+     "kanji": 82,
+     "bytes": 106274
+    },
+    {
+     "file": "strokes/strokes-8d.json",
+     "kanji": 50,
+     "bytes": 71994
+    },
+    {
+     "file": "strokes/strokes-8e.json",
+     "kanji": 67,
+     "bytes": 106474
+    },
+    {
+     "file": "strokes/strokes-8f.json",
+     "kanji": 80,
+     "bytes": 113004
+    },
+    {
+     "file": "strokes/strokes-90.json",
+     "kanji": 104,
+     "bytes": 143064
+    },
+    {
+     "file": "strokes/strokes-91.json",
+     "kanji": 73,
+     "bytes": 106501
+    },
+    {
+     "file": "strokes/strokes-92.json",
+     "kanji": 51,
+     "bytes": 69950
+    },
+    {
+     "file": "strokes/strokes-93.json",
+     "kanji": 55,
+     "bytes": 94127
+    },
+    {
+     "file": "strokes/strokes-94.json",
+     "kanji": 33,
+     "bytes": 71024
+    },
+    {
+     "file": "strokes/strokes-95.json",
+     "kanji": 41,
+     "bytes": 59851
+    },
+    {
+     "file": "strokes/strokes-96.json",
+     "kanji": 98,
+     "bytes": 123265
+    },
+    {
+     "file": "strokes/strokes-97.json",
+     "kanji": 80,
+     "bytes": 131269
+    },
+    {
+     "file": "strokes/strokes-98.json",
+     "kanji": 68,
+     "bytes": 107362
+    },
+    {
+     "file": "strokes/strokes-99.json",
+     "kanji": 63,
+     "bytes": 98846
+    },
+    {
+     "file": "strokes/strokes-9a.json",
+     "kanji": 54,
+     "bytes": 101113
+    },
+    {
+     "file": "strokes/strokes-9b.json",
+     "kanji": 66,
+     "bytes": 119042
+    },
+    {
+     "file": "strokes/strokes-9c.json",
+     "kanji": 44,
+     "bytes": 84089
+    },
+    {
+     "file": "strokes/strokes-9d.json",
+     "kanji": 65,
+     "bytes": 112118
+    },
+    {
+     "file": "strokes/strokes-9e.json",
+     "kanji": 58,
+     "bytes": 100566
+    },
+    {
+     "file": "strokes/strokes-9f.json",
+     "kanji": 33,
+     "bytes": 61996
+    }
+   ]
+  }
+ },
+ "sizes": {
+  "indexBytes": 754006,
+  "metaBytes": 4314799,
+  "strokesBytes": 8401723,
+  "componentsBytes": 53684,
+  "radicalsBytes": 63287,
+  "totalBytes": 13587499
+ },
+ "validation": {
+  "metaCountMatchesDicFiles": true,
+  "strokeCountsChecked": 6417,
+  "strokeCountDisagreements": [
+   {
+    "char": "倏",
+    "kanjivg": 11,
+    "kanjidic2": 10
+   },
+   {
+    "char": "倦",
+    "kanjivg": 10,
+    "kanjidic2": 11
+   },
+   {
+    "char": "僅",
+    "kanjivg": 13,
+    "kanjidic2": 12
+   },
+   {
+    "char": "僊",
+    "kanjivg": 14,
+    "kanjidic2": 13
+   },
+   {
+    "char": "儲",
+    "kanjivg": 18,
+    "kanjidic2": 17
+   },
+   {
+    "char": "兎",
+    "kanjivg": 7,
+    "kanjidic2": 8
+   },
+   {
+    "char": "厩",
+    "kanjivg": 14,
+    "kanjidic2": 12
+   },
+   {
+    "char": "呀",
+    "kanjivg": 7,
+    "kanjidic2": 8
+   },
+   {
+    "char": "呰",
+    "kanjivg": 8,
+    "kanjidic2": 9
+   },
+   {
+    "char": "噌",
+    "kanjivg": 15,
+    "kanjidic2": 14
+   },
+   {
+    "char": "噓",
+    "kanjivg": 15,
+    "kanjidic2": 14
+   },
+   {
+    "char": "嚔",
+    "kanjivg": 18,
+    "kanjidic2": 17
+   },
+   {
+    "char": "圍",
+    "kanjivg": 12,
+    "kanjidic2": 13
+   },
+   {
+    "char": "堵",
+    "kanjivg": 12,
+    "kanjidic2": 11
+   },
+   {
+    "char": "娩",
+    "kanjivg": 10,
+    "kanjidic2": 11
+   },
+   {
+    "char": "嫂",
+    "kanjivg": 12,
+    "kanjidic2": 13
+   },
+   {
+    "char": "屠",
+    "kanjivg": 12,
+    "kanjidic2": 11
+   },
+   {
+    "char": "嶐",
+    "kanjivg": 15,
+    "kanjidic2": 14
+   },
+   {
+    "char": "幃",
+    "kanjivg": 12,
+    "kanjidic2": 13
+   },
+   {
+    "char": "廐",
+    "kanjivg": 14,
+    "kanjidic2": 13
+   },
+   {
+    "char": "惓",
+    "kanjivg": 11,
+    "kanjidic2": 12
+   },
+   {
+    "char": "戠",
+    "kanjivg": 12,
+    "kanjidic2": 13
+   },
+   {
+    "char": "捲",
+    "kanjivg": 11,
+    "kanjidic2": 12
+   },
+   {
+    "char": "搜",
+    "kanjivg": 12,
+    "kanjidic2": 13
+   },
+   {
+    "char": "旡",
+    "kanjivg": 4,
+    "kanjidic2": 5
+   },
+   {
+    "char": "晦",
+    "kanjivg": 11,
+    "kanjidic2": 10
+   },
+   {
+    "char": "榊",
+    "kanjivg": 14,
+    "kanjidic2": 13
+   },
+   {
+    "char": "榔",
+    "kanjivg": 14,
+    "kanjidic2": 13
+   },
+   {
+    "char": "槌",
+    "kanjivg": 14,
+    "kanjidic2": 13
+   },
+   {
+    "char": "樋",
+    "kanjivg": 15,
+    "kanjidic2": 14
+   },
+   {
+    "char": "櫛",
+    "kanjivg": 19,
+    "kanjidic2": 17
+   },
+   {
+    "char": "欝",
+    "kanjivg": 25,
+    "kanjidic2": 26
+   },
+   {
+    "char": "歎",
+    "kanjivg": 15,
+    "kanjidic2": 14
+   },
+   {
+    "char": "沛",
+    "kanjivg": 7,
+    "kanjidic2": 8
+   },
+   {
+    "char": "漣",
+    "kanjivg": 14,
+    "kanjidic2": 13
+   },
+   {
+    "char": "潛",
+    "kanjivg": 15,
+    "kanjidic2": 17
+   },
+   {
+    "char": "瀕",
+    "kanjivg": 19,
+    "kanjidic2": 20
+   },
+   {
+    "char": "瀞",
+    "kanjivg": 19,
+    "kanjidic2": 17
+   },
+   {
+    "char": "瀦",
+    "kanjivg": 19,
+    "kanjidic2": 18
+   },
+   {
+    "char": "灘",
+    "kanjivg": 22,
+    "kanjidic2": 21
+   },
+   {
+    "char": "煉",
+    "kanjivg": 13,
+    "kanjidic2": 12
+   },
+   {
+    "char": "煕",
+    "kanjivg": 14,
+    "kanjidic2": 13
+   },
+   {
+    "char": "牙",
+    "kanjivg": 4,
+    "kanjidic2": 5
+   },
+   {
+    "char": "甑",
+    "kanjivg": 17,
+    "kanjidic2": 16
+   },
+   {
+    "char": "祁",
+    "kanjivg": 8,
+    "kanjidic2": 7
+   },
+   {
+    "char": "祇",
+    "kanjivg": 9,
+    "kanjidic2": 8
+   },
+   {
+    "char": "祓",
+    "kanjivg": 10,
+    "kanjidic2": 9
+   },
+   {
+    "char": "禰",
+    "kanjivg": 19,
+    "kanjidic2": 18
+   },
+   {
+    "char": "禱",
+    "kanjivg": 19,
+    "kanjidic2": 18
+   },
+   {
+    "char": "离",
+    "kanjivg": 10,
+    "kanjidic2": 11
+   },
+   {
+    "char": "稗",
+    "kanjivg": 13,
+    "kanjidic2": 14
+   },
+   {
+    "char": "穿",
+    "kanjivg": 9,
+    "kanjidic2": 10
+   },
+   {
+    "char": "窿",
+    "kanjivg": 17,
+    "kanjidic2": 16
+   },
+   {
+    "char": "笈",
+    "kanjivg": 10,
+    "kanjidic2": 9
+   },
+   {
+    "char": "筬",
+    "kanjivg": 12,
+    "kanjidic2": 13
+   },
+   {
+    "char": "絳",
+    "kanjivg": 12,
+    "kanjidic2": 13
+   },
+   {
+    "char": "縋",
+    "kanjivg": 16,
+    "kanjidic2": 15
+   },
+   {
+    "char": "繡",
+    "kanjivg": 19,
+    "kanjidic2": 18
+   },
+   {
+    "char": "繦",
+    "kanjivg": 18,
+    "kanjidic2": 17
+   },
+   {
+    "char": "纛",
+    "kanjivg": 24,
+    "kanjidic2": 25
+   },
+   {
+    "char": "耂",
+    "kanjivg": 4,
+    "kanjidic2": 6
+   },
+   {
+    "char": "腿",
+    "kanjivg": 14,
+    "kanjidic2": 13
+   },
+   {
+    "char": "舛",
+    "kanjivg": 6,
+    "kanjidic2": 7
+   },
+   {
+    "char": "艹",
+    "kanjivg": 3,
+    "kanjidic2": 6
+   },
+   {
+    "char": "菟",
+    "kanjivg": 12,
+    "kanjidic2": 11
+   },
+   {
+    "char": "葛",
+    "kanjivg": 12,
+    "kanjidic2": 11
+   },
+   {
+    "char": "蓬",
+    "kanjivg": 14,
+    "kanjidic2": 13
+   },
+   {
+    "char": "蕚",
+    "kanjivg": 15,
+    "kanjidic2": 16
+   },
+   {
+    "char": "蕣",
+    "kanjivg": 15,
+    "kanjidic2": 16
+   },
+   {
+    "char": "薯",
+    "kanjivg": 17,
+    "kanjidic2": 16
+   },
+   {
+    "char": "藷",
+    "kanjivg": 19,
+    "kanjidic2": 18
+   },
+   {
+    "char": "蝕",
+    "kanjivg": 15,
+    "kanjidic2": 14
+   },
+   {
+    "char": "衷",
+    "kanjivg": 9,
+    "kanjidic2": 10
+   },
+   {
+    "char": "襖",
+    "kanjivg": 18,
+    "kanjidic2": 17
+   },
+   {
+    "char": "訝",
+    "kanjivg": 11,
+    "kanjidic2": 12
+   },
+   {
+    "char": "諛",
+    "kanjivg": 15,
+    "kanjidic2": 16
+   },
+   {
+    "char": "謎",
+    "kanjivg": 17,
+    "kanjidic2": 16
+   },
+   {
+    "char": "譖",
+    "kanjivg": 19,
+    "kanjidic2": 21
+   },
+   {
+    "char": "谺",
+    "kanjivg": 11,
+    "kanjidic2": 12
+   },
+   {
+    "char": "賭",
+    "kanjivg": 16,
+    "kanjidic2": 15
+   },
+   {
+    "char": "赱",
+    "kanjivg": 6,
+    "kanjidic2": 7
+   },
+   {
+    "char": "辻",
+    "kanjivg": 6,
+    "kanjidic2": 5
+   },
+   {
+    "char": "辿",
+    "kanjivg": 7,
+    "kanjidic2": 6
+   },
+   {
+    "char": "迂",
+    "kanjivg": 7,
+    "kanjidic2": 6
+   },
+   {
+    "char": "迄",
+    "kanjivg": 7,
+    "kanjidic2": 6
+   },
+   {
+    "char": "迦",
+    "kanjivg": 9,
+    "kanjidic2": 8
+   },
+   {
+    "char": "逗",
+    "kanjivg": 11,
+    "kanjidic2": 10
+   },
+   {
+    "char": "這",
+    "kanjivg": 11,
+    "kanjidic2": 10
+   },
+   {
+    "char": "逢",
+    "kanjivg": 11,
+    "kanjidic2": 10
+   },
+   {
+    "char": "逼",
+    "kanjivg": 13,
+    "kanjidic2": 12
+   },
+   {
+    "char": "遁",
+    "kanjivg": 13,
+    "kanjidic2": 12
+   },
+   {
+    "char": "遏",
+    "kanjivg": 13,
+    "kanjidic2": 12
+   },
+   {
+    "char": "遜",
+    "kanjivg": 14,
+    "kanjidic2": 13
+   },
+   {
+    "char": "遡",
+    "kanjivg": 14,
+    "kanjidic2": 13
+   },
+   {
+    "char": "邁",
+    "kanjivg": 16,
+    "kanjidic2": 17
+   },
+   {
+    "char": "邉",
+    "kanjivg": 17,
+    "kanjidic2": 18
+   },
+   {
+    "char": "鄰",
+    "kanjivg": 15,
+    "kanjidic2": 16
+   },
+   {
+    "char": "鎚",
+    "kanjivg": 18,
+    "kanjidic2": 17
+   },
+   {
+    "char": "鑁",
+    "kanjivg": 21,
+    "kanjidic2": 22
+   },
+   {
+    "char": "鑓",
+    "kanjivg": 22,
+    "kanjidic2": 21
+   },
+   {
+    "char": "陟",
+    "kanjivg": 10,
+    "kanjidic2": 11
+   },
+   {
+    "char": "隧",
+    "kanjivg": 16,
+    "kanjidic2": 15
+   },
+   {
+    "char": "霈",
+    "kanjivg": 15,
+    "kanjidic2": 16
+   },
+   {
+    "char": "頤",
+    "kanjivg": 16,
+    "kanjidic2": 15
+   },
+   {
+    "char": "飴",
+    "kanjivg": 14,
+    "kanjidic2": 13
+   },
+   {
+    "char": "餅",
+    "kanjivg": 15,
+    "kanjidic2": 14
+   },
+   {
+    "char": "餌",
+    "kanjivg": 15,
+    "kanjidic2": 14
+   },
+   {
+    "char": "鴉",
+    "kanjivg": 15,
+    "kanjidic2": 16
+   },
+   {
+    "char": "麭",
+    "kanjivg": 16,
+    "kanjidic2": 12
+   },
+   {
+    "char": "龜",
+    "kanjivg": 16,
+    "kanjidic2": 18
+   },
+   {
+    "char": "𦥑",
+    "kanjivg": 7,
+    "kanjidic2": 6
+   }
+  ],
+  "goTreeOk": true,
+  "componentsIntegrity": true,
+  "soundComponentPhonCrossCheck": {
+   "checked": 1183,
+   "agreed": 575
+  },
+  "strokesCapped": false
+ },
+ "attribution": "Readings, meanings, grades, frequency and radical data: KANJIDIC2 (EDRDG, CC BY-SA 3.0). Stroke paths and component decomposition: KanjiVG (CC BY-SA 3.0, https://kanjivg.tagaini.net). components.json and soundComponent are derived from those sources (see Doc 18)."
+}
