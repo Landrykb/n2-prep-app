@@ -553,4 +553,89 @@ check('cold start end-to-end (seeded bank shape): an empty known set yields a ca
   assert.deepEqual(ranks, [...ranks].sort((a, b) => a - b))
 })
 
+// ---------- declared level: the one-tap starting belief (Doc 16 §5 amendment #3) ----------
+// Landry's objection: he never entered a level anywhere, so /read
+// must not gate fitting on the checkup. The tap is a starting
+// belief; a real diagnosis overrides it whenever one exists; every
+// footer labels which basis was used.
+
+check('resolveBand: a diagnosis overrides a declared band, always', () => {
+  assert.deepEqual(fit.resolveBand({ diagnosisBand: 'N2', declaredBand: 'N4' }), { band: 'N2', source: 'diagnosis' })
+  assert.deepEqual(fit.resolveBand({ diagnosisBand: 'N5', declaredBand: 'N1' }), { band: 'N5', source: 'diagnosis' })
+})
+
+check('resolveBand: declared speaks when no diagnosis; none when neither; junk is ignored', () => {
+  assert.deepEqual(fit.resolveBand({ diagnosisBand: null, declaredBand: 'N3' }), { band: 'N3', source: 'declared' })
+  assert.deepEqual(fit.resolveBand({ declaredBand: 'N4' }), { band: 'N4', source: 'declared' })
+  assert.deepEqual(fit.resolveBand({ diagnosisBand: null, declaredBand: null }), { band: null, source: 'none' })
+  assert.deepEqual(fit.resolveBand({}), { band: null, source: 'none' })
+  assert.deepEqual(fit.resolveBand(), { band: null, source: 'none' })
+  // Not-a-band values never become a basis — no guessing at levels.
+  assert.deepEqual(fit.resolveBand({ diagnosisBand: 'N9', declaredBand: 'N3' }), { band: 'N3', source: 'declared' })
+  assert.deepEqual(fit.resolveBand({ diagnosisBand: 'N9', declaredBand: 'beginner' }), { band: null, source: 'none' })
+})
+
+check('declared credit: a declared band fits passages like a diagnosed one (gate unchanged)', () => {
+  // The same passage shape as the diagnosed-credit check above.
+  const toks = [
+    ...Array(9).fill({ s: '食べ', h: '食べる', l: 'N5' }),
+    ...Array(5).fill({ s: '引っ越し', h: '引っ越す', l: 'N4' }),
+    ...Array(5).fill({ s: 'は', h: 'は', l: null }),
+    { s: '指摘', h: '指摘', l: 'N1' },
+  ]
+  const deck = new Map([['食べる', 'N5'], ['引っ越す', 'N4'], ['指摘', 'N1']])
+  const resolved = fit.resolveBand({ diagnosisBand: null, declaredBand: 'N3' })
+  assert.equal(resolved.source, 'declared')
+  const declared = fit.buildKnownSet([], [], fit.deckCreditSet(deck, resolved.band))
+  const picked = fit.pickPassage([passage('fit', 'N3', toks)], declared, resolved.band)
+  assert.equal(picked.ratio, 0.95) // credit on for declared — the same gate, the same fit
+  // And with no basis at all there is still no credit and no fit.
+  const none = fit.resolveBand({ diagnosisBand: null, declaredBand: null })
+  assert.equal(none.band, null)
+  assert.equal(fit.pickPassage([passage('fit', 'N3', toks)], fit.buildKnownSet([], []), 'N3'), null)
+})
+
+check('level callbacks: every level callback_data fits in 12 bytes', () => {
+  // Telegram rejects oversized button payloads silently — the whole
+  // level surface (five bands + Not sure) must stay tiny.
+  for (const b of fit.BANDS) {
+    assert.ok(Buffer.byteLength(`level:${b}`, 'utf8') <= 12, `level:${b}`)
+  }
+  assert.equal(Buffer.byteLength('level:N5', 'utf8'), 8)
+  assert.equal(Buffer.byteLength('level:none', 'utf8'), 10)
+})
+
+check('shouldAskLevel: asks only a linked, basis-less, undeclared learner', () => {
+  const linked = { user_id: 'u1', chat_id: 42, declared_band: null }
+  assert.equal(fit.shouldAskLevel(linked, 'none'), true) // the one case that asks
+  assert.equal(fit.shouldAskLevel({ ...linked, declared_band: 'N3' }, 'none'), false) // declared set
+  assert.equal(fit.shouldAskLevel(linked, 'diagnosis'), false) // diagnosis in charge
+  assert.equal(fit.shouldAskLevel(linked, 'declared'), false) // declared in charge
+  assert.equal(fit.shouldAskLevel(null, 'none'), false) // no link at all
+  assert.equal(fit.shouldAskLevel({ user_id: 'u1', chat_id: null, declared_band: null }, 'none'), false) // unlinked row
+  assert.equal(fit.shouldAskLevel({ user_id: 'u1', declared_band: null }, 'none'), false) // no chat bound
+})
+
+check('twin parity: band resolution and the ask agree (resolveBand, shouldAskLevel)', () => {
+  const inputs = [
+    { diagnosisBand: 'N2', declaredBand: 'N4' },
+    { diagnosisBand: null, declaredBand: 'N3' },
+    { diagnosisBand: 'N9', declaredBand: 'beginner' },
+    { diagnosisBand: null, declaredBand: null },
+    {},
+  ]
+  for (const input of inputs) assert.deepEqual(port.resolveBand(input), fit.resolveBand(input))
+  const links = [
+    { user_id: 'u1', chat_id: 42, declared_band: null },
+    { user_id: 'u1', chat_id: 42, declared_band: 'N3' },
+    { user_id: 'u1', chat_id: null, declared_band: null },
+    null,
+  ]
+  for (const link of links) {
+    for (const source of ['diagnosis', 'declared', 'none']) {
+      assert.equal(port.shouldAskLevel(link, source), fit.shouldAskLevel(link, source))
+    }
+  }
+})
+
 console.log(`reader: ${passed} checks passed`)

@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { BANDS, buildKnownSet, capCandidates, countKnownContent, deckCreditSet, evaluateDraft, isColdStart, nextForbiddenList, passageRatio, pickPassage, pickStarter, shouldGenerate } from './fit.ts'
+import { BANDS, buildKnownSet, capCandidates, countKnownContent, deckCreditSet, evaluateDraft, isColdStart, nextForbiddenList, passageRatio, pickPassage, pickStarter, resolveBand, shouldAskLevel, shouldGenerate } from './fit.ts'
 import { DECK_LEVELS } from './deck.ts'
 import { DECK_GLOSS } from './gloss.ts'
 import { segmentText } from './segment.ts'
@@ -24,6 +24,15 @@ import { segmentText } from './segment.ts'
 // serves a LABELLED starter from the low bands (fit.ts pickStarter)
 // instead of the dead-end reply, and fitted generation is skipped
 // until a basis exists.
+// Declared level (Doc 16 §5 amendment #3): the starter track still
+// made the checkup the only road to fitting, and Landry's answer was
+// that he never entered a level anywhere — /read must not demand
+// homework. So with NO band basis at all, /read first asks ONE
+// question with one-tap buttons; the tap is stored on the link row
+// (declared_band, migration 00011) and becomes the fitting basis —
+// a starting belief the learner states, overridden by a real
+// diagnosis whenever one exists, and labelled as declared in every
+// footer. /level re-opens the question at any time.
 // No morning dispatch (R1), no Mini App (R1), no voice (R2).
 //
 // The bot never nags (Doc 16 §9): it sends when asked, and is silent
@@ -212,6 +221,38 @@ const WELCOME =
 
 const HELP = 'I only know two tricks so far: /read (a passage at your level) and /unlink (disconnect this chat).'
 
+// The one-tap level ask (Doc 16 §5 amendment #3). It is the /read
+// response when the learner has no band basis at all — never a
+// standalone nag — and it fires at most once: once a band is
+// declared (or a diagnosis exists) /read serves instead. The
+// callback_data values are tiny by design (level:N5 = 8 bytes,
+// level:none = 10): Telegram rejects oversized button payloads
+// silently, so the whole level surface stays far under the limit.
+const LEVEL_ASK =
+  '🔍 One thing first — I do not know your level yet, and I fit every passage to it.\n' +
+  'Tap yours and reading starts now. No forms, no homework: this tap is just where we start, ' +
+  'and your checkup in Yonde is the sharper measure whenever you want it.'
+
+const levelKeyboard = {
+  inline_keyboard: [
+    BANDS.map((b) => ({ text: b, callback_data: `level:${b}` })),
+    [{ text: 'Not sure', callback_data: 'level:none' }],
+  ],
+}
+
+// The /level intro line names the CURRENT basis before offering the
+// buttons (Doc 16 §5 amendment #3) — a learner re-asking the
+// question should be told what is in charge right now.
+const levelIntro = (source: string, band: string | null) =>
+  source === 'diagnosis'
+    ? `Your checkup put you at ${band}, and a checkup always outranks a tap — I fit to it. ` +
+      'If that feels wrong, a fresh checkup in Yonde is the way to change it. ' +
+      'A tap below only sets your starting level for if no checkup were on file.'
+    : source === 'declared'
+      ? `You told me ${band} — that is the level I fit to. Tap to change it, ` +
+        'or take the checkup in Yonde for the sharper measure.'
+      : LEVEL_ASK
+
 // The starter footer (cold start, Doc 16 §5 amendment #2). It must
 // never claim fitting that did not happen: it says plainly this is a
 // starter, says why, invites mining (mined words are the first real
@@ -322,6 +363,7 @@ serve(async (req: Request) => {
       const setMyCommands = await tg(botToken, 'setMyCommands', {
         commands: [
           { command: 'read', description: 'Send me a passage at my level' },
+          { command: 'level', description: 'Tell Hori your level (one tap)' },
           { command: 'unlink', description: 'Disconnect this chat from Yonde' },
           { command: 'start', description: 'Link this chat to your Yonde account' },
         ],
@@ -352,7 +394,7 @@ serve(async (req: Request) => {
     const linkByChat = async (chatId: number) => {
       const { data } = await supabaseAdmin
         .from('telegram_links')
-        .select('user_id, chat_id, username')
+        .select('user_id, chat_id, username, declared_band')
         .eq('chat_id', chatId)
         .maybeSingle()
       return data
@@ -368,20 +410,31 @@ serve(async (req: Request) => {
     }
 
     // The calibrated known set (Doc 16 §5 amendment): queue fronts +
-    // Twin personal vocab + below-band deck credit. Credit exists ONLY
-    // with a diagnosis — a diagnosed band certifies the vocabulary
-    // below it; without one the set is queue-only and conservative.
+    // Twin personal vocab + below-band deck credit. The credit follows
+    // the resolved band basis (resolveBand, amendment #3): it exists
+    // with a DIAGNOSIS — the checkup certifies the vocabulary below
+    // the band — OR with a DECLARED band, the one-tap starting belief
+    // the learner states in Telegram (self-assessment is the same
+    // graded-reader assumption, owned by the learner; the gate still
+    // validates every passage, and a diagnosis overrides the tap
+    // whenever one exists). With neither basis there is no credit:
+    // the set is queue-only and conservative. hasDiagnosis stays
+    // diagnosis-only, for copy that speaks about the checkup itself.
     // (Personal vocab has no stored list yet — twin.vocab is derived
     // stats — so it contributes nothing today; the parameter stays
     // plumbed for when the Twin grows one.)
-    const knownFor = (state: Record<string, unknown>) => {
+    const knownFor = (state: Record<string, unknown>, declaredBand?: string | null) => {
       const queue = Array.isArray(state.queue) ? state.queue : []
       const estimate = (state.diagnosis as Record<string, unknown> | undefined)?.jlptEstimate
-      const hasDiagnosis = typeof estimate === 'string' && (BANDS as string[]).includes(estimate)
-      const band = hasDiagnosis ? (estimate as string) : 'N4' // gentle default; the footer says so
-      const credit = hasDiagnosis ? deckCreditSet(DECK_LEVELS, band) : null
+      const { band: resolvedBand, source: bandSource } = resolveBand({
+        diagnosisBand: typeof estimate === 'string' ? estimate : null,
+        declaredBand: declaredBand ?? null,
+      })
+      const hasDiagnosis = bandSource === 'diagnosis'
+      const band = resolvedBand ?? 'N4' // gentle default; the footer says so
+      const credit = resolvedBand ? deckCreditSet(DECK_LEVELS, resolvedBand) : null
       const known = buildKnownSet(queue, [], credit)
-      return { queue, known, hasDiagnosis, band }
+      return { queue, known, hasDiagnosis, band, bandSource }
     }
 
     // ---------- R0.5 generation fallback ----------
@@ -457,21 +510,46 @@ serve(async (req: Request) => {
     }
 
     // ---------- /read ----------
-    const handleRead = async (chatId: number) => {
+    // opts.fromLevelTap: this serve ANSWERS a level tap, so the ask
+    // below must not fire again inside it. opts.forceStarter: the
+    // tap was 'Not sure' — serve the starter track even if the
+    // census alone would not call this learner cold. opts
+    // .declaredBand overrides the row's value (the level callback
+    // has just written it; the serve should not depend on re-read
+    // timing).
+    const handleRead = async (
+      chatId: number,
+      opts: { declaredBand?: string | null; fromLevelTap?: boolean; forceStarter?: boolean } = {},
+    ) => {
       const link = await linkByChat(chatId)
       if (!link) {
         await sendMessage(botToken, chatId, LINK_EXPLAINER)
         return
       }
+      const declaredBand = opts.declaredBand !== undefined ? opts.declaredBand : (link.declared_band ?? null)
       const row = await loadState(link.user_id)
       const state = (row?.state ?? {}) as Record<string, unknown>
-      const { queue, known, hasDiagnosis, band } = knownFor(state)
-      // Cold start (Doc 16 §5 amendment #2): no diagnosis AND a
-      // known-content census under the limit = no fitting basis at
-      // all. For this learner the gated pick can fit nothing and
-      // generation has nothing to validate against — /read runs the
-      // starter track instead (below).
-      const cold = isColdStart(hasDiagnosis, countKnownContent(known))
+      const { queue, known, hasDiagnosis, band, bandSource } = knownFor(state, declaredBand)
+
+      // The level ask (Doc 16 §5 amendment #3): a linked learner
+      // with NO band basis gets one question before any passage —
+      // fitting to a level they never stated would be a guess, and
+      // gating on the checkup is homework. The ask IS the /read
+      // response in this state (never a standalone nag), and it
+      // stops the moment a basis exists.
+      if (!opts.fromLevelTap && shouldAskLevel({ ...link, declared_band: declaredBand }, bandSource)) {
+        await sendMessage(botToken, chatId, LEVEL_ASK, { reply_markup: levelKeyboard })
+        return
+      }
+
+      // Cold start (Doc 16 §5 amendment #2): no band basis of any
+      // kind AND a known-content census under the limit = nothing to
+      // fit against. For this learner the gated pick can fit nothing
+      // and generation has nothing to validate against — /read runs
+      // the starter track instead (below). A declared band is never
+      // cold (amendment #3): the tap IS a basis.
+      const cold = opts.forceStarter === true
+        || (bandSource === 'none' && isColdStart(hasDiagnosis, countKnownContent(known)))
 
       const since = new Date(Date.now() - RECENT_DAYS * 86400000).toISOString()
       const { data: sentRows } = await supabaseAdmin
@@ -531,11 +609,15 @@ serve(async (req: Request) => {
         await sendMessage(
           botToken,
           chatId,
-          // Not cold, has words, still nothing fits, and no diagnosis
-          // on file: name the checkup as the switch that turns
+          // Not cold, has words, still nothing fits, and NO band
+          // basis at all (bandSource 'none': no diagnosis, no
+          // declaration): name the checkup as the switch that turns
           // level-fitting on (the starter track above already covers
-          // the truly cold; this line is for the in-between).
-          !cold && !hasDiagnosis ? nothingFits + CHECKUP_SWITCH_LINE : nothingFits,
+          // the truly cold; this line is for the in-between). A
+          // declared learner already has a basis — for them the
+          // checkup is a sharpening, named in the fitted footers,
+          // not a switch that is off.
+          !cold && bandSource === 'none' ? nothingFits + CHECKUP_SWITCH_LINE : nothingFits,
         )
         return
       }
@@ -562,16 +644,22 @@ serve(async (req: Request) => {
         '',
         renderPassage(String(passage.text), newWords),
         '',
-        // The footer names BOTH fitting sources (Doc 16 §5 labelling):
+        // The footer names the fitting basis (Doc 16 §5 labelling):
         // with a diagnosis, the learner's level (via below-band deck
-        // credit) and their queue; without one, the queue only — the
-        // copy must never claim level fitting that did not happen.
-        // A starter gets its own footer for the same reason: no fit
-        // was measured, so none is claimed (amendment #2).
+        // credit) and their queue; with a declared band, the level
+        // THEY stated and their queue — the wording says the band
+        // came from their tap, never from a measurement; with no
+        // basis, the queue only. The copy must never claim level
+        // fitting that did not happen, on a basis that did not
+        // happen. A starter gets its own footer for the same reason:
+        // no fit was measured, so none is claimed (amendment #2).
         (coldStart
           ? STARTER_FOOTER
-          : hasDiagnosis
+          : bandSource === 'diagnosis'
           ? `Fitted to your ${esc(band)} level and your queue: about ${pct}% of its words should already be familiar (an estimate) · ${newWords.length} new word${newWords.length === 1 ? '' : 's'}`
+          : bandSource === 'declared'
+          ? `Fitted to the ${esc(band)} you told me and your queue: about ${pct}% of its words should already be familiar (an estimate) · ${newWords.length} new word${newWords.length === 1 ? '' : 's'}` +
+            '\nYour checkup in Yonde sharpens this whenever you want it.'
           : `Fitted to your queue: about ${pct}% of its words should already be familiar (an estimate) · ${newWords.length} new word${newWords.length === 1 ? '' : 's'}` +
             '\nBand N4 is a gentle default — take the 10-minute checkup in Yonde and I will fit to your real level.'),
       ]
@@ -637,8 +725,9 @@ serve(async (req: Request) => {
       const queue = Array.isArray(state.queue) ? [...(state.queue as Record<string, unknown>[])] : []
       // The SAME calibrated known set as /read (Doc 16 §5): a candidate
       // is mined only when it is genuinely new to this learner — not
-      // queued, and not credited below their diagnosed band.
-      const { known } = knownFor(state)
+      // queued, and not credited below their resolved band (diagnosis
+      // or declared, amendment #3).
+      const { known } = knownFor(state, link.declared_band ?? null)
       // Mine works from the same capped, level-ordered candidate list
       // a starter send bolds (Doc 16 §5 amendment #2): stored lists
       // are builder-capped at 12 today, so for fitted passages the
@@ -711,11 +800,64 @@ serve(async (req: Request) => {
       )
     }
 
+    // ---------- level callback (the one-tap declared level) ----------
+    const handleLevel = async (cb: Record<string, unknown>) => {
+      const cbId = String(cb.id ?? '')
+      const from = (cb.from ?? {}) as Record<string, unknown>
+      const message = (cb.message ?? {}) as Record<string, unknown>
+      const chat = (message.chat ?? {}) as Record<string, unknown>
+      const chatId = Number(chat.id)
+      const choice = String(cb.data ?? '').slice('level:'.length)
+
+      const answer = (text: string) =>
+        tg(botToken, 'answerCallbackQuery', { callback_query_id: cbId, text })
+
+      // The SAME ownership verification as the Mine callback: the
+      // tap must be in the linked private chat, from its owner —
+      // a level declaration writes learner state, so it is held to
+      // exactly the same standard.
+      const link = Number.isFinite(chatId) ? await linkByChat(chatId) : null
+      if (!link || Number(from.id) !== chatId) {
+        await answer('This chat is not linked to a Yonde account.')
+        return
+      }
+
+      if (choice === 'none') {
+        // 'Not sure' is a complete answer: no declaration is stored,
+        // and the passage arrives via the starter track.
+        await answer('No problem — we start easy.')
+        await handleRead(chatId, { fromLevelTap: true, forceStarter: true })
+        return
+      }
+      if (!(BANDS as string[]).includes(choice)) {
+        await answer('')
+        return
+      }
+
+      const { error } = await supabaseAdmin
+        .from('telegram_links')
+        .update({ declared_band: choice, declared_at: new Date().toISOString() })
+        .eq('user_id', link.user_id)
+      if (error) {
+        console.error('reader-bot: declared band write failed')
+        await answer('That did not save on my side — try again.')
+        return
+      }
+      await answer(`${choice} — got it.`)
+      // Serve immediately through the normal /read flow: the tap
+      // should feel like the passage just arrives. If nothing fits
+      // even with the declared credit, the normal nothing-fits copy
+      // follows — the declaration is saved either way.
+      await handleRead(chatId, { fromLevelTap: true, declaredBand: choice })
+    }
+
     // ---------- dispatch ----------
     if (update.callback_query) {
       const cb = update.callback_query as Record<string, unknown>
       if (String(cb.data ?? '').startsWith('mine:')) {
         try { await handleMine(cb) } catch (err) { console.error('reader-bot: mine failed', err) }
+      } else if (String(cb.data ?? '').startsWith('level:')) {
+        try { await handleLevel(cb) } catch (err) { console.error('reader-bot: level failed', err) }
       } else if (cb.id) {
         await tg(botToken, 'answerCallbackQuery', { callback_query_id: String(cb.id), text: '' })
       }
@@ -771,6 +913,22 @@ serve(async (req: Request) => {
         }
       } else if (cmd === '/read') {
         await handleRead(chatId)
+      } else if (cmd === '/level') {
+        // Re-opens the one-tap question at any time (Doc 16 §5
+        // amendment #3), with the intro line naming the basis
+        // currently in charge. Unlinked chats get the explainer —
+        // there is no row to declare onto.
+        const link = await linkByChat(chatId)
+        if (!link) {
+          await sendMessage(botToken, chatId, LINK_EXPLAINER)
+        } else {
+          const row = await loadState(link.user_id)
+          const state = (row?.state ?? {}) as Record<string, unknown>
+          const { band, bandSource } = knownFor(state, link.declared_band ?? null)
+          await sendMessage(botToken, chatId, levelIntro(bandSource, bandSource === 'none' ? null : band), {
+            reply_markup: levelKeyboard,
+          })
+        }
       } else if (cmd === '/unlink') {
         const { data: cleared } = await supabaseAdmin
           .from('telegram_links')

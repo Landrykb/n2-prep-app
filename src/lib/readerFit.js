@@ -22,10 +22,13 @@
 //
 // Known set (calibrated): queue fronts (already dictionary-form words,
 // used as-is) + Twin personal vocab + BELOW-BAND DECK CREDIT — every
-// deck headword whose level is strictly below the learner's diagnosed
-// band. The credit is the standard graded-reader assumption: a
-// diagnosed band certifies the vocabulary below it. It exists ONLY
-// with a diagnosis; no diagnosis, no credit (queue-only, conservative).
+// deck headword whose level is strictly below the learner's band. The
+// credit is the standard graded-reader assumption: a band certifies
+// the vocabulary below it. It exists only with a band basis — a
+// diagnosis, or (amendment #3) the learner's own one-tap declared
+// band; the basis is resolved by resolveBand below, labelled in every
+// footer, and a diagnosis overrides a declaration whenever one exists.
+// No basis, no credit (queue-only, conservative).
 //
 // A token counts as KNOWN when either:
 //   - its headword is in the learner's known set, or
@@ -50,7 +53,8 @@ export function bandRank(band) {
  * Below-band deck credit: the set of deck headwords whose level is
  * strictly below `band`. `deckLevels` maps headword -> level (a Map or
  * a plain object). An unknown/absent band earns NO credit — credit is
- * a diagnosis-backed claim, never a default.
+ * a basis-backed claim (diagnosis, or the learner's declared band —
+ * resolveBand), never a default.
  */
 export function deckCreditSet(deckLevels, band) {
   const rank = bandRank(band)
@@ -62,6 +66,38 @@ export function deckCreditSet(deckLevels, band) {
     if (r !== -1 && r < rank && word) credit.add(word)
   }
   return credit
+}
+
+/**
+ * Band resolution (Doc 16 §5 amendment #3): which band /read fits to,
+ * and on what basis. A declared band is a STARTING BELIEF the learner
+ * states in one tap inside Telegram — it exists so the Reader never
+ * gates fitting on the in-app checkup — and a real diagnosis in
+ * learner_state overrides it whenever one exists:
+ *   diagnosis > declared > none.
+ * Returns { band, source } with source 'diagnosis' | 'declared' |
+ * 'none'; band is null exactly when source is 'none'. Anything that
+ * is not a real band string is ignored, never guessed at.
+ */
+export function resolveBand({ diagnosisBand, declaredBand } = {}) {
+  if (BANDS.includes(diagnosisBand)) return { band: diagnosisBand, source: 'diagnosis' }
+  if (BANDS.includes(declaredBand)) return { band: declaredBand, source: 'declared' }
+  return { band: null, source: 'none' }
+}
+
+/**
+ * Should /read open with the one-tap level ask instead of serving?
+ * Only for a LINKED chat (a link row whose chat_id is bound) whose
+ * band basis is 'none' and which carries no declared band. The ask
+ * is the /read response in that state, never a standalone nag: once
+ * a band is declared — or a diagnosis exists — this stays false
+ * forever. (An unlinked chat gets the link explainer, not a quiz.)
+ */
+export function shouldAskLevel(link, bandSource) {
+  if (!link || link.chat_id == null) return false
+  if (bandSource !== 'none') return false
+  if (link.declared_band) return false
+  return true
 }
 
 /**
