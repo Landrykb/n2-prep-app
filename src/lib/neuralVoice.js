@@ -33,6 +33,22 @@ import { speakText } from './tts.js'
 import { prepareNeuralText, estimateSpeechMs } from './neuralText.js'
 import { synthesizeInBrowser, cancelBrowserSynthesis } from './edgeTts.js'
 import { resolveCast } from './voiceCast.js'
+import { appendErrorLog } from './errorLog.js'
+
+// Voice failures are otherwise invisible: every route fails
+// SILENTLY into the next one, so when Landry reported "the
+// voices do not play anymore" (2026-11-08) there was nothing
+// anywhere naming the failing step. Each route now leaves one
+// structured line in the on-device error log (My Twin →
+// Privacy shows/shares it) before falling back: which route,
+// which stage, and the platform's own reason (the play()
+// rejection name, the media error code). Normal successful
+// playback logs nothing.
+function logVoice(kind, detail = {}) {
+  try {
+    appendErrorLog({ at: new Date().toISOString(), where: 'voice', kind, ...detail })
+  } catch { /* logging must never throw */ }
+}
 
 const FETCH_TIMEOUT_MS = 12000
 // Network + decode slack on top of the spoken-duration estimate: a
@@ -108,11 +124,17 @@ export function playAudioFile(src, { onEnd, onError } = {}) {
     if (pendingEnd === fireEnd) pendingEnd = null
     if (onEnd) onEnd()
   }
-  const fail = () => {
+  const fail = (err) => {
     if (endFired) return
     endFired = true
+    const mediaCode = currentAudio?.error?.code ?? null
     teardownAudio()
     if (pendingEnd === fireEnd) pendingEnd = null
+    logVoice('file-play-failed', {
+      name: err?.name || (mediaCode ? 'media-error' : 'unknown'),
+      ...(mediaCode ? { code: mediaCode } : {}),
+      src: String(src).split('/').pop() || '',
+    })
     if (onError) onError()
     else if (onEnd) onEnd()
   }
@@ -121,10 +143,10 @@ export function playAudioFile(src, { onEnd, onError } = {}) {
     const audio = new Audio(src)
     currentAudio = audio
     audio.onended = fireEnd
-    audio.onerror = fail
+    audio.onerror = () => fail(null)
     const played = audio.play()
-    if (played && typeof played.catch === 'function') played.catch(fail)
-  } catch { fail() }
+    if (played && typeof played.catch === 'function') played.catch((err) => fail(err))
+  } catch (err) { fail(err) }
 }
 
 /** The signed-in user's access token, or null (guest / signed out). */
@@ -146,7 +168,10 @@ async function getNeuralAudio(text, cast = 'female') {
   const c = resolveCast(cast)
   const direct = await synthesizeInBrowser(text, { voiceName: c.edge, pitch: c.pitch })
   if (direct) return direct
-  return fetchNeuralAudio(text, cast)
+  logVoice('browser-synth-null', { cast })
+  const served = await fetchNeuralAudio(text, cast)
+  if (!served) logVoice('server-tts-null', { cast })
+  return served
 }
 
 /**
@@ -196,6 +221,7 @@ export function speakSenseiLine(text, { rate = 1, onEnd, onFallback, cast = 'fem
   }
   const deviceFallback = () => {
     if (endFired) return
+    logVoice('device-fallback', {})
     // onFallback (optional): told WHICH device result served, so a
     // caller like TtsButton can keep its honest no-Japanese-voice
     // label when the device voice had to read Japanese without one.
@@ -227,7 +253,7 @@ export function speakSenseiLine(text, { rate = 1, onEnd, onFallback, cast = 'fem
       if (played && typeof played.catch === 'function') {
         // Autoplay refused (no user-gesture credit left): the device
         // voice was primed by the Accept tap, so fall back to it.
-        played.catch(() => { if (!endFired) { clearWatchdog(); teardownAudio(); deviceFallback() } })
+        played.catch((err) => { logVoice('blob-play-rejected', { name: err?.name || 'unknown' }); if (!endFired) { clearWatchdog(); teardownAudio(); deviceFallback() } })
       }
     } catch { clearWatchdog(); deviceFallback() }
   })
