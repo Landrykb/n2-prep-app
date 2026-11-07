@@ -116,7 +116,8 @@ export default function DictionaryView() {
               <p className="text-sm text-slate-300 mt-0.5">{e.meaning}</p>
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              <TtsButton text={e.word} className="p-1.5" />
+              {/* Speak the READING, never the kanji surface: the engine picks its own reading for 明日 (あした) even on the あす entry — Landry, 2026-11-07. */}
+              <TtsButton text={e.reading || e.word} className="p-1.5" />
               <button
                 onClick={() => open({ _type: e.type || 'Vocab', _key: e.word, word: e.word, char: e.word.length === 1 ? e.word : undefined, reading: e.reading, meaning: e.meaning, image: e.image })}
                 aria-label={`Show details for ${e.word}`}

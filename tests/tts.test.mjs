@@ -339,4 +339,18 @@ await acheck('edgeTts: cancelBrowserSynthesis aborts an in-flight synthesis', as
   })
 }
 
+// ---------- Dictionary speaks the reading (2026-11-07) ----------
+// Landry: the dictionary's speaker "says other words than the
+// kanji written" — it was fed the kanji surface, so the engine
+// chose its own reading (明日 -> あした even on the あす entry).
+// The entry's reading is the only correct thing to speak.
+{
+  const { readFileSync } = await import('node:fs')
+  const dict = readFileSync(new URL('../src/components/DictionaryView.jsx', import.meta.url), 'utf8')
+  check('the dictionary speaker is fed the entry reading', () => {
+    assert.ok(dict.includes('text={e.reading || e.word}'), 'reading first, surface as fallback')
+    assert.ok(!dict.includes('text={e.word}'), 'bare surface never spoken')
+  })
+}
+
 console.log(`\ntts: ${passed} checks passed`)
