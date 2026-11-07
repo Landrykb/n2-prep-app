@@ -73,15 +73,33 @@ serve(async (req: Request) => {
   await probe('arrived')
 
   const authHeader = req.headers.get('Authorization') ?? ''
-  const caller = createClient(supabaseUrl, anonKey, {
-    auth: { persistSession: false },
-    global: { headers: { Authorization: authHeader } },
-  })
-  const { data: { user }, error: userError } = await caller.auth.getUser()
-  if (userError || !user) {
-    await probe('auth-fail', userError?.message ?? 'no user')
-    return json({ error: 'Unauthorized' }, 401)
+  // The caller is named by asking the Auth API directly
+  // (2026-11-08): supabase-js getUser() THREW an unhandled
+  // exception for real user tokens in this runtime — every
+  // signed-in voice request died right here with a 500 (the
+  // 'arrived'-only probe rows), while a claim-invalid token
+  // returned a clean error and hid the fault for weeks. A
+  // plain fetch names its failures instead of throwing them.
+  let user: { id: string } | null = null
+  try {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 10000)
+    const res = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: { apikey: anonKey, Authorization: authHeader },
+      signal: ctrl.signal,
+    }).finally(() => clearTimeout(timer))
+    if (res.ok) {
+      const u = await res.json().catch(() => null) as { id?: string } | null
+      if (u?.id) user = { id: u.id }
+      else await probe('auth-fail', 'no user id in auth response')
+    } else {
+      await probe('auth-fail', `auth http ${res.status}`)
+    }
+  } catch (err) {
+    await probe('auth-fail', `auth fetch: ${(err as Error)?.name ?? 'error'}`)
   }
+  if (!user) return json({ error: 'Unauthorized' }, 401)
+  await probe('authed')
 
   const body = await req.json().catch(() => ({})) as { text?: unknown; voice?: unknown }
   const text = typeof body?.text === 'string' ? body.text.trim() : ''
@@ -95,7 +113,12 @@ serve(async (req: Request) => {
 
   // Cache first: the same line in the same cast never synthesizes twice.
   const cachePath = `tts-cache/${await hashOf(`${cast}\n${text}`)}.mp3`
-  const cached = await admin.storage.from(BUCKET).download(cachePath).catch(() => null)
+  // storage-js download() resolves { data, error } — the Blob
+  // is .data. Reading .arrayBuffer() off the result object
+  // itself threw and 500'd every cache miss (2026-11-08: the
+  // crash hiding behind the getUser crash).
+  const cacheDl = await admin.storage.from(BUCKET).download(cachePath).catch(() => null)
+  const cached = cacheDl?.data ?? null
   if (cached) {
     const bytes = new Uint8Array(await cached.arrayBuffer())
     if (bytes.length > 0) {
@@ -127,7 +150,8 @@ serve(async (req: Request) => {
     if (!row) break
     if (row.status === 'failed') return json({ error: 'Synthesis failed' }, 502)
     if (row.status === 'done' && row.storage_path) {
-      const file = await admin.storage.from(BUCKET).download(row.storage_path).catch(() => null)
+      const jobDl = await admin.storage.from(BUCKET).download(row.storage_path).catch(() => null)
+      const file = jobDl?.data ?? null
       if (!file) return json({ error: 'Audio unavailable' }, 502)
       const bytes = new Uint8Array(await file.arrayBuffer())
       if (bytes.length === 0) return json({ error: 'Audio unavailable' }, 502)
