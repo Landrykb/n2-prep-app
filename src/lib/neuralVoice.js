@@ -225,8 +225,9 @@ async function sessionToken() {
 /**
  * Get this line's neural audio: the browser-direct Edge route first
  * (works from the learner's device, guests included), then the tts
- * edge function (signed-in users). Returns a Blob, or null when both
- * routes fail — the caller falls back to the device voice.
+ * edge function (signed-in users). Returns a Blob, an https URL
+ * string, or null when both routes fail — the caller falls back
+ * to the device voice.
  */
 async function getNeuralAudio(text, cast = 'female', browserTimeoutMs = null) {
   const c = resolveCast(cast)
@@ -242,8 +243,13 @@ async function getNeuralAudio(text, cast = 'female', browserTimeoutMs = null) {
 }
 
 /**
- * Ask the tts edge function for this line's audio. Returns a Blob, or
- * null on any failure — the caller falls back to the device voice.
+ * Ask the tts edge function for this line's audio. Returns a
+ * playable https URL (tts-vm answers with a signed Storage URL —
+ * WebKit refused the MP3 *blob* with NotSupportedError, while
+ * the same bytes stream fine from an https src), or the raw
+ * bytes as a Blob when the function falls back to sending
+ * them. Null on any failure — the caller falls back to the
+ * device voice.
  */
 async function fetchNeuralAudio(text, cast = 'female') {
   const token = await sessionToken()
@@ -265,6 +271,10 @@ async function fetchNeuralAudio(text, cast = 'female') {
       signal: ctrl.signal,
     })
     if (!res.ok) return null
+    if ((res.headers.get('Content-Type') || '').includes('application/json')) {
+      const data = await res.json().catch(() => null)
+      return typeof data?.url === 'string' && data.url ? data.url : null
+    }
     const blob = await res.blob()
     return blob && blob.size > 0 ? blob : null
   } catch { return null } finally { clearTimeout(timer) }
@@ -305,11 +315,13 @@ export function speakSenseiLine(text, { rate = 1, onEnd, onFallback, cast = 'fem
   const rateOk = typeof rate === 'number' && rate > 0 ? rate : 1
   const horizon = Math.max(estimateSpeechMs(clean, rate), (clean.length / 6.5) * 1000 / rateOk) + WATCHDOG_SLACK_MS
   watchdog = setTimeout(fireEnd, horizon)
-  getNeuralAudio(clean, cast, browserTimeoutMs).then((blob) => {
+  getNeuralAudio(clean, cast, browserTimeoutMs).then((source) => {
     if (endFired) return
-    if (!blob) { clearWatchdog(); deviceFallback(); return }
+    if (!source) { clearWatchdog(); deviceFallback(); return }
     try {
-      currentUrl = URL.createObjectURL(blob)
+      // An https URL streams natively (the listening-file path);
+      // a Blob rides an object URL (the browser Edge route).
+      currentUrl = typeof source === 'string' ? source : URL.createObjectURL(source)
       const audio = sharedAudio()
       audio.src = currentUrl
       currentAudio = audio

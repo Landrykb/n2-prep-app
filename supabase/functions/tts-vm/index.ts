@@ -46,6 +46,21 @@ async function hashOf(text: string): Promise<string> {
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('')
 }
 
+// The client plays a signed https URL, not the bytes
+// (2026-11-08): WebKit rejected the returned MP3 *blob* with
+// NotSupportedError on Landry's phone while the very same
+// bytes streamed fine from an https src — the mechanism the
+// pre-rendered listening files already use. Signing is best
+// effort: on failure the caller falls back to the bytes.
+async function urlResponse(
+  admin: ReturnType<typeof createClient>,
+  path: string,
+): Promise<Response | null> {
+  const { data } = await admin.storage.from(BUCKET).createSignedUrl(path, 3600).catch(() => ({ data: null }))
+  if (!data?.signedUrl) return null
+  return json({ url: data.signedUrl, contentType: 'audio/mpeg' })
+}
+
 const audioResponse = (bytes: Uint8Array) =>
   new Response(bytes, {
     status: 200,
@@ -119,12 +134,9 @@ serve(async (req: Request) => {
   // crash hiding behind the getUser crash).
   const cacheDl = await admin.storage.from(BUCKET).download(cachePath).catch(() => null)
   const cached = cacheDl?.data ?? null
-  if (cached) {
-    const bytes = new Uint8Array(await cached.arrayBuffer())
-    if (bytes.length > 0) {
-      await probe('cache-hit')
-      return audioResponse(bytes)
-    }
+  if (cached && cached.size > 0) {
+    await probe('cache-hit')
+    return await urlResponse(admin, cachePath) ?? audioResponse(new Uint8Array(await cached.arrayBuffer()))
   }
 
   const { data: job, error: insertError } = await admin
@@ -159,7 +171,7 @@ serve(async (req: Request) => {
       // (best effort — the bytes are already in hand).
       await admin.storage.from(BUCKET).upload(cachePath, bytes, { contentType: 'audio/mpeg', upsert: true }).catch(() => null)
       await probe('done')
-      return audioResponse(bytes)
+      return await urlResponse(admin, cachePath) ?? audioResponse(bytes)
     }
   }
   // Timed out: the job still completes on the worker and its
