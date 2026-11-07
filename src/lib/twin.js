@@ -25,6 +25,7 @@ import { loadProfile, loadDiagnosis } from './profile.js'
 import { loadCallState } from './calls.js'
 import { todayStr } from './session.js'
 import { recordMetric } from './metrics.js'
+import { appendDiagnosisHistory } from './day30.js'
 import { shadowClassify } from './correctorShadow.js'
 
 export const TWIN_KEY = 'jpn:twin:v1'
@@ -159,9 +160,12 @@ export function pushDiagnosisHistory(result) {
   // Diagnosis.jsx re-renders with the same result object; guard duplicates.
   const last = history[history.length - 1]
   if (last && last.at === entry.at) return history
-  history.push(entry)
-  try { localStorage.setItem(DIAGNOSIS_HISTORY_KEY, JSON.stringify(history.slice(-24))) } catch { /* ignore */ }
-  return history
+  // Day-30 cohort measurement (day30.js, Doc 11 §7): the append caps
+  // the history while PINNING the first diagnosis — the Day-30 delta
+  // is anchored on it and must stay computable forever.
+  const next = appendDiagnosisHistory(history, entry)
+  try { localStorage.setItem(DIAGNOSIS_HISTORY_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+  return next
 }
 
 /** Section deltas between the two most recent diagnoses (null if < 2). */

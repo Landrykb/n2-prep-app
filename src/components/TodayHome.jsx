@@ -4,7 +4,12 @@ import { brand } from '../lib/brand.js'
 import { loadCallState } from '../lib/calls.js'
 import { detectMode } from '../lib/modes.js'
 import { getPlanFor, tomorrowStr } from '../lib/planner.js'
-import { recordQueueRating } from '../lib/twin.js'
+import { recordQueueRating, loadDiagnosisHistory } from '../lib/twin.js'
+import {
+  loadFirstWeekFeedbackStamp, saveFirstWeekFeedbackStamp, firstWeekFeedbackStatus,
+  recordFirstWeekAnswer, recordFirstWeekDismissal,
+} from '../lib/day30.js'
+import { saveFeedback } from '../lib/feedback.js'
 import { loadMetrics, summariseMetrics } from '../lib/metrics.js'
 import FeedbackBox from './FeedbackBox.jsx'
 import Mascot from './Mascot.jsx'
@@ -41,6 +46,86 @@ function recordToday() {
     return kept
   }
   return days
+}
+
+// First-week feedback (cohort readiness, day30.js, Doc 11 §7): ONE
+// question, days 7–10 after the first diagnosis, wording fixed in the
+// catalogs so cohort answers compare. The answer rides the existing
+// feedback path with category 'first-week'; the stamp is local, and
+// once answered — or dismissed twice — the card never returns.
+const FIRST_WEEK_CHIPS = [
+  { id: 'no-time', key: 'today.firstWeek.chipNoTime' },
+  { id: 'too-hard', key: 'today.firstWeek.chipTooHard' },
+  { id: 'forgot', key: 'today.firstWeek.chipForgot' },
+  { id: 'the-call', key: 'today.firstWeek.chipTheCall' },
+]
+
+function FirstWeekCard() {
+  const { t } = useLanguage()
+  const [stamp, setStamp] = useState(loadFirstWeekFeedbackStamp)
+  const [chip, setChip] = useState(null)
+  const [text, setText] = useState('')
+  const [done, setDone] = useState(null) // 'sent' | 'local'
+  const status = firstWeekFeedbackStatus({ diagnosisHistory: loadDiagnosisHistory(), stamp })
+
+  if (done) {
+    return (
+      <section className="rounded-2xl glass p-5 card-glow">
+        <p className="text-sm text-slate-200">{done === 'sent' ? t('today.firstWeek.thanks') : t('today.firstWeek.localNote')}</p>
+      </section>
+    )
+  }
+  if (!status.show) return null
+
+  const send = async () => {
+    const parts = []
+    if (chip) parts.push(`chip=${chip}`)
+    if (text.trim()) parts.push(text.trim())
+    const res = await saveFeedback(parts.join(' — ') || 'chip=none', 'today', 'first-week')
+    saveFirstWeekFeedbackStamp(recordFirstWeekAnswer(stamp, chip))
+    setDone(res.sent ? 'sent' : 'local')
+  }
+  const dismiss = () => {
+    const next = recordFirstWeekDismissal(stamp)
+    saveFirstWeekFeedbackStamp(next)
+    setStamp(next)
+  }
+
+  return (
+    <section className="rounded-2xl glass p-5 card-glow space-y-3">
+      <div className="flex items-start gap-2.5">
+        <span className="mt-0.5"><Mascot agent="michi" size={28} showName={false} /></span>
+        <div>
+          <h2 className="font-bold text-white">{t('today.firstWeek.title')}</h2>
+          <p className="text-xs text-slate-400 mt-0.5">{t('today.firstWeek.hint')}</p>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {FIRST_WEEK_CHIPS.map((c) => (
+          <button
+            key={c.id}
+            onClick={() => setChip(chip === c.id ? null : c.id)}
+            aria-pressed={chip === c.id}
+            className={`px-3.5 py-2 rounded-xl text-sm font-semibold border transition-colors ${chip === c.id
+              ? 'bg-[#FF6B57]/15 border-[#FF6B57] text-white'
+              : 'bg-bun-700 hover:bg-bun-600 border-white/10 text-slate-200'}`}
+          >
+            {t(c.key)}
+          </button>
+        ))}
+      </div>
+      <input
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder={t('today.firstWeek.placeholder')}
+        className="w-full rounded-xl bg-bun-900 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-[#FF6B57] focus:outline-none"
+      />
+      <div className="flex flex-wrap gap-2">
+        <button onClick={send} disabled={!chip && !text.trim()} className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] disabled:opacity-40 text-white text-sm font-semibold">{t('today.firstWeek.send')}</button>
+        <button onClick={dismiss} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium">{t('today.firstWeek.notNow')}</button>
+      </div>
+    </section>
+  )
 }
 
 // The new Today home: problem first, then a plan derived from that problem,
@@ -164,6 +249,8 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
       <button onClick={() => setActive('coach')} className="w-full rounded-2xl bg-bun-800/70 border border-bun-600/40 hover:border-[#FF6B57]/40 p-3.5 text-sm text-slate-200 flex items-center justify-center gap-2 transition">
         <Mail size={15} className="text-[#FF8A75]" /> {t('today.weeklyLetter')} <span className="text-slate-400">{t('today.weeklyLetterHint')}</span>
       </button>
+
+      <FirstWeekCard />
 
       {isComeback && (
         <section className="rounded-2xl bg-emerald-500/10 border border-emerald-500/30 p-5">

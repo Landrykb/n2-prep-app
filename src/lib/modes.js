@@ -15,6 +15,7 @@
 // (strongest first) whichever mode is active.
 
 import { saveTwin, refreshTwin } from './twin.js'
+import { recordModeSpellsForTwin } from './day30.js'
 import { daysSinceLastVisit } from './profile.js'
 import { getExamSetting } from './examDate.js'
 import { resolveExamDate, daysUntil } from './nextJLPT.js'
@@ -114,6 +115,15 @@ export function detectMode(now = new Date()) {
   if (slump) mode = 'slump'
   if (badweek) mode = 'badweek'
   if (event) mode = 'event'
+
+  // Mode spells (cohort readiness, day30.js, Doc 11 §7): record the
+  // spell bookkeeping from the Twin as it was BEFORE this detection —
+  // a change closes the previous spell and opens the new one; no
+  // change seeds/confirms the open spell. Measurement only: the
+  // verdicts this feeds (the Phase 3 gate) are never user-facing.
+  try {
+    recordModeSpellsForTwin({ mode: twin.mode, modeSince: twin.modeSince }, mode, now)
+  } catch { /* spell recording must never break mode detection */ }
 
   if (twin.mode !== mode) {
     twin.mode = mode

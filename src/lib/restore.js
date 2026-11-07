@@ -21,7 +21,7 @@
 //    is restored ONLY when this device has no value for it — a backup
 //    fills gaps, it does not silently overwrite the present.
 
-import { mergeQueues, mergeDiagnosisHistory } from './stateMerge.js'
+import { mergeQueues, mergeDiagnosisHistory, mergeModeSpells } from './stateMerge.js'
 import { pickNewerTwin } from './twinMerge.js'
 
 export const QUEUE_KEY = 'jpn:queue:v1'
@@ -29,6 +29,7 @@ export const TWIN_KEY = 'jpn:twin:v1'
 export const PROFILE_KEY = 'jpn:profile:v1'
 export const DIAGNOSIS_KEY = 'jpn:diagnosis:v1'
 export const DIAGNOSIS_HISTORY_KEY = 'jpn:diagnosisHistory:v1'
+export const MODE_SPELLS_KEY = 'jpn:modeSpells:v1'
 export const PROMISE_KEY = 'jpn:promise:v1'
 
 const APP_PREFIXES = ['jpn:', 'n2:']
@@ -79,6 +80,14 @@ export function planRestore(current, imported) {
       report.historyBefore = before.length
       report.historyAfter = merged.length
       if (merged.length !== before.length) writes[key] = merged
+      continue
+    }
+    if (key === MODE_SPELLS_KEY) {
+      // Mode spells (day30.js): union by startedAt, like the history —
+      // a restore ADDS missing spells, never rewrites the present.
+      const before = Array.isArray(cur[key]) ? cur[key] : []
+      const merged = mergeModeSpells(before, Array.isArray(value) ? value : [])
+      if (JSON.stringify(merged) !== JSON.stringify(before)) writes[key] = merged
       continue
     }
     if (key === PROFILE_KEY || key === DIAGNOSIS_KEY || key === PROMISE_KEY) {

@@ -28,6 +28,7 @@
     "test:corrector": "TZ=UTC node tests/corrector.test.mjs",
   "test:planner-shadow": "TZ=UTC node tests/planner-shadow.test.mjs",
     "test:coach-shadow": "TZ=UTC node tests/coach-shadow.test.mjs",
+  "test:day30": "TZ=UTC node tests/day30.test.mjs",
     "eval:corrector": "TZ=UTC node scripts/eval-corrector.mjs"
   },
   "dependencies": {

@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Download, Trash2, Mail, ChevronRight, X, Send, BookOpenText } from 'lucide-react'
+import { Download, Trash2, Mail, ChevronRight, X, Send, BookOpenText, Stethoscope } from 'lucide-react'
 import { brand } from '../lib/brand.js'
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient.js'
 import {
   refreshTwin, loadTwin, deleteTwin, topPatterns, removePattern,
-  learningStyleRows, diagnosisDeltas, patternById,
+  learningStyleRows, diagnosisDeltas, patternById, loadDiagnosisHistory,
 } from '../lib/twin.js'
-import { detectMode } from '../lib/modes.js'
+import { detectMode, MODES } from '../lib/modes.js'
+import { day30Status, loadModeSpells, modeSpellsSummary } from '../lib/day30.js'
 import { PERSONAS, PAINS, PROOF_TARGETS } from '../lib/profile.js'
 import { SECTION_KEYS } from '../lib/levels.js'
 import Mascot from './Mascot.jsx'
@@ -47,6 +48,54 @@ function makeLinkCode() {
   const bytes = new Uint8Array(10)
   crypto.getRandomValues(bytes)
   return [...bytes].map((b) => LINK_CODE_ALPHABET[b % LINK_CODE_ALPHABET.length]).join('')
+}
+
+// Day-30 cohort measurement (day30.js, Doc 11 §7): two honest cards,
+// shown only when the record calls for them. At 30+ days with no
+// qualifying second checkup, the checkup card asks for the second
+// measurement; once a second diagnosis exists ≥25 days after the
+// first, the delta card shows the change — total and per section,
+// unclamped, labelled as the app's own estimates.
+const fmtDelta = (n) => (n > 0 ? `+${n}` : `${n}`)
+
+function Day30Card({ setActive }) {
+  const { t } = useLanguage()
+  const status = day30Status(loadDiagnosisHistory())
+  if (status.state === 'checkup-due') {
+    return (
+      <Section title={t('twin.day30.checkupTitle')}>
+        <div className="flex items-start gap-2.5">
+          <span className="mt-0.5"><Mascot agent="michi" size={28} showName={false} /></span>
+          <p className="text-sm text-slate-300">{t('twin.day30.checkupBody', { days: status.daysSinceFirst })}</p>
+        </div>
+        <button onClick={() => setActive?.('diagnosis')} className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold flex items-center gap-1.5"><Stethoscope size={15} /> {t('twin.day30.checkupCta')}</button>
+      </Section>
+    )
+  }
+  if (status.state === 'delta' && status.delta) {
+    const d = status.delta
+    const sectionRows = [
+      ['language', 'progress.sectionLanguage'],
+      ['reading', 'progress.sectionReading'],
+      ['listening', 'progress.sectionListening'],
+    ].filter(([id]) => d.sections[id] !== null && d.sections[id] !== undefined)
+    return (
+      <Section title={t('twin.day30.deltaTitle')}>
+        <p className="text-sm text-slate-300">{t('twin.day30.deltaBody', {
+          firstDate: new Date(d.firstAt).toLocaleDateString(),
+          secondDate: new Date(d.secondAt).toLocaleDateString(),
+          days: d.days,
+        })}</p>
+        <p className="text-base font-semibold text-white">{t('twin.day30.deltaTotal', { delta: fmtDelta(d.total), total: status.second.total })}</p>
+        <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-300">
+          {sectionRows.map(([id, key]) => (
+            <span key={id}>{t('twin.day30.deltaSection', { section: t(key), delta: fmtDelta(d.sections[id]) })}</span>
+          ))}
+        </div>
+      </Section>
+    )
+  }
+  return null
 }
 
 function ReaderLinkCard({ user, setActive }) {
@@ -487,6 +536,8 @@ export default function TwinView({ setActive }) {
         </div>
       </section>
 
+      <Day30Card setActive={setActive} />
+
       <ReaderLinkCard user={user} setActive={setActive} />
 
       <Section title={t('twin.stands.title')} hint={t('twin.stands.hint')}>
@@ -573,6 +624,9 @@ export default function TwinView({ setActive }) {
                 ? <>{t(m.sessions === 1 ? 'twin.rhythm.proofValueOne' : 'twin.rhythm.proofValue', { per: m.minutesPerProofPoint, minutes: m.minutes, sessions: m.sessions, proof: m.proofPoints, kept: m.callsKept, partial: m.callsPartial, missed: m.callsMissed })}</>
                 : t('twin.rhythm.proofNone')}</li>) })()}
             <li className="flex items-center gap-2 pt-1"><Mascot agent="michi" size={28} showName={false} /><span><span className="text-slate-500">{t('twin.rhythm.rightNow')}</span> {meta.label} {t('twin.rhythm.rightNowSuffix')}</span></li>
+            {(() => { const summary = modeSpellsSummary(loadModeSpells()); return summary.length ? (
+              <li><span className="text-slate-500">{t('twin.rhythm.modes30')}</span> {summary.map((s) => t('twin.rhythm.modeDays', { mode: MODES[s.mode]?.label || s.mode, days: s.days })).join(' · ')}</li>
+            ) : null })()}
           </ul>
           <button onClick={() => setActive?.('coach')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1"><Mail size={14} /> {t('twin.rhythm.readLetter')}</button>
         </Section>

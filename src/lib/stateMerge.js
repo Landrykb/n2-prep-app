@@ -25,6 +25,16 @@
 //
 // DIAGNOSIS HISTORY — a list keyed by its `at` timestamp: union, dedupe
 // by `at`, sorted ascending. Two devices' histories interleave honestly.
+// Capped at 24 with the FIRST entry pinned (day30.js
+// DIAGNOSIS_HISTORY_CAP): the Day-30 delta is anchored on the first
+// diagnosis, so capping keeps first + newest, never first-evicting.
+//
+// MODE SPELLS — a list keyed by `startedAt` (day30.js): union; on a
+// shared startedAt the closed copy wins (it carries the endedAt),
+// between two closed copies the later endedAt wins; capped at the
+// last 26. The same rule lives in day30.js (mergeModeSpells) — it is
+// duplicated here only to keep this module import-free; the day30
+// test suite pins both implementations to identical output.
 
 export function fsrsProgressKey(item) {
   const f = item?.fsrs || {}
@@ -81,7 +91,27 @@ export function mergeDiagnosisHistory(localHist, otherHist) {
   for (const e of [...(Array.isArray(localHist) ? localHist : []), ...(Array.isArray(otherHist) ? otherHist : [])]) {
     if (e && e.at) byAt.set(e.at, e)
   }
-  return [...byAt.values()].sort((a, b) => ts(a.at) - ts(b.at))
+  const sorted = [...byAt.values()].sort((a, b) => ts(a.at) - ts(b.at))
+  if (sorted.length <= 24) return sorted
+  return [sorted[0], ...sorted.slice(-23)]
+}
+
+export function mergeModeSpells(localSpells, otherSpells) {
+  const byStart = new Map()
+  const put = (s) => {
+    if (!s || typeof s.mode !== 'string' || !s.mode || !Number.isFinite(ts(s.startedAt)) || ts(s.startedAt) === 0) return
+    const clean = { mode: s.mode, startedAt: s.startedAt, endedAt: s.endedAt && Number.isFinite(ts(s.endedAt)) ? s.endedAt : null }
+    const prev = byStart.get(clean.startedAt)
+    if (!prev) { byStart.set(clean.startedAt, clean); return }
+    if (prev.mode !== clean.mode) return
+    const prevEnd = prev.endedAt ? ts(prev.endedAt) : -Infinity
+    const cleanEnd = clean.endedAt ? ts(clean.endedAt) : -Infinity
+    if (cleanEnd > prevEnd) byStart.set(clean.startedAt, clean)
+  }
+  for (const s of Array.isArray(localSpells) ? localSpells : []) put(s)
+  for (const s of Array.isArray(otherSpells) ? otherSpells : []) put(s)
+  const sorted = [...byStart.values()].sort((a, b) => ts(a.startedAt) - ts(b.startedAt))
+  return sorted.slice(-26)
 }
 
 /**
@@ -105,11 +135,14 @@ export function mergeEncounters(localWords, otherWords) {
 
 /**
  * Merge two learner-state documents ({ queue, profile, diagnosis,
- * diagnosisHistory, promise, declaredLevel, encounters, language }).
+ * diagnosisHistory, promise, declaredLevel, encounters, language,
+ * modeSpells }).
  * Returns a new document; inputs untouched. declaredLevel and
  * language are single documents like the others — the newer one
  * (its `at`) wins whole.
  * Encounters union (above): met words are never un-met by a merge.
+ * Mode spells union by startedAt (above): a spell, once recorded,
+ * is never un-recorded by a merge.
  */
 export function mergeLearnerState(local, other) {
   const L = local || {}
@@ -123,6 +156,7 @@ export function mergeLearnerState(local, other) {
     declaredLevel: pickDoc(L.declaredLevel, O.declaredLevel, (d) => d.at),
     language: pickDoc(L.language, O.language, (d) => d.at),
     encounters: mergeEncounters(L.encounters, O.encounters),
+    modeSpells: mergeModeSpells(L.modeSpells, O.modeSpells),
   }
 }
 

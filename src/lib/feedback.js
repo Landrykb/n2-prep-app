@@ -17,14 +17,21 @@ export function loadFeedback() {
   } catch { return [] }
 }
 
-/** @returns {Promise<{local: true, sent: boolean}>} sent = reached the table */
-export async function saveFeedback(body, context = '') {
-  const entry = { at: new Date().toISOString(), body, context }
+/** @returns {Promise<{local: true, sent: boolean}>} sent = reached the table.
+ *  `category` (optional, e.g. 'first-week' for the cohort question in
+ *  day30.js) is stored on the local record as its own field. The
+ *  feedback table (migration 00008) has no category column, so for
+ *  the server copy the category rides at the head of `context` —
+ *  "first-week: twin" — where it stays greppable in the inbox
+ *  without a schema change. */
+export async function saveFeedback(body, context = '', category = null) {
+  const entry = { at: new Date().toISOString(), body, context, ...(category ? { category } : {}) }
   try {
     const list = loadFeedback()
     list.push(entry)
     localStorage.setItem(FEEDBACK_KEY, JSON.stringify(list.slice(-50)))
   } catch { /* ignore */ }
+  const remoteContext = category ? `${category}${context && context !== category ? `: ${context}` : ''}` : context
   let sent = false
   try {
     const { supabase, isSupabaseConfigured } = await import('./supabaseClient.js')
@@ -32,7 +39,7 @@ export async function saveFeedback(body, context = '') {
       const { data } = await supabase.auth.getSession()
       const user = data?.session?.user
       if (user) {
-        const { error } = await supabase.from('feedback').insert({ user_id: user.id, body, context })
+        const { error } = await supabase.from('feedback').insert({ user_id: user.id, body, context: remoteContext })
         sent = !error
       }
     }

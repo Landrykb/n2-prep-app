@@ -3,7 +3,7 @@
 // cloud sync (stateSync.js) in the same shape the merge logic
 // (stateMerge.js) consumes:
 //
-//   { queue, profile, diagnosis, diagnosisHistory, promise, declaredLevel, encounters, language }
+//   { queue, profile, diagnosis, diagnosisHistory, promise, declaredLevel, encounters, language, modeSpells }
 //
 // Local storage stays the offline source of truth; this module only
 // reads/writes the existing keys. Diagnosis history writes go through
@@ -14,6 +14,7 @@ import { PROFILE_KEY, DIAGNOSIS_KEY, loadProfile, loadDiagnosis } from './profil
 import { PROMISE_KEY, loadPromise } from './promise.js'
 import { emitLearnerStateSaved } from './stateEvents.js'
 import { ENCOUNTERS_KEY, collectEncounterWords } from './encounters.js'
+import { MODE_SPELLS_KEY, loadModeSpells } from './day30.js'
 
 export const DIAGNOSIS_HISTORY_KEY = 'jpn:diagnosisHistory:v1'
 export const DECLARED_LEVEL_KEY = 'jpn:declaredLevel:v1'
@@ -90,6 +91,10 @@ export function collectLearnerState() {
     // same document and grants them full proven credit.
     encounters: collectEncounterWords(),
     language: loadLanguage(),
+    // Cohort readiness (day30.js, Doc 11 §7): Twin mode spells —
+    // union-merged by startedAt so the mode history (and the
+    // bad-week gate measurement) survives across devices.
+    modeSpells: loadModeSpells(),
   }
 }
 
@@ -102,6 +107,7 @@ const SLICE_KEYS = [
   ['declaredLevel', DECLARED_LEVEL_KEY],
   ['encounters', ENCOUNTERS_KEY],
   ['language', LANGUAGE_KEY],
+  ['modeSpells', MODE_SPELLS_KEY],
 ]
 
 /** Write a (merged) state document back to the local keys, verbatim —
