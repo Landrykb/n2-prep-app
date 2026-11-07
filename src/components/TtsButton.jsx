@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Volume2, Loader2 } from 'lucide-react'
 import { ttsAvailable } from '../lib/tts.js'
-import { playAudioFile, speakSenseiLine, speakTurns, getLastVoiceFailure } from '../lib/neuralVoice.js'
+import { playAudioFile, speakSenseiLine, speakTurns, getLastVoiceFailure, primeAudioOutput } from '../lib/neuralVoice.js'
 import { parseScriptTurns } from '../lib/voiceCast.js'
 import { modelCast } from '../lib/voicePreference.js'
 import { useLanguage } from '../hooks/useLanguage.js'
@@ -32,6 +32,11 @@ export default function TtsButton({ text, className = '', cast = null, audioSrc 
   const speak = (e) => {
     e?.stopPropagation()
     if (!available || !text) return
+    // Unlock sound INSIDE the tap (iOS gesture credit) before
+    // anything async happens — the fix for the 2026-11-08
+    // silence: unprimed, the audio element's later play() and
+    // the device voice were both dropped by Safari.
+    primeAudioOutput()
     setFailNote(null)
     setSpeaking(true)
     // The neural chain first (Doc 17): Edge's Nanami from this
@@ -67,11 +72,13 @@ export default function TtsButton({ text, className = '', cast = null, audioSrc 
       speakTurns(turns, {
         onEnd: () => setSpeaking(false),
         onFallback: () => noteFailure(),
+        browserTimeoutMs: 6000,
       })
       return
     }
     speakSenseiLine(text, {
       cast: cast || modelCast(),
+      browserTimeoutMs: 6000,
       onEnd: () => setSpeaking(false),
       // Honest label (P1-2): the device voice had to serve and it
       // has no Japanese voice — say so, as before.

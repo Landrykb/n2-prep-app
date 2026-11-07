@@ -3,7 +3,7 @@ import { Phone, PhoneOff, Mic, MicOff, CheckCircle2, RotateCcw, Clock, Bell, Inb
 import { loadProfile } from '../lib/profile.js'
 import { micErrorCopy } from '../lib/speechErrors.js'
 import { primeSpeech, ttsAvailable } from '../lib/tts.js'
-import { speakSenseiLine, stopNeuralSpeech } from '../lib/neuralVoice.js'
+import { speakSenseiLine, stopNeuralSpeech, primeAudioOutput } from '../lib/neuralVoice.js'
 import { useFurigana } from '../hooks/useFurigana.js'
 import { segmentFurigana, cleanReading } from '../lib/furigana.js'
 import { localDictionary, lookup } from '../lib/dictionary.js'
@@ -691,6 +691,7 @@ export default function SenseiCall() {
 
   const accept = () => {
     primeSpeech() // inside the tap, so iOS lets Sensei speak when her turn comes
+    primeAudioOutput() // same tap: gesture credit for the shared audio element her neural lines play on
     setPhase('incall'); setExIdx(0); setResults([]); setCurrent(null); setInput(''); setLastAttempt(null)
   }
 

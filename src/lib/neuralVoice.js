@@ -29,7 +29,7 @@
 // call forward by itself.
 
 import { supabase, isSupabaseConfigured } from './supabaseClient.js'
-import { speakText } from './tts.js'
+import { speakText, primeSpeech } from './tts.js'
 import { prepareNeuralText, estimateSpeechMs } from './neuralText.js'
 import { synthesizeInBrowser, cancelBrowserSynthesis } from './edgeTts.js'
 import { resolveCast } from './voiceCast.js'
@@ -46,8 +46,15 @@ import { appendErrorLog } from './errorLog.js'
 // playback logs nothing.
 let lastVoiceFailure = null
 
-function logVoice(kind, detail = {}) {
-  lastVoiceFailure = { kind, ...detail }
+function logVoice(kind, detail = {}, { sticky = true } = {}) {
+  // 'device-fallback' is logged non-sticky: it is the chain's
+  // final state, not the cause — the specific step logged just
+  // before it (browser-synth-null / server-tts-null /
+  // blob-play-rejected) is the one the button should name.
+  const now = Date.now()
+  if (sticky || !lastVoiceFailure || now - (lastVoiceFailure.atMs || 0) > 15000) {
+    lastVoiceFailure = { kind, ...detail, atMs: now }
+  }
   try {
     appendErrorLog({ at: new Date().toISOString(), where: 'voice', kind, ...detail })
   } catch { /* logging must never throw */ }
@@ -70,6 +77,44 @@ const WATCHDOG_SLACK_MS = 15000
 
 let currentAudio = null
 let currentUrl = null
+// ONE shared audio element for every neural playback (blob lines
+// and pre-rendered files alike). iOS Safari only lets an element
+// make sound after it has played inside a user gesture; a fresh
+// element created after seconds of synthesis awaits has no
+// gesture credit left and its play() is refused or ignored —
+// the root cause of the 2026-11-08 "voices do not play
+// anymore": the chain's own comment assumed the audio element
+// was "primed by the Accept tap", but only speechSynthesis was
+// ever primed (primeSpeech, call screen only), and the play
+// buttons primed nothing at all. The shared element is primed
+// on every tap (primeAudioOutput below), so later async plays
+// on the SAME element are allowed to sound.
+let sharedAudioEl = null
+function sharedAudio() {
+  if (!sharedAudioEl) sharedAudioEl = new Audio()
+  return sharedAudioEl
+}
+
+const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA='
+
+/**
+ * Unlock audio output for this page. Call SYNCHRONOUSLY inside
+ * a tap handler, before any await: plays a silent clip on the
+ * shared element (gesture credit for every later line) and
+ * primes the device voice the same way the call screen always
+ * did. Best effort; safe to call on every tap.
+ */
+export function primeAudioOutput() {
+  try {
+    const a = sharedAudio()
+    if (a.paused) {
+      a.src = SILENT_WAV
+      const p = a.play()
+      if (p && typeof p.catch === 'function') p.catch(() => {})
+    }
+  } catch { /* priming is best effort */ }
+  try { primeSpeech() } catch { /* best effort */ }
+}
 let pendingEnd = null
 let watchdog = null
 // Turn-chain token: speakTurns plays dialogue turns back to
@@ -153,8 +198,9 @@ export function playAudioFile(src, { onEnd, onError } = {}) {
   }
   pendingEnd = fireEnd
   try {
-    const audio = new Audio(src)
+    const audio = sharedAudio()
     currentAudio = audio
+    audio.src = src
     audio.onended = fireEnd
     audio.onerror = () => fail(null)
     const played = audio.play()
@@ -177,9 +223,12 @@ async function sessionToken() {
  * edge function (signed-in users). Returns a Blob, or null when both
  * routes fail — the caller falls back to the device voice.
  */
-async function getNeuralAudio(text, cast = 'female') {
+async function getNeuralAudio(text, cast = 'female', browserTimeoutMs = null) {
   const c = resolveCast(cast)
-  const direct = await synthesizeInBrowser(text, { voiceName: c.edge, pitch: c.pitch })
+  const direct = await synthesizeInBrowser(text, {
+    voiceName: c.edge, pitch: c.pitch,
+    ...(browserTimeoutMs ? { timeoutMs: browserTimeoutMs } : {}),
+  })
   if (direct) return direct
   logVoice('browser-synth-null', { cast })
   const served = await fetchNeuralAudio(text, cast)
@@ -222,7 +271,7 @@ async function fetchNeuralAudio(text, cast = 'female') {
  * the caller's point of view — the fetch starts immediately and the
  * fallback decision happens inside.
  */
-export function speakSenseiLine(text, { rate = 1, onEnd, onFallback, cast = 'female' } = {}) {
+export function speakSenseiLine(text, { rate = 1, onEnd, onFallback, cast = 'female', browserTimeoutMs = null } = {}) {
   stopNeuralSpeech()
   let endFired = false
   const fireEnd = () => {
@@ -234,7 +283,7 @@ export function speakSenseiLine(text, { rate = 1, onEnd, onFallback, cast = 'fem
   }
   const deviceFallback = () => {
     if (endFired) return
-    logVoice('device-fallback', {})
+    logVoice('device-fallback', {}, { sticky: false })
     // onFallback (optional): told WHICH device result served, so a
     // caller like TtsButton can keep its honest no-Japanese-voice
     // label when the device voice had to read Japanese without one.
@@ -251,12 +300,13 @@ export function speakSenseiLine(text, { rate = 1, onEnd, onFallback, cast = 'fem
   const rateOk = typeof rate === 'number' && rate > 0 ? rate : 1
   const horizon = Math.max(estimateSpeechMs(clean, rate), (clean.length / 6.5) * 1000 / rateOk) + WATCHDOG_SLACK_MS
   watchdog = setTimeout(fireEnd, horizon)
-  getNeuralAudio(clean, cast).then((blob) => {
+  getNeuralAudio(clean, cast, browserTimeoutMs).then((blob) => {
     if (endFired) return
     if (!blob) { clearWatchdog(); deviceFallback(); return }
     try {
       currentUrl = URL.createObjectURL(blob)
-      const audio = new Audio(currentUrl)
+      const audio = sharedAudio()
+      audio.src = currentUrl
       currentAudio = audio
       const r = typeof rate === 'number' && rate > 0 ? rate : 1
       try { audio.playbackRate = r } catch { /* default rate is fine */ }
@@ -278,7 +328,7 @@ export function speakSenseiLine(text, { rate = 1, onEnd, onFallback, cast = 'fem
  * the last turn (or when the chain is stopped — the stop path
  * completes the pending line exactly like a single line).
  */
-export function speakTurns(turns, { onEnd } = {}) {
+export function speakTurns(turns, { onEnd, onFallback, browserTimeoutMs = null } = {}) {
   const list = (turns || []).filter((t) => t && t.text)
   if (!list.length) { if (onEnd) onEnd(); return }
   const token = {}
@@ -297,6 +347,8 @@ export function speakTurns(turns, { onEnd } = {}) {
     speakSenseiLine(turn.text, {
       cast: turn.cast || 'female',
       onEnd: () => next(),
+      ...(onFallback ? { onFallback } : {}),
+      ...(browserTimeoutMs ? { browserTimeoutMs } : {}),
     })
     // Re-assert AFTER the call: starting this turn stopped the
     // previous one, and that stop clears the token by design.
