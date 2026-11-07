@@ -1039,10 +1039,15 @@ serve(async (req: Request) => {
       const readings = kanjiReadings(
         Array.isArray(passage.tokens) ? passage.tokens : [],
         (h: string) => glossBook[h]?.reading,
+        // Amendment #13 (Landry, 2026-11-07): the meaning rides
+        // with the reading — knowing how a word sounds is half
+        // the aid; the gloss is the other half. Deck meanings are
+        // English source data in every UI language.
+        (h: string) => glossBook[h]?.meaning,
       )
       const readingsBlock = readings.length > 0
         ? `<blockquote expandable>${bt(lang, 'passage.readingsHeader')}\n` +
-          readings.map((r) => `${esc(r.word)} （${esc(r.reading)}）`).join('\n') +
+          readings.map((r) => `${esc(r.word)} （${esc(r.reading)}）${r.meaning ? ` — ${esc(r.meaning)}` : ''}`).join('\n') +
           '</blockquote>'
         : null
       const lines = [

@@ -1554,4 +1554,22 @@ const botI18n = await import('../supabase/functions/reader-bot/i18n.ts')
   })
 }
 
+check('kanjiReadings: an injected meaning source adds the gloss; without one the entries are unchanged (amendment #13)', () => {
+  const toks = [
+    { s: '時間', h: '時間', l: 'N3' },
+    { s: 'は', h: 'は', l: null },
+    { s: '国語', h: '国語', l: 'N3' },
+  ]
+  const readings = { '時間': 'じかん', '国語': 'こくご' }
+  const meanings = { '時間': 'time' } // 国語 deliberately unglossed in the fixture
+  assert.deepEqual(fit.kanjiReadings(toks, glossOf(readings), glossOf(meanings)), [
+    { word: '時間', reading: 'じかん', meaning: 'time' },
+    { word: '国語', reading: 'こくご' },
+  ])
+  assert.deepEqual(fit.kanjiReadings(toks, glossOf(readings)), [
+    { word: '時間', reading: 'じかん' },
+    { word: '国語', reading: 'こくご' },
+  ])
+})
+
 console.log(`reader: ${passed} checks passed`)

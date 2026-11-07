@@ -711,7 +711,7 @@ export const KANJI_READINGS_CAP = 40
  * (non-array tokens, empty surfaces, a missing or throwing
  * readingOf) yields fewer entries, never a crash.
  */
-export function kanjiReadings(tokens, readingOf) {
+export function kanjiReadings(tokens, readingOf, meaningOf) {
   const out = []
   if (!Array.isArray(tokens) || typeof readingOf !== 'function') return out
   const seen = new Set()
@@ -730,7 +730,22 @@ export function kanjiReadings(tokens, readingOf) {
       reading = null
     }
     if (typeof reading !== 'string' || !reading || reading === surface) continue
-    out.push({ word: surface, reading })
+    // Meanings ride along only when a meaning source is injected
+    // (amendment #13): the entry gains the gloss for the headword;
+    // without one the entry is exactly { word, reading } as before.
+    let meaning = null
+    if (typeof meaningOf === 'function') {
+      try {
+        meaning = meaningOf(headword)
+      } catch {
+        meaning = null
+      }
+    }
+    out.push(
+      typeof meaning === 'string' && meaning
+        ? { word: surface, reading, meaning }
+        : { word: surface, reading },
+    )
   }
   return out
 }
