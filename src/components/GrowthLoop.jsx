@@ -65,7 +65,7 @@ const HANDOFFS = {
   },
 }
 
-const RING_R = 37 // % of the square — node centres and the SVG ring agree
+const RING_R = 32 // % of the square — node centres and the SVG ring agree
 
 function nodePos(i) {
   const rad = ((-90 + i * 60) * Math.PI) / 180
@@ -82,9 +82,9 @@ function AgentDisc({ m, size, selected }) {
         width: size,
         height: size,
         border: `3px solid ${m.color}`,
-        background: 'rgba(255,255,255,0.04)',
-        boxShadow: selected ? `0 0 0 4px ${m.color}55, 0 0 22px ${m.color}66` : 'none',
-        transform: selected ? 'scale(1.08)' : 'scale(1)',
+        background: selected ? `${m.color}1f` : 'rgba(255,255,255,0.04)',
+        boxShadow: selected ? `0 0 0 3px #151129, 0 0 0 5.5px ${m.color}` : 'none',
+        transform: selected ? 'scale(1.07)' : 'scale(1)',
       }}
     >
       {imgOk ? (
@@ -144,15 +144,12 @@ export default function GrowthLoop({ setActive }) {
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
-      <div>
-        <h2 className="text-2xl font-bold text-white">{t('loop.header.title')}</h2>
-        <p className="text-sm text-slate-400 mt-1">
-          {t('loop.header.intro')}
-        </p>
-      </div>
+      <p className="text-[15px] leading-relaxed text-slate-300">
+        {t('loop.header.intro')}
+      </p>
 
       {!hasAnyData && (
-        <section className="rounded-2xl glass p-5 card-glow space-y-2">
+        <section className="rounded-3xl bg-[#151129] border border-white/5 p-5 space-y-2">
           <h3 className="text-base font-semibold text-white">{t('loop.empty.title', { brand: brand.name })}</h3>
           <p className="text-sm text-slate-300">
             {t('loop.empty.body')}
@@ -167,8 +164,8 @@ export default function GrowthLoop({ setActive }) {
       )}
 
       {/* ——— The diagram ——— */}
-      <section className="rounded-2xl glass p-4 sm:p-6 card-glow">
-        <div className="relative mx-auto w-full max-w-[560px] aspect-square select-none">
+      <section className="rounded-3xl bg-[#151129] border border-white/5 px-4 pt-7 pb-5 sm:px-6">
+        <div className="relative mx-auto w-full max-w-[540px] aspect-square select-none mb-7">
           <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" aria-hidden="true">
             <defs>
               <linearGradient id="loopGrad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -176,25 +173,26 @@ export default function GrowthLoop({ setActive }) {
                 <stop offset="100%" stopColor="#FF6B57" />
               </linearGradient>
             </defs>
-            <circle cx="50" cy="50" r={RING_R} fill="none" stroke="url(#loopGrad)" strokeWidth="0.7" opacity="0.55" />
+            <circle cx="50" cy="50" r={RING_R} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="2.2" />
+            <circle cx="50" cy="50" r={RING_R} fill="none" stroke="url(#loopGrad)" strokeWidth="0.55" opacity="0.6" />
             {LOOP_ORDER.map((id, i) => {
               const mid = nodePos(i + 0.5)
               const angle = -90 + 30 + i * 60
               return (
-                <g key={id} transform={`translate(${mid.x} ${mid.y}) rotate(${angle + 90})`} opacity="0.85">
-                  <polygon points="0,-2.1 1.35,1.35 -1.35,1.35" fill="#FF6B57" />
+                <g key={id} transform={`translate(${mid.x} ${mid.y}) rotate(${angle + 90})`} opacity="0.9">
+                  <polygon points="0,-1.7 1.1,1.1 -1.1,1.1" fill="#FF6B57" />
                 </g>
               )
             })}
             {!reducedMotion && (
               <>
-                <path id="loopPulsePath" d="M 50 13 A 37 37 0 1 1 49.99 13" fill="none" stroke="none" />
-                <circle r="3.1" fill="#FF6B57" opacity="0.22">
+                <path id="loopPulsePath" d="M 50 18 A 32 32 0 1 1 49.99 18" fill="none" stroke="none" />
+                <circle r="2.9" fill="#FF6B57" opacity="0.22">
                   <animateMotion dur="18s" repeatCount="indefinite">
                     <mpath href="#loopPulsePath" />
                   </animateMotion>
                 </circle>
-                <circle r="1.5" fill="#FF8A75">
+                <circle r="1.4" fill="#FF8A75">
                   <animateMotion dur="18s" repeatCount="indefinite">
                     <mpath href="#loopPulsePath" />
                   </animateMotion>
@@ -204,9 +202,9 @@ export default function GrowthLoop({ setActive }) {
           </svg>
 
           {/* The Twin at the centre — the queue is the flywheel. */}
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[46%] text-center pointer-events-none">
-            <p className="text-[11px] uppercase tracking-widest text-slate-400">{t('loop.centre.twin')}</p>
-            <p className="text-4xl font-bold text-white mt-1">{centre.queueTotal}</p>
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[42%] text-center pointer-events-none">
+            <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">{t('loop.centre.twin')}</p>
+            <p className="text-[44px] leading-none font-bold text-white mt-2">{centre.queueTotal}</p>
             <p className="text-xs text-slate-300">{t('loop.centre.words')}</p>
             {centre.queueTotal > 0 && (
               <p className="text-[11px] text-slate-400 mt-1">
@@ -231,18 +229,18 @@ export default function GrowthLoop({ setActive }) {
                 key={id}
                 onClick={() => setSelected(id)}
                 aria-pressed={isSel}
-                className="absolute w-[104px] -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-1 rounded-2xl px-1 py-1.5 focus:outline-none"
-                style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
+                className="absolute w-[132px] -translate-x-1/2 flex flex-col items-center gap-1 rounded-2xl px-1 focus:outline-none"
+                style={{ left: `${pos.x}%`, top: `calc(${pos.y}% - 32px)` }}
               >
-                <AgentDisc m={m} size={60} selected={isSel} />
-                <span className="text-sm font-semibold text-white leading-none">
+                <AgentDisc m={m} size={64} selected={isSel} />
+                <span className="text-[13px] font-semibold text-white leading-tight mt-0.5">
                   {m.name} <span style={{ color: m.color }}>{m.kanji}</span>
                 </span>
                 <span className="text-[11px] text-slate-400 leading-none">{m.roleKey ? t(m.roleKey) : m.role}</span>
                 {st.stat && (
                   <span
-                    className="text-[11px] font-medium leading-tight text-center rounded-full px-2 py-0.5 mt-0.5"
-                    style={{ color: m.color, border: `1px solid ${m.color}66`, background: `${m.color}14` }}
+                    className="text-[11px] font-medium whitespace-nowrap rounded-full px-2 py-[3px] mt-1"
+                    style={{ color: m.color, border: `1px solid ${m.color}55`, background: `${m.color}12` }}
                   >
                     {st.stat}
                   </span>
@@ -251,11 +249,11 @@ export default function GrowthLoop({ setActive }) {
             )
           })}
         </div>
-        <p className="text-center text-xs text-slate-500 mt-2">{t('loop.diagram.tap')}</p>
+        <p className="text-center text-xs text-slate-500 mt-5">{t('loop.diagram.tap')}</p>
       </section>
 
       {/* ——— The selected agent's handoff ——— */}
-      <section className="rounded-2xl glass p-5 card-glow space-y-4" style={{ borderLeft: `4px solid ${sel.color}` }}>
+      <section className="rounded-3xl bg-[#151129] border border-white/5 p-5 space-y-4" style={{ borderLeft: `4px solid ${sel.color}` }}>
         <div className="flex items-center gap-3">
           <Mascot agent={sel.id} size={52} showName={false} motion="none" />
           <div>
@@ -276,8 +274,8 @@ export default function GrowthLoop({ setActive }) {
           </p>
         </div>
         {(selStat.stat || selStat.detail) && (
-          <div className="rounded-xl bg-white/[0.03] border border-white/5 px-4 py-3">
-            <p className="text-[11px] uppercase tracking-widest text-slate-500">{t('loop.handoff.inYourLoop')}</p>
+          <div className="rounded-xl px-4 py-3" style={{ background: `${sel.color}10`, border: `1px solid ${sel.color}30` }}>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">{t('loop.handoff.inYourLoop')}</p>
             {selStat.stat && <p className="text-base font-semibold text-white mt-1">{selStat.stat}</p>}
             {selStat.detail && <p className="text-sm text-slate-300 mt-0.5">{selStat.detail}</p>}
           </div>
@@ -291,12 +289,12 @@ export default function GrowthLoop({ setActive }) {
       </section>
 
       {/* ——— Your Japanese this week ——— */}
-      <section className="rounded-2xl glass p-5 card-glow space-y-3">
+      <section className="rounded-3xl bg-[#151129] border border-white/5 p-5 space-y-3">
         <h3 className="text-base font-semibold text-white">{t('loop.week.title')}</h3>
         {week.hasData ? (
           <div className="grid grid-cols-3 gap-3">
             {week.tiles.map((tile) => (
-              <div key={tile.id} className="rounded-xl bg-white/[0.03] border border-white/5 px-3 py-3 text-center">
+              <div key={tile.id} className="rounded-2xl bg-white/[0.04] px-3 py-3.5 text-center">
                 <p className="text-2xl font-bold text-white">{tile.value}</p>
                 <p className="text-[11px] text-slate-400 mt-0.5">{tile.labelKey ? t(tile.labelKey) : tile.label}</p>
               </div>
