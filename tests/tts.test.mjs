@@ -390,4 +390,14 @@ check('the file route is wired: player, button, and the three surfaces', async (
   assert.ok(exam.includes('audio: l.audio'), 'mock groups keep the audio field')
 })
 
+check('the server route is tts-vm and taps prime the output', async () => {
+  const { readFileSync } = await import('node:fs')
+  const voice = readFileSync(new URL('../src/lib/neuralVoice.js', import.meta.url), 'utf8')
+  assert.ok(voice.includes('/functions/v1/tts-vm'), 'server voice route is tts-vm')
+  assert.ok(voice.includes('export function primeAudioOutput'), 'audio output priming is exported')
+  assert.ok(voice.includes('sharedAudio()'), 'playback uses one shared audio element')
+  const btn = readFileSync(new URL('../src/components/TtsButton.jsx', import.meta.url), 'utf8')
+  assert.ok(btn.includes('primeAudioOutput()'), 'the play button primes inside its tap')
+})
+
 console.log(`\ntts: ${passed} checks passed`)

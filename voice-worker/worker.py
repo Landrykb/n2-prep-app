@@ -25,6 +25,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import time
 import urllib.request
 import urllib.error
@@ -36,6 +37,22 @@ TMP_DIR = os.path.join(HOME, "tmp")
 VOICE = "ja-JP-NanamiNeural"
 POLL_SECONDS = 10
 MAX_TEXT_CHARS = 1200
+
+# The synchronous tts lane (Doc 17 addendum 5, 2026-11-08): the
+# app's play buttons ask the `tts-vm` function for one line; the
+# function enqueues a kind='tts' job and waits, so this lane
+# polls FAST (1.5 s) in its own thread and returns MP3 (the web
+# plays it everywhere — the passage lane's ogg/opus conversion
+# is a Telegram requirement, not a web one). Casts mirror
+# src/lib/voiceCast.js in the app: the free Edge route has two
+# Japanese neural voices; girl/boy are pitch lifts.
+TTS_POLL_SECONDS = 1.5
+CASTS = {
+    "female": ("ja-JP-NanamiNeural", "+0Hz"),
+    "male": ("ja-JP-KeitaNeural", "+0Hz"),
+    "girl": ("ja-JP-NanamiNeural", "+35Hz"),
+    "boy": ("ja-JP-KeitaNeural", "+25Hz"),
+}
 
 
 def log(msg):
@@ -80,6 +97,78 @@ async def synthesize_mp3(text, out_path):
     await communicate.save(out_path)
 
 
+async def synthesize_mp3_cast(text, out_path, voice, pitch):
+    import edge_tts  # from the venv
+
+    communicate = edge_tts.Communicate(text, voice, pitch=pitch)
+    await communicate.save(out_path)
+
+
+def synthesize_tts_mp3(text, job_id, cast):
+    voice, pitch = CASTS.get(cast, CASTS["female"])
+    mp3_path = os.path.join(TMP_DIR, "tts-" + job_id + ".mp3")
+    asyncio.run(synthesize_mp3_cast(text, mp3_path, voice, pitch))
+    with open(mp3_path, "rb") as f:
+        data = f.read()
+    try:
+        os.unlink(mp3_path)
+    except OSError:
+        pass
+    if not data:
+        raise RuntimeError("empty audio from synthesis")
+    return data
+
+
+def tts_loop(cfg):
+    """Fast lane: claim kind='tts' jobs and hand MP3 bytes back.
+
+    Runs in a daemon thread beside the passage loop; shares the
+    one worker secret and door. A failure here never touches the
+    passage lane.
+    """
+    url = cfg.get("VOICE_QUEUE_URL", "")
+    secret = cfg.get("VOICE_WORKER_SECRET", "")
+    log("tts lane started (poll %.1fs)" % TTS_POLL_SECONDS)
+    while True:
+        try:
+            res = post_json(url, secret, {"action": "tts-claim"}, timeout=30)
+            job = res.get("job") if isinstance(res, dict) else None
+            if not job:
+                time.sleep(TTS_POLL_SECONDS)
+                continue
+            job_id = str(job["id"])
+            text = str(job.get("text", ""))[:MAX_TEXT_CHARS]
+            cast = str(job.get("cast", "female"))
+            t0 = time.time()
+            try:
+                audio = synthesize_tts_mp3(text, job_id, cast)
+                post_json(
+                    url, secret,
+                    {
+                        "action": "tts-complete",
+                        "jobId": job_id,
+                        "audioBase64": base64.b64encode(audio).decode("ascii"),
+                    },
+                    timeout=120,
+                )
+                log("tts job %s done (%d bytes, %.1fs, cast=%s)"
+                    % (job_id, len(audio), time.time() - t0, cast))
+            except Exception as e:
+                log("tts job %s failed: %s" % (job_id, repr(e)[:200]))
+                try:
+                    post_json(url, secret,
+                              {"action": "fail", "jobId": job_id,
+                               "error": repr(e)[:200]}, timeout=30)
+                except Exception:
+                    pass
+        except urllib.error.HTTPError as e:
+            log("tts queue HTTP %s; backing off" % e.code)
+            time.sleep(15)
+        except Exception as e:
+            log("tts poll error: %s; backing off" % repr(e)[:160])
+            time.sleep(15)
+
+
 def synthesize_ogg(text, job_id):
     mp3_path = os.path.join(TMP_DIR, job_id + ".mp3")
     ogg_path = os.path.join(TMP_DIR, job_id + ".ogg")
@@ -112,6 +201,8 @@ def main():
         log("FATAL: worker.env missing VOICE_QUEUE_URL or VOICE_WORKER_SECRET")
         return 1
     log("voice worker started (voice=%s)" % VOICE)
+    lane = threading.Thread(target=tts_loop, args=(cfg,), daemon=True)
+    lane.start()
     while True:
         try:
             res = post_json(url, secret, {"action": "claim"}, timeout=30)

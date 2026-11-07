@@ -69,7 +69,12 @@ export function getLastVoiceFailure() {
   return lastVoiceFailure
 }
 
-const FETCH_TIMEOUT_MS = 12000
+// The server route is tts-vm now (Doc 17 addendum 5): the old
+// `tts` function's own synthesis is dead from Supabase egress,
+// so the function enqueues a job for the Voice Worker VM and
+// waits for its fast lane — 20 s server-side, so the client
+// allows a little more before giving up to the device voice.
+const FETCH_TIMEOUT_MS = 22000
 // Network + decode slack on top of the spoken-duration estimate: a
 // line whose audio has not finished by then counts as finished, so a
 // wedged fetch or a silent audio element can never stall the call.
@@ -249,7 +254,7 @@ async function fetchNeuralAudio(text, cast = 'female') {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS)
   try {
-    const res = await fetch(`${url}/functions/v1/tts`, {
+    const res = await fetch(`${url}/functions/v1/tts-vm`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

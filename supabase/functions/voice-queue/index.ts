@@ -92,6 +92,7 @@ serve(async (req: Request) => {
           .from('voice_jobs')
           .select('id, text')
           .eq('status', 'pending')
+          .eq('kind', 'passage')
           .order('created_at', { ascending: true })
           .limit(1)
         if (selError) {
@@ -105,6 +106,7 @@ serve(async (req: Request) => {
           .update({ status: 'claimed', claimed_at: new Date().toISOString() })
           .eq('id', next.id)
           .eq('status', 'pending')
+          .eq('kind', 'passage')
           .select('id, text')
         if (claimError) {
           console.error('voice-queue: claim write failed')
@@ -188,6 +190,91 @@ serve(async (req: Request) => {
           console.error(`voice-queue: reader-bot poke failed job=${jobId}`)
         }
       }
+      return json({ ok: true })
+    }
+
+    // ---------- tts-claim: the synchronous lane (Doc 17 add. 5) --
+    // Same conditional-update claim discipline as the passage
+    // lane, scoped to kind='tts', and the cast rides along so the
+    // worker knows which voice to speak in.
+    if (action === 'tts-claim') {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const { data: pending, error: selError } = await supabaseAdmin
+          .from('voice_jobs')
+          .select('id, text, voice_cast')
+          .eq('status', 'pending')
+          .eq('kind', 'tts')
+          .order('created_at', { ascending: true })
+          .limit(1)
+        if (selError) {
+          console.error('voice-queue: tts pending scan failed')
+          return json({ error: 'Queue read failed' }, 500)
+        }
+        const next = pending?.[0]
+        if (!next) return json({ job: null })
+        const { data: claimed, error: claimError } = await supabaseAdmin
+          .from('voice_jobs')
+          .update({ status: 'claimed', claimed_at: new Date().toISOString() })
+          .eq('id', next.id)
+          .eq('status', 'pending')
+          .eq('kind', 'tts')
+          .select('id, text, voice_cast')
+        if (claimError) {
+          console.error('voice-queue: tts claim write failed')
+          return json({ error: 'Claim failed' }, 500)
+        }
+        if (claimed && claimed.length > 0) {
+          return json({ job: { id: claimed[0].id, text: claimed[0].text, cast: claimed[0].voice_cast || 'female' } })
+        }
+      }
+      return json({ job: null })
+    }
+
+    // ---------- tts-complete: MP3 bytes back, no Telegram poke ---
+    if (action === 'tts-complete') {
+      const jobId = typeof body?.jobId === 'string' ? body.jobId : ''
+      const audioBase64 = typeof body?.audioBase64 === 'string' ? body.audioBase64 : ''
+      if (!jobId || !audioBase64) {
+        return json({ error: 'jobId and audioBase64 are required' }, 400)
+      }
+      let bytes: Uint8Array
+      try {
+        const bin = atob(audioBase64)
+        bytes = new Uint8Array(bin.length)
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+      } catch {
+        return json({ error: 'audioBase64 is not valid base64' }, 400)
+      }
+      if (bytes.length === 0 || bytes.length > MAX_AUDIO_BYTES) {
+        return json({ error: 'Audio size out of bounds' }, 400)
+      }
+      const storagePath = `${jobId}.mp3`
+      const { error: uploadError } = await supabaseAdmin.storage
+        .from(BUCKET)
+        .upload(storagePath, bytes, { contentType: 'audio/mpeg', upsert: true })
+      if (uploadError) {
+        console.error(`voice-queue: tts storage upload failed job=${jobId}`)
+        return json({ error: 'Storage upload failed' }, 500)
+      }
+      const { data: done, error: doneError } = await supabaseAdmin
+        .from('voice_jobs')
+        .update({
+          status: 'done',
+          storage_path: storagePath,
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', jobId)
+        .eq('status', 'claimed')
+        .eq('kind', 'tts')
+        .select('id')
+      if (doneError) {
+        console.error(`voice-queue: tts done write failed job=${jobId}`)
+        return json({ error: 'Job update failed' }, 500)
+      }
+      if (!done || done.length === 0) {
+        return json({ error: 'Job is not in a claimed state' }, 409)
+      }
+      console.log(`voice-queue: tts job ${jobId} done (${bytes.length} bytes)`)
       return json({ ok: true })
     }
 
