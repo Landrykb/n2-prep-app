@@ -55,6 +55,7 @@ import { getKanjiMeta, getKanjiStrokes } from './lib/kanjiDb.js'
 import { wordsForKanji, wordDisplayForm } from './lib/wordsDb.js'
 import ComponentSearch from './components/ComponentSearch.jsx'
 import { useHashRoute } from './hooks/useHashRoute.js'
+import { useLanguage } from './hooks/useLanguage.js'
 import { useSwipeNav } from './hooks/useSwipeNav.js'
 import { useExamDate } from './hooks/useExamDate.js'
 import AuthModal from './components/AuthModal.jsx'
@@ -102,38 +103,38 @@ import {
 } from './data.js'
 
 const nav = [
-  { id: 'session', label: 'One Session', short: 'Session', icon: Play , group: 'today' },
-  { id: 'dashboard', label: 'Today', icon: LayoutDashboard , group: 'today' },
-  { id: 'voice', label: 'Voice Loop', icon: Mic , group: 'library' },
-  { id: 'sensei', label: 'Yobidashi', short: 'Yobidashi', icon: Phone , group: 'fleet' },
-  { id: 'diagnosis', label: 'Diagnosis', icon: Stethoscope , group: 'fleet' },
-  { id: 'twin', label: 'Your Fleet', short: 'Fleet', icon: Users , group: 'fleet' },
-  { id: 'loop', label: 'The Loop', short: 'Loop', icon: Repeat , group: 'fleet' },
-  { id: 'coach', label: 'Coach Letter', short: 'Letter', icon: Mail , group: 'fleet' },
-  { id: 'mine', label: 'Mine Your Japanese', icon: Pickaxe , group: 'library' },
-  { id: 'lessons', label: 'Memory Lessons', icon: BookOpen , group: 'library' },
-  { id: 'drills', label: 'Drills', icon: Dumbbell , group: 'library' },
-  { id: 'mock', label: 'Mock Exam', icon: ClipboardCheck , group: 'library' },
-  { id: 'anki', label: 'Anki Cards', icon: Layers , group: 'library' },
-  { id: 'speed', label: 'Speed Cards', icon: Zap , group: 'library' },
-  { id: 'dictionary', label: 'Dictionary', icon: Search , group: 'library' },
-  { id: 'reading', label: 'Daily Reading', icon: Eye , group: 'library' },
-  { id: 'reader', label: 'Reader', short: 'Reader', icon: BookOpenText , group: 'library' },
-  { id: 'ai', label: 'AI Tutor', icon: Bot , group: 'library' },
-  { id: 'plan', label: 'Study Plan', icon: Map , group: 'library' },
-  { id: 'resources', label: 'Resources', icon: Library , group: 'library' },
-  { id: 'sources', label: 'Sources & Licences', short: 'Sources', icon: ScrollText , group: 'library' },
-  { id: 'videos', label: 'Videos', icon: Play , group: 'library' },
-  { id: 'n2listening', label: 'Listening', icon: Headphones , group: 'library' },
-  { id: 'bjt', label: 'BJT', icon: Building2 , group: 'library' },
-  { id: 'errors', label: 'Error Log', icon: AlertCircle , group: 'library' },
+  { id: 'session', labelKey: 'shell.nav.session', shortKey: 'shell.navShort.session', icon: Play , group: 'today' },
+  { id: 'dashboard', labelKey: 'shell.nav.dashboard', icon: LayoutDashboard , group: 'today' },
+  { id: 'voice', labelKey: 'shell.nav.voice', icon: Mic , group: 'library' },
+  { id: 'sensei', labelKey: 'shell.nav.sensei', shortKey: 'shell.navShort.sensei', icon: Phone , group: 'fleet' },
+  { id: 'diagnosis', labelKey: 'shell.nav.diagnosis', icon: Stethoscope , group: 'fleet' },
+  { id: 'twin', labelKey: 'shell.nav.twin', shortKey: 'shell.navShort.twin', icon: Users , group: 'fleet' },
+  { id: 'loop', labelKey: 'shell.nav.loop', shortKey: 'shell.navShort.loop', icon: Repeat , group: 'fleet' },
+  { id: 'coach', labelKey: 'shell.nav.coach', shortKey: 'shell.navShort.coach', icon: Mail , group: 'fleet' },
+  { id: 'mine', labelKey: 'shell.nav.mine', icon: Pickaxe , group: 'library' },
+  { id: 'lessons', labelKey: 'shell.nav.lessons', icon: BookOpen , group: 'library' },
+  { id: 'drills', labelKey: 'shell.nav.drills', icon: Dumbbell , group: 'library' },
+  { id: 'mock', labelKey: 'shell.nav.mock', icon: ClipboardCheck , group: 'library' },
+  { id: 'anki', labelKey: 'shell.nav.anki', icon: Layers , group: 'library' },
+  { id: 'speed', labelKey: 'shell.nav.speed', icon: Zap , group: 'library' },
+  { id: 'dictionary', labelKey: 'shell.nav.dictionary', icon: Search , group: 'library' },
+  { id: 'reading', labelKey: 'shell.nav.reading', icon: Eye , group: 'library' },
+  { id: 'reader', labelKey: 'shell.nav.reader', shortKey: 'shell.navShort.reader', icon: BookOpenText , group: 'library' },
+  { id: 'ai', labelKey: 'shell.nav.ai', icon: Bot , group: 'library' },
+  { id: 'plan', labelKey: 'shell.nav.plan', icon: Map , group: 'library' },
+  { id: 'resources', labelKey: 'shell.nav.resources', icon: Library , group: 'library' },
+  { id: 'sources', labelKey: 'shell.nav.sources', shortKey: 'shell.navShort.sources', icon: ScrollText , group: 'library' },
+  { id: 'videos', labelKey: 'shell.nav.videos', icon: Play , group: 'library' },
+  { id: 'n2listening', labelKey: 'shell.nav.n2listening', icon: Headphones , group: 'library' },
+  { id: 'bjt', labelKey: 'shell.nav.bjt', icon: Building2 , group: 'library' },
+  { id: 'errors', labelKey: 'shell.nav.errors', icon: AlertCircle , group: 'library' },
 ]
 
 const navIds = nav.map((n) => n.id)
 const NAV_GROUPS = [
-  { id: 'today', label: 'Today' },
-  { id: 'fleet', label: 'Your Fleet' },
-  { id: 'library', label: 'Library' },
+  { id: 'today', labelKey: 'shell.group.today' },
+  { id: 'fleet', labelKey: 'shell.group.fleet' },
+  { id: 'library', labelKey: 'shell.group.library' },
 ]
 
 function Furigana({ text, glossary = [] }) {
@@ -217,6 +218,7 @@ function FuriganaWord({ p, onOpen }) {
 }
 
 function SelectionPopup({ dictionary, onNeedDictionary }) {
+  const { t } = useLanguage()
   const [selected, setSelected] = useState(null)
   const [pos, setPos] = useState({ x: 0, y: 0 })
   const popupRef = useRef(null)
@@ -264,7 +266,7 @@ function SelectionPopup({ dictionary, onNeedDictionary }) {
     >
       <div className="flex items-center justify-between mb-2">
         <TtsButton text={selected.text} />
-        <button onClick={() => setSelected(null)} className="text-xs text-slate-500 hover:text-slate-300">Close</button>
+        <button onClick={() => setSelected(null)} className="text-xs text-slate-500 hover:text-slate-300">{t('shell.popup.close')}</button>
       </div>
       {selected.match ? (
         <div className="flex items-start gap-3">
@@ -278,9 +280,9 @@ function SelectionPopup({ dictionary, onNeedDictionary }) {
         </div>
       ) : (
         <p className="text-sm text-slate-300">
-          No match found for “{selected.text}”.
+          {t('shell.popup.noMatch', { text: selected.text })}
           <br />
-          <span className="text-slate-500">Select a single word, kanji, or phrase from the lessons.</span>
+          <span className="text-slate-500">{t('shell.popup.noMatchHint')}</span>
         </p>
       )}
       {(() => {
@@ -290,7 +292,7 @@ function SelectionPopup({ dictionary, onNeedDictionary }) {
             onClick={() => { open(found); setSelected(null) }}
             className="mt-3 w-full py-2 rounded-xl bg-[#FF6B57]/20 hover:bg-[#FF6B57]/30 text-[#FFA08D] text-sm font-medium transition"
           >
-            Open visual breakdown
+            {t('shell.popup.openBreakdown')}
           </button>
         ) : null
       })()}
@@ -314,6 +316,7 @@ function Badge({ children, color = 'plum' }) {
 }
 
 function Header({ active, daysToExam, user, onSignOut, isSupabaseConfigured, onToggleMenu, menuOpen }) {
+  const { t } = useLanguage()
   // P0-4: the header used to show invented stats ("N2 Candidate / Next
   // mock in 2 days") and a streak flame. It now shows only what the
   // learner's own record holds: the diagnosed estimate, and the next
@@ -324,10 +327,10 @@ function Header({ active, daysToExam, user, onSignOut, isSupabaseConfigured, onT
     let mockGate = null
     const at = promise?.at ? new Date(promise.at).getTime() : null
     if (at) {
-      mockGate = 'Mock gates passed — time to re-check'
+      mockGate = t('shell.header.mockGatesPassed')
       for (const day of [30, 55]) {
         const when = at + day * 86400000
-        if (Date.now() < when) { mockGate = `Next mock gate · Day ${day} — ${new Date(when).toLocaleDateString()}`; break }
+        if (Date.now() < when) { mockGate = t('shell.header.nextMockGate', { day, date: new Date(when).toLocaleDateString() }); break }
       }
     }
     return { diagnosis, promise, mockGate }
@@ -346,55 +349,55 @@ function Header({ active, daysToExam, user, onSignOut, isSupabaseConfigured, onT
       <div className="flex items-center gap-2 min-w-0">
         <button
           onClick={onToggleMenu}
-          aria-label={menuOpen ? 'Close the menu' : 'Open the menu'}
+          aria-label={menuOpen ? t('shell.menu.close') : t('shell.menu.open')}
           aria-expanded={menuOpen}
           className="lg:hidden p-2.5 rounded-lg bg-bun-700 text-slate-200 min-w-[42px] min-h-[42px] flex items-center justify-center"
         >
           {menuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
-        <h2 className="text-base sm:text-lg font-semibold truncate">{nav.find((n) => n.id === active)?.label}</h2>
+        <h2 className="text-base sm:text-lg font-semibold truncate">{(() => { const item = nav.find((n) => n.id === active); return item ? t(item.labelKey) : null })()}</h2>
       </div>
       <div className="flex items-center gap-1.5 sm:gap-4 shrink-0">
         <button
           onClick={toggleFurigana}
           aria-pressed={furiganaOn}
-          title={furiganaOn ? 'Furigana on — tap to hide readings' : 'Furigana off — tap to show readings above kanji'}
+          title={furiganaOn ? t('shell.furigana.onTitle') : t('shell.furigana.offTitle')}
           className={`flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-full border text-xs sm:text-sm font-medium transition whitespace-nowrap shrink-0 ${
             furiganaOn ? 'bg-[#FF6B57]/20 border-[#FF6B57]/50 text-[#FFA08D]' : 'bg-bun-700/50 border-bun-600/30 text-slate-300 hover:text-white'
           }`}
         >
           <Baseline size={16} />
           <span className="whitespace-nowrap">ふりがな</span>
-          <span className={`text-[10px] font-bold uppercase tracking-wide ${furiganaOn ? 'text-[#FFA08D]' : 'text-slate-500'}`}>{furiganaOn ? 'On' : 'Off'}</span>
+          <span className={`text-[10px] font-bold uppercase tracking-wide ${furiganaOn ? 'text-[#FFA08D]' : 'text-slate-500'}`}>{furiganaOn ? t('shell.furigana.on') : t('shell.furigana.off')}</span>
         </button>
         <div className="text-right hidden lg:block">
           {record.diagnosis ? (<>
-            <p className="text-sm font-medium text-slate-100">{record.diagnosis.jlptEstimate} estimate · {record.diagnosis.total}/180</p>
-            <p className="text-xs text-slate-400">{record.mockGate || 'From your diagnosis'}</p>
+            <p className="text-sm font-medium text-slate-100">{t('shell.header.estimate', { estimate: record.diagnosis.jlptEstimate, total: record.diagnosis.total })}</p>
+            <p className="text-xs text-slate-400">{record.mockGate || t('shell.header.fromDiagnosis')}</p>
           </>) : (<>
-            <p className="text-sm font-medium text-slate-100">No diagnosis yet</p>
-            <p className="text-xs text-slate-400">Your real level appears here after the 10-minute check</p>
+            <p className="text-sm font-medium text-slate-100">{t('shell.header.noDiagnosis')}</p>
+            <p className="text-xs text-slate-400">{t('shell.header.noDiagnosisHint')}</p>
           </>)}
         </div>
         <div className="hidden sm:flex items-center gap-2 text-xs text-slate-300">
           <Calendar size={14} className="text-[#FF8A75]" />
-          <span className="font-medium">{daysToExam} days to JLPT</span>
+          <span className="font-medium">{t('shell.header.daysToJlpt', { days: daysToExam })}</span>
         </div>
         {isSupabaseConfigured && (
           <div className="flex items-center gap-2">
             <div className="hidden sm:flex items-center gap-2 text-xs text-slate-300" title={user?.email ?? ''}>
               <User size={14} />
-              <span className="max-w-[120px] truncate">{user?.email ?? 'Guest'}</span>
+              <span className="max-w-[120px] truncate">{user?.email ?? t('shell.header.guest')}</span>
             </div>
             {user && (
               <button
                 onClick={onSignOut}
-                aria-label="Sign out"
+                aria-label={t('shell.header.signOut')}
                 className="flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-full border border-bun-600/30 bg-bun-700/50 hover:bg-rose-500/20 hover:border-rose-500/30 text-slate-300 hover:text-rose-300 transition text-xs sm:text-sm font-medium min-h-[42px] whitespace-nowrap shrink-0"
-                title="Sign out"
+                title={t('shell.header.signOut')}
               >
                 <LogOut size={16} />
-                <span className="whitespace-nowrap">Log Out</span>
+                <span className="whitespace-nowrap">{t('shell.header.logOut')}</span>
               </button>
             )}
           </div>
@@ -410,6 +413,7 @@ function Header({ active, daysToExam, user, onSignOut, isSupabaseConfigured, onT
 }
 
 function Sidebar({ active, setActive, mobileOpen, setMobileOpen }) {
+  const { t } = useLanguage()
   return (
     <>
       <aside className={`fixed z-40 top-0 left-0 h-full w-64 bg-bun-800 border-r border-bun-600/30 transform transition-transform lg:translate-x-0 lg:static flex flex-col pt-safe pb-safe ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
@@ -422,7 +426,7 @@ function Sidebar({ active, setActive, mobileOpen, setMobileOpen }) {
             </div>
             <button
               onClick={() => setMobileOpen(false)}
-              aria-label="Close the menu"
+              aria-label={t('shell.menu.close')}
               className="lg:hidden p-2.5 rounded-lg bg-bun-700 text-slate-200 min-w-[42px] min-h-[42px] flex items-center justify-center shrink-0"
             >
               <X size={20} />
@@ -432,7 +436,7 @@ function Sidebar({ active, setActive, mobileOpen, setMobileOpen }) {
         <nav className="flex-1 overflow-y-auto px-6 pb-4 space-y-1.5">
           {NAV_GROUPS.map((g) => (
             <div key={g.id} className="pt-3 first:pt-0">
-              <p className="px-3.5 pb-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">{g.label}</p>
+              <p className="px-3.5 pb-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">{t(g.labelKey)}</p>
               {nav.filter((n) => (n.group || 'library') === g.id).map((n) => {
             const Icon = n.icon
             return (
@@ -442,7 +446,7 @@ function Sidebar({ active, setActive, mobileOpen, setMobileOpen }) {
                 aria-current={active === n.id ? 'page' : undefined}
                 className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-medium transition ${active === n.id ? 'bg-[#FF6B57]/15 text-[#FFA08D] border border-[#FF6B57]/30' : 'text-slate-400 hover:text-slate-100 hover:bg-bun-700/60'}`}
               >
-                <Icon size={18} /> {n.label}
+                <Icon size={18} /> {t(n.labelKey)}
               </button>
             )
           })}
@@ -451,8 +455,8 @@ function Sidebar({ active, setActive, mobileOpen, setMobileOpen }) {
         </nav>
         <div className="shrink-0 p-6 border-t border-bun-600/30">
           <div className="rounded-xl bg-bun-700/60 p-4 border border-bun-600/30">
-            <p className="text-sm font-semibold text-slate-100">Small days count</p>
-            <p className="text-xs text-slate-400 mt-1">Michi's rule: the plan bends, it doesn't break. A light day kept is worth more than a heavy day skipped — your weekly rhythm lives on Today.</p>
+            <p className="text-sm font-semibold text-slate-100">{t('shell.footer.title')}</p>
+            <p className="text-xs text-slate-400 mt-1">{t('shell.footer.body')}</p>
           </div>
         </div>
       </aside>
@@ -468,10 +472,11 @@ const quickNav = ['session', 'dashboard', 'sensei', 'twin']
 
 /** Fixed bottom tab bar so the PWA always has visible navigation on mobile. */
 function BottomNav({ active, setActive, onMenu, menuOpen }) {
+  const { t } = useLanguage()
   const items = quickNav.map((id) => nav.find((n) => n.id === id)).filter(Boolean)
   return (
     <nav
-      aria-label="Quick navigation"
+      aria-label={t('shell.bottomNav.label')}
       className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-bun-800/95 backdrop-blur border-t border-bun-600/30 pb-safe inset-x-safe"
     >
       <div className="flex items-stretch justify-around">
@@ -486,18 +491,18 @@ function BottomNav({ active, setActive, onMenu, menuOpen }) {
               className={`flex-1 flex flex-col items-center gap-0.5 py-2 min-h-[56px] justify-center transition ${isActive ? 'text-[#FF8A75]' : 'text-slate-400'}`}
             >
               <Icon size={20} />
-              <span className="text-[10px] font-medium leading-none">{n.short || n.label.split(' ')[0]}</span>
+              <span className="text-[10px] font-medium leading-none">{n.shortKey ? t(n.shortKey) : t(n.labelKey)}</span>
             </button>
           )
         })}
         <button
           onClick={onMenu}
-          aria-label={menuOpen ? 'Close the menu' : 'Open the full menu'}
+          aria-label={menuOpen ? t('shell.menu.close') : t('shell.menu.openFull')}
           aria-expanded={menuOpen}
           className={`flex-1 flex flex-col items-center gap-0.5 py-2 min-h-[56px] justify-center transition ${menuOpen ? 'text-[#FF8A75]' : 'text-slate-400'}`}
         >
           {menuOpen ? <X size={20} /> : <Menu size={20} />}
-          <span className="text-[10px] font-medium leading-none">{menuOpen ? 'Close' : 'Menu'}</span>
+          <span className="text-[10px] font-medium leading-none">{menuOpen ? t('shell.bottomNav.close') : t('shell.bottomNav.menu')}</span>
         </button>
       </div>
     </nav>
@@ -521,7 +526,7 @@ const KANJI_CARD_GRADIENTS = [
  * KANJIDIC2 meaning; examples = JMdict common words). Nothing is invented:
  * fields with no source stay empty and their blocks simply do not render.
  */
-async function buildDbKanjiItem(char) {
+async function buildDbKanjiItem(char, t) {
   const [meta, strokes] = await Promise.all([getKanjiMeta(char), getKanjiStrokes(char)])
   if (!meta) return null
   const topParts = [...new Set((strokes?.tree?.children || []).map((c) => c.element).filter((el) => el && el !== char))]
@@ -533,8 +538,8 @@ async function buildDbKanjiItem(char) {
   }
   const named = radicals.map((r) => `${r.part} (${r.name})`).join(' + ')
   const story = named
-    ? `${char} is built from ${named}.`
-    : `${char} has no simpler parts to break down — learn it as one shape.`
+    ? t('lessons.storyBuilt', { char, parts: named })
+    : t('lessons.storyNoParts', { char })
   const wordEntries = await wordsForKanji(char, 5).catch(() => [])
   const examples = wordEntries.map((e) => ({
     word: wordDisplayForm(e, char),
@@ -551,7 +556,7 @@ async function buildDbKanjiItem(char) {
     level: meta.level || '',
     on: (meta.on || []).join('・'),
     kun: (meta.kun || []).map(formatKun).filter(Boolean).join('・'),
-    meaning: (meta.meanings || []).slice(0, 4).join(', ') || '(no gloss)',
+    meaning: (meta.meanings || []).slice(0, 4).join(', ') || t('lessons.noGloss'),
     meaningFr: (meta.meaningsFr || []).slice(0, 3).join(', ') || '',
     strokes: meta.strokes,
     freq: meta.freq,
@@ -569,6 +574,7 @@ async function buildDbKanjiItem(char) {
 }
 
 function Lessons() {
+  const { t } = useLanguage()
   const [mode, setMode] = useState('kanji')
   const [kanjiBrowse, setKanjiBrowse] = useState('level')
   const [activeItem, setActiveItem] = useState(null)
@@ -599,14 +605,14 @@ function Lessons() {
     const all = await loadAllKanji().catch(() => [])
     const found = all.find((k) => k.char === char)
     if (found) { setActiveItem(found); setShowBack(false); return }
-    const built = await buildDbKanjiItem(char).catch(() => null)
+    const built = await buildDbKanjiItem(char, t).catch(() => null)
     if (built) { setActiveItem(built); setShowBack(false) }
   }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <h2 className="text-2xl font-bold text-white">Memory Lessons</h2>
+        <h2 className="text-2xl font-bold text-white">{t('lessons.title')}</h2>
         <div className="flex p-1 rounded-xl bg-bun-700/60 border border-bun-600/40">
           {['kanji', 'grammar', 'vocab'].map((m) => (
             <button
@@ -614,7 +620,7 @@ function Lessons() {
               onClick={() => { setMode(m); setActiveItem(null); setShowBack(false) }}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition capitalize ${mode === m ? 'bg-[#FF6B57] text-white shadow' : 'text-slate-400 hover:text-white'}`}
             >
-              {m} {mode === m && <Sparkles size={12} className="inline ml-1" />}
+              {t(`lessons.mode.${m}`)} {mode === m && <Sparkles size={12} className="inline ml-1" />}
             </button>
           ))}
         </div>
@@ -622,9 +628,9 @@ function Lessons() {
 
       {mode === 'kanji' && !activeItem && (
         <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-500">Browse:</span>
+          <span className="text-xs text-slate-500">{t('lessons.browse')}</span>
           <div className="flex gap-1.5">
-            {[['level', 'By Level'], ['parts', 'By Parts']].map(([b, label]) => (
+            {[['level', 'lessons.browseLevel'], ['parts', 'lessons.browseParts']].map(([b, labelKey]) => (
               <button
                 key={b}
                 onClick={() => setKanjiBrowse(b)}
@@ -633,7 +639,7 @@ function Lessons() {
                   kanjiBrowse === b ? 'bg-[#71368A] text-white border-[#71368A]' : 'bg-bun-800 text-slate-400 border-bun-600/40 hover:text-white'
                 }`}
               >
-                {label}
+                {t(labelKey)}
               </button>
             ))}
           </div>
@@ -642,7 +648,7 @@ function Lessons() {
 
       {mode === 'kanji' && !activeItem && kanjiBrowse === 'level' && (
         <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-500">Level:</span>
+          <span className="text-xs text-slate-500">{t('lessons.level')}</span>
           <div className="flex flex-wrap gap-1.5">
             {KANJI_LEVELS.map((lv) => (
               <button
@@ -658,14 +664,14 @@ function Lessons() {
             ))}
           </div>
           {kanjiLoading && <Loader2 size={14} className="animate-spin text-slate-500" />}
-          {!kanjiLoading && <span className="text-xs text-slate-500">{kanjiList.length} kanji</span>}
+          {!kanjiLoading && <span className="text-xs text-slate-500">{t('lessons.kanjiCount', { count: kanjiList.length })}</span>}
         </div>
       )}
 
       {activeItem ? (
         <div className="animate-slide-up">
           <button onClick={() => { setActiveItem(null); setShowBack(false) }} className="text-sm text-slate-400 hover:text-white mb-4 flex items-center gap-1">
-            <ChevronRight size={14} className="rotate-180" /> Back to {mode} library
+            <ChevronRight size={14} className="rotate-180" /> {t('lessons.backToLibrary', { mode: t(`lessons.mode.${mode}`) })}
           </button>
           {mode === 'kanji' && <KanjiDetail item={activeItem} showBack={showBack} setShowBack={setShowBack} />}
           {mode === 'grammar' && <GrammarDetail item={activeItem} showBack={showBack} setShowBack={setShowBack} />}
@@ -692,6 +698,7 @@ function Lessons() {
 }
 
 function KanjiDetail({ item, showBack, setShowBack }) {
+  const { t } = useLanguage()
   return (
     <div className="rounded-3xl glass p-6 sm:p-10 card-glow">
       <div className="flex flex-col lg:flex-row gap-8 items-start">
@@ -709,20 +716,20 @@ function KanjiDetail({ item, showBack, setShowBack }) {
 
           <div className="flex items-center gap-3 mb-6 p-3 rounded-xl bg-bun-700/40 border border-bun-600/20">
             <span className="text-3xl" aria-label="drawing">{item.doodle}</span>
-            <span className="text-xs text-slate-500">Scene drawing</span>
+            <span className="text-xs text-slate-500">{t('lessons.sceneDrawing')}</span>
           </div>
 
           <div className="grid sm:grid-cols-2 gap-4 mb-6">
             {item.radicals.map((r, i) => (
               <div key={i} className="rounded-xl bg-bun-700/50 border border-bun-600/30 p-4 flex items-center gap-3">
                 <span className="text-2xl">{r.icon}</span>
-                <div><p className="text-sm font-bold text-white">{r.part} · {r.name}</p><p className="text-xs text-slate-400">Component {i + 1}</p></div>
+                <div><p className="text-sm font-bold text-white">{r.part} · {r.name}</p><p className="text-xs text-slate-400">{t('lessons.component', { n: i + 1 })}</p></div>
               </div>
             ))}
           </div>
 
           <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-5 mb-4">
-            <h3 className="text-sm font-bold text-[#FF8A75] mb-2 flex items-center gap-2"><Brain size={16} /> Visual Story</h3>
+            <h3 className="text-sm font-bold text-[#FF8A75] mb-2 flex items-center gap-2"><Brain size={16} /> {t('lessons.visualStory')}</h3>
             <KanjiTapText text={item.story} className="text-slate-300" />
           </div>
 
@@ -735,19 +742,19 @@ function KanjiDetail({ item, showBack, setShowBack }) {
 
           {item.example ? (
             <>
-              <button onClick={() => setShowBack((s) => !s)} className="px-5 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-medium transition">{showBack ? 'Hide Example' : 'Show Example Sentence'}</button>
+              <button onClick={() => setShowBack((s) => !s)} className="px-5 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-medium transition">{showBack ? t('lessons.hideExample') : t('lessons.showExample')}</button>
               {showBack && (
                 <div className="mt-4 rounded-xl bg-gradient-to-r from-[#71368A]/30 to-[#FF6B57]/20 border border-[#FF6B57]/20 p-4 animate-fade-in">
                   <div className="text-slate-100 font-medium text-lg leading-loose mb-2">
                     <Furigana text={item.example} glossary={item.exampleGlossary} />
                   </div>
-                  <p className="text-sm text-slate-400">Hover or click any word for reading and meaning.</p>
+                  <p className="text-sm text-slate-400">{t('lessons.exampleHintTap')}</p>
                 </div>
               )}
             </>
           ) : item.examples?.length > 0 && (
             <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4">
-              <h3 className="text-sm font-bold text-[#FF8A75] mb-3">Real words using {item.char}</h3>
+              <h3 className="text-sm font-bold text-[#FF8A75] mb-3">{t('lessons.realWords', { char: item.char })}</h3>
               <div className="flex flex-wrap gap-2">
                 {item.examples.map((w, i) => (
                   <span key={i} className="text-sm px-3 py-1.5 rounded-full bg-bun-700/60 border border-bun-600/30 text-slate-200">
@@ -764,6 +771,7 @@ function KanjiDetail({ item, showBack, setShowBack }) {
 }
 
 function GrammarDetail({ item, showBack, setShowBack }) {
+  const { t } = useLanguage()
   return (
     <div className="rounded-3xl glass p-6 sm:p-10 card-glow">
       <div className="flex flex-col lg:flex-row gap-8 items-start">
@@ -779,11 +787,11 @@ function GrammarDetail({ item, showBack, setShowBack }) {
 
           <div className="flex items-center gap-3 mb-6 p-3 rounded-xl bg-bun-700/40 border border-bun-600/20">
             <span className="text-3xl" aria-label="drawing">{item.doodle}</span>
-            <span className="text-xs text-slate-500">Scene drawing</span>
+            <span className="text-xs text-slate-500">{t('lessons.sceneDrawing')}</span>
           </div>
 
           <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-5 mb-4">
-            <h3 className="text-sm font-bold text-cyan-300 mb-2 flex items-center gap-2"><Eye size={16} /> Visual Scenario</h3>
+            <h3 className="text-sm font-bold text-cyan-300 mb-2 flex items-center gap-2"><Eye size={16} /> {t('lessons.visualScenario')}</h3>
             <KanjiTapText text={item.scene} className="text-slate-300" />
           </div>
 
@@ -794,13 +802,13 @@ function GrammarDetail({ item, showBack, setShowBack }) {
             </div>
           )}
 
-          <button onClick={() => setShowBack((s) => !s)} className="px-5 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-medium transition">{showBack ? 'Hide Example' : 'Show Example Sentence'}</button>
+          <button onClick={() => setShowBack((s) => !s)} className="px-5 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-medium transition">{showBack ? t('lessons.hideExample') : t('lessons.showExample')}</button>
           {showBack && (
             <div className="mt-4 rounded-xl bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-500/20 p-4 animate-fade-in">
               <div className="text-slate-100 font-medium text-lg leading-loose mb-2">
                 <Furigana text={item.example} glossary={item.exampleGlossary} />
               </div>
-              <p className="text-sm text-slate-400">Hover or click any word for reading and meaning.</p>
+              <p className="text-sm text-slate-400">{t('lessons.exampleHintTap')}</p>
             </div>
           )}
         </div>
@@ -810,6 +818,7 @@ function GrammarDetail({ item, showBack, setShowBack }) {
 }
 
 function VocabDetail({ item, showBack, setShowBack }) {
+  const { t } = useLanguage()
   return (
     <div className="rounded-3xl glass p-6 sm:p-10 card-glow">
       <div className="flex flex-col lg:flex-row gap-8 items-start">
@@ -824,11 +833,11 @@ function VocabDetail({ item, showBack, setShowBack }) {
 
           <div className="flex items-center gap-3 mb-6 p-3 rounded-xl bg-bun-700/40 border border-bun-600/20">
             <span className="text-3xl" aria-label="drawing">{item.doodle}</span>
-            <span className="text-xs text-slate-500">Scene drawing</span>
+            <span className="text-xs text-slate-500">{t('lessons.sceneDrawing')}</span>
           </div>
 
           <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-5 mb-4">
-            <h3 className="text-sm font-bold text-[#FF8A75] mb-2 flex items-center gap-2"><Brain size={16} /> Memory Image</h3>
+            <h3 className="text-sm font-bold text-[#FF8A75] mb-2 flex items-center gap-2"><Brain size={16} /> {t('lessons.memoryImage')}</h3>
             <KanjiTapText text={item.story} className="text-slate-300" />
           </div>
 
@@ -839,14 +848,14 @@ function VocabDetail({ item, showBack, setShowBack }) {
             </div>
           )}
 
-          <p className="text-sm text-slate-400 mb-2">Collocation: <KanjiTapText text={item.collocation} className="text-slate-200" /></p>
-          <button onClick={() => setShowBack((s) => !s)} className="px-5 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-medium transition">{showBack ? 'Hide Example' : 'Show Example Sentence'}</button>
+          <p className="text-sm text-slate-400 mb-2">{t('lessons.collocation')}{' '}<KanjiTapText text={item.collocation} className="text-slate-200" /></p>
+          <button onClick={() => setShowBack((s) => !s)} className="px-5 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-medium transition">{showBack ? t('lessons.hideExample') : t('lessons.showExample')}</button>
           {showBack && (
             <div className="mt-4 rounded-xl bg-gradient-to-r from-emerald-900/30 to-teal-900/30 border border-emerald-500/20 p-4 animate-fade-in">
               <div className="text-slate-100 font-medium text-lg leading-loose mb-2">
                 <Furigana text={item.example} glossary={item.exampleGlossary} />
               </div>
-              <p className="text-sm text-slate-400">Say the whole phrase, then hover words you are unsure about.</p>
+              <p className="text-sm text-slate-400">{t('lessons.exampleHintSay')}</p>
             </div>
           )}
         </div>
@@ -1671,6 +1680,7 @@ function ErrorLog() {
 }
 
 function App() {
+  const { t } = useLanguage()
   const { user, loading, isSupabaseConfigured, signOut } = useAuth()
   const [active, setActive] = useHashRoute('dashboard', navIds)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -1843,7 +1853,7 @@ function App() {
             <Suspense
               fallback={
                 <div className="p-8 text-slate-400 flex items-center gap-2">
-                  <Loader2 size={20} className="animate-spin" /> Loading…
+                  <Loader2 size={20} className="animate-spin" /> {t('shell.loading')}
                 </div>
               }
             >

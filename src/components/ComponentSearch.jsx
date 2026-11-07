@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Loader2, X } from 'lucide-react'
 import { getRadicals, loadComponents, loadKanjiIndex, intersectComponents } from '../lib/kanjiDb.js'
+import { useLanguage } from '../hooks/useLanguage.js'
 
 // Find By Parts — Shirabe-style multi-radical search (docs/19).
 // Pick the parts you can see in a kanji; the result set is the pure
@@ -12,6 +13,7 @@ import { getRadicals, loadComponents, loadKanjiIndex, intersectComponents } from
 const RESULT_CAP = 120
 
 export default function ComponentSearch({ onOpenKanji }) {
+  const { t } = useLanguage()
   const [radicals, setRadicals] = useState(null)
   const [components, setComponents] = useState(null)
   const [index, setIndex] = useState(null)
@@ -64,30 +66,30 @@ export default function ComponentSearch({ onOpenKanji }) {
   if (!radicals || !components || !index) {
     return (
       <div className="flex items-center gap-2 text-sm text-slate-400 py-6">
-        <Loader2 size={16} className="animate-spin" /> Loading the parts index…
+        <Loader2 size={16} className="animate-spin" /> {t('parts.loading')}
       </div>
     )
   }
 
   return (
     <div className="space-y-5">
-      <p className="text-sm text-slate-400">Pick the parts you can see in the kanji — 日 and 月 find 明.</p>
+      <p className="text-sm text-slate-400">{t('parts.intro')}</p>
 
       {selected.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-slate-500">Parts:</span>
+          <span className="text-xs text-slate-500">{t('parts.selectedLabel')}</span>
           {selected.map((part) => (
             <button
               key={part}
               onClick={() => toggle(part)}
               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#FF6B57] text-white text-sm font-medium"
-              aria-label={`Remove part ${part}`}
+              aria-label={t('parts.removePart', { part })}
             >
               {part} <X size={13} />
             </button>
           ))}
           <button onClick={() => setSelected([])} className="px-2.5 py-1 rounded-full bg-bun-800 text-slate-300 border border-bun-600/40 text-xs font-medium hover:text-white">
-            Clear All
+            {t('parts.clearAll')}
           </button>
         </div>
       )}
@@ -95,7 +97,7 @@ export default function ComponentSearch({ onOpenKanji }) {
       <div className="space-y-3">
         {radicalGroups.map(([strokes, group]) => (
           <div key={strokes} className="flex items-start gap-3">
-            <span className="text-xs text-slate-500 w-14 shrink-0 pt-1.5">{strokes ? `${strokes} strokes` : 'Radicals'}</span>
+            <span className="text-xs text-slate-500 w-14 shrink-0 pt-1.5">{strokes ? t('parts.strokesCount', { count: strokes }) : t('parts.radicals')}</span>
             <div className="flex flex-wrap gap-1.5">
               {group.map((r) => {
                 const forms = [r.char, ...(r.variants || [])]
@@ -106,7 +108,7 @@ export default function ComponentSearch({ onOpenKanji }) {
                       key={`${r.n}-${form}`}
                       onClick={() => toggle(form)}
                       aria-pressed={active}
-                      title={`Radical ${r.n}${r.nameEn ? ` — ${r.nameEn}` : ''}${r.nameJa ? ` (${r.nameJa})` : ''}`}
+                      title={`${t('parts.radicalTitle', { n: r.n })}${r.nameEn ? ` — ${r.nameEn}` : ''}${r.nameJa ? ` (${r.nameJa})` : ''}`}
                       className={`min-w-[36px] px-2 py-1.5 rounded-lg text-base border transition ${
                         active ? 'bg-[#FF6B57] text-white border-[#FF6B57]' : 'bg-bun-800 text-slate-200 border-bun-600/40 hover:border-[#FF6B57]/40 hover:text-white'
                       }`}
@@ -122,12 +124,12 @@ export default function ComponentSearch({ onOpenKanji }) {
       </div>
 
       <div>
-        <label className="block text-xs text-slate-500 mb-1.5" htmlFor="more-parts-filter">More Parts — type a part to find rarer components</label>
+        <label className="block text-xs text-slate-500 mb-1.5" htmlFor="more-parts-filter">{t('parts.morePartsLabel')}</label>
         <input
           id="more-parts-filter"
           value={partFilter}
           onChange={(e) => setPartFilter(e.target.value)}
-          placeholder="e.g. 吾"
+          placeholder={t('parts.morePartsPlaceholder')}
           className="w-full sm:w-64 px-3 py-2 rounded-lg bg-bun-800 border border-bun-600/40 text-slate-100 text-sm placeholder:text-slate-500 focus:outline-none focus:border-[#FF6B57]/60"
         />
         {moreParts.length > 0 && (
@@ -149,8 +151,8 @@ export default function ComponentSearch({ onOpenKanji }) {
         <div>
           <p className="text-xs text-slate-500 mb-2">
             {results.length === 0
-              ? 'No kanji in the database is built from all of these parts — try removing one.'
-              : `${results.length} kanji built from ${selected.join(' + ')}${results.length > RESULT_CAP ? ` — showing the ${RESULT_CAP} most frequent; add another part to narrow` : ''}`}
+              ? t('parts.noResults')
+              : `${t('parts.resultsCount', { count: results.length, parts: selected.join(' + ') })}${results.length > RESULT_CAP ? t('parts.resultsCapped', { cap: RESULT_CAP }) : ''}`}
           </p>
           {results.length > 0 && (
             <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-2">
@@ -167,7 +169,7 @@ export default function ComponentSearch({ onOpenKanji }) {
             </div>
           )}
           {results.length > RESULT_CAP && (
-            <p className="text-xs text-slate-500 mt-2">+{results.length - RESULT_CAP} more — add another part to narrow.</p>
+            <p className="text-xs text-slate-500 mt-2">{t('parts.moreResults', { count: results.length - RESULT_CAP })}</p>
           )}
         </div>
       )}

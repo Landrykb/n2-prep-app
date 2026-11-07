@@ -5,6 +5,7 @@ import TtsButton from './TtsButton.jsx'
 import KanjiTapText from './KanjiTapText.jsx'
 import KanjiLens from './KanjiLens.jsx'
 import { kanjiReadings } from '../lib/kanjiReadings.js'
+import { useLanguage } from '../hooks/useLanguage.js'
 
 function Glossary({ items }) {
   return (
@@ -19,6 +20,7 @@ function Glossary({ items }) {
 }
 
 function FallbackLinks({ keyword, type }) {
+  const { t } = useLanguage()
   const query = `${keyword} ${type === 'Grammar' ? 'JLPT N2 grammar' : type === 'Vocab' ? 'JLPT N2 vocabulary' : 'JLPT N2 kanji'}`
   const youtube = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`
   return (
@@ -29,13 +31,14 @@ function FallbackLinks({ keyword, type }) {
         rel="noreferrer"
         className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-medium transition"
       >
-        <Search size={16} /> YouTube search
+        <Search size={16} /> {t('modal.youtubeSearch')}
       </a>
     </div>
   )
 }
 
 function VideoBox({ keyword, type }) {
+  const { t } = useLanguage()
   const [videos, setVideos] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -58,25 +61,25 @@ function VideoBox({ keyword, type }) {
         const relevant = all.filter((v) => v.title.toLowerCase().includes(cleanKeyword) || v.channel.toLowerCase().includes(cleanKeyword))
         setVideos(relevant)
       } catch (err) {
-        if (!cancelled) setError(err.message || 'Could not load videos.')
+        if (!cancelled) setError(err.message || t('modal.loadVideosError'))
       } finally {
         if (!cancelled) setLoading(false)
       }
     }
     search()
     return () => { cancelled = true }
-  }, [keyword, type])
+  }, [keyword, type, t])
 
   return (
     <div className="rounded-xl bg-gradient-to-r from-rose-900/20 to-[#71368A]/20 border border-rose-500/20 p-4">
-      <h4 className="text-xs uppercase tracking-wider text-rose-300 mb-3 flex items-center gap-2"><Play size={14} /> Learn with real videos</h4>
+      <h4 className="text-xs uppercase tracking-wider text-rose-300 mb-3 flex items-center gap-2"><Play size={14} /> {t('modal.learnWithVideos')}</h4>
       <p className="text-sm text-slate-300 mb-4">
-        Watching a real teacher explain <span className="text-[#FF8A75] font-medium">{keyword}</span> in a lesson or real-life clip makes it stick.
+        {t('modal.videoIntro', { keyword })}
       </p>
 
       {loading && (
         <div className="flex items-center gap-2 text-sm text-slate-400">
-          <Loader2 size={18} className="animate-spin" /> Searching YouTube…
+          <Loader2 size={18} className="animate-spin" /> {t('modal.searchingYoutube')}
         </div>
       )}
 
@@ -111,7 +114,7 @@ function VideoBox({ keyword, type }) {
 
       {!loading && !error && videos.length === 0 && (
         <div className="text-sm text-slate-400">
-          No teaching videos found.
+          {t('modal.noVideos')}
           <FallbackLinks keyword={keyword} type={type} />
         </div>
       )}
@@ -120,9 +123,11 @@ function VideoBox({ keyword, type }) {
 }
 
 export default function KanjiModal({ item, onClose }) {
+  const { t } = useLanguage()
   if (!item) return null
 
   const type = item.type || item._type || (item.char ? 'Kanji' : item.pattern ? 'Grammar' : item.word ? 'Vocab' : 'Common')
+  const typeLabel = { Kanji: t('modal.typeKanji'), Grammar: t('modal.typeGrammar'), Vocab: t('modal.typeVocab'), Common: t('modal.typeCommon') }[type] || type
   const title = item.char || item.pattern || item.word || item.front || item._key || 'Detail'
   const fallback = kanjiReadings[item.char || item.word || title] || { on: '', kun: '' }
   const on = item.on || fallback.on || ''
@@ -153,8 +158,8 @@ export default function KanjiModal({ item, onClose }) {
               {image}
             </div>
             <div className="min-w-0">
-              <p className="text-xs uppercase tracking-wider text-slate-400">{type}</p>
-              <h2 className="text-3xl sm:text-5xl font-bold text-white leading-tight break-all">{title}</h2>
+              <p className="text-xs uppercase tracking-wider text-slate-400">{typeLabel}</p>
+              <h2 className="text-3xl sm:text-5xl font-bold text-white leading-tight break-all">{title === 'Detail' ? t('modal.detail') : title}</h2>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -176,7 +181,7 @@ export default function KanjiModal({ item, onClose }) {
 
           {form && (
             <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4">
-              <h4 className="text-xs uppercase tracking-wider text-slate-400 mb-1">Form</h4>
+              <h4 className="text-xs uppercase tracking-wider text-slate-400 mb-1">{t('modal.form')}</h4>
               <KanjiTapText text={form} className="text-slate-200 text-sm font-medium" />
             </div>
           )}
@@ -186,7 +191,7 @@ export default function KanjiModal({ item, onClose }) {
               <iframe
                 className="w-full aspect-video"
                 src={videoUrl}
-                title={`${title} video`}
+                title={t('modal.videoTitle', { title })}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
               />
@@ -197,28 +202,28 @@ export default function KanjiModal({ item, onClose }) {
 
           {story && (
             <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4">
-              <h4 className="text-xs uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-2"><Brain size={14} /> Memory Story</h4>
+              <h4 className="text-xs uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-2"><Brain size={14} /> {t('modal.memoryStory')}</h4>
               <KanjiTapText text={story} className="text-slate-200 text-sm" />
             </div>
           )}
 
           {nuance && (
             <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4">
-              <h4 className="text-xs uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-2"><Eye size={14} /> Nuance</h4>
+              <h4 className="text-xs uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-2"><Eye size={14} /> {t('modal.nuance')}</h4>
               <KanjiTapText text={nuance} className="text-slate-200 text-sm" />
             </div>
           )}
 
           {collocation && (
             <p className="text-sm text-slate-300">
-              <span className="text-slate-500">Collocation:</span> <KanjiTapText text={collocation} className="text-slate-300" />
+              <span className="text-slate-500">{t('modal.collocation')}</span> <KanjiTapText text={collocation} className="text-slate-300" />
             </p>
           )}
 
           {example && (
             <div className="rounded-xl bg-gradient-to-r from-[#71368A]/30 to-[#FF6B57]/20 border border-[#FF6B57]/20 p-4">
               <div className="flex items-center justify-between mb-2">
-                <h4 className="text-xs uppercase tracking-wider text-[#FF8A75]">Example</h4>
+                <h4 className="text-xs uppercase tracking-wider text-[#FF8A75]">{t('modal.example')}</h4>
                 <TtsButton text={example} className="scale-90" />
               </div>
               <KanjiTapText text={example} className="text-lg text-slate-100 font-medium" />

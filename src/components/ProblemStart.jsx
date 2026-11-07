@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { X, CheckCircle2, Circle, Lock, Compass, Target, HeartPulse } from 'lucide-react'
 import { PERSONAS, PAINS, PROOF_TARGETS, saveProfile, ladderWithStatus, PROOF_LADDER } from '../lib/profile.js'
+import { useLanguage } from '../hooks/useLanguage.js'
 
 // "Start with your problem" onboarding — three questions, saved to
 // localStorage (jpn:profile:v1), dismissible, re-openable from Today.
 export function OnboardingFlow({ initial, onDone, onClose }) {
+  const { t } = useLanguage()
   const [persona, setPersona] = useState(initial?.persona || '')
   const [pains, setPains] = useState(initial?.pains || [])
   const [proofTarget, setProofTarget] = useState(initial?.proofTarget || '')
@@ -23,15 +25,15 @@ export function OnboardingFlow({ initial, onDone, onClose }) {
     <div className="rounded-3xl glass p-6 sm:p-8 card-glow space-y-7 border border-[#FF6B57]/25">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#FF8A75] mb-1"><Compass size={14} /> Start with your problem</p>
-          <h2 className="text-2xl font-bold text-white">Not features. Your problem first.</h2>
-          <p className="text-sm text-slate-400 mt-1">Three questions. Your Today plan, your diagnosis and your scenes are built from these answers — and re-built when they change.</p>
+          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#FF8A75] mb-1"><Compass size={14} /> {t('problem.eyebrow')}</p>
+          <h2 className="text-2xl font-bold text-white">{t('problem.title')}</h2>
+          <p className="text-sm text-slate-400 mt-1">{t('problem.subtitle')}</p>
         </div>
-        {onClose && <button onClick={onClose} className="p-2 rounded-lg bg-bun-700 text-slate-400 hover:text-white shrink-0" aria-label="Dismiss"><X size={16} /></button>}
+        {onClose && <button onClick={onClose} className="p-2 rounded-lg bg-bun-700 text-slate-400 hover:text-white shrink-0" aria-label={t('problem.dismiss')}><X size={16} /></button>}
       </div>
 
       <section className="space-y-3">
-        <h3 className="text-sm font-bold text-white">1 · Who are you?</h3>
+        <h3 className="text-sm font-bold text-white">{t('problem.q1')}</h3>
         <div className="grid gap-2 sm:grid-cols-2">
           {PERSONAS.map((p) => (
             <button key={p.id} onClick={() => setPersona(p.id)} className={`text-left rounded-xl border p-3 transition ${persona === p.id ? 'bg-[#FF6B57]/20 border-[#FF6B57]/50' : 'bg-bun-700/40 border-bun-600/30 hover:bg-bun-700/60'}`}>
@@ -43,7 +45,7 @@ export function OnboardingFlow({ initial, onDone, onClose }) {
       </section>
 
       <section className="space-y-3">
-        <h3 className="text-sm font-bold text-white">2 · What hurts? <span className="text-slate-400 font-normal">(pick all that are true)</span></h3>
+        <h3 className="text-sm font-bold text-white">{t('problem.q2')} <span className="text-slate-400 font-normal">{t('problem.q2Hint')}</span></h3>
         <div className="grid gap-2 sm:grid-cols-2">
           {PAINS.map((p) => {
             const on = pains.includes(p.id)
@@ -58,7 +60,7 @@ export function OnboardingFlow({ initial, onDone, onClose }) {
       </section>
 
       <section className="space-y-3">
-        <h3 className="text-sm font-bold text-white">3 · What proof are you climbing toward?</h3>
+        <h3 className="text-sm font-bold text-white">{t('problem.q3')}</h3>
         <div className="grid gap-2 sm:grid-cols-2">
           {PROOF_TARGETS.map((t) => (
             <button key={t.id} onClick={() => setProofTarget(t.id)} className={`text-left rounded-xl border p-3 transition ${proofTarget === t.id ? 'bg-emerald-500/10 border-emerald-500/40' : 'bg-bun-700/40 border-bun-600/30 hover:bg-bun-700/60'}`}>
@@ -68,44 +70,45 @@ export function OnboardingFlow({ initial, onDone, onClose }) {
           ))}
         </div>
         {proofTarget === 'real-life' && (
-          <input value={realLifeGoal} onChange={(e) => setRealLifeGoal(e.target.value)} placeholder="Your height, in your words — e.g. handle immigration alone in June"
+          <input value={realLifeGoal} onChange={(e) => setRealLifeGoal(e.target.value)} placeholder={t('problem.realLifePlaceholder')}
             className="w-full rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 focus:border-[#FF6B57] focus:outline-none" />
         )}
       </section>
 
       <button onClick={finish} disabled={!complete} className="w-full sm:w-auto px-6 py-3 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-sm transition">
-        Build my plan from my problem
+        {t('problem.buildCta')}
       </button>
-      {!complete && <p className="text-xs text-slate-500 -mt-4">Answer all three — persona, at least one pain, and a proof target.</p>}
+      {!complete && <p className="text-xs text-slate-500 -mt-4">{t('problem.incompleteHint')}</p>}
     </div>
   )
 }
 
 // The Proof Ladder — where you are, the next height, what each height unlocks.
 export function ProofLadderView({ diagnosis, profile }) {
+  const { t } = useLanguage()
   const ladder = ladderWithStatus(diagnosis)
   return (
     <div className="rounded-2xl glass p-5 card-glow space-y-3">
-      <h3 className="text-lg font-bold text-white flex items-center gap-2"><Target size={18} className="text-emerald-300" /> Your Proof Ladder</h3>
+      <h3 className="text-lg font-bold text-white flex items-center gap-2"><Target size={18} className="text-emerald-300" /> {t('problem.ladderTitle')}</h3>
       <p className="text-xs text-slate-400">
         {diagnosis
-          ? <>Current estimate: <span className="text-white font-semibold">{diagnosis.jlptEstimate}</span> · sections — language {diagnosis.sections.language}/60, reading {diagnosis.sections.reading}/60, listening {diagnosis.sections.listening}/60 · BJT estimate ~{diagnosis.bjtScore} ({diagnosis.bjtBand}).</>
-          : 'No diagnosis yet — the ladder lights up after your first 10-minute health check.'}
-        {profile?.proofTarget === 'real-life' && profile?.realLifeGoal ? <> Your named height: <span className="text-emerald-300">{profile.realLifeGoal}</span>.</> : null}
+          ? <>{t('problem.ladderCurrentStart')}<span className="text-white font-semibold">{diagnosis.jlptEstimate}</span>{t('problem.ladderCurrentRest', { language: diagnosis.sections.language, reading: diagnosis.sections.reading, listening: diagnosis.sections.listening, bjt: diagnosis.bjtScore, band: diagnosis.bjtBand })}</>
+          : t('problem.ladderNoDiagnosis')}
+        {profile?.proofTarget === 'real-life' && profile?.realLifeGoal ? <>{t('problem.ladderNamedHeightStart')}<span className="text-emerald-300">{profile.realLifeGoal}</span>{t('problem.ladderNamedHeightEnd')}</> : null}
       </p>
       <div className="space-y-2">
         {ladder.map((h) => (
           <div key={h.id} className={`flex items-start gap-3 rounded-xl border p-3 ${h.status === 'reached' ? 'bg-emerald-500/10 border-emerald-500/30' : h.status === 'next' ? 'bg-[#FF6B57]/15 border-[#FF6B57]/40' : 'bg-bun-700/30 border-bun-600/20 opacity-75'}`}>
             <span className="mt-0.5 shrink-0">{h.status === 'reached' ? <CheckCircle2 size={17} className="text-emerald-300" /> : h.status === 'next' ? <HeartPulse size={17} className="text-[#FF8A75]" /> : <Lock size={15} className="text-slate-500" />}</span>
             <div className="min-w-0">
-              <p className="text-sm font-bold text-white">{h.label} {h.status === 'next' && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-[#FF6B57] text-white align-middle">NEXT HEIGHT</span>}{h.status === 'reached' && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-600/60 text-emerald-100 align-middle">REACHED (EST.)</span>}</p>
-              <p className="text-xs text-slate-400">Proof: {h.proof}</p>
-              <p className="text-xs text-slate-300">Unlocks: {h.unlocks}</p>
+              <p className="text-sm font-bold text-white">{h.label} {h.status === 'next' && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-[#FF6B57] text-white align-middle">{t('problem.badgeNext')}</span>}{h.status === 'reached' && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-600/60 text-emerald-100 align-middle">{t('problem.badgeReached')}</span>}</p>
+              <p className="text-xs text-slate-400">{t('problem.ladderProof', { proof: h.proof })}</p>
+              <p className="text-xs text-slate-300">{t('problem.ladderUnlocks', { unlocks: h.unlocks })}</p>
             </div>
           </div>
         ))}
       </div>
-      <p className="text-[11px] text-slate-500">Ladder heights use official pass marks and BJT bands. “Reached” is an estimate from your in-app diagnosis, not an exam result — the exam is the proof.</p>
+      <p className="text-[11px] text-slate-500">{t('problem.ladderFooter')}</p>
     </div>
   )
 }

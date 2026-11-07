@@ -1,5 +1,6 @@
 import { ExternalLink } from 'lucide-react'
 import { brand } from '../lib/brand.js'
+import { useLanguage } from '../hooks/useLanguage.js'
 import { SOURCES } from '../lib/sources.js'
 
 // Sources & Licences — the plain list of every dataset and service
@@ -7,12 +8,13 @@ import { SOURCES } from '../lib/sources.js'
 // manifests and the code). Deliberately a list, not cards: one
 // accent, the licence on every entry, a link where one exists.
 export default function SourcesView() {
+  const { t } = useLanguage()
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-white">Sources &amp; Licences</h2>
+        <h2 className="text-2xl font-bold text-white">{t('sources.title')}</h2>
         <p className="text-sm text-slate-400 mt-1">
-          {brand.name} is built on open dictionaries and two online voice services. If it is listed here, the app ships it or calls it; if it is not listed, the app does not use it.
+          {t('sources.intro', { brand: brand.name })}
         </p>
       </div>
 
@@ -33,7 +35,7 @@ export default function SourcesView() {
       </div>
 
       <p className="text-xs text-slate-500">
-        Derived data is labelled where it is derived: the sound-component signal and the component index are computed from the sources above by the build scripts, and the attested sound families name both sources that confirm them.
+        {t('sources.closing')}
       </p>
     </div>
   )

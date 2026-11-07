@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useAuth } from '../hooks/useAuth.js'
+import { useLanguage } from '../hooks/useLanguage.js'
 import { getUserProgress, setUserProgress } from '../lib/supabaseApi.js'
 import { addToQueue, loadQueue, saveQueue, queueItemId } from '../lib/queue.js'
 import { userKey } from '../lib/userKey.js'
@@ -64,6 +65,7 @@ function graduatedState(count, now = new Date()) {
 // is never deleted or altered; the move is idempotent (flag + queue dedupe)
 // and never runs on its own.
 function MigrationCard({ cards, progress }) {
+  const { t } = useLanguage()
   const [migration, setMigration] = useState(loadMigration)
   const [note, setNote] = useState('')
   const learnedIds = useMemo(
@@ -96,7 +98,7 @@ function MigrationCard({ cards, progress }) {
       back: c.back,
       level: c.level,
       source: 'anki',
-      note: `Moved from your Anki tab — you had already learned this word there (reviewed ${progress.count[c.id]}×).`,
+      note: t('queue.migrationItemNote', { count: progress.count[c.id] }),
     }))
     addToQueue(items, now)
     const queue = loadQueue().map((item) => {
@@ -112,19 +114,19 @@ function MigrationCard({ cards, progress }) {
     const record = { doneAt: now.toISOString(), imported: items.length, backupDownloaded: true }
     try { localStorage.setItem(MIGRATION_KEY, JSON.stringify(record)) } catch {}
     setMigration(record)
-    setNote(`Done — ${items.length} known word${items.length === 1 ? '' : 's'} moved into the one queue as review cards. Your Anki progress here is untouched, and your backup file is in your downloads.`)
+    setNote(t(items.length === 1 ? 'queue.migrationNoteOne' : 'queue.migrationNoteMany', { count: items.length }))
   }
 
   return (
     <div className="rounded-2xl glass p-5 card-glow space-y-3 text-left">
-      <h3 className="font-bold text-white flex items-center gap-2"><Layers size={17} className="text-[#FF8A75]" /> One queue, everywhere</h3>
+      <h3 className="font-bold text-white flex items-center gap-2"><Layers size={17} className="text-[#FF8A75]" /> {t('queue.migrationTitle')}</h3>
       {migration ? (
-        <p className="text-sm text-emerald-300 flex items-start gap-2"><CheckCircle2 size={16} className="shrink-0 mt-0.5" /> Moved on {new Date(migration.doneAt).toLocaleDateString()}: {migration.imported} known words now live in the Today queue with their learning preserved. This tab keeps working exactly as before — nothing was deleted.</p>
+        <p className="text-sm text-emerald-300 flex items-start gap-2"><CheckCircle2 size={16} className="shrink-0 mt-0.5" /> {t('queue.migrationDone', { date: new Date(migration.doneAt).toLocaleDateString(), count: migration.imported })}</p>
       ) : (
         <>
-          <p className="text-sm text-slate-300">The rest of the app now reviews everything in <strong className="text-white">one queue</strong> with the newer FSRS scheduler. You have <strong className="text-white">{learnedIds.length} learned word{learnedIds.length === 1 ? '' : 's'}</strong> in this tab’s older system. Moving them is one tap, it downloads a backup of this progress <em>first</em>, and it never deletes anything here.</p>
-          <button onClick={doMigration} disabled={!learnedIds.length || !cards.length} className="px-4 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] disabled:opacity-40 text-white text-sm font-semibold">Move My Progress To The New System</button>
-          {!learnedIds.length && <p className="text-xs text-slate-500">Nothing to move yet — words become “learned” here after their first good review.</p>}
+          <p className="text-sm text-slate-300">{t('queue.migrationIntroStart')} <strong className="text-white">{t('queue.migrationOneQueue')}</strong> {t('queue.migrationIntroMiddle')} <strong className="text-white">{t(learnedIds.length === 1 ? 'queue.migrationLearnedWord' : 'queue.migrationLearnedWords', { count: learnedIds.length })}</strong> {t('queue.migrationIntroEnd')} <em>{t('queue.migrationFirst')}</em>{t('queue.migrationIntroTail')}</p>
+          <button onClick={doMigration} disabled={!learnedIds.length || !cards.length} className="px-4 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] disabled:opacity-40 text-white text-sm font-semibold">{t('queue.migrationButton')}</button>
+          {!learnedIds.length && <p className="text-xs text-slate-500">{t('queue.migrationNothing')}</p>}
         </>
       )}
       {note && <p className="text-xs text-slate-400">{note}</p>}
@@ -186,12 +188,13 @@ export default function Anki() {
   const [index, setIndex] = useState(0)
   const [flipped, setFlipped] = useState(false)
   const { user } = useAuth()
+  const { t } = useLanguage()
 
   useEffect(() => {
     let cancelled = false
     fetch('/data/ankiVocab.json')
       .then((r) => {
-        if (!r.ok) throw new Error('Could not load deck')
+        if (!r.ok) throw new Error(t('queue.loadError'))
         return r.json()
       })
       .then((data) => {
@@ -205,7 +208,7 @@ export default function Anki() {
         setLoading(false)
       })
     return () => { cancelled = true }
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     migrateLegacyAnkiKey(user)
@@ -340,7 +343,7 @@ export default function Anki() {
   }
 
   const resetProgress = () => {
-    if (typeof window !== 'undefined' && window.confirm('Reset all saved Anki progress?')) {
+    if (typeof window !== 'undefined' && window.confirm(t('queue.resetConfirm'))) {
       const fresh = { due: {}, count: {}, lastDate: today(), newToday: 0, newLimit }
       setProgress(fresh)
       saveProgress(progressKeyFor(user), fresh)
@@ -364,7 +367,7 @@ export default function Anki() {
     return (
       <div className="max-w-2xl mx-auto text-center py-20 text-slate-400">
         <Loader2 size={24} className="animate-spin mx-auto mb-4" />
-        <p>Loading 8,334-card deck…</p>
+        <p>{t('queue.loadingDeck', { count: '8,334' })}</p>
       </div>
     )
   }
@@ -378,17 +381,17 @@ export default function Anki() {
   }
 
   if (!current) {
-    const summary = mode === 'due' ? 'No due cards right now. Check back tomorrow or switch to All.'
-      : mode === 'new' ? `No new cards left today. Limit: ${newLimit}.` : 'You have studied the whole deck in this mode.'
+    const summary = mode === 'due' ? t('queue.emptyDue')
+      : mode === 'new' ? t('queue.emptyNew', { limit: newLimit }) : t('queue.emptyAll')
     return (
       <div className="max-w-2xl mx-auto text-center py-12 space-y-6">
         <div className="w-20 h-20 mx-auto rounded-full bg-bun-700 flex items-center justify-center text-4xl">🎉</div>
-        <h2 className="text-2xl font-bold text-white mb-2">Session done</h2>
+        <h2 className="text-2xl font-bold text-white mb-2">{t('queue.sessionDone')}</h2>
         <p className="text-slate-300">{summary}</p>
         <div className="flex flex-wrap items-center justify-center gap-3">
-          <button onClick={() => setMode('due')} className="px-5 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-medium transition">Study due</button>
-          <button onClick={() => setMode('all')} className="px-5 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-slate-200 text-sm font-medium transition">Study all</button>
-          <button onClick={exportCSV} className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition"><Download size={16} className="inline mr-2" /> Export CSV</button>
+          <button onClick={() => setMode('due')} className="px-5 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-medium transition">{t('queue.studyDue')}</button>
+          <button onClick={() => setMode('all')} className="px-5 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-slate-200 text-sm font-medium transition">{t('queue.studyAll')}</button>
+          <button onClick={exportCSV} className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition"><Download size={16} className="inline mr-2" /> {t('queue.exportCsv')}</button>
         </div>
         <MigrationCard cards={cards} progress={progress} />
       </div>
@@ -401,11 +404,11 @@ export default function Anki() {
     <div className="max-w-2xl mx-auto space-y-6 pb-28 sm:pb-24">
       <MigrationCard cards={cards} progress={progress} />
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-2xl font-bold text-white">Anki Cards</h2>
+        <h2 className="text-2xl font-bold text-white">{t('queue.title')}</h2>
         <div className="flex gap-2">
           <a href="https://apps.ankiweb.net/" target="_blank" rel="noreferrer" className="px-3 py-1.5 rounded-lg text-sm bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-slate-200 flex items-center gap-1"><ExternalLink size={14} /> Anki</a>
           <button onClick={exportCSV} className="px-3 py-1.5 rounded-lg text-sm bg-[#FF6B57] hover:bg-[#FF7F6E] text-white flex items-center gap-1"><Download size={14} /> CSV</button>
-          <button onClick={resetProgress} className="px-3 py-1.5 rounded-lg text-sm bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 flex items-center gap-1"><RotateCcw size={14} /> Reset</button>
+          <button onClick={resetProgress} className="px-3 py-1.5 rounded-lg text-sm bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 flex items-center gap-1"><RotateCcw size={14} /> {t('queue.reset')}</button>
         </div>
       </div>
 
@@ -413,25 +416,25 @@ export default function Anki() {
         <div className="flex flex-wrap items-center gap-3">
           <Settings size={16} className="text-slate-500" />
           <select value={mode} onChange={(e) => setMode(e.target.value)} className="bg-bun-900 border border-bun-600/40 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF6B57]">
-            <option value="due">Due + new today</option>
-            <option value="new">New only</option>
-            <option value="all">All cards</option>
+            <option value="due">{t('queue.modeDue')}</option>
+            <option value="new">{t('queue.modeNew')}</option>
+            <option value="all">{t('queue.modeAll')}</option>
           </select>
           <select value={level} onChange={(e) => setLevel(e.target.value)} className="bg-bun-900 border border-bun-600/40 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF6B57]">
-            <option value="all">All levels</option>
+            <option value="all">{t('queue.allLevels')}</option>
             <option value="N5">N5</option>
             <option value="N4">N4</option>
             <option value="N3">N3</option>
             <option value="N2">N2</option>
             <option value="N1">N1</option>
           </select>
-          <button onClick={() => setShuffle((s) => !s)} className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 border transition ${shuffle ? 'bg-[#FF6B57] border-[#FF6B57] text-white' : 'bg-bun-900 border-bun-600/40 text-slate-300 hover:bg-bun-700'}`}><Shuffle size={14} /> {shuffle ? 'On' : 'Off'}</button>
+          <button onClick={() => setShuffle((s) => !s)} className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 border transition ${shuffle ? 'bg-[#FF6B57] border-[#FF6B57] text-white' : 'bg-bun-900 border-bun-600/40 text-slate-300 hover:bg-bun-700'}`}><Shuffle size={14} /> {shuffle ? t('queue.on') : t('queue.off')}</button>
           <div className="relative flex-1 min-w-[140px]">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…" className="w-full bg-bun-900 border border-bun-600/40 rounded-lg pl-8 pr-3 py-1.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#FF6B57]" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('queue.searchPlaceholder')} className="w-full bg-bun-900 border border-bun-600/40 rounded-lg pl-8 pr-3 py-1.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#FF6B57]" />
           </div>
           <div className="flex items-center gap-2 text-sm text-slate-400">
-            <span>New/day</span>
+            <span>{t('queue.newPerDay')}</span>
             <input type="number" min={1} max={100} value={newLimit} onChange={(e) => {
               const n = Math.max(1, Math.min(100, Number(e.target.value)))
               setNewLimit(n)
@@ -446,10 +449,10 @@ export default function Anki() {
         </div>
 
         <div className="grid grid-cols-4 gap-3">
-          <Stat label="Total" value={stats.total} />
-          <Stat label="Due" value={stats.due} />
-          <Stat label="New today" value={`${stats.newToday} / ${newLimit}`} />
-          <Stat label="Learned" value={stats.learned} />
+          <Stat label={t('queue.statTotal')} value={stats.total} />
+          <Stat label={t('queue.statDue')} value={stats.due} />
+          <Stat label={t('queue.statNewToday')} value={`${stats.newToday} / ${newLimit}`} />
+          <Stat label={t('queue.statLearned')} value={stats.learned} />
         </div>
         <div className="grid grid-cols-5 gap-3">
           <Stat label="N5" value={stats.byLevel.N5} />
@@ -462,7 +465,7 @@ export default function Anki() {
         <div className="h-2 w-full rounded-full bg-bun-700 overflow-hidden">
           <div className="h-full bg-gradient-to-r from-[#71368A] to-cyan-500 transition-all" style={{ width: `${progressPct}%` }} />
         </div>
-        <p className="text-xs text-slate-500 text-right">{index} / {queue.length} in this session</p>
+        <p className="text-xs text-slate-500 text-right">{t('queue.sessionProgress', { index, total: queue.length })}</p>
       </div>
 
       <div className="rounded-3xl glass p-8 sm:p-12 card-glow text-center min-h-[360px] flex flex-col items-center justify-center">
@@ -479,13 +482,13 @@ export default function Anki() {
       </div>
 
       {!flipped ? (
-        <button onClick={() => setFlipped(true)} className="w-full py-3 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-medium transition">Show answer</button>
+        <button onClick={() => setFlipped(true)} className="w-full py-3 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-medium transition">{t('queue.showAnswer')}</button>
       ) : (
         <div className="grid grid-cols-4 gap-2">
-          <button onClick={() => rate(0)} className="py-2.5 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-200 text-sm font-medium hover:bg-rose-500/30 transition flex items-center justify-center gap-1"><XCircle size={14} /> Again</button>
-          <button onClick={() => rate(1)} className="py-2.5 rounded-xl bg-orange-500/20 border border-orange-500/40 text-orange-200 text-sm font-medium hover:bg-orange-500/30 transition">Hard</button>
-          <button onClick={() => rate(2)} className="py-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 text-sm font-medium hover:bg-emerald-500/30 transition flex items-center justify-center gap-1"><CheckCircle2 size={14} /> Good</button>
-          <button onClick={() => rate(3)} className="py-2.5 rounded-xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-200 text-sm font-medium hover:bg-cyan-500/30 transition">Easy</button>
+          <button onClick={() => rate(0)} className="py-2.5 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-200 text-sm font-medium hover:bg-rose-500/30 transition flex items-center justify-center gap-1"><XCircle size={14} /> {t('queue.rateAgain')}</button>
+          <button onClick={() => rate(1)} className="py-2.5 rounded-xl bg-orange-500/20 border border-orange-500/40 text-orange-200 text-sm font-medium hover:bg-orange-500/30 transition">{t('queue.rateHard')}</button>
+          <button onClick={() => rate(2)} className="py-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 text-sm font-medium hover:bg-emerald-500/30 transition flex items-center justify-center gap-1"><CheckCircle2 size={14} /> {t('queue.rateGood')}</button>
+          <button onClick={() => rate(3)} className="py-2.5 rounded-xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-200 text-sm font-medium hover:bg-cyan-500/30 transition">{t('queue.rateEasy')}</button>
         </div>
       )}
     </div>

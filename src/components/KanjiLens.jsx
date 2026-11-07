@@ -7,6 +7,7 @@ import { useKanjiModal } from '../hooks/useKanjiModal.js'
 import { addToQueue, loadQueue } from '../lib/queue.js'
 import { recordLensEncounters } from '../lib/encounters.js'
 import { recordMetric } from '../lib/metrics.js'
+import { useLanguage } from '../hooks/useLanguage.js'
 
 // Kanji Lens — the evidence-based kanji visualization (docs/18).
 // Components assemble first, with the job the data supports named for
@@ -32,6 +33,7 @@ const DRAW_CSS = `
 `
 
 function DrawPad({ paths, char, queueFront, queued, onAddToQueue, onSelfMark }) {
+  const { t } = useLanguage()
   const wrapRef = useRef(null)
   const canvasRef = useRef(null)
   const drawingRef = useRef(false)
@@ -116,28 +118,28 @@ function DrawPad({ paths, char, queueFront, queued, onAddToQueue, onSelfMark }) 
         />
       </div>
       <p className="text-xs text-slate-400 mt-3">
-        Draw it from memory. Then Reveal and compare with your own eyes — no score is computed here; your eyes are the check.
+        {t('lens.drawHint')}
       </p>
       <div className="flex flex-wrap gap-2 mt-3">
-        <button onClick={() => setRevealed((v) => !v)} className="px-3 py-1.5 rounded-lg bg-bun-700 text-slate-200 text-sm font-medium hover:text-white">{revealed ? 'Hide' : 'Reveal'}</button>
-        <button onClick={clear} className="px-3 py-1.5 rounded-lg bg-bun-700 text-slate-200 text-sm font-medium hover:text-white">Clear</button>
-        <button onClick={() => mark('got')} className={`px-3 py-1.5 rounded-lg text-sm font-medium ${marked === 'got' ? 'bg-emerald-600 text-white' : 'bg-bun-700 text-slate-200 hover:text-white'}`}>I Got It</button>
-        <button onClick={() => mark('not_yet')} className={`px-3 py-1.5 rounded-lg text-sm font-medium ${marked === 'not_yet' ? 'bg-[#FF6B57] text-white' : 'bg-bun-700 text-slate-200 hover:text-white'}`}>Not Yet</button>
+        <button onClick={() => setRevealed((v) => !v)} className="px-3 py-1.5 rounded-lg bg-bun-700 text-slate-200 text-sm font-medium hover:text-white">{revealed ? t('lens.hide') : t('lens.reveal')}</button>
+        <button onClick={clear} className="px-3 py-1.5 rounded-lg bg-bun-700 text-slate-200 text-sm font-medium hover:text-white">{t('lens.clear')}</button>
+        <button onClick={() => mark('got')} className={`px-3 py-1.5 rounded-lg text-sm font-medium ${marked === 'got' ? 'bg-emerald-600 text-white' : 'bg-bun-700 text-slate-200 hover:text-white'}`}>{t('lens.gotIt')}</button>
+        <button onClick={() => mark('not_yet')} className={`px-3 py-1.5 rounded-lg text-sm font-medium ${marked === 'not_yet' ? 'bg-[#FF6B57] text-white' : 'bg-bun-700 text-slate-200 hover:text-white'}`}>{t('lens.notYet')}</button>
       </div>
-      {marked && <p className="text-xs text-slate-400 mt-2">{marked === 'got' ? 'Marked as yours. It will keep coming back in your reviews until it is proven.' : 'Marked honestly — its word can join your queue below, and it comes back in your reviews.'}</p>}
+      {marked && <p className="text-xs text-slate-400 mt-2">{marked === 'got' ? t('lens.markedGot') : t('lens.markedNotYet')}</p>}
       {marked === 'not_yet' && (
         <div className="mt-3">
           {queued ? (
-            <button disabled className="px-3 py-1.5 rounded-lg bg-bun-700/50 text-slate-400 text-sm font-medium cursor-default">Already In Your Queue</button>
+            <button disabled className="px-3 py-1.5 rounded-lg bg-bun-700/50 text-slate-400 text-sm font-medium cursor-default">{t('lens.alreadyInQueue')}</button>
           ) : queueFront ? (
             <div className="flex flex-wrap items-center gap-2">
-              <button onClick={onAddToQueue} className="px-3 py-1.5 rounded-lg bg-[#71368A] text-white text-sm font-medium">Add Its Word To My Queue</button>
-              <span className="text-xs text-slate-400">Adds {queueFront} — a word this kanji lives in.</span>
+              <button onClick={onAddToQueue} className="px-3 py-1.5 rounded-lg bg-[#71368A] text-white text-sm font-medium">{t('lens.addWordToQueue')}</button>
+              <span className="text-xs text-slate-400">{t('lens.addsWord', { queueFront })}</span>
             </div>
           ) : (
             <div>
-              <button disabled className="px-3 py-1.5 rounded-lg bg-bun-700/50 text-slate-400 text-sm font-medium cursor-default">Add Its Word To My Queue</button>
-              <p className="text-xs text-slate-500 mt-1.5">No common word with this kanji in the dictionary yet — nothing honest to add.</p>
+              <button disabled className="px-3 py-1.5 rounded-lg bg-bun-700/50 text-slate-400 text-sm font-medium cursor-default">{t('lens.addWordToQueue')}</button>
+              <p className="text-xs text-slate-500 mt-1.5">{t('lens.noCommonWord')}</p>
             </div>
           )}
         </div>
@@ -147,6 +149,7 @@ function DrawPad({ paths, char, queueFront, queued, onAddToQueue, onSelfMark }) 
 }
 
 export default function KanjiLens({ char, item }) {
+  const { t } = useLanguage()
   const reduced = useReducedMotion()
   const { close: closeModal } = useKanjiModal() || {}
   const [lensChar, setLensChar] = useState(char)
@@ -306,7 +309,7 @@ export default function KanjiLens({ char, item }) {
       front: queuePick.front,
       back: queuePick.entry.gloss?.[0] || '',
       reading: queuePick.entry.kana || '',
-      note: `From the Kanji Lens: ${lensChar} — marked Not Yet in Draw, so its word joins the queue.`,
+      note: t('lens.queueNote', { char: lensChar }),
       source: 'lens',
       level: meta?.level ? String(meta.level) : '',
     }])
@@ -343,14 +346,14 @@ export default function KanjiLens({ char, item }) {
   if (!data) {
     return (
       <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4 flex items-center gap-2 text-sm text-slate-400">
-        <Loader2 size={16} className="animate-spin" /> Loading kanji data…
+        <Loader2 size={16} className="animate-spin" /> {t('lens.loading')}
       </div>
     )
   }
   if (!meta && !strokes) {
     return (
       <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4 text-sm text-slate-400">
-        {lensChar} is not in the kanji database yet.
+        {t('lens.notInDatabase', { char: lensChar })}
       </div>
     )
   }
@@ -411,9 +414,9 @@ export default function KanjiLens({ char, item }) {
     <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4">
       <style>{DRAW_CSS}</style>
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <h4 className="text-xs uppercase tracking-wider text-slate-400">Kanji Lens</h4>
+        <h4 className="text-xs uppercase tracking-wider text-slate-400">{t('lens.title')}</h4>
         {lensChar !== char && (
-          <button onClick={() => setLensChar(char)} className="text-xs px-2 py-1 rounded-lg bg-bun-700 text-slate-300 hover:text-white">Back To {char}</button>
+          <button onClick={() => setLensChar(char)} className="text-xs px-2 py-1 rounded-lg bg-bun-700 text-slate-300 hover:text-white">{t('lens.backTo', { char })}</button>
         )}
       </div>
 
@@ -424,12 +427,12 @@ export default function KanjiLens({ char, item }) {
               <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-bun-700/60 border border-bun-600/30 text-slate-300">{t.theme}</span>
             ))}
           </div>
-          <p className="text-[10px] text-slate-500 mt-1">Theme tags from the Licence curriculum lists (S5/S6) — reference data.</p>
+          <p className="text-[10px] text-slate-500 mt-1">{t('lens.themeTagsNote')}</p>
         </div>
       )}
 
       <div className="flex flex-wrap gap-2 mb-4">
-        {[['assemble', 'Assemble'], ['strokes', 'Stroke Order'], ['draw', 'Draw']].map(([m, label]) => (
+        {[['assemble', t('lens.modeAssemble')], ['strokes', t('lens.modeStrokeOrder')], ['draw', t('lens.modeDraw')]].map(([m, label]) => (
           <button key={m} onClick={() => { setMode(m); if (m !== 'draw') { setPlaying(!reduced); setPlayKey((k) => k + 1) } }}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium ${mode === m ? 'bg-[#FF6B57] text-white' : 'bg-bun-700 text-slate-300 hover:text-white'}`}>
             {label}
@@ -438,15 +441,15 @@ export default function KanjiLens({ char, item }) {
         {mode === 'strokes' && (
           <button onClick={() => setShowNumbers((v) => !v)} aria-pressed={showNumbers}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium ${showNumbers ? 'bg-[#71368A] text-white' : 'bg-bun-700 text-slate-300 hover:text-white'}`}>
-            Numbers
+            {t('lens.numbers')}
           </button>
         )}
       </div>
 
       {variants && variants.length > 0 && mode !== 'draw' && (
         <div className="flex flex-wrap items-center gap-2 mb-4">
-          <span className="text-xs uppercase tracking-wider text-slate-400">Forms</span>
-          {['Standard', ...variants.map((v) => v.variant)].map((name, i) => (
+          <span className="text-xs uppercase tracking-wider text-slate-400">{t('lens.forms')}</span>
+          {[t('lens.formStandard'), ...variants.map((v) => v.variant)].map((name, i) => (
             <button key={name} onClick={() => pickForm(i)} aria-pressed={formIdx === i}
               className={`px-2.5 py-1 rounded-lg text-xs font-medium ${formIdx === i ? 'bg-[#71368A] text-white' : 'bg-bun-700 text-slate-300 hover:text-white'}`}>
               {name}
@@ -478,40 +481,40 @@ export default function KanjiLens({ char, item }) {
           </div>
           <p className="text-center text-sm text-slate-300 mt-3 min-h-[1.25rem]">
             {stageMode === 'assemble'
-              ? (step >= topComps.length ? `${lensChar} — assembled from ${topComps.length} component${topComps.length === 1 ? '' : 's'}.` : currentCaption)
-              : `${activePaths.length} strokes — watch the order${showNumbers ? '; each number sits where its stroke starts' : ''}.`}
+              ? (step >= topComps.length ? t(topComps.length === 1 ? 'lens.assembledOne' : 'lens.assembledMany', { char: lensChar, count: topComps.length }) : currentCaption)
+              : t(showNumbers ? 'lens.strokeOrderCaptionNumbers' : 'lens.strokeOrderCaption', { count: activePaths.length })}
           </p>
           {activeVariant && (
             <p className="text-center text-xs text-slate-500 mt-1">
-              {activeVariant.note ? `${activeVariant.variant} form: ${activeVariant.note}.` : `${activeVariant.variant} form.`}
-              {formStrokeMismatch && ` It has ${activeVariant.paths.length} strokes against the standard ${paths.length}, so it is shown in Stroke Order — the component assembly belongs to the standard form.`}
+              {activeVariant.note ? t('lens.variantFormNote', { variant: activeVariant.variant, note: activeVariant.note }) : t('lens.variantForm', { variant: activeVariant.variant })}
+              {formStrokeMismatch && t('lens.variantMismatch', { variantCount: activeVariant.paths.length, standardCount: paths.length })}
             </p>
           )}
           <div className="flex flex-wrap justify-center gap-2 mt-2">
             {reduced ? (
               <button onClick={() => { if (stageMode === 'assemble') setStep((s) => Math.min(s + 1, topComps.length)); else setStrokeStep((s) => Math.min(s + 1, activePaths.length)) }}
-                className="px-3 py-1.5 rounded-lg bg-bun-700 text-slate-200 text-sm font-medium hover:text-white">Step Forward</button>
+                className="px-3 py-1.5 rounded-lg bg-bun-700 text-slate-200 text-sm font-medium hover:text-white">{t('lens.stepForward')}</button>
             ) : (
               <button onClick={() => setPlaying((p) => !p)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bun-700 text-slate-200 text-sm font-medium hover:text-white">
-                {playing ? <Pause size={14} /> : <Play size={14} />} {playing ? 'Pause' : 'Play'}
+                {playing ? <Pause size={14} /> : <Play size={14} />} {playing ? t('lens.pause') : t('lens.play')}
               </button>
             )}
             <button onClick={() => { setStep(0); setStrokeStep(0); setPlayKey((k) => k + 1); setPlaying(!reduced) }}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bun-700 text-slate-200 text-sm font-medium hover:text-white">
-              <RotateCcw size={14} /> Replay
+              <RotateCcw size={14} /> {t('lens.replay')}
             </button>
           </div>
         </div>
       ) : (
         <div className="text-center py-4">
           <p className="text-7xl font-bold text-white">{lensChar}</p>
-          <p className="text-xs text-slate-400 mt-3">No stroke data for this kanji yet — the breakdown below comes from its dictionary entry.</p>
+          <p className="text-xs text-slate-400 mt-3">{t('lens.noStrokeData')}</p>
         </div>
       )}
 
       {wordExample && (
         <p className="text-sm text-slate-300 mt-4 text-center">
-          <span className="text-slate-500">In a word:</span>{' '}
+          <span className="text-slate-500">{t('lens.inAWord')}</span>{' '}
           <span className="text-slate-100 font-medium">{wordExample.word}</span>
           {wordExample.sentence && <span className="block text-xs text-slate-400 mt-1">{wordExample.sentence}</span>}
         </p>
@@ -519,7 +522,7 @@ export default function KanjiLens({ char, item }) {
 
       {words && words.length > 0 && (
         <div className="mt-5">
-          <h5 className="text-xs uppercase tracking-wider text-slate-400 mb-2">Words With This Kanji</h5>
+          <h5 className="text-xs uppercase tracking-wider text-slate-400 mb-2">{t('lens.wordsWithKanji')}</h5>
           <div className="space-y-1.5">
             {words.map(({ entry, accent, sentence }) => (
               <div key={entry.id} className="flex flex-wrap items-baseline gap-x-2 rounded-lg px-2 py-1.5 bg-bun-700/30">
@@ -538,17 +541,17 @@ export default function KanjiLens({ char, item }) {
             ))}
           </div>
           {words.some((w) => w.accent != null) && (
-            <p className="text-[11px] text-slate-500 mt-2">Pitch accent number: Kanjium (CC BY-SA 4.0)</p>
+            <p className="text-[11px] text-slate-500 mt-2">{t('lens.pitchAccentAttribution')}</p>
           )}
           {words.some((w) => w.sentence) && (
-            <p className="text-[11px] text-slate-500 mt-1">Example sentences: Tatoeba / Tanaka Corpus (CC BY 2.0 FR), dictionary-linked by EDRDG</p>
+            <p className="text-[11px] text-slate-500 mt-1">{t('lens.exampleSentencesAttribution')}</p>
           )}
         </div>
       )}
 
       {flat.length > 1 && (
         <div className="mt-5">
-          <h5 className="text-xs uppercase tracking-wider text-slate-400 mb-2">What It Is Built From</h5>
+          <h5 className="text-xs uppercase tracking-wider text-slate-400 mb-2">{t('lens.builtFrom')}</h5>
           <div className="space-y-1.5">
             {flat.filter((n) => n.depth >= 1).map((n, i) => {
               const cm = compMeta[n.element]
@@ -558,10 +561,10 @@ export default function KanjiLens({ char, item }) {
                   className="w-full text-left flex items-baseline gap-2 rounded-lg px-2 py-1.5 hover:bg-bun-700/60 disabled:hover:bg-transparent"
                   style={{ marginLeft: `${(n.depth - 1) * 18}px` }}>
                   <span className="text-xl font-bold text-white">{n.element}</span>
-                  {n.role === 'radical' && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#71368A] text-white">Radical</span>}
-                  {n.role === 'sound' && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#FF6B57] text-white">Sound</span>}
+                  {n.role === 'radical' && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#71368A] text-white">{t('lens.badgeRadical')}</span>}
+                  {n.role === 'sound' && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#FF6B57] text-white">{t('lens.badgeSound')}</span>}
                   <span className="text-xs text-slate-400">
-                    {[positionWords(n.position), cm?.meanings?.[0] || '', cm?.on?.[0] || '', shared > 1 ? `${shared} kanji share this part` : ''].filter(Boolean).join(' · ')}
+                    {[positionWords(n.position), cm?.meanings?.[0] || '', cm?.on?.[0] || '', shared > 1 ? t('lens.sharedPart', { count: shared }) : ''].filter(Boolean).join(' · ')}
                   </span>
                   {fr?.radicalNameFr && n.element === frRadicalTarget && (
                     <span className="text-[11px] text-slate-500">FR · {fr.radicalNameFr}</span>
@@ -576,9 +579,9 @@ export default function KanjiLens({ char, item }) {
       {family?.soundComponent && family.sound.length > 0 && (
         <div className="mt-5">
           <h5 className="text-xs uppercase tracking-wider text-slate-400 mb-2">
-            Sound Family — {family.soundComponent}{family.soundOn ? ` gives ${family.soundOn}` : ''}
+            {family.soundOn ? t('lens.soundFamilyWithOn', { component: family.soundComponent, on: family.soundOn }) : t('lens.soundFamily', { component: family.soundComponent })}
             {family.attested && (
-              <span className="ml-2 normal-case tracking-normal px-1.5 py-0.5 rounded-full bg-[#71368A] text-white text-[10px]">Confirmed by two sources</span>
+              <span className="ml-2 normal-case tracking-normal px-1.5 py-0.5 rounded-full bg-[#71368A] text-white text-[10px]">{t('lens.confirmedTwoSources')}</span>
             )}
           </h5>
           <div className="flex flex-wrap gap-2">
@@ -591,10 +594,10 @@ export default function KanjiLens({ char, item }) {
             ))}
           </div>
           {family.attested && family.sound.some((m) => m.attested === false) && (
-            <p className="text-[11px] text-slate-500 mt-2">Dimmed members match the reading pattern only — the second source does not confirm them.</p>
+            <p className="text-[11px] text-slate-500 mt-2">{t('lens.dimmedAttested')}</p>
           )}
           {family.sound.some((m) => !m.matches) && (
-            <p className="text-[11px] text-slate-500 mt-2">Dimmed members drifted to a different sound — the component is a clue, not a promise.</p>
+            <p className="text-[11px] text-slate-500 mt-2">{t('lens.dimmedDrifted')}</p>
           )}
         </div>
       )}
@@ -602,7 +605,7 @@ export default function KanjiLens({ char, item }) {
       {family && family.radical.length > 0 && (
         <div className="mt-5">
           <h5 className="text-xs uppercase tracking-wider text-slate-400 mb-2">
-            Same Radical{radicalInfo ? ` — ${radicalInfo.char} (No. ${meta.radical})` : ''}
+            {radicalInfo ? t('lens.sameRadicalWith', { char: radicalInfo.char, number: meta.radical }) : t('lens.sameRadical')}
           </h5>
           <div className="flex flex-wrap gap-2">
             {family.radical.map((c) => (
@@ -615,11 +618,11 @@ export default function KanjiLens({ char, item }) {
       )}
 
       <div className="flex flex-wrap items-baseline justify-between gap-2 mt-5">
-        <p className="text-[10px] text-slate-500">Strokes &amp; components: KanjiVG (CC BY-SA 3.0) · Readings &amp; meanings: KANJIDIC2 (EDRDG) · Words: JMdict (EDRDG, CC BY-SA 4.0) · Pitch accent: Kanjium / Uros O. (CC BY-SA 4.0)</p>
+        <p className="text-[10px] text-slate-500">{t('lens.sourcesAttribution')}</p>
         <button
           onClick={() => { closeModal?.(); window.location.hash = '#/sources' }}
           className="text-[11px] px-2 py-1 rounded-lg bg-bun-700 text-slate-300 hover:text-white shrink-0">
-          All Sources
+          {t('lens.allSources')}
         </button>
       </div>
     </div>

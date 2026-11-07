@@ -9,6 +9,7 @@ import { collectLearnerState } from '../lib/learnerState.js'
 import { estimateWorkingLevel } from '../lib/twinEstimate.js'
 import { LOOP_ORDER, agentLoopStats, loopCentre, weekStrip } from '../lib/loopStats.js'
 import { useAuth } from '../hooks/useAuth.js'
+import { useLanguage } from '../hooks/useLanguage.js'
 import Mascot from './Mascot.jsx'
 
 // THE LOOP — "how all of the agents are working together to make your
@@ -27,40 +28,40 @@ import Mascot from './Mascot.jsx'
 // The handoffs, in plain language (grounded in the Doc 05 job specs).
 const HANDOFFS = {
   michi: {
-    gets: 'Your Twin — the whole week that was: sessions, calls, slips, pace.',
-    hands: 'The season’s direction — and the weekly letter that tells the truth about it.',
+    getsKey: 'loop.michi.gets',
+    handsKey: 'loop.michi.hands',
     next: 'Saki',
-    door: { view: 'coach', label: 'Read Michi’s Letter' },
+    door: { view: 'coach', labelKey: 'loop.michi.door' },
   },
   saki: {
-    gets: 'Michi’s direction, and your Twin as it stands tonight.',
-    hands: 'Tomorrow’s plan — a few things, in the right order, sized to your mode.',
+    getsKey: 'loop.saki.gets',
+    handsKey: 'loop.saki.hands',
     next: 'Koe',
-    door: { view: 'plan', label: 'See Tomorrow’s Plan' },
+    door: { view: 'plan', labelKey: 'loop.saki.door' },
   },
   koe: {
-    gets: 'Today’s plan, and a scene picked from your world.',
-    hands: 'You, speaking out loud — and every slip, noticed and kept.',
+    getsKey: 'loop.koe.gets',
+    handsKey: 'loop.koe.hands',
     next: 'Nao',
-    door: { view: 'sensei', label: 'Answer The Call' },
+    door: { view: 'sensei', labelKey: 'loop.koe.door' },
   },
   nao: {
-    gets: 'The slips from your calls and sessions.',
-    hands: 'One fix at a time, turned into cards in your one queue.',
-    next: 'your queue',
-    door: { view: 'anki', label: 'Open Your Queue' },
+    getsKey: 'loop.nao.gets',
+    handsKey: 'loop.nao.hands',
+    nextKey: 'loop.next.yourQueue',
+    door: { view: 'anki', labelKey: 'loop.nao.door' },
   },
   hori: {
-    gets: 'Your documents, and the set of words you already know.',
-    hands: 'Reading fitted to your words — and new words, mined into your queue.',
+    getsKey: 'loop.hori.gets',
+    handsKey: 'loop.hori.hands',
     next: 'Tsuku',
-    door: { view: 'reader', label: 'Open The Reader' },
+    door: { view: 'reader', labelKey: 'loop.hori.door' },
   },
   tsuku: {
-    gets: 'What Hori mined, and the level you are reaching for.',
-    hands: 'Fresh passages and practice — made for you, checked before they ship.',
-    next: 'your Twin',
-    door: { view: 'voice', label: 'Try A Voice Loop Scene' },
+    getsKey: 'loop.tsuku.gets',
+    handsKey: 'loop.tsuku.hands',
+    nextKey: 'loop.next.yourTwin',
+    door: { view: 'voice', labelKey: 'loop.tsuku.door' },
   },
 }
 
@@ -103,6 +104,7 @@ function AgentDisc({ m, size, selected }) {
 
 export default function GrowthLoop({ setActive }) {
   const { user } = useAuth()
+  const { t } = useLanguage()
   const [selected, setSelected] = useState('michi')
   const [reducedMotion, setReducedMotion] = useState(
     () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
@@ -142,27 +144,23 @@ export default function GrowthLoop({ setActive }) {
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       <div>
-        <h2 className="text-2xl font-bold text-white">The Loop</h2>
+        <h2 className="text-2xl font-bold text-white">{t('loop.header.title')}</h2>
         <p className="text-sm text-slate-400 mt-1">
-          Six agents, one cycle, your Japanese travelling around it. Nobody here works alone:
-          each one hands its work to the next, and everything lands back in your Twin — so the
-          fleet you meet tomorrow is smarter than the one you met today.
+          {t('loop.header.intro')}
         </p>
       </div>
 
       {!hasAnyData && (
         <section className="rounded-2xl glass p-5 card-glow space-y-2">
-          <h3 className="text-base font-semibold text-white">This Is How {brand.name} Works</h3>
+          <h3 className="text-base font-semibold text-white">{t('loop.empty.title', { brand: brand.name })}</h3>
           <p className="text-sm text-slate-300">
-            This is the machine, shown honestly before it has your data: every number on this
-            page appears only when it is really yours — nothing here is a sample. One session
-            starts the loop turning.
+            {t('loop.empty.body')}
           </p>
           <button
             onClick={() => setActive?.('session')}
             className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold inline-flex items-center gap-1"
           >
-            Start With One Session <ChevronRight size={14} />
+            {t('loop.empty.start')} <ChevronRight size={14} />
           </button>
         </section>
       )}
@@ -206,18 +204,18 @@ export default function GrowthLoop({ setActive }) {
 
           {/* The Twin at the centre — the queue is the flywheel. */}
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[46%] text-center pointer-events-none">
-            <p className="text-[11px] uppercase tracking-widest text-slate-400">Your Twin</p>
+            <p className="text-[11px] uppercase tracking-widest text-slate-400">{t('loop.centre.twin')}</p>
             <p className="text-4xl font-bold text-white mt-1">{centre.queueTotal}</p>
-            <p className="text-xs text-slate-300">words in your one queue</p>
+            <p className="text-xs text-slate-300">{t('loop.centre.words')}</p>
             {centre.queueTotal > 0 && (
               <p className="text-[11px] text-slate-400 mt-1">
-                {centre.graduated} graduated · {centre.fresh} fresh
+                {t('loop.centre.breakdown', { graduated: centre.graduated, fresh: centre.fresh })}
               </p>
             )}
             {est.band && (
               <p className="text-[11px] mt-1.5">
-                <span className="text-[#FF8A75] font-medium">Working level {est.band}</span>
-                <span className="text-slate-500"> (estimate)</span>
+                <span className="text-[#FF8A75] font-medium">{t('loop.centre.workingLevel', { band: est.band })}</span>
+                <span className="text-slate-500"> {t('loop.centre.estimate')}</span>
               </p>
             )}
           </div>
@@ -252,7 +250,7 @@ export default function GrowthLoop({ setActive }) {
             )
           })}
         </div>
-        <p className="text-center text-xs text-slate-500 mt-2">Tap an agent to see its handoff.</p>
+        <p className="text-center text-xs text-slate-500 mt-2">{t('loop.diagram.tap')}</p>
       </section>
 
       {/* ——— The selected agent's handoff ——— */}
@@ -269,16 +267,16 @@ export default function GrowthLoop({ setActive }) {
         </div>
         <div className="space-y-2 text-sm">
           <p className="text-slate-300">
-            <span className="text-slate-500 font-medium">Gets — </span>{selHandoff.gets}
+            <span className="text-slate-500 font-medium">{t('loop.handoff.gets')} </span>{t(selHandoff.getsKey)}
           </p>
           <p className="text-slate-300 flex items-start gap-1.5">
             <ArrowRight size={15} className="mt-0.5 shrink-0" style={{ color: sel.color }} />
-            <span><span className="text-slate-500 font-medium">Hands on to {selHandoff.next} — </span>{selHandoff.hands}</span>
+            <span><span className="text-slate-500 font-medium">{t('loop.handoff.handsTo', { next: selHandoff.nextKey ? t(selHandoff.nextKey) : selHandoff.next })} </span>{t(selHandoff.handsKey)}</span>
           </p>
         </div>
         {(selStat.stat || selStat.detail) && (
           <div className="rounded-xl bg-white/[0.03] border border-white/5 px-4 py-3">
-            <p className="text-[11px] uppercase tracking-widest text-slate-500">In Your Loop Right Now</p>
+            <p className="text-[11px] uppercase tracking-widest text-slate-500">{t('loop.handoff.inYourLoop')}</p>
             {selStat.stat && <p className="text-base font-semibold text-white mt-1">{selStat.stat}</p>}
             {selStat.detail && <p className="text-sm text-slate-300 mt-0.5">{selStat.detail}</p>}
           </div>
@@ -287,13 +285,13 @@ export default function GrowthLoop({ setActive }) {
           onClick={() => setActive?.(selHandoff.door.view)}
           className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium inline-flex items-center gap-1.5"
         >
-          {selHandoff.door.label} <ChevronRight size={14} />
+          {t(selHandoff.door.labelKey)} <ChevronRight size={14} />
         </button>
       </section>
 
       {/* ——— Your Japanese this week ——— */}
       <section className="rounded-2xl glass p-5 card-glow space-y-3">
-        <h3 className="text-base font-semibold text-white">Your Japanese This Week</h3>
+        <h3 className="text-base font-semibold text-white">{t('loop.week.title')}</h3>
         {week.hasData ? (
           <div className="grid grid-cols-3 gap-3">
             {week.tiles.map((t) => (
@@ -305,13 +303,12 @@ export default function GrowthLoop({ setActive }) {
           </div>
         ) : (
           <p className="text-sm text-slate-400">
-            Not enough data yet — this strip only ever shows real numbers from the last seven
-            days, and yours have not started. One session changes that.
+            {t('loop.week.empty')}
           </p>
         )}
         <p className="text-xs text-slate-500">
-          Everything above lands back in your Twin — and next week, Michi reads a smarter one.
-          {user ? '' : ' The loop keeps its memory on this device.'}
+          {t('loop.week.footer')}
+          {user ? '' : ` ${t('loop.week.footerGuest')}`}
         </p>
       </section>
     </div>

@@ -11,6 +11,7 @@ import { PERSONAS, PAINS, PROOF_TARGETS } from '../lib/profile.js'
 import { SECTION_KEYS } from '../lib/levels.js'
 import Mascot from './Mascot.jsx'
 import { useAuth } from '../hooks/useAuth.js'
+import { useLanguage } from '../hooks/useLanguage.js'
 import { downloadAllLocalData, wipeAllLocalData, requestServerAccountDeletion } from '../lib/accountDeletion.js'
 import { getTwinSyncState, subscribeTwinSync, TWIN_SYNC_EVENT } from '../lib/twinSync.js'
 import { getStateSyncState, subscribeStateSync } from '../lib/stateSync.js'
@@ -30,12 +31,7 @@ import { Upload } from 'lucide-react'
 // queue, profile and diagnosis stay, and the fleet simply starts learning
 // again from the next session, which the copy says out loud.
 
-const METHOD_LABELS = {
-  voice: 'Speaking — scenes & calls',
-  mining: 'Cards from your own documents',
-  listening: 'Listening bites',
-  reading: 'Reading checks',
-}
+// Method labels are chrome — resolved via i18n (twin.method.*) inside TwinView.
 
 // Yonde Reader on Telegram (Doc 16, R0). The working bot name from
 // Doc 16 §6 — Landry still owes the handle confirmation, so it lives in
@@ -54,6 +50,7 @@ function makeLinkCode() {
 }
 
 function ReaderLinkCard({ user, setActive }) {
+  const { t } = useLanguage()
   const [status, setStatus] = useState('loading') // loading | setup | unlinked | pending | linked
   const [link, setLink] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -112,46 +109,46 @@ function ReaderLinkCard({ user, setActive }) {
   }
 
   return (
-    <Section title="Yonde Reader on Telegram" hint="Hori, your Miner, in the app that is already open every day.">
-      {status === 'loading' && <p className="text-sm text-slate-400">Checking your Telegram link…</p>}
+    <Section title={t('twin.reader.title')} hint={t('twin.reader.hint')}>
+      {status === 'loading' && <p className="text-sm text-slate-400">{t('twin.reader.checking')}</p>}
       {status === 'setup' && (
         <p className="text-sm text-slate-300">
           {user
-            ? 'Reader is still being set up on our side — the Telegram door is being finished. Nothing for you to do; this card wakes up when it is ready.'
-            : 'Sign in first — the Reader link belongs to your account, so your fitted passages and mined words land in your queue, not a stranger’s.'}
+            ? t('twin.reader.setupSignedIn')
+            : t('twin.reader.setupSignedOut')}
         </p>
       )}
       {status === 'unlinked' && (
         <div className="space-y-3">
           <div className="flex items-start gap-2.5">
             <span className="mt-0.5"><Mascot agent="hori" size={28} showName={false} /></span>
-            <p className="text-sm text-slate-300">Connect Telegram and Hori will send you a short passage fitted to the words you actually know — new words in bold, one tap to mine them into your one queue. For now he answers when you ask, with <span className="text-slate-100 font-medium">/read</span>; the morning passage arrives in the next stage. No streaks, no nagging, ever.</p>
+            <p className="text-sm text-slate-300">{t('twin.reader.unlinkedIntro')} <span className="text-slate-100 font-medium">/read</span>{t('twin.reader.unlinkedOutro')}</p>
           </div>
-          <button onClick={connect} disabled={busy} className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] disabled:opacity-40 text-white text-sm font-semibold flex items-center gap-1.5"><Send size={15} /> Connect Telegram</button>
+          <button onClick={connect} disabled={busy} className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] disabled:opacity-40 text-white text-sm font-semibold flex items-center gap-1.5"><Send size={15} /> {t('twin.reader.connect')}</button>
         </div>
       )}
       {status === 'pending' && link?.link_code && (
         <div className="space-y-3">
-          <p className="text-sm text-slate-300">Tap <span className="text-slate-100 font-medium">Open Telegram</span>, then press <span className="text-slate-100 font-medium">Start</span> in the bot — that finishes the link. The code expires in 30 minutes; if Telegram does not open, start @{READER_BOT_USERNAME} yourself and send <span className="font-mono text-slate-100">/start {link.link_code}</span>.</p>
+          <p className="text-sm text-slate-300">{t('twin.reader.pendingTap')} <span className="text-slate-100 font-medium">{t('twin.reader.openTelegram')}</span>{t('twin.reader.pendingThenPress')} <span className="text-slate-100 font-medium">{t('twin.reader.pendingStart')}</span> {t('twin.reader.pendingRest', { bot: READER_BOT_USERNAME })} <span className="font-mono text-slate-100">/start {link.link_code}</span>.</p>
           <div className="flex flex-wrap items-center gap-2">
-            <a href={`https://t.me/${READER_BOT_USERNAME}?start=${link.link_code}`} target="_blank" rel="noreferrer" className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold flex items-center gap-1.5"><Send size={15} /> Open Telegram</a>
+            <a href={`https://t.me/${READER_BOT_USERNAME}?start=${link.link_code}`} target="_blank" rel="noreferrer" className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold flex items-center gap-1.5"><Send size={15} /> {t('twin.reader.openTelegram')}</a>
             <span className="font-mono text-sm text-slate-200 bg-bun-800 border border-bun-600/40 rounded-lg px-2.5 py-1.5">{link.link_code}</span>
-            <button onClick={refresh} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium">Refresh Status</button>
+            <button onClick={refresh} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium">{t('twin.reader.refreshStatus')}</button>
           </div>
         </div>
       )}
       {status === 'linked' && (
         <div className="flex flex-wrap items-center gap-3">
           <p className="text-sm text-slate-300 flex-1 min-w-[220px]">
-            Connected{link?.username ? <> as <span className="text-slate-100 font-medium">@{link.username}</span></> : ''} — your chat is linked. Send <span className="text-slate-100 font-medium">/read</span> there any time and Hori digs up your next passage.
+            {t('twin.reader.connected')}{link?.username ? <> {t('twin.reader.connectedAs')} <span className="text-slate-100 font-medium">@{link.username}</span></> : ''} {t('twin.reader.connectedSuffix')} <span className="text-slate-100 font-medium">/read</span> {t('twin.reader.connectedOutro')}
           </p>
-          <button onClick={unlink} disabled={busy} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 disabled:opacity-40 text-slate-100 text-sm font-medium">Unlink</button>
+          <button onClick={unlink} disabled={busy} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 disabled:opacity-40 text-slate-100 text-sm font-medium">{t('twin.reader.unlink')}</button>
         </div>
       )}
       {status !== 'loading' && (
         <div className="flex flex-wrap items-center gap-3 pt-1">
-          <p className="text-sm text-slate-400 flex-1 min-w-[220px]">The same shelf lives here in the app, too — fitted to your words, every word tappable.</p>
-          <button onClick={() => setActive?.('reader')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1.5"><BookOpenText size={15} /> Open The Reader Here</button>
+          <p className="text-sm text-slate-400 flex-1 min-w-[220px]">{t('twin.reader.shelf')}</p>
+          <button onClick={() => setActive?.('reader')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1.5"><BookOpenText size={15} /> {t('twin.reader.openHere')}</button>
         </div>
       )}
     </Section>
@@ -165,6 +162,7 @@ function ReaderLinkCard({ user, setActive }) {
 // never overwrites the diagnosis, the promise, or any stored band:
 // those stay exactly what their own code paths wrote.
 function WorkingLevelCard({ user }) {
+  const { t } = useLanguage()
   const [readerEvidence, setReaderEvidence] = useState({ declaredBand: null, lastGoodStep: 0 })
   useEffect(() => {
     let cancelled = false
@@ -203,22 +201,27 @@ function WorkingLevelCard({ user }) {
     lastGoodStep: readerEvidence.lastGoodStep,
   })
   const confidenceLine = {
-    low: 'early days — little activity behind it so far',
-    medium: 'forming — a fair amount of activity behind it',
-    high: 'well-grounded — a lot of activity behind it',
+    low: t('twin.working.confLow'),
+    medium: t('twin.working.confMedium'),
+    high: t('twin.working.confHigh'),
+  }[est.confidence]
+  const confidenceWord = {
+    low: t('twin.working.confWordLow'),
+    medium: t('twin.working.confWordMedium'),
+    high: t('twin.working.confWordHigh'),
   }[est.confidence]
 
   return (
-    <Section title="Working Level (Estimate)" hint="Between checkups, your activity keeps talking. This is what it adds up to — worked out on this device, from your own record, in plain code.">
+    <Section title={t('twin.working.title')} hint={t('twin.working.hint')}>
       {est.band ? (
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
           <p className="text-3xl font-bold text-white">{est.band}</p>
-          <p className="text-sm text-slate-300">Confidence: <span className="text-[#FF8A75] font-medium">{est.confidence}</span> — {confidenceLine}.</p>
+          <p className="text-sm text-slate-300">{t('twin.working.confidenceLabel')} <span className="text-[#FF8A75] font-medium">{confidenceWord}</span> — {confidenceLine}.</p>
         </div>
       ) : (
-        <p className="text-sm text-slate-300">Not enough signal yet — finish a checkup, master some queue cards, take a few calls, or read with Hori, and a working level starts to form here.</p>
+        <p className="text-sm text-slate-300">{t('twin.working.empty')}</p>
       )}
-      <p className="text-xs text-slate-500">This is an estimate from your activity, not a diagnosis. Your diagnosis and your promise are unchanged by it — this number never overwrites them.</p>
+      <p className="text-xs text-slate-500">{t('twin.working.footnote')}</p>
     </Section>
   )
 }
@@ -232,6 +235,7 @@ function WorkingLevelCard({ user }) {
 // pace while it is the winning basis. "Not Sure" records nothing and
 // points at the checkup, the real answer.
 function YourLevelCard({ setActive }) {
+  const { t } = useLanguage()
   const [declared, setDeclared] = useState(() => loadDeclaredLevel())
   const [justPicked, setJustPicked] = useState(null)
   const [notSure, setNotSure] = useState(false)
@@ -264,32 +268,32 @@ function YourLevelCard({ setActive }) {
   }
 
   return (
-    <Section title="Your Level" hint="The level your fleet aims at. A checkup measures it; a tap just declares it — and you can change your mind any time.">
+    <Section title={t('twin.level.title')} hint={t('twin.level.hint')}>
       {basis.source === 'diagnosis' && (
         <div className="space-y-1">
           <p className="text-3xl font-bold text-white">{basis.band}</p>
-          <p className="text-sm text-slate-300">From your checkup — it measured you, so it stays in charge.</p>
-          <p className="text-sm text-slate-400">Your checkup outranks a tap — it measured, this guesses. You can still declare below; it just stays second.</p>
-          {declared && <p className="text-xs text-slate-500">On record from your tap: {declaredDisplay}.</p>}
+          <p className="text-sm text-slate-300">{t('twin.level.fromCheckup')}</p>
+          <p className="text-sm text-slate-400">{t('twin.level.checkupOutranks')}</p>
+          {declared && <p className="text-xs text-slate-500">{t('twin.level.onRecord', { band: declaredDisplay })}</p>}
         </div>
       )}
       {basis.source === 'declared' && basis.rawBand === 'N7' && (
         <div className="space-y-1">
           <p className="text-3xl font-bold text-white">N7+ 😂</p>
-          <p className="text-sm text-slate-300">You told us — and we heard the real message underneath the joke: start me gently.</p>
-          <p className="text-sm text-slate-300"><span className="text-[#FF8A75] font-medium">Foundations pace:</span> we start from the bases and climb slower — more comfortable reads before anything steps up.</p>
+          <p className="text-sm text-slate-300">{t('twin.level.n7Heard')}</p>
+          <p className="text-sm text-slate-300"><span className="text-[#FF8A75] font-medium">{t('twin.level.foundationsPace')}</span> {t('twin.level.foundationsRest')}</p>
         </div>
       )}
       {basis.source === 'declared' && basis.rawBand !== 'N7' && (
         <div className="space-y-1">
           <p className="text-3xl font-bold text-white">{basis.band}</p>
-          <p className="text-sm text-slate-300">You told us: {declaredDisplay}. No checkup yet, so your fleet aims at your word until a checkup measures the real thing.</p>
+          <p className="text-sm text-slate-300">{t('twin.level.youToldUs', { band: declaredDisplay })}</p>
         </div>
       )}
       {basis.source === 'none' && (
         <div className="space-y-1">
-          <p className="text-xl font-bold text-white">Not set yet</p>
-          <p className="text-sm text-slate-300">Tell us where you think you are, and your fleet has a level to aim at from day one.</p>
+          <p className="text-xl font-bold text-white">{t('twin.level.notSet')}</p>
+          <p className="text-sm text-slate-300">{t('twin.level.notSetHint')}</p>
         </div>
       )}
 
@@ -300,27 +304,27 @@ function YourLevelCard({ setActive }) {
           onClick={pickNotSure}
           className="px-3.5 py-2 rounded-xl text-sm font-medium border border-white/10 bg-transparent hover:bg-white/5 text-slate-300 transition-colors"
         >
-          Not Sure
+          {t('twin.level.notSure')}
         </button>
       </div>
 
       {justPicked === 'N7' && (
-        <p className="text-sm text-[#FF8A75]">N7+ — the legendary level. Below the test, above giving up. We start at the very beginning.</p>
+        <p className="text-sm text-[#FF8A75]">{t('twin.level.n7Picked')}</p>
       )}
       {justPicked && justPicked !== 'N7' && (
         <p className="text-sm text-[#FF8A75]">{basis.source === 'diagnosis'
-          ? `Noted — ${justPicked} is on record. Your checkup still leads.`
-          : `Got it — ${justPicked} it is. Your fleet aims there now.`}</p>
+          ? t('twin.level.notedDiagnosis', { band: justPicked })
+          : t('twin.level.noted', { band: justPicked })}</p>
       )}
       {notSure && (
         <div className="space-y-2">
-          <p className="text-sm text-slate-300">Fair enough — guessing helps nobody. The checkup is the real answer.</p>
+          <p className="text-sm text-slate-300">{t('twin.level.notSureLine')}</p>
           <button onClick={() => setActive?.('diagnosis')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium inline-flex items-center gap-1">
-            Take The Checkup <ChevronRight size={14} />
+            {t('twin.level.takeCheckup')} <ChevronRight size={14} />
           </button>
         </div>
       )}
-      <p className="text-xs text-slate-500">One declaration, everywhere — this is the same level your Reader on Telegram reads.</p>
+      <p className="text-xs text-slate-500">{t('twin.level.footer')}</p>
     </Section>
   )
 }
@@ -338,6 +342,7 @@ function Section({ title, children, hint }) {
 }
 
 export default function TwinView({ setActive }) {
+  const { lang, setLang, languages, t } = useLanguage()
   const [twin, setTwin] = useState(() => refreshTwin())
   // Quiet sync state (Doc 04 §3): signed out, the Twin lives on this
   // device only; signed in, it mirrors to the learner's account. Shown as
@@ -359,6 +364,12 @@ export default function TwinView({ setActive }) {
   const [delResult, setDelResult] = useState(null)
   const [deleted, setDeleted] = useState(false)
   const { meta } = detectMode()
+  const methodLabels = {
+    voice: t('twin.method.voice'),
+    mining: t('twin.method.mining'),
+    listening: t('twin.method.listening'),
+    reading: t('twin.method.reading'),
+  }
   const patterns = topPatterns(twin, 8)
   const rows = learningStyleRows(twin)
   const deltas = diagnosisDeltas()
@@ -385,13 +396,13 @@ export default function TwinView({ setActive }) {
     setRestoreError(''); setRestoreReport(null)
     if (!file) return
     let parsed
-    try { parsed = JSON.parse(await file.text()) } catch { setRestoreError('That file could not be read as JSON — nothing was restored.'); return }
+    try { parsed = JSON.parse(await file.text()) } catch { setRestoreError(t('twin.privacy.restoreUnreadable')); return }
     const v = validateExport(parsed)
     if (!v.ok) { setRestoreError(v.reason); return }
     const { writes, report } = planRestore(collectAllLocalData(), v.data)
     try {
       for (const [k, val] of Object.entries(writes)) localStorage.setItem(k, JSON.stringify(val))
-    } catch { setRestoreError('This device refused part of the restore (storage may be full) — some items may not have been written. Nothing was deleted.'); return }
+    } catch { setRestoreError(t('twin.privacy.restoreRefused')); return }
     setRestoreReport(report)
   }
 
@@ -409,7 +420,7 @@ export default function TwinView({ setActive }) {
   }
 
   const wipe = () => {
-    if (!window.confirm('Delete what your fleet has learned about you? Your queue, your problem profile and your diagnosis stay. The fleet starts learning again from your next session.')) return
+    if (!window.confirm(t('twin.fleet.confirmDelete'))) return
     deleteTwin()
     setDeleted(true)
   }
@@ -417,9 +428,9 @@ export default function TwinView({ setActive }) {
   if (deleted) {
     return (
       <div className="max-w-2xl mx-auto text-center py-16 space-y-4">
-        <h2 className="text-2xl font-bold text-white">Fleet memory deleted</h2>
-        <p className="text-sm text-slate-300 max-w-md mx-auto">Your Twin, Saki’s plans and Michi’s letters on this device are gone. Your queue, your problem and your diagnosis are untouched. From your next session, the fleet starts learning you again — that is the whole deal, and it is yours to restart or not.</p>
-        <button onClick={() => setActive?.('dashboard')} className="px-5 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold">Back To Today</button>
+        <h2 className="text-2xl font-bold text-white">{t('twin.deleted.title')}</h2>
+        <p className="text-sm text-slate-300 max-w-md mx-auto">{t('twin.deleted.body')}</p>
+        <button onClick={() => setActive?.('dashboard')} className="px-5 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold">{t('twin.backToToday')}</button>
       </div>
     )
   }
@@ -427,22 +438,22 @@ export default function TwinView({ setActive }) {
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       <div>
-        <h2 className="text-2xl font-bold text-white">What Your Fleet Knows About You</h2>
-        <p className="text-sm text-slate-400 mt-1">{brand.name} keeps a model of your Japanese — your Twin — so every session is built for you, not for an average learner. It lives on this device, it is yours to inspect, correct, export or delete. <span className="text-slate-300">{brand.tagline}.</span></p>
-        <p className="text-xs text-slate-500 mt-1.5">Fleet memory: {syncState === 'local-only'
-          ? 'this device only'
+        <h2 className="text-2xl font-bold text-white">{t('twin.header.title')}</h2>
+        <p className="text-sm text-slate-400 mt-1">{t('twin.header.intro', { brand: brand.name })} <span className="text-slate-300">{brand.tagline}.</span></p>
+        <p className="text-xs text-slate-500 mt-1.5">{t('twin.header.fleetMemory')} {syncState === 'local-only'
+          ? t('twin.header.syncLocalOnly')
           : syncState === 'synced'
-            ? 'synced to your account'
+            ? t('twin.header.syncSynced')
             : syncState === 'syncing'
-              ? 'syncing to your account…'
-              : 'on this device — sync will retry'}</p>
-        <p className="text-xs text-slate-500 mt-1">Your queue, problem, diagnosis and promise: {stateSyncState === 'local-only'
-          ? 'on this device only — sign in and they follow you'
+              ? t('twin.header.syncSyncing')
+              : t('twin.header.syncRetry')}</p>
+        <p className="text-xs text-slate-500 mt-1">{t('twin.header.queueLine')} {stateSyncState === 'local-only'
+          ? t('twin.header.stateLocalOnly')
           : stateSyncState === 'synced'
-            ? 'synced to your account — a new phone picks up where this one left off'
+            ? t('twin.header.stateSynced')
             : stateSyncState === 'syncing'
-              ? 'syncing to your account…'
-              : 'on this device — sync will retry'}</p>
+              ? t('twin.header.syncSyncing')
+              : t('twin.header.syncRetry')}</p>
       </div>
 
       {/* The Loop entry (Doc 05 §11): the fleet-togetherness view. The
@@ -454,8 +465,8 @@ export default function TwinView({ setActive }) {
       >
         <Mascot agent="michi" size={46} showName={false} motion="none" />
         <span className="flex-1 min-w-0">
-          <span className="block text-base font-semibold text-white">See How Your Fleet Works Together</span>
-          <span className="block text-sm text-slate-400 mt-0.5">The Loop — six agents handing work to each other around your Twin, with your real numbers on every handoff.</span>
+          <span className="block text-base font-semibold text-white">{t('twin.loopEntry.title')}</span>
+          <span className="block text-sm text-slate-400 mt-0.5">{t('twin.loopEntry.hint')}</span>
         </span>
         <ChevronRight size={18} className="text-slate-400 shrink-0" />
       </button>
@@ -478,7 +489,7 @@ export default function TwinView({ setActive }) {
 
       <ReaderLinkCard user={user} setActive={setActive} />
 
-      <Section title="Where Your Japanese Stands" hint="Section scores come only from your health checks (estimates from short samples — never official scores). Speaking and register are labelled heuristic: patterns counted, not sounds judged.">
+      <Section title={t('twin.stands.title')} hint={t('twin.stands.hint')}>
         {Object.keys(twin.sections || {}).length ? (
           <div className="grid gap-3 sm:grid-cols-3">
             {SECTION_KEYS.map((s) => {
@@ -488,87 +499,87 @@ export default function TwinView({ setActive }) {
                 <div key={s.id} className="rounded-xl bg-bun-700/40 border border-bun-600/30 p-4">
                   <p className="text-xs text-slate-400">{s.label}</p>
                   <p className="text-2xl font-bold text-white">{sec.score}<span className="text-sm text-slate-400">/60</span></p>
-                  {sec.trend?.length > 1 && <p className="text-xs text-slate-400 mt-1">Trend: {sec.trend.join(' → ')}</p>}
-                  <p className="text-xs mt-1">{sec.score < 19 ? <span className="text-amber-300">Below the 19/60 survival line — the rescue target</span> : <span className="text-emerald-300">Above the survival line</span>}</p>
+                  {sec.trend?.length > 1 && <p className="text-xs text-slate-400 mt-1">{t('twin.stands.trend', { trend: sec.trend.join(' → ') })}</p>}
+                  <p className="text-xs mt-1">{sec.score < 19 ? <span className="text-amber-300">{t('twin.stands.belowLine')}</span> : <span className="text-emerald-300">{t('twin.stands.aboveLine')}</span>}</p>
                 </div>
               )
             })}
           </div>
-        ) : <p className="text-sm text-slate-300">No health check yet — run the 10-minute Diagnosis once and this fills in with your real sections, not a guess.</p>}
+        ) : <p className="text-sm text-slate-300">{t('twin.stands.empty')}</p>}
         <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-slate-300">
-          <p>Speaking (heuristic): {twin.speaking.masteredScenes || 0} scenes mastered · average attempt score {twin.speaking.avgBest ?? '—'}%</p>
-          <p>Register (heuristic): {twin.register.bjtBand ? `BJT estimate ${twin.register.bjtBand}${twin.register.bjtScore ? ` (~${twin.register.bjtScore})` : ''} · ` : ''}{twin.register.keigoAttempts || 0} business/keigo attempts counted</p>
+          <p>{t('twin.stands.speaking', { scenes: twin.speaking.masteredScenes || 0, avg: twin.speaking.avgBest ?? '—' })}</p>
+          <p>{t('twin.stands.register', { bjt: twin.register.bjtBand ? (twin.register.bjtScore ? t('twin.stands.bjtWithScore', { band: twin.register.bjtBand, score: twin.register.bjtScore }) : t('twin.stands.bjt', { band: twin.register.bjtBand })) : '', attempts: twin.register.keigoAttempts || 0 })}</p>
         </div>
-        {deltas && <p className="text-xs text-slate-500">Latest movement between checks: total {deltas.total > 0 ? `+${deltas.total}` : deltas.total} — the full trend lives in Diagnosis and in Michi’s letters.</p>}
+        {deltas && <p className="text-xs text-slate-500">{t('twin.stands.deltas', { total: deltas.total > 0 ? `+${deltas.total}` : deltas.total })}</p>}
       </Section>
 
       <YourLevelCard setActive={setActive} />
 
       <WorkingLevelCard user={user} />
 
-      <Section title="What Trips You Up" hint="Your error fingerprint — counted from your own attempts by simple local rules (a heuristic: it spots likely patterns, it does not grade like a teacher). Wrong about one? Remove it; your correction outranks the counting, permanently.">
+      <Section title={t('twin.trips.title')} hint={t('twin.trips.hint')}>
         {patterns.length ? (
           <ul className="space-y-2">
             {patterns.map((p) => (
               <li key={p.id} className="flex items-start gap-3 rounded-xl bg-bun-700/40 border border-bun-600/20 p-3.5">
                 <span className="mt-0.5"><Mascot agent="nao" size={26} showName={false} /></span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-white">{p.label} <span className="text-xs font-normal text-slate-400">· seen {p.count}× · last {p.lastSeenAt ? new Date(p.lastSeenAt).toLocaleDateString() : '—'}</span></p>
+                  <p className="text-sm font-semibold text-white">{p.label} <span className="text-xs font-normal text-slate-400">{t('twin.trips.seen', { count: p.count, date: p.lastSeenAt ? new Date(p.lastSeenAt).toLocaleDateString() : '—' })}</span></p>
                   <p className="text-xs text-slate-400 mt-0.5">{patternById(p.id)?.plain}</p>
-                  {p.example && <p className="text-xs text-slate-500 mt-1 truncate">Your words: 「{p.example}」</p>}
+                  {p.example && <p className="text-xs text-slate-500 mt-1 truncate">{t('twin.trips.yourWords', { example: p.example })}</p>}
                 </div>
-                <button onClick={() => setTwin(removePattern(p.id))} className="shrink-0 flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-bun-800 border border-bun-600/40 text-slate-400 hover:text-white transition"><X size={12} /> Not Me — Remove</button>
+                <button onClick={() => setTwin(removePattern(p.id))} className="shrink-0 flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-bun-800 border border-bun-600/40 text-slate-400 hover:text-white transition"><X size={12} /> {t('twin.trips.remove')}</button>
               </li>
             ))}
           </ul>
-        ) : <p className="text-sm text-slate-300">Nothing counted yet. As you speak scenes and review cards, the slips that repeat will gather here — that list is what Saki plans around.</p>}
+        ) : <p className="text-sm text-slate-300">{t('twin.trips.empty')}</p>}
       </Section>
 
-      <Section title="How You Learn Best — So Far" hint="Proof points are a plain proxy: scenes mastered, mined cards graduated, items answered right. Points per hour is shown only as a guide — the confidence words matter more than the decimals.">
+      <Section title={t('twin.learn.title')} hint={t('twin.learn.hint')}>
         <div className="grid gap-2 sm:grid-cols-2">
           {rows.map((r) => (
             <div key={r.id} className="rounded-xl bg-bun-700/40 border border-bun-600/30 p-3.5">
-              <p className="text-sm font-semibold text-white">{METHOD_LABELS[r.id] || r.id}</p>
-              <p className="text-xs text-slate-400 mt-1">{r.trials} sessions · {r.proof} proof points{r.proofPerHour !== null ? ` · ~${r.proofPerHour} pts/hour (proxy)` : ''}</p>
-              <p className="text-xs mt-0.5"><span className="text-[#FF8A75]">Confidence: {r.confidence}</span></p>
+              <p className="text-sm font-semibold text-white">{methodLabels[r.id] || r.id}</p>
+              <p className="text-xs text-slate-400 mt-1">{t('twin.learn.rowStats', { trials: r.trials, proof: r.proof })}{r.proofPerHour !== null ? ` · ${t('twin.learn.perHour', { perHour: r.proofPerHour })}` : ''}</p>
+              <p className="text-xs mt-0.5"><span className="text-[#FF8A75]">{t('twin.learn.confidence', { confidence: r.confidence })}</span></p>
             </div>
           ))}
         </div>
         {twin.learningStyle?.note && (
           <div className="rounded-xl bg-sky-500/10 border border-sky-500/25 p-3.5 flex items-start gap-2.5">
             <Mascot agent="saki" size={28} showName={false} />
-            <p className="text-sm text-slate-200"><span className="font-semibold text-white">Saki’s method note:</span> {twin.learningStyle.note}</p>
+            <p className="text-sm text-slate-200"><span className="font-semibold text-white">{t('twin.learn.sakiNote')}</span> {twin.learningStyle.note}</p>
           </div>
         )}
       </Section>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Section title="Your Life, As The App Knows It" hint="From the problem you named on day one. If life changed, the plan should too.">
+        <Section title={t('twin.life.title')} hint={t('twin.life.hint')}>
           <ul className="text-sm text-slate-300 space-y-1.5">
-            <li><span className="text-slate-500">You are:</span> {persona?.label || 'not set yet'}</li>
-            <li><span className="text-slate-500">What hurts:</span> {(twin.life?.pains || []).map((id) => PAINS.find((p) => p.id === id)?.label).filter(Boolean).join(' · ') || 'not set yet'}</li>
-            <li><span className="text-slate-500">Climbing toward:</span> {target?.label || 'not set yet'}</li>
+            <li><span className="text-slate-500">{t('twin.life.youAre')}</span> {persona?.label || t('twin.life.notSet')}</li>
+            <li><span className="text-slate-500">{t('twin.life.whatHurts')}</span> {(twin.life?.pains || []).map((id) => PAINS.find((p) => p.id === id)?.label).filter(Boolean).join(' · ') || t('twin.life.notSet')}</li>
+            <li><span className="text-slate-500">{t('twin.life.climbing')}</span> {target?.label || t('twin.life.notSet')}</li>
           </ul>
-          <button onClick={() => setActive?.('dashboard')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1">Change My Problem <ChevronRight size={14} /></button>
+          <button onClick={() => setActive?.('dashboard')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1">{t('twin.life.changeProblem')} <ChevronRight size={14} /></button>
         </Section>
 
-        <Section title="Your Rhythm" hint="How the days actually go — the fleet plans around this, never against it.">
+        <Section title={t('twin.rhythm.title')} hint={t('twin.rhythm.hint')}>
           <ul className="text-sm text-slate-300 space-y-1.5">
-            <li><span className="text-slate-500">Sessions logged:</span> {(twin.rhythm.sessionLog || []).length} recent · last {twin.rhythm.lastSessionAt ? new Date(twin.rhythm.lastSessionAt).toLocaleDateString() : '—'}</li>
-            <li><span className="text-slate-500">Calls:</span> {kept + missed ? `${kept} kept of ${kept + missed} recorded` : 'none recorded yet'}</li>
-            <li><span className="text-slate-500">Recent felt effort:</span> {(twin.rhythm.feltEffortRecent || []).slice(-3).join(' · ') || 'not answered yet'}</li>
+            <li><span className="text-slate-500">{t('twin.rhythm.sessions')}</span> {t('twin.rhythm.sessionsValue', { count: (twin.rhythm.sessionLog || []).length, date: twin.rhythm.lastSessionAt ? new Date(twin.rhythm.lastSessionAt).toLocaleDateString() : '—' })}</li>
+            <li><span className="text-slate-500">{t('twin.rhythm.calls')}</span> {kept + missed ? t('twin.rhythm.callsValue', { kept, total: kept + missed }) : t('twin.rhythm.callsNone')}</li>
+            <li><span className="text-slate-500">{t('twin.rhythm.feltEffort')}</span> {(twin.rhythm.feltEffortRecent || []).slice(-3).join(' · ') || t('twin.rhythm.notAnswered')}</li>
             {(() => { const m = summariseMetrics(loadMetrics()); return (
-              <li><span className="text-slate-500">Proof pace (North Star):</span> {m.minutesPerProofPoint !== null
-                ? <>{m.minutesPerProofPoint} minutes per proof point — {m.minutes} minutes across {m.sessions} finished session{m.sessions === 1 ? '' : 's'}, {m.proofPoints} proof points. Calls: {m.callsKept} kept · {m.callsPartial} partial · {m.callsMissed} missed (missed costs nothing, ever).</>
-                : 'not enough data yet — it is computed from your finished sessions only, never estimated.'}</li>) })()}
-            <li className="flex items-center gap-2 pt-1"><Mascot agent="michi" size={28} showName={false} /><span><span className="text-slate-500">Right now:</span> {meta.label} — the plan on Today already matches this.</span></li>
+              <li><span className="text-slate-500">{t('twin.rhythm.proofPace')}</span> {m.minutesPerProofPoint !== null
+                ? <>{t(m.sessions === 1 ? 'twin.rhythm.proofValueOne' : 'twin.rhythm.proofValue', { per: m.minutesPerProofPoint, minutes: m.minutes, sessions: m.sessions, proof: m.proofPoints, kept: m.callsKept, partial: m.callsPartial, missed: m.callsMissed })}</>
+                : t('twin.rhythm.proofNone')}</li>) })()}
+            <li className="flex items-center gap-2 pt-1"><Mascot agent="michi" size={28} showName={false} /><span><span className="text-slate-500">{t('twin.rhythm.rightNow')}</span> {meta.label} {t('twin.rhythm.rightNowSuffix')}</span></li>
           </ul>
-          <button onClick={() => setActive?.('coach')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1"><Mail size={14} /> Read Michi’s Letter</button>
+          <button onClick={() => setActive?.('coach')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1"><Mail size={14} /> {t('twin.rhythm.readLetter')}</button>
         </Section>
       </div>
 
-      <Section title="Your Words" hint="The ONE queue — every personal card you own, whatever made it.">
-        <p className="text-sm text-slate-300">{twin.vocab.queueTotal} cards total · {twin.vocab.graduated} graduated (reviewed 3+ times and holding) · {twin.vocab.fresh} brand new.</p>
+      <Section title={t('twin.words.title')} hint={t('twin.words.hint')}>
+        <p className="text-sm text-slate-300">{t('twin.words.stats', { total: twin.vocab.queueTotal, graduated: twin.vocab.graduated, fresh: twin.vocab.fresh })}</p>
         <div className="flex flex-wrap gap-1.5">
           {Object.entries(twin.vocab.bySource || {}).map(([src, n]) => (
             <span key={src} className="text-xs px-2 py-1 rounded-full bg-bun-800 border border-bun-600/40 text-slate-300">{src}: {n}</span>
@@ -577,38 +588,58 @@ export default function TwinView({ setActive }) {
       </Section>
 
       <section className="rounded-2xl border border-bun-600/30 p-5 flex flex-wrap items-center gap-3">
-        <p className="text-sm text-slate-300 flex-1 min-w-[220px]">This model is yours. Take it with you, or erase the fleet’s memory — the queue, your problem and your diagnosis stay either way.</p>
-        <button onClick={exportTwin} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1.5"><Download size={15} /> Export My Twin</button>
-        <button onClick={wipe} className="px-4 py-2 rounded-xl bg-rose-600/15 hover:bg-rose-600/25 border border-rose-500/30 text-rose-200 text-sm font-medium flex items-center gap-1.5"><Trash2 size={15} /> Delete Fleet Memory</button>
+        <p className="text-sm text-slate-300 flex-1 min-w-[220px]">{t('twin.fleet.text')}</p>
+        <button onClick={exportTwin} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1.5"><Download size={15} /> {t('twin.fleet.export')}</button>
+        <button onClick={wipe} className="px-4 py-2 rounded-xl bg-rose-600/15 hover:bg-rose-600/25 border border-rose-500/30 text-rose-200 text-sm font-medium flex items-center gap-1.5"><Trash2 size={15} /> {t('twin.fleet.delete')}</button>
       </section>
+
+      <Section title={t('settings.language')} hint={t('settings.languageHint')}>
+        <div className="flex flex-wrap gap-2">
+          {languages.map((entry) => {
+            const active = lang === entry.id
+            return (
+              <button
+                key={entry.id}
+                onClick={() => setLang(entry.id)}
+                aria-pressed={active}
+                className={`px-3.5 py-2 rounded-xl text-sm font-semibold border transition-colors ${active
+                  ? 'bg-[#FF6B57]/15 border-[#FF6B57] text-white'
+                  : 'bg-bun-700 hover:bg-bun-600 border-white/10 text-slate-200'}`}
+              >
+                {entry.label}
+              </button>
+            )
+          })}
+        </div>
+      </Section>
 
       <section className="rounded-2xl border border-bun-600/30 p-5 space-y-4">
         <div>
-          <h3 className="text-lg font-bold text-white">Privacy, Terms And Your Account</h3>
-          <p className="text-xs text-slate-500 mt-0.5">Different from Delete Fleet Memory above: that erases only what the fleet learned. This section is everything — all of your data, and your account itself.</p>
+          <h3 className="text-lg font-bold text-white">{t('twin.privacy.title')}</h3>
+          <p className="text-xs text-slate-500 mt-0.5">{t('twin.privacy.hint')}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => setActive?.('privacy')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium">Privacy Policy</button>
-          <button onClick={() => setActive?.('terms')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium">Terms Of Use</button>
-          <button onClick={downloadAllLocalData} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1.5"><Download size={15} /> Export Everything On This Device</button>
+          <button onClick={() => setActive?.('privacy')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium">{t('twin.privacy.policy')}</button>
+          <button onClick={() => setActive?.('terms')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium">{t('twin.privacy.terms')}</button>
+          <button onClick={downloadAllLocalData} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1.5"><Download size={15} /> {t('twin.privacy.exportAll')}</button>
           <label className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1.5 cursor-pointer">
-            <Upload size={15} /> Restore From A Backup
+            <Upload size={15} /> {t('twin.privacy.restore')}
             <input type="file" accept="application/json,.json" className="hidden" onChange={(e) => { runRestore(e.target.files?.[0]); e.target.value = '' }} />
           </label>
         </div>
-        <p className="text-xs text-slate-500">Restoring merges with what is on this device — your queue can only grow, newer records win, and nothing here is ever deleted by a restore.</p>
+        <p className="text-xs text-slate-500">{t('twin.privacy.restoreNote')}</p>
         {restoreError && <p className="text-sm text-rose-300">{restoreError}</p>}
         {restoreReport && (
           <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-4 space-y-2">
-            <p className="text-sm font-bold text-white">Backup merged in</p>
+            <p className="text-sm font-bold text-white">{t('twin.privacy.mergedTitle')}</p>
             <p className="text-sm text-slate-300">
-              Queue: {restoreReport.queueBefore} → {restoreReport.queueAfter} cards ({restoreReport.queueAdded} added).
-              {restoreReport.historyAfter > restoreReport.historyBefore && <> Diagnosis history grew by {restoreReport.historyAfter - restoreReport.historyBefore}.</>}
-              {restoreReport.twin === 'updated' && <> Your Twin was updated from the backup (it was newer).</>}
-              {restoreReport.slicesUpdated.length > 0 && <> Updated: {restoreReport.slicesUpdated.map((k) => k.replace('jpn:', '').replace(':v1', '')).join(', ')}.</>}
-              {restoreReport.restoredKeys > 0 && <> {restoreReport.restoredKeys} other saved item{restoreReport.restoredKeys === 1 ? '' : 's'} filled in.</>}
+              {t('twin.privacy.queueMerged', { before: restoreReport.queueBefore, after: restoreReport.queueAfter, added: restoreReport.queueAdded })}
+              {restoreReport.historyAfter > restoreReport.historyBefore && <> {t('twin.privacy.historyGrew', { n: restoreReport.historyAfter - restoreReport.historyBefore })}</>}
+              {restoreReport.twin === 'updated' && <> {t('twin.privacy.twinUpdated')}</>}
+              {restoreReport.slicesUpdated.length > 0 && <> {t('twin.privacy.updated', { list: restoreReport.slicesUpdated.map((k) => k.replace('jpn:', '').replace(':v1', '')).join(', ') })}</>}
+              {restoreReport.restoredKeys > 0 && <> {t(restoreReport.restoredKeys === 1 ? 'twin.privacy.otherFilled' : 'twin.privacy.otherFilledPlural', { n: restoreReport.restoredKeys })}</>}
             </p>
-            <button onClick={() => window.location.reload()} className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold">Reload To See It Everywhere</button>
+            <button onClick={() => window.location.reload()} className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold">{t('twin.privacy.reload')}</button>
           </div>
         )}
 
@@ -616,44 +647,44 @@ export default function TwinView({ setActive }) {
 
         {delStep === 'idle' && (
           <div className="flex flex-wrap items-center gap-3">
-            <p className="text-sm text-slate-300 flex-1 min-w-[220px]">Leaving for good? Delete your account and every piece of data {brand.name} holds about you.</p>
-            <button onClick={() => setDelStep('confirm')} className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold">Delete My Account And Data</button>
+            <p className="text-sm text-slate-300 flex-1 min-w-[220px]">{t('twin.account.leaving', { brand: brand.name })}</p>
+            <button onClick={() => setDelStep('confirm')} className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold">{t('twin.account.deleteButton')}</button>
           </div>
         )}
 
         {delStep === 'confirm' && (
           <div className="rounded-xl bg-rose-600/10 border border-rose-500/30 p-4 space-y-3">
-            <p className="text-sm font-bold text-white">What happens, exactly</p>
+            <p className="text-sm font-bold text-white">{t('twin.account.whatHappens')}</p>
             <ul className="text-sm text-slate-300 space-y-1.5 list-disc pl-5">
-              <li>Everything stored on this device is erased: your Twin, queue, profile, diagnosis, plans, letters, call settings and history — all of it.</li>
-              <li>{user ? 'Your server account deletion is requested and your rows are removed with it.' : 'You are not signed in on this device, so there is no server account attached to this data.'} One honest caveat: the server-side delete step is still being finished — if it cannot complete today, the result screen will tell you plainly, and your local data is still fully erased.</li>
-              <li>This cannot be undone. If you might come back, export first.</li>
+              <li>{t('twin.account.liDevice')}</li>
+              <li>{user ? t('twin.account.liServerUser') : t('twin.account.liServerGuest')} {t('twin.account.liCaveat')}</li>
+              <li>{t('twin.account.liUndo')}</li>
             </ul>
             <label className="flex items-start gap-2 text-sm text-slate-200 cursor-pointer">
               <input type="checkbox" checked={delAgreed} onChange={(e) => setDelAgreed(e.target.checked)} className="mt-0.5" />
-              I exported my data, or I am sure I don't need it
+              {t('twin.account.checkbox')}
             </label>
             <div className="flex flex-wrap gap-2">
-              <button onClick={downloadAllLocalData} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium">Export Everything First</button>
-              <button onClick={runAccountDeletion} disabled={!delAgreed} className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white text-sm font-semibold">Yes — Delete Everything</button>
-              <button onClick={() => setDelStep('idle')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium">Keep My Account</button>
+              <button onClick={downloadAllLocalData} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium">{t('twin.account.exportFirst')}</button>
+              <button onClick={runAccountDeletion} disabled={!delAgreed} className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white text-sm font-semibold">{t('twin.account.yesDelete')}</button>
+              <button onClick={() => setDelStep('idle')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium">{t('twin.account.keep')}</button>
             </div>
           </div>
         )}
 
-        {delStep === 'working' && <p className="text-sm text-slate-300">Deleting…</p>}
+        {delStep === 'working' && <p className="text-sm text-slate-300">{t('twin.account.deleting')}</p>}
 
         {delStep === 'done' && delResult && (
           <div className="rounded-xl bg-bun-700/40 border border-bun-600/30 p-4 space-y-2">
-            <p className="text-sm font-bold text-white">Done — here is exactly what happened</p>
-            <p className="text-sm text-slate-300">On this device: {delResult.removed} stored item{delResult.removed === 1 ? '' : 's'} erased. Nothing about you remains in this app on this device.</p>
+            <p className="text-sm font-bold text-white">{t('twin.account.doneTitle')}</p>
+            <p className="text-sm text-slate-300">{t(delResult.removed === 1 ? 'twin.account.doneDeviceOne' : 'twin.account.doneDevice', { n: delResult.removed })}</p>
             <p className="text-sm text-slate-300">
-              {delResult.server === 'deleted' && 'On the server: your account and its data were deleted.'}
-              {delResult.server === 'not-signed-in' && 'On the server: you were not signed in, so there was no account to delete.'}
-              {delResult.server === 'not-configured' && 'On the server: this build has no account server connected, so nothing existed there.'}
-              {delResult.server === 'pending-server' && 'On the server: the account deletion step could not complete — that part is still being finished on our side. Your data on this device is fully erased; to complete the server deletion, contact us from the Privacy Policy page and we will finish it for you.'}
+              {delResult.server === 'deleted' && t('twin.account.serverDeleted')}
+              {delResult.server === 'not-signed-in' && t('twin.account.serverNotSignedIn')}
+              {delResult.server === 'not-configured' && t('twin.account.serverNotConfigured')}
+              {delResult.server === 'pending-server' && t('twin.account.serverPending')}
             </p>
-            <button onClick={() => setActive?.('dashboard')} className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold">Back To Today</button>
+            <button onClick={() => setActive?.('dashboard')} className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold">{t('twin.backToToday')}</button>
           </div>
         )}
       </section>

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useLanguage } from '../hooks/useLanguage.js'
 
 // Kanji In This Passage (Doc 16 §5 amendment #10, Fit v2): the web
 // Reader's animated face of the Telegram readings block. The bot
@@ -22,6 +23,7 @@ import { useState } from 'react'
 //   onHighlight(word) — pulse/scroll the word in the passage
 //   onMineWord(candidates) — Reader's single-word mine flow
 export default function KanjiChips({ chips, activeWord, onHighlight, onMineWord }) {
+  const { t } = useLanguage()
   // Reader keys this component by passage id, so a new passage
   // remounts it: selection (and the mount stagger) start fresh.
   const [selected, setSelected] = useState(null)
@@ -31,7 +33,7 @@ export default function KanjiChips({ chips, activeWord, onHighlight, onMineWord 
 
   return (
     <div className="mt-5">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Kanji In This Passage</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">{t('reader.kanjiHeading')}</p>
       <div className="flex flex-wrap gap-2">
         {chips.map((chip, i) => (
           <button
@@ -63,7 +65,7 @@ export default function KanjiChips({ chips, activeWord, onHighlight, onMineWord 
               onClick={() => onMineWord?.([active.candidate])}
               className="mt-2 rounded-full bg-[#FF6B57] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#ff7f6e]"
             >
-              Mine This Word
+              {t('reader.mineThisWord')}
             </button>
           )}
         </div>

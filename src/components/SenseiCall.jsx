@@ -15,6 +15,7 @@ import {
   loadInbox, markInboxDone, fmtTime, MASTERY, INCOMING_CALL_KEY,
 } from '../lib/calls.js'
 import { useAuth } from '../hooks/useAuth.js'
+import { useLanguage } from '../hooks/useLanguage.js'
 import { syncCallWindows } from '../lib/callSync.js'
 import { bestScore, missingPhrases } from './VoiceLoop.jsx'
 import { recordVoiceAttempt, recordCallOutcome } from '../lib/twin.js'
@@ -91,6 +92,7 @@ function freshRingChain(profile, slotIdx) {
 export default function SenseiCall() {
   const profile = useMemo(loadProfile, [])
   const { user } = useAuth()
+  const { t } = useLanguage()
   // Honest reach mode (Doc 02 §3.2): signed in = the server scheduler can
   // ring a closed app by push; signed out = calls ring on this device when
   // the app opens. The settings copy below says exactly which one applies.
@@ -242,7 +244,7 @@ export default function SenseiCall() {
   const handleSilence = () => {
     if (turnRef.current !== 'listening') return
     if (repromptRef.current >= 1) {
-      dropToManual('I couldn’t hear you that time — type your line below, or tap Speak when you’re ready. Nothing is lost.')
+      dropToManual(t('call.manualNoHear'))
       return
     }
     repromptRef.current += 1
@@ -252,8 +254,8 @@ export default function SenseiCall() {
 
   const beginUserTurn = () => {
     if (phaseRef.current !== 'incall') return
-    if (micMutedRef.current) { dropToManual('Your mic is muted — unmute it above when you want to speak, or type instead.'); return }
-    if (!speechSupported) { dropToManual('Voice recognition isn’t available in this browser — typing works the same way on a call.'); return }
+    if (micMutedRef.current) { dropToManual(t('call.manualMicMutedTurn')); return }
+    if (!speechSupported) { dropToManual(t('call.manualNoVoice')); return }
     if (!micExplained()) { setShowMicPrompt(true); dropToManual(); return }
     setInterim('')
     startListening({ auto: true })
@@ -264,7 +266,7 @@ export default function SenseiCall() {
     micMutedRef.current = next
     setMicMuted(next)
     if (next) {
-      if (turnRef.current === 'listening') dropToManual('Mic muted — unmute above when you want to speak, or type instead.')
+      if (turnRef.current === 'listening') dropToManual(t('call.manualMicMutedToggle'))
     } else if (phaseRef.current === 'incall' && turnRef.current === 'manual') {
       setManualNote('')
       beginUserTurn()
@@ -385,12 +387,12 @@ export default function SenseiCall() {
     if (source === 'test' || source === 'mini') { setRing(null); setPhase('idle'); return }
     recordCallOutcome({ kept: false })
     let s = loadCallState()
-    s = recordHistory(s, { kind: 'call', scene: chain[0]?.title || 'Practice call', status: 'missed', bestScore: null, how })
+    s = recordHistory(s, { kind: 'call', scene: chain[0]?.title || t('call.practiceCallFallback'), status: 'missed', bestScore: null, how })
     const { state: next, outcome } = registerMiss(s, { slotIdx, wasCallback: source === 'callback', sceneTitle: chain[0]?.title })
     updateState(next)
     setInbox(loadInbox())
-    if (outcome.kind === 'callback') setNotice(`No answer needed right now — ${next.settings.senseiName} will call you back once, at ${fmtTime(outcome.at)}. Nothing else is owed.`)
-    else if (outcome.kind === 'inbox') setNotice('That was the callback — so instead of calling again, a short message is waiting in your inbox below, with a 60-second version for whenever you have a minute.')
+    if (outcome.kind === 'callback') setNotice(t('call.noticeCallback', { sensei: next.settings.senseiName, time: fmtTime(outcome.at) }))
+    else if (outcome.kind === 'inbox') setNotice(t('call.noticeInbox'))
     else setNotice('')
     setRing(null); setPhase('idle')
   }
@@ -408,7 +410,7 @@ export default function SenseiCall() {
 
   const startListening = ({ auto = false } = {}) => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-    if (!SR) { if (auto) dropToManual('Voice recognition isn’t available in this browser — typing works the same way on a call.'); return }
+    if (!SR) { if (auto) dropToManual(t('call.manualNoVoice')); return }
     stopSpeech() // half-duplex: Sensei is silenced before the mic opens
     stopRecognition()
     const session = listenSessionRef.current
@@ -565,9 +567,9 @@ export default function SenseiCall() {
 
   const queueErrors = (done) => {
     const items = done.filter((r) => r.imperfect).map((r) => ({
-      front: `${r.scene.title} — say it right: ${r.scene.promptEn}`,
+      front: t('call.queueFront', { title: r.scene.title, prompt: r.scene.promptEn }),
       back: r.scene.model,
-      note: `From your Yobidashi call. Your version: 「${r.firstText}」. Missing: ${r.firstMissing.join('、') || r.scene.targetPattern}. ${r.scene.commonError}`,
+      note: t('call.queueNote', { text: r.firstText, missing: r.firstMissing.join('、') || r.scene.targetPattern, error: r.scene.commonError }),
       source: 'voice', level: r.scene.level,
     }))
     if (items.length) addToQueue(items)
@@ -580,7 +582,7 @@ export default function SenseiCall() {
     if (ring && ring.source !== 'test') recordCallOutcome({ kept: true, bestScore: bestScoreVal, partial: done.length < chain.length })
     const weakest = [...done].sort((a, b) => a.best - b.best)[0]
     let s = loadCallState()
-    s = recordHistory(s, { kind: 'call', scene: chain[0]?.title || 'Practice call', status: 'completed', bestScore: bestScoreVal, exchanges: done.length })
+    s = recordHistory(s, { kind: 'call', scene: chain[0]?.title || t('call.practiceCallFallback'), status: 'completed', bestScore: bestScoreVal, exchanges: done.length })
     if (ring && (ring.source === 'slot' || ring.source === 'callback' || ring.source === 'catchup')) {
       const date = todayStr()
       const d = s.days[date]
@@ -616,14 +618,14 @@ export default function SenseiCall() {
     if (untouched) { const days = { ...s.days }; delete days[date]; s = { ...s, days } }
     s = ensureToday(s)
     updateState(s)
-    setSavedNote('Saved on this device. Today’s call times were re-planned from the new settings.')
+    setSavedNote(t('call.savedDevice'))
     setTimeout(() => setSavedNote(''), 4000)
     // Mirror to the server scheduler when signed in (no-op signed out), so
     // the summons can also reach a closed app — including the enabled flag,
     // so switching calls off here stops the server too.
     syncCallWindows(s).then((r) => {
       if (r === 'synced') {
-        setSavedNote('Saved on this device and synced to your account — calls can reach you even when the app is closed.')
+        setSavedNote(t('call.savedSynced'))
         setTimeout(() => setSavedNote(''), 5000)
       }
     }).catch(() => {})
@@ -635,105 +637,105 @@ export default function SenseiCall() {
   const testCall = () => startRinging({ source: 'test', slotIdx: 7, chain: freshRingChain(profile, 7) })
   const miniCall = (msg) => startRinging({ source: 'mini', slotIdx: msg.slotIdx || 0, inboxId: msg.id, chain: pickCallScenes(profile, msg.date || todayStr(), msg.slotIdx || 0, 2) })
 
-  const statusLabel = { pending: 'scheduled', ringing: 'calling now', completed: 'kept ✓', 'callback-scheduled': 'callback planned', missed: 'missed — moved to inbox', skipped: 'resting (day closed kindly)' }
+  const statusLabel = { pending: t('call.statusPending'), ringing: t('call.statusRinging'), completed: t('call.statusCompleted'), 'callback-scheduled': t('call.statusCallback'), missed: t('call.statusMissed'), skipped: t('call.statusSkipped') }
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <div>
-        <h2 className="text-2xl font-bold text-white flex items-center gap-2"><Phone size={22} className="text-emerald-300" /> Yobidashi</h2>
-        <p className="text-sm text-slate-400 mt-1 max-w-2xl">The learners who got good had a life that <em>required</em> Japanese every day — a lab, a company. If your life requires none, this manufactures a small requirement instead: a short spoken call, at a varied time inside windows you choose. Miss it, and it calls back <strong className="text-slate-200">once</strong> — then leaves a kind message, then silence. No streaks. No penalties. Ever.</p>
+        <h2 className="text-2xl font-bold text-white flex items-center gap-2"><Phone size={22} className="text-emerald-300" /> {t('call.title')}</h2>
+        <p className="text-sm text-slate-400 mt-1 max-w-2xl">{t('call.introA')}<em>{t('call.introRequired')}</em>{t('call.introB')}<strong className="text-slate-200">{t('call.introOnce')}</strong>{t('call.introC')}</p>
       </div>
 
       {notice && (
         <div className="rounded-2xl bg-cyan-500/10 border border-cyan-500/30 p-4 text-sm text-cyan-100 flex items-start gap-2">
           <Bell size={16} className="shrink-0 mt-0.5" /> <span>{notice}</span>
-          <button onClick={() => setNotice('')} className="ml-auto text-cyan-300 hover:text-white" aria-label="Dismiss"><X size={15} /></button>
+          <button onClick={() => setNotice('')} className="ml-auto text-cyan-300 hover:text-white" aria-label={t('call.dismiss')}><X size={15} /></button>
         </div>
       )}
       {day?.callback && day.callback.status === 'pending' && phase === 'idle' && (
         <div className="rounded-2xl bg-amber-500/10 border border-amber-500/30 p-4 text-sm text-amber-100 flex items-center gap-2">
-          <Clock size={16} /> I’ll call you back at <strong>{fmtTime(new Date(day.callback.at))}</strong> — once. After that, a message, not another call.
+          <Clock size={16} /> {t('call.callbackBefore')}<strong>{fmtTime(new Date(day.callback.at))}</strong>{t('call.callbackAfter')}
         </div>
       )}
 
       {/* Today's plan */}
       <section className="rounded-2xl glass p-5 card-glow space-y-3">
-        <h3 className="font-bold text-white">Today’s calls</h3>
+        <h3 className="font-bold text-white">{t('call.todaysCalls')}</h3>
         {!callState.settings.enabled ? (
-          <p className="text-sm text-slate-400">The Yobidashi is off. Turn it on below and pick your windows — the first call can also be tested right now:</p>
+          <p className="text-sm text-slate-400">{t('call.offNote')}</p>
         ) : day && day.slots.length ? (
           <ul className="space-y-2">
             {day.slots.map((slot) => (
               <li key={slot.idx} className="flex flex-wrap items-center gap-2 text-sm rounded-xl bg-bun-700/40 border border-bun-600/20 px-3.5 py-2.5">
                 <Clock size={14} className="text-slate-400" />
                 <span className="text-slate-100 font-medium">~{fmtTime(new Date(slot.at))}</span>
-                <span className="text-slate-400 text-xs">inside {slot.windowLabel} — the exact minute varies, like a real call</span>
+                <span className="text-slate-400 text-xs">{t('call.slotInside', { window: slot.windowLabel })}</span>
                 <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-bun-800 border border-bun-600/40 text-slate-300">{statusLabel[slot.status] || slot.status}</span>
               </li>
             ))}
           </ul>
-        ) : <p className="text-sm text-slate-400">No windows planned for today yet.</p>}
+        ) : <p className="text-sm text-slate-400">{t('call.noWindows')}</p>}
         <div className="flex flex-wrap gap-2 pt-1">
-          <button onClick={testCall} className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold flex items-center gap-1.5"><Phone size={15} /> Call me now (test)</button>
-          <span className="text-xs text-slate-500 self-center">A test call has no consequences — decline it, hang up, nothing is recorded as missed.</span>
+          <button onClick={testCall} className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold flex items-center gap-1.5"><Phone size={15} /> {t('call.testCall')}</button>
+          <span className="text-xs text-slate-500 self-center">{t('call.testCallNote')}</span>
         </div>
       </section>
 
       {/* Settings */}
       <section className="rounded-2xl glass p-5 card-glow space-y-4">
-        <h3 className="font-bold text-white">Call settings</h3>
+        <h3 className="font-bold text-white">{t('call.settingsTitle')}</h3>
         <label className="flex items-center justify-between gap-3 rounded-xl bg-bun-700/40 border border-bun-600/20 px-4 py-3 cursor-pointer">
-          <span className="text-sm text-slate-200">The Yobidashi is <strong>{settings.enabled ? 'on' : 'off'}</strong><span className="block text-xs text-slate-400 mt-0.5">{reachMode === 'server'
-            ? 'When on, calls arrive inside your windows below. You are signed in, so a summons can also reach you while the app is closed — by push, as a doorbell (see the honest note).'
-            : 'When on, calls arrive inside your windows below — on this device, they ring when you open the app. Sign in to let calls reach a closed app too (see the honest note).'}</span></span>
+          <span className="text-sm text-slate-200">{t('call.toggleIs')}<strong>{t(settings.enabled ? 'call.on' : 'call.off')}</strong><span className="block text-xs text-slate-400 mt-0.5">{reachMode === 'server'
+            ? t('call.reachServer')
+            : t('call.reachDevice')}</span></span>
           <button role="switch" aria-checked={settings.enabled} onClick={() => setSettings((st) => ({ ...st, enabled: !st.enabled }))} className={`w-12 h-7 rounded-full shrink-0 transition ${settings.enabled ? 'bg-emerald-500' : 'bg-bun-600'}`}>
             <span className={`block w-5 h-5 rounded-full bg-white shadow transition-transform ${settings.enabled ? 'translate-x-6' : 'translate-x-1'}`} />
           </button>
         </label>
         <div className="grid sm:grid-cols-3 gap-3">
-          <label className="text-xs text-slate-400 space-y-1.5">Your sensei’s name
+          <label className="text-xs text-slate-400 space-y-1.5">{t('call.senseiNameLabel')}
             <input value={settings.senseiName} onChange={(e) => setSettings((st) => ({ ...st, senseiName: e.target.value || 'Sensei' }))} className="w-full rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2 text-sm text-slate-100 focus:border-[#FF6B57] focus:outline-none" />
           </label>
-          <label className="text-xs text-slate-400 space-y-1.5">Calls per day
+          <label className="text-xs text-slate-400 space-y-1.5">{t('call.callsPerDay')}
             <select value={settings.callsPerDay} onChange={(e) => setSettings((st) => ({ ...st, callsPerDay: Number(e.target.value) }))} className="w-full rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2 text-sm text-slate-100 focus:border-[#FF6B57] focus:outline-none">
-              {[1, 2, 3].map((n) => <option key={n} value={n}>{n} call{n > 1 ? 's' : ''}</option>)}
+              {[1, 2, 3].map((n) => <option key={n} value={n}>{t(n > 1 ? 'call.callCountMany' : 'call.callCountOne', { n })}</option>)}
             </select>
           </label>
-          <label className="text-xs text-slate-400 space-y-1.5">Persistence
+          <label className="text-xs text-slate-400 space-y-1.5">{t('call.persistence')}
             <select value={settings.persistence} onChange={(e) => setSettings((st) => ({ ...st, persistence: e.target.value }))} className="w-full rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2 text-sm text-slate-100 focus:border-[#FF6B57] focus:outline-none">
-              <option value="gentle">Gentle — one callback, ~40 min later</option>
-              <option value="standard">Standard — one callback, 20–40 min later</option>
+              <option value="gentle">{t('call.persistenceGentle')}</option>
+              <option value="standard">{t('call.persistenceStandard')}</option>
             </select>
           </label>
         </div>
         <div className="space-y-2">
-          <p className="text-xs text-slate-400">Call windows (1–3) — the call lands at a varied minute inside a window, never a fixed alarm time:</p>
+          <p className="text-xs text-slate-400">{t('call.windowsHint')}</p>
           {settings.windows.map((w, i) => (
             <div key={i} className="flex items-center gap-2">
-              <span className="text-xs text-slate-500 w-14">Window {i + 1}</span>
+              <span className="text-xs text-slate-500 w-14">{t('call.windowN', { n: i + 1 })}</span>
               <input type="time" value={w.start} onChange={(e) => setWindow(i, 'start', e.target.value)} className="rounded-lg bg-bun-800 border border-bun-600/40 px-2.5 py-1.5 text-sm text-slate-100 focus:border-[#FF6B57] focus:outline-none" />
-              <span className="text-slate-500 text-xs">to</span>
+              <span className="text-slate-500 text-xs">{t('call.to')}</span>
               <input type="time" value={w.end} onChange={(e) => setWindow(i, 'end', e.target.value)} className="rounded-lg bg-bun-800 border border-bun-600/40 px-2.5 py-1.5 text-sm text-slate-100 focus:border-[#FF6B57] focus:outline-none" />
-              {settings.windows.length > 1 && <button onClick={() => removeWindow(i)} className="text-xs text-slate-500 hover:text-rose-300 px-1">Remove</button>}
+              {settings.windows.length > 1 && <button onClick={() => removeWindow(i)} className="text-xs text-slate-500 hover:text-rose-300 px-1">{t('call.remove')}</button>}
             </div>
           ))}
-          {settings.windows.length < 3 && <button onClick={addWindow} className="text-xs text-[#FF8A75] hover:text-[#FFA08D]">+ Add a window</button>}
+          {settings.windows.length < 3 && <button onClick={addWindow} className="text-xs text-[#FF8A75] hover:text-[#FFA08D]">{t('call.addWindow')}</button>}
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={saveSettings} className="px-4 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold">Save settings</button>
+          <button onClick={saveSettings} className="px-4 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold">{t('call.saveSettings')}</button>
           {savedNote && <span className="text-xs text-emerald-300">{savedNote}</span>}
         </div>
         <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4 text-xs text-slate-400 leading-relaxed">
-          <p className="text-slate-200 font-semibold text-sm mb-1 flex items-center gap-1.5"><Bell size={14} /> The honest note — how a web app “calls” you</p>
-          While this app is closed, it cannot ring your phone like a carrier call. What it <em>can</em> do is send a <strong className="text-slate-200">push notification</strong> (turn those on in the card on the Today page) at your call time — tapping it opens this call screen. {reachMode === 'server'
-            ? 'Because you are signed in, your windows are synced to a small server scheduler, so that push can be sent at your call time even while the app is closed; if a summons is ever missed, opening the app offers the call once more. Call times follow this device’s timezone — travel, and your new timezone is re-synced when the app comes back to the front.'
-            : 'That only works while you are signed in — signed out, nothing leaves this device, and your call simply rings here the next time you open the app.'} While the app is open, the call arrives right here, like the test call above. No real phone number is dialled, and nothing here pretends otherwise.
+          <p className="text-slate-200 font-semibold text-sm mb-1 flex items-center gap-1.5"><Bell size={14} /> {t('call.honestTitle')}</p>
+          {t('call.honest1')}<em>{t('call.honestCan')}</em>{t('call.honest2')}<strong className="text-slate-200">{t('call.honestPush')}</strong>{t('call.honest3')} {reachMode === 'server'
+            ? t('call.honestServer')
+            : t('call.honestDevice')} {t('call.honest4')}
         </div>
       </section>
 
       {/* Inbox */}
       <section className="rounded-2xl glass p-5 card-glow space-y-3">
-        <h3 className="font-bold text-white flex items-center gap-2"><Inbox size={17} className="text-cyan-300" /> Inbox — messages from {callState.settings.senseiName}</h3>
+        <h3 className="font-bold text-white flex items-center gap-2"><Inbox size={17} className="text-cyan-300" /> {t('call.inboxTitle', { sensei: callState.settings.senseiName })}</h3>
         {inbox.length ? (
           <ul className="space-y-2.5">
             {inbox.slice(0, 8).map((m) => (
@@ -741,17 +743,17 @@ export default function SenseiCall() {
                 <p className="text-sm font-semibold text-white">{m.title} <span className="text-[11px] font-normal text-slate-500 ml-1">{new Date(m.at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span></p>
                 <p className="text-sm text-slate-300">{m.body}</p>
                 {m.done
-                  ? <p className="text-xs text-emerald-300 flex items-center gap-1"><CheckCircle2 size={13} /> 60-second version done — nicely kept.</p>
-                  : <button onClick={() => miniCall(m)} className="px-3.5 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold flex items-center gap-1.5"><Phone size={13} /> Do the 60-second version</button>}
+                  ? <p className="text-xs text-emerald-300 flex items-center gap-1"><CheckCircle2 size={13} /> {t('call.inboxDone')}</p>
+                  : <button onClick={() => miniCall(m)} className="px-3.5 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold flex items-center gap-1.5"><Phone size={13} /> {t('call.inboxDo')}</button>}
               </li>
             ))}
           </ul>
-        ) : <p className="text-sm text-slate-400">Nothing here. If a call and its one callback both miss you, the only thing that lands here is one kind message with a 60-second version — never a pile.</p>}
+        ) : <p className="text-sm text-slate-400">{t('call.inboxEmpty')}</p>}
       </section>
 
       {/* History — calls kept, never a streak */}
       <section className="rounded-2xl glass p-5 card-glow space-y-3">
-        <h3 className="font-bold text-white">Calls kept</h3>
+        <h3 className="font-bold text-white">{t('call.historyTitle')}</h3>
         {callState.history.length ? (
           <ul className="space-y-1.5">
             {callState.history.slice(0, 10).map((h) => (
@@ -759,43 +761,43 @@ export default function SenseiCall() {
                 <span className="text-slate-400 text-xs">{new Date(h.at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                 <span className="text-slate-100">{h.scene}</span>
                 <span className={`ml-auto text-xs px-2 py-0.5 rounded-full border ${h.status === 'completed' ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30' : 'bg-bun-800 text-slate-400 border-bun-600/40'}`}>
-                  {h.status === 'completed' ? `kept · best ${h.bestScore}%` : 'missed · no penalty, ever'}
+                  {h.status === 'completed' ? t('call.historyKept', { score: h.bestScore }) : t('call.historyMissed')}
                 </span>
               </li>
             ))}
           </ul>
-        ) : <p className="text-sm text-slate-400">No calls yet. This list is a record, not a scoreboard — a missed call here costs nothing and breaks nothing.</p>}
+        ) : <p className="text-sm text-slate-400">{t('call.historyEmpty')}</p>}
       </section>
 
       {/* INCOMING CALL overlay */}
       {phase === 'ringing' && ring && (
         <div className="fixed inset-0 z-[80] bg-gradient-to-b from-bun-900 via-[#141a33] to-bun-900 flex flex-col items-center justify-center p-6 text-center">
-          <p className="text-xs uppercase tracking-[0.25em] text-slate-400 mb-6">{ring.source === 'callback' ? 'Calling back — once, as promised' : ring.source === 'catchup' ? 'Missed call — calling again now' : ring.source === 'test' ? 'Test call' : ring.source === 'mini' ? 'Your 60-second version' : 'Incoming practice call'}</p>
+          <p className="text-xs uppercase tracking-[0.25em] text-slate-400 mb-6">{ring.source === 'callback' ? t('call.ringCallback') : ring.source === 'catchup' ? t('call.ringCatchup') : ring.source === 'test' ? t('call.ringTest') : ring.source === 'mini' ? t('call.ringMini') : t('call.ringIncoming')}</p>
           <div className="relative mb-6">
             <span className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping" />
             <span className="absolute inset-0 rounded-full bg-[#FF6B57]/15 animate-ping [animation-duration:1.9s] [animation-delay:0.5s]" />
             <span className="absolute inset-0 rounded-full bg-[#FF6B57]/10 animate-ping [animation-duration:1.9s] [animation-delay:1.05s]" />
             <span className="relative block">
-              <Mascot agent="koe" size={96} showName={false} motion="bounce" label={`${callState.settings.senseiName} — Koe, your sensei, is calling`} />
+              <Mascot agent="koe" size={96} showName={false} motion="bounce" label={t('call.ringMascotLabel', { sensei: callState.settings.senseiName })} />
             </span>
           </div>
           <p className="text-sm font-semibold tracking-widest text-amber-300 mb-1">呼び出しの時間</p>
-          <p className="text-[11px] uppercase tracking-[0.3em] text-slate-500 mb-4">Yobidashi no Jikan — you are being summoned</p>
+          <p className="text-[11px] uppercase tracking-[0.3em] text-slate-500 mb-4">{t('call.ringSummoned')}</p>
           <h3 className="text-3xl font-bold text-white">{callState.settings.senseiName}</h3>
-          <p className="text-slate-300 mt-2">Wants to practice: <span className="text-white font-semibold">{chain[0]?.title}</span></p>
-          <p className="text-xs text-slate-500 mt-1">{chain[0]?.domain} · {chain[0]?.level} · {ring.source === 'mini' ? '1 quick exchange' : `${exchangesTotal} short exchanges`} · about {ring.source === 'mini' ? '1' : '3'} minutes</p>
-          {ring.source === 'catchup' && <p className="text-xs text-cyan-300 mt-3 max-w-sm">This call was scheduled earlier today while the app was closed — this is its one re-offer, not a new demand.</p>}
+          <p className="text-slate-300 mt-2">{t('call.ringWants')} <span className="text-white font-semibold">{chain[0]?.title}</span></p>
+          <p className="text-xs text-slate-500 mt-1">{chain[0]?.domain} · {chain[0]?.level} · {ring.source === 'mini' ? t('call.ringQuick') : t('call.ringExchanges', { n: exchangesTotal })} · {t('call.ringAbout', { n: ring.source === 'mini' ? '1' : '3' })}</p>
+          {ring.source === 'catchup' && <p className="text-xs text-cyan-300 mt-3 max-w-sm">{t('call.ringCatchupNote')}</p>}
           <div className="flex items-center gap-10 mt-12">
             <div className="flex flex-col items-center gap-2">
-              <button onClick={() => handleMissed('declined')} className="w-16 h-16 rounded-full bg-rose-600 hover:bg-rose-500 flex items-center justify-center text-white shadow-lg transition" aria-label="Decline call"><PhoneOff size={26} /></button>
-              <span className="text-xs text-slate-400">{ring.source === 'test' || ring.source === 'mini' ? 'Not now' : 'Decline'}</span>
+              <button onClick={() => handleMissed('declined')} className="w-16 h-16 rounded-full bg-rose-600 hover:bg-rose-500 flex items-center justify-center text-white shadow-lg transition" aria-label={t('call.declineCall')}><PhoneOff size={26} /></button>
+              <span className="text-xs text-slate-400">{ring.source === 'test' || ring.source === 'mini' ? t('call.notNow') : t('call.decline')}</span>
             </div>
             <div className="flex flex-col items-center gap-2">
-              <button onClick={accept} className="w-16 h-16 rounded-full bg-emerald-500 hover:bg-emerald-400 flex items-center justify-center text-white shadow-lg animate-bounce transition" aria-label="Accept call"><Phone size={26} /></button>
-              <span className="text-xs text-slate-400">Accept</span>
+              <button onClick={accept} className="w-16 h-16 rounded-full bg-emerald-500 hover:bg-emerald-400 flex items-center justify-center text-white shadow-lg animate-bounce transition" aria-label={t('call.acceptCall')}><Phone size={26} /></button>
+              <span className="text-xs text-slate-400">{t('call.accept')}</span>
             </div>
           </div>
-          {(ring.source === 'slot' || ring.source === 'callback' || ring.source === 'catchup') && <p className="text-[11px] text-slate-600 mt-10 max-w-sm">Declining is safe: one callback later, then a message — then silence. Nothing breaks.</p>}
+          {(ring.source === 'slot' || ring.source === 'callback' || ring.source === 'catchup') && <p className="text-[11px] text-slate-600 mt-10 max-w-sm">{t('call.ringDeclineSafe')}</p>}
         </div>
       )}
 
@@ -805,29 +807,29 @@ export default function SenseiCall() {
           <div className="max-w-2xl mx-auto p-5 sm:p-6 space-y-4">
             <div className="flex items-center justify-between gap-2 pt-2">
               <div>
-                <p className="text-xs uppercase tracking-wider text-emerald-300 flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> On a call with {callState.settings.senseiName}</p>
+                <p className="text-xs uppercase tracking-wider text-emerald-300 flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> {t('call.onCallWith', { sensei: callState.settings.senseiName })}</p>
                 <span className="mt-2 block"><Mascot agent="koe" size={30} showName={false} /></span>
                 <h3 className="text-xl font-bold text-white mt-1">{scene.title}</h3>
-                <p className="text-xs text-slate-400">Exchange {exIdx + 1} of {exchangesTotal} · {scene.domain} · {scene.level}</p>
+                <p className="text-xs text-slate-400">{t('call.exchangeOf', { n: exIdx + 1, total: exchangesTotal })} · {scene.domain} · {scene.level}</p>
               </div>
-              <button onClick={hangUp} className="shrink-0 px-4 py-2.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold flex items-center gap-1.5"><PhoneOff size={15} /> Hang up</button>
+              <button onClick={hangUp} className="shrink-0 px-4 py-2.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold flex items-center gap-1.5"><PhoneOff size={15} /> {t('call.hangUp')}</button>
             </div>
             <div className="flex gap-1.5">{chain.slice(0, exchangesTotal).map((_, i) => <div key={i} className={`h-1.5 flex-1 rounded-full ${i < results.length ? 'bg-emerald-500' : i === exIdx ? 'bg-[#FF6B57]' : 'bg-bun-700'}`} />)}</div>
 
             {/* The only controls the call itself needs: two mutes. Turns,
                 scoring and advancing all happen on their own. */}
             <div className="flex flex-wrap items-center gap-2">
-              <button onClick={toggleMicMute} aria-pressed={micMuted} title={micMuted ? 'Your mic is off — tap to unmute' : 'Your mic is on — tap to mute'} className={`px-3 py-2 rounded-full border text-xs font-semibold flex items-center gap-1.5 transition ${micMuted ? 'bg-rose-500/15 border-rose-500/40 text-rose-200' : 'bg-bun-700/60 border-bun-600/30 text-slate-200 hover:text-white'}`}>
-                {micMuted ? <MicOff size={14} /> : <Mic size={14} />} {micMuted ? 'Mic Off' : 'Mic On'}
+              <button onClick={toggleMicMute} aria-pressed={micMuted} title={micMuted ? t('call.micOffTitle') : t('call.micOnTitle')} className={`px-3 py-2 rounded-full border text-xs font-semibold flex items-center gap-1.5 transition ${micMuted ? 'bg-rose-500/15 border-rose-500/40 text-rose-200' : 'bg-bun-700/60 border-bun-600/30 text-slate-200 hover:text-white'}`}>
+                {micMuted ? <MicOff size={14} /> : <Mic size={14} />} {micMuted ? t('call.micOff') : t('call.micOn')}
               </button>
-              <button onClick={toggleSenseiMute} aria-pressed={senseiMuted} title={senseiMuted ? 'Sensei’s voice is off — tap to hear her again' : 'Sensei’s voice is on — tap to mute her'} className={`px-3 py-2 rounded-full border text-xs font-semibold flex items-center gap-1.5 transition ${senseiMuted ? 'bg-rose-500/15 border-rose-500/40 text-rose-200' : 'bg-bun-700/60 border-bun-600/30 text-slate-200 hover:text-white'}`}>
-                {senseiMuted ? <VolumeX size={14} /> : <Volume2 size={14} />} {senseiMuted ? 'Sensei Voice Off' : 'Sensei Voice On'}
+              <button onClick={toggleSenseiMute} aria-pressed={senseiMuted} title={senseiMuted ? t('call.senseiVoiceOffTitle') : t('call.senseiVoiceOnTitle')} className={`px-3 py-2 rounded-full border text-xs font-semibold flex items-center gap-1.5 transition ${senseiMuted ? 'bg-rose-500/15 border-rose-500/40 text-rose-200' : 'bg-bun-700/60 border-bun-600/30 text-slate-200 hover:text-white'}`}>
+                {senseiMuted ? <VolumeX size={14} /> : <Volume2 size={14} />} {senseiMuted ? t('call.senseiVoiceOff') : t('call.senseiVoiceOn')}
               </button>
-              <span className="text-[11px] text-slate-500">The call runs itself — these two switches are all you need.</span>
+              <span className="text-[11px] text-slate-500">{t('call.controlsNote')}</span>
             </div>
 
             <div className={`rounded-2xl bg-bun-700/40 border p-4 transition ${turnState === 'sensei' ? 'border-emerald-500/40' : 'border-bun-600/20'}`}>
-              <p className="text-xs text-slate-400 mb-1">{callState.settings.senseiName} says:</p>
+              <p className="text-xs text-slate-400 mb-1">{t('call.says', { sensei: callState.settings.senseiName })}</p>
               <div className="flex items-start gap-2">
                 <p className="text-slate-100 leading-loose flex-1"><KanjiTapText text={scene.partner} /></p>
                 <TtsButton text={scene.partner} />
@@ -849,24 +851,24 @@ export default function SenseiCall() {
                     )
                   })}
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1.5">Key words for this scene — they glow roughly in time with the voice as each line is spoken, and words you missed stay amber after your try.</p>
+                <p className="text-[11px] text-slate-500 mt-1.5">{t('call.spotlightNote')}</p>
               </div>
             )}
 
-            <p className="text-sm text-slate-200"><span className="text-[#FF8A75] font-semibold">Your turn — say this, your way:</span> {scene.promptEn}</p>
+            <p className="text-sm text-slate-200"><span className="text-[#FF8A75] font-semibold">{t('call.yourTurnSay')}</span> {scene.promptEn}</p>
 
             {turnState === 'sensei' && (
-              <p className="text-xs text-emerald-300 flex items-center gap-1.5"><Volume2 size={13} /> Sensei is speaking — just listen. The mic opens by itself when she finishes.</p>
+              <p className="text-xs text-emerald-300 flex items-center gap-1.5"><Volume2 size={13} /> {t('call.senseiSpeaking')}</p>
             )}
             {turnState === 'listening' && (
               <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3">
-                <p className="text-xs text-emerald-300 font-semibold flex items-center gap-1.5"><Mic size={13} /> Your turn — I’m listening…</p>
+                <p className="text-xs text-emerald-300 font-semibold flex items-center gap-1.5"><Mic size={13} /> {t('call.listening')}</p>
                 <p className="text-sm text-slate-100 mt-1 min-h-[1.25rem]">{interim || '…'}</p>
               </div>
             )}
-            {turnState === 'scoring' && <p className="text-xs text-slate-400">Checking that against the model…</p>}
+            {turnState === 'scoring' && <p className="text-xs text-slate-400">{t('call.scoring')}</p>}
             {turnState === 'feedback' && (
-              <p className="text-xs text-emerald-300 flex items-center gap-1.5"><Volume2 size={13} /> Listen to the model — then the call moves on by itself. “Say it again” below interrupts if you want another try first.</p>
+              <p className="text-xs text-emerald-300 flex items-center gap-1.5"><Volume2 size={13} /> {t('call.feedbackListen')}</p>
             )}
             {turnState === 'manual' && manualNote && (
               <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
@@ -879,18 +881,18 @@ export default function SenseiCall() {
               <div className={`rounded-xl border p-4 space-y-2 ${lastAttempt.score >= MASTERY ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-bun-700/40 border-bun-600/20'}`}>
                 <p className="text-sm text-slate-200">「{lastAttempt.text}」 <span className={`font-bold ${lastAttempt.score >= MASTERY ? 'text-emerald-300' : 'text-amber-300'}`}>{lastAttempt.score}%</span></p>
                 {lastAttempt.score >= MASTERY ? (
-                  <p className="text-sm text-emerald-200 flex items-center gap-2"><CheckCircle2 size={15} /> Clean — next exchange coming up.</p>
+                  <p className="text-sm text-emerald-200 flex items-center gap-2"><CheckCircle2 size={15} /> {t('call.cleanNext')}</p>
                 ) : (
                   <>
                     <div className="flex items-start gap-2">
-                      <p className="text-sm text-slate-200 leading-loose flex-1">Model: <KanjiTapText text={scene.model} /></p>
+                      <p className="text-sm text-slate-200 leading-loose flex-1">{t('call.model')} <KanjiTapText text={scene.model} /></p>
                       <TtsButton text={scene.model} />
                     </div>
-                    {lastAttempt.missing.length > 0 && <p className="text-sm text-amber-200">Missing: {lastAttempt.missing.join('、')}</p>}
+                    {lastAttempt.missing.length > 0 && <p className="text-sm text-amber-200">{t('call.missing', { words: lastAttempt.missing.join('、') })}</p>}
                     <p className="text-xs text-slate-400">{scene.commonError}</p>
                     <div className="flex flex-wrap gap-2">
-                      <button onClick={retryAttempt} className="px-3 py-1.5 rounded-lg bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-xs font-medium flex items-center gap-1"><RotateCcw size={13} /> Say it again</button>
-                      {current && current.attempts >= 2 && <button onClick={moveOn} className="px-3 py-1.5 rounded-lg bg-bun-700 hover:bg-bun-600 text-slate-200 text-xs font-medium">Move on — it joins my queue</button>}
+                      <button onClick={retryAttempt} className="px-3 py-1.5 rounded-lg bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-xs font-medium flex items-center gap-1"><RotateCcw size={13} /> {t('call.sayAgain')}</button>
+                      {current && current.attempts >= 2 && <button onClick={moveOn} className="px-3 py-1.5 rounded-lg bg-bun-700 hover:bg-bun-600 text-slate-200 text-xs font-medium">{t('call.moveOn')}</button>}
                     </div>
                   </>
                 )}
@@ -901,32 +903,32 @@ export default function SenseiCall() {
                 own whenever the call drops to 'manual'. */}
             <div className="rounded-2xl border border-bun-600/20 bg-bun-800/40">
               <button onClick={() => setManualOpen((o) => !o)} aria-expanded={manualOpen || turnState === 'manual'} className="w-full flex items-center justify-between px-4 py-3 text-sm text-slate-300 hover:text-white transition">
-                <span>Type or tap instead</span>
+                <span>{t('call.typeInstead')}</span>
                 <ChevronDown size={16} className={`transition-transform ${(manualOpen || turnState === 'manual') ? 'rotate-180' : ''}`} />
               </button>
               {(manualOpen || turnState === 'manual') && (
                 <div className="px-4 pb-4 space-y-3">
                   <div className="flex gap-2">
-                    <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={2} placeholder="Speak with the mic, or type your Japanese here…"
+                    <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={2} placeholder={t('call.inputPlaceholder')}
                       className="flex-1 rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 focus:border-[#FF6B57] focus:outline-none" />
                     <div className="flex flex-col gap-2">
                       <button onClick={requestListening} disabled={!speechSupported || listening} className="px-3 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] disabled:opacity-40 text-white text-xs font-medium flex items-center gap-1.5">
-                        {listening ? <MicOff size={14} /> : <Mic size={14} />} {listening ? 'Listening…' : 'Speak'}
+                        {listening ? <MicOff size={14} /> : <Mic size={14} />} {listening ? t('call.listeningBtn') : t('call.speak')}
                       </button>
-                      <button onClick={check} disabled={!input.trim()} className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-medium">Say it</button>
+                      <button onClick={check} disabled={!input.trim()} className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-medium">{t('call.sayIt')}</button>
                     </div>
                   </div>
                   {micError && (
                     <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
-                      <p className="text-sm font-semibold text-amber-200">{micError.title}</p>
-                      <p className="text-xs text-amber-100/80 mt-0.5">{micError.body}</p>
+                      <p className="text-sm font-semibold text-amber-200">{micError.titleKey ? t(micError.titleKey) : micError.title}</p>
+                      <p className="text-xs text-amber-100/80 mt-0.5">{micError.bodyKey ? t(micError.bodyKey) : micError.body}</p>
                     </div>
                   )}
-                  {!speechSupported && <p className="text-xs text-slate-500">Voice recognition isn’t available in this browser — typing your version works the same way on a call.</p>}
+                  {!speechSupported && <p className="text-xs text-slate-500">{t('call.noVoiceShort')}</p>}
                 </div>
               )}
             </div>
-            <p className="text-[11px] text-slate-600 text-center pb-4">Hanging up before the first exchange counts as a missed call (one callback, then a message). After that, hanging up just ends the call warmly — what you did is kept.</p>
+            <p className="text-[11px] text-slate-600 text-center pb-4">{t('call.hangupNote')}</p>
           </div>
         </div>
       )}
@@ -935,22 +937,22 @@ export default function SenseiCall() {
       {phase === 'wrapup' && wrap && (
         <div className="fixed inset-0 z-[80] bg-bun-900 overflow-y-auto">
           <div className="max-w-2xl mx-auto p-6 space-y-5 text-center pt-14">
-            <Mascot agent="koe" size={76} showName={false} motion="hop" label="Koe, celebrating a kept call" />
+            <Mascot agent="koe" size={76} showName={false} motion="hop" label={t('call.wrapMascotLabel')} />
             <CheckCircle2 size={42} className="text-emerald-400 mx-auto" />
             <div>
-              <h3 className="text-2xl font-bold text-white">Call kept. よくできました。</h3>
-              <p className="text-sm text-slate-300 mt-2 max-w-md mx-auto">{wrap.exchanges} exchange{wrap.exchanges === 1 ? '' : 's'} in your own voice · best-score average {wrap.bestScore}%.{wrap.queued ? ` ${wrap.queued} mistake${wrap.queued === 1 ? '' : 's'} from this call joined your review queue — spaced, in new scenes, until they stick.` : ' No mistakes needed saving from this call.'}</p>
+              <h3 className="text-2xl font-bold text-white">{t('call.wrapTitle')}</h3>
+              <p className="text-sm text-slate-300 mt-2 max-w-md mx-auto">{t(wrap.exchanges === 1 ? 'call.wrapExchOne' : 'call.wrapExchMany', { n: wrap.exchanges, score: wrap.bestScore })}{wrap.queued ? t(wrap.queued === 1 ? 'call.wrapQueuedOne' : 'call.wrapQueuedMany', { n: wrap.queued }) : t('call.wrapNoQueued')}</p>
             </div>
             {wrap.weakest && wrap.weakest.best < MASTERY && (
               <div className="rounded-2xl bg-amber-500/10 border border-amber-500/30 p-5 text-left space-y-2">
-                <p className="text-sm font-semibold text-amber-200 flex items-center gap-2"><Mascot agent="nao" size={26} showName={false} /> Nao, your fixer: the one correction that matters most from this call</p>
+                <p className="text-sm font-semibold text-amber-200 flex items-center gap-2"><Mascot agent="nao" size={26} showName={false} /> {t('call.wrapFixer')}</p>
                 <p className="text-sm text-slate-200">{wrap.weakest.scene.title}: <span className="text-white">「{wrap.weakest.scene.model}」</span></p>
-                <p className="text-xs text-slate-400">{wrap.weakest.scene.commonError} Target: {wrap.weakest.scene.targetPattern}</p>
+                <p className="text-xs text-slate-400">{wrap.weakest.scene.commonError} {t('call.wrapTarget', { pattern: wrap.weakest.scene.targetPattern })}</p>
                 <div className="flex"><TtsButton text={wrap.weakest.scene.model} className="px-3 py-1.5 text-sm" /></div>
               </div>
             )}
-            <button onClick={() => { setPhase('idle'); setRing(null) }} className="px-6 py-3 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-semibold">Done — back to my day</button>
-            <p className="text-[11px] text-slate-600">That’s the whole requirement for this call slot. Small, kept, finished.</p>
+            <button onClick={() => { setPhase('idle'); setRing(null) }} className="px-6 py-3 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-semibold">{t('call.wrapDone')}</button>
+            <p className="text-[11px] text-slate-600">{t('call.wrapFooter')}</p>
           </div>
         </div>
       )}

@@ -1,8 +1,10 @@
 import { Bell, BellOff, BellRing, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 import { usePush } from '../hooks/usePush.js'
+import { useLanguage } from '../hooks/useLanguage.js'
 
 export default function NotificationCard() {
+  const { t } = useLanguage()
   const { supported, subscribed, permission, subscribe, unsubscribe, sendTest } = usePush()
   const [loading, setLoading] = useState(false)
 
@@ -11,7 +13,7 @@ export default function NotificationCard() {
       <div className="rounded-2xl glass p-5 card-glow">
         <div className="flex items-center gap-3 text-slate-400">
           <BellOff size={20} />
-          <p className="text-sm">Push notifications are not supported in this browser.</p>
+          <p className="text-sm">{t('notify.unsupported')}</p>
         </div>
       </div>
     )
@@ -37,9 +39,9 @@ export default function NotificationCard() {
             {subscribed ? <BellRing size={20} /> : <Bell size={20} />}
           </div>
           <div>
-            <h3 className="font-bold text-white text-sm">Study reminders</h3>
+            <h3 className="font-bold text-white text-sm">{t('notify.title')}</h3>
             <p className="text-xs text-slate-400">
-              {subscribed ? 'Push reminders are on.' : needsPermission ? 'Permission denied.' : 'Get a gentle nudge when your light session is ready.'}
+              {subscribed ? t('notify.on') : needsPermission ? t('notify.denied') : t('notify.hint')}
             </p>
           </div>
         </div>
@@ -53,7 +55,7 @@ export default function NotificationCard() {
           } disabled:opacity-50`}
         >
           {loading ? <Loader2 size={14} className="animate-spin" /> : null}
-          {subscribed ? 'Turn off' : needsPermission ? 'Blocked' : 'Allow'}
+          {subscribed ? t('notify.turnOff') : needsPermission ? t('notify.blocked') : t('notify.allow')}
         </button>
       </div>
     </div>

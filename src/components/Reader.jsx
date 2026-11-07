@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { BookOpenText, CheckCircle2, Mic, Pickaxe, RefreshCw, Square } from 'lucide-react'
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient.js'
 import { useAuth } from '../hooks/useAuth.js'
+import { useLanguage } from '../hooks/useLanguage.js'
 import { useFurigana } from '../hooks/useFurigana.js'
 import { collectLearnerState } from '../lib/learnerState.js'
 import { addToQueue, loadQueue, queueItemId } from '../lib/queue.js'
@@ -39,17 +40,13 @@ import Mascot from './Mascot.jsx'
 const RECENT_DAYS = 14
 
 // The starter footer — verbatim from reader-bot (Doc 16 §5 amendment
-// #2): it never claims fitting that did not happen.
-const STARTER_FOOTER =
-  'A starter, not a fitted pick — I do not know your level yet, so this one is from the easy shelf, with the new words kept few. ' +
-  'Mine any words you like: every mined word teaches me what you know. ' +
-  'Take the 10-minute checkup in Yonde and fitting switches on — from then on, every passage is measured against your words before it is sent.'
+// #2): it never claims fitting that did not happen. It lives in the
+// i18n catalog as reader.starterFooter (Doc 20).
 
 // Appended to the nothing-fits state when the learner has words but
 // no band basis at all (reader-bot, same amendment): the checkup is
-// named as the switch that turns level-fitting on.
-const CHECKUP_SWITCH_LINE =
-  'The checkup is the switch here: take the 10-minute checkup in Yonde, and Hori can fit to your level, not just your queue.'
+// named as the switch that turns level-fitting on. Catalog key:
+// reader.checkupSwitch.
 
 // The first sentence of `text` containing `word` — the mined card's
 // context line, the reader-bot's own helper (Doc 16 §3).
@@ -171,6 +168,7 @@ function PassageText({ text, newWords, highlightWord }) {
 }
 
 export default function Reader() {
+  const { t } = useLanguage()
   const { user } = useAuth()
   const [phase, setPhase] = useState('loading') // loading | guest | error | empty | ready
   const [emptyKind, setEmptyKind] = useState('nofit') // nofit | shelf
@@ -237,9 +235,9 @@ export default function Reader() {
     // stretch, a gentler notch as settling.
     const basisLabel = ctx.resolvedBand ?? ctx.band
     const stepLine = ctx.fitStep > 0
-      ? `\nStretching you a little past ${basisLabel} today — Push Me works both ways: Too Hard brings us back.`
+      ? t('reader.stepStretch', { band: basisLabel })
       : ctx.fitStep < 0
-        ? `\nKeeping it a notch gentler than ${basisLabel} while it settles.`
+        ? t('reader.stepGentler', { band: basisLabel })
         : ''
     return {
       passage: fit.passage,
@@ -417,7 +415,7 @@ export default function Reader() {
     const excluded = [...excludedRef.current, String(pick.passage.id)]
     const next = doPick(ctx, excluded)
     if (!next || String(next.passage.id) === String(pick.passage.id)) {
-      setNote('Nothing else on the shelf fits right now — this one is your best fit today.')
+      setNote(t('reader.nothingElse'))
     } else {
       excludedRef.current = excluded
       setNote('')
@@ -462,8 +460,8 @@ export default function Reader() {
       setPick((cur) => (cur ? { ...cur, newWords: cur.newWords.filter((c) => !minedFronts.has(c.h || c.word)) } : cur))
     }
     setMineNote(added > 0
-      ? `⛏ ${added} word${added === 1 ? '' : 's'} joined your review queue — they will surface in your sessions, with this passage's sentence on the card.`
-      : 'Nothing new to mine — you already know, or have already queued, every bolded word in that passage.')
+      ? t(added === 1 ? 'reader.minedOne' : 'reader.minedMany', { count: added })
+      : t('reader.mineNothing'))
   }
 
   const mine = () => { if (pick) mineCandidates(pick.newWords) }
@@ -560,8 +558,8 @@ export default function Reader() {
       setAloud({
         status: 'error',
         message: e?.error === 'not-allowed'
-          ? 'The microphone was blocked. Allow microphone access in your browser settings, then try again — nothing was scored.'
-          : 'Speech recognition stopped before it heard a full read — nothing was scored. Try again in a quieter spot.',
+          ? t('reader.micBlocked')
+          : t('reader.recogStopped'),
       })
     }
     recog.onend = () => {
@@ -579,7 +577,7 @@ export default function Reader() {
     } catch {
       listeningRef.current = false
       recogRef.current = null
-      setAloud({ status: 'error', message: 'Speech recognition could not start — nothing was scored.' })
+      setAloud({ status: 'error', message: t('reader.recogCantStart') })
     }
   }
 
@@ -592,26 +590,26 @@ export default function Reader() {
   // the copy never claims level fitting that did not happen, on a
   // basis that did not happen.
   const footerFor = (p) => {
-    if (p.coldStart) return STARTER_FOOTER
+    if (p.coldStart) return t('reader.starterFooter')
     const pct = Math.round(p.ratio * 100)
     const n = p.sentNewCount ?? p.newWords.length
-    const words = `${n} new word${n === 1 ? '' : 's'}`
+    const words = t(n === 1 ? 'reader.newWordOne' : 'reader.newWordsMany', { count: n })
     let text
     if (bandSource === 'diagnosis') {
-      text = `Fitted to your ${displayBand} level and your queue: about ${pct}% of its words should already be familiar (an estimate) · ${words}`
+      text = t('reader.footerDiagnosis', { band: displayBand, pct, words })
     } else if (bandSource === 'declared') {
-      text = `Fitted to the ${displayBand} you told me and your queue: about ${pct}% of its words should already be familiar (an estimate) · ${words}\nYour checkup in Yonde sharpens this whenever you want it.`
+      text = t('reader.footerDeclared', { band: displayBand, pct, words })
     } else {
-      text = `Fitted to your queue: about ${pct}% of its words should already be familiar (an estimate) · ${words}\nBand N4 is a gentle default — take the 10-minute checkup in Yonde and I will fit to your real level.`
+      text = t('reader.footerQueue', { pct, words })
     }
     // Fit v2 honesty (amendment #10), the bot footer's family: the
     // new-kanji dose is said out loud (the kanji strip below the
     // passage is where those kanji wait), and a batch-recycle pick
     // says so — only when true.
     let extra = ''
-    if (p.newKanjiCount === 1) extra += '\n1 kanji here is new to you — it is in the kanji strip below, and it will keep coming back until it is yours.'
-    else if (p.newKanjiCount > 1) extra += `\n${p.newKanjiCount} kanji here are new to you — they're in the kanji strip below, and they'll keep coming back until they're yours.`
-    if (p.recycledBatch) extra += '\nThis one practises the batch you are learning now — the same words again, in new sentences, until they are yours.'
+    if (p.newKanjiCount === 1) extra += t('reader.newKanjiOne')
+    else if (p.newKanjiCount > 1) extra += t('reader.newKanjiMany', { count: p.newKanjiCount })
+    if (p.recycledBatch) extra += t('reader.recycledBatch')
     return text + (p.stepLine || '') + extra
   }
 
@@ -660,36 +658,36 @@ export default function Reader() {
       <div>
         <div className="flex items-center gap-3 mb-1">
           <BookOpenText size={20} className="text-[#FF8A75]" />
-          <h2 className="text-2xl font-bold text-white">Yonde Reader</h2>
+          <h2 className="text-2xl font-bold text-white">{t('reader.title')}</h2>
           <Mascot agent="hori" size={34} />
         </div>
-        <p className="text-xs text-slate-500 mb-1">Hori digs; what Hori finds is fitted to your words before you ever see it.</p>
-        <p className="text-sm text-slate-400">A short passage measured against the words you actually know — the same shelf Hori serves in Telegram, fitted by the same rules. New words come bold; one tap mines them into your one queue.</p>
+        <p className="text-xs text-slate-500 mb-1">{t('reader.tagline')}</p>
+        <p className="text-sm text-slate-400">{t('reader.intro')}</p>
       </div>
 
       {phase === 'guest' && (
         <div className="rounded-2xl glass p-5 card-glow flex items-start gap-3">
           <span className="mt-0.5"><Mascot agent="hori" size={30} showName={false} /></span>
-          <p className="text-sm text-slate-300">The Reader fits every passage to <span className="text-slate-100 font-medium">your</span> words — your queue, your level. Sign in and Hori can dig for you; a guest has no words to fit to, so there is honestly nothing to show yet.</p>
+          <p className="text-sm text-slate-300">{t('reader.guestBefore')}<span className="text-slate-100 font-medium">{t('reader.guestYour')}</span>{t('reader.guestAfter')}</p>
         </div>
       )}
 
-      {phase === 'loading' && <p className="text-sm text-slate-400">Hori is digging through the shelf…</p>}
+      {phase === 'loading' && <p className="text-sm text-slate-400">{t('reader.loading')}</p>}
 
       {phase === 'error' && (
         <div className="rounded-2xl glass p-5 card-glow">
-          <p className="text-sm text-slate-300">The reading shelf is empty on my side right now — try again a little later.</p>
+          <p className="text-sm text-slate-300">{t('reader.errorShelf')}</p>
         </div>
       )}
 
       {phase === 'empty' && (
         <div className="rounded-2xl glass p-5 card-glow space-y-2">
           {emptyKind === 'shelf' ? (
-            <p className="text-sm text-slate-300">The easy shelf is empty on my side right now — try again a little later.</p>
+            <p className="text-sm text-slate-300">{t('reader.emptyShelf')}</p>
           ) : (
             <>
-              <p className="text-sm text-slate-300">Nothing in the bank fits your words today. Every passage is checked against what you know before it is shown, and Hori would rather show nothing than the wrong level. New words from your next session change the fit — try again after it.</p>
-              {bandSource === 'none' && <p className="text-sm text-slate-300">{CHECKUP_SWITCH_LINE}</p>}
+              <p className="text-sm text-slate-300">{t('reader.emptyNofit')}</p>
+              {bandSource === 'none' && <p className="text-sm text-slate-300">{t('reader.checkupSwitch')}</p>}
             </>
           )}
         </div>
@@ -698,12 +696,12 @@ export default function Reader() {
       {phase === 'ready' && pick && (
         <>
           <section className="rounded-3xl glass p-6 sm:p-8 card-glow space-y-5">
-            <p className="text-sm text-slate-400">🔍 Hori dug this up for you — {pick.passage.topic || 'Reading'} · {pick.passage.band}</p>
+            <p className="text-sm text-slate-400">{t('reader.dugUp', { topic: pick.passage.topic || t('reader.defaultTopic'), band: pick.passage.band })}</p>
             <PassageText text={pick.passage.text} newWords={pick.newWords} highlightWord={pulseWord} />
             <KanjiChips key={String(pick.passage.id)} chips={chips} activeWord={pulseWord} onHighlight={setPulseWord} onMineWord={mineCandidates} />
             {pick.newWords.length > 0 && (
               <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4">
-                <h3 className="text-sm font-bold text-[#FF8A75] mb-2">New Words In This Passage</h3>
+                <h3 className="text-sm font-bold text-[#FF8A75] mb-2">{t('reader.newWordsHeading')}</h3>
                 <ul className="space-y-1">
                   {pick.newWords.map((c, i) => (
                     <li key={i} className="text-sm text-slate-200">
@@ -721,17 +719,17 @@ export default function Reader() {
           <div className="flex flex-wrap items-center gap-2">
             {pick.newWords.length > 0 && (
               <button onClick={mine} className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold flex items-center gap-1.5">
-                <Pickaxe size={15} /> Mine The New Words
+                <Pickaxe size={15} /> {t('reader.mineNewWords')}
               </button>
             )}
             <button onClick={another} disabled={busy} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 disabled:opacity-40 text-slate-100 text-sm font-medium flex items-center gap-1.5">
-              <RefreshCw size={15} /> Another Passage
+              <RefreshCw size={15} /> {t('reader.anotherPassage')}
             </button>
             {finished ? (
-              <span className="text-sm text-emerald-300 flex items-center gap-1.5"><CheckCircle2 size={15} /> Finished — logged. That read counts.</span>
+              <span className="text-sm text-emerald-300 flex items-center gap-1.5"><CheckCircle2 size={15} /> {t('reader.finishedLogged')}</span>
             ) : (
               <button onClick={finish} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1.5">
-                <CheckCircle2 size={15} /> Finished Reading
+                <CheckCircle2 size={15} /> {t('reader.finishedReading')}
               </button>
             )}
           </div>
@@ -739,47 +737,47 @@ export default function Reader() {
           {note && <p className="text-sm text-slate-400">{note}</p>}
 
           <section className="rounded-3xl glass p-6 card-glow space-y-3">
-            <h3 className="text-base font-bold text-white">Read It Aloud</h3>
-            <p className="text-sm text-slate-400">Read the passage out loud and your browser turns your voice into text — the free speech recognition built into browsers like Chrome. Yonde itself sends nothing anywhere: the matching happens here, in code, and only your score is kept. <span className="text-slate-200">It is a reading match, not a pronunciation grade.</span></p>
+            <h3 className="text-base font-bold text-white">{t('reader.readAloudTitle')}</h3>
+            <p className="text-sm text-slate-400">{t('reader.readAloudIntro')}<span className="text-slate-200">{t('reader.readAloudIntroEmphasis')}</span></p>
             {!speechSupported ? (
-              <p className="text-sm text-slate-300">Read-aloud scoring needs a browser with speech recognition — Chrome has it built in. Your voice note to Hori in Telegram still counts as a read.</p>
+              <p className="text-sm text-slate-300">{t('reader.readAloudUnsupported')}</p>
             ) : aloud?.status === 'listening' ? (
               <div className="flex flex-wrap items-center gap-3">
                 <button onClick={stopAndScore} className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold flex items-center gap-1.5">
-                  <Square size={15} /> Stop And Score
+                  <Square size={15} /> {t('reader.stopAndScore')}
                 </button>
-                <span className="text-sm text-slate-300">Listening… read the whole passage, then stop.</span>
+                <span className="text-sm text-slate-300">{t('reader.listening')}</span>
               </div>
             ) : (
               <button onClick={startAloud} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1.5">
-                <Mic size={15} /> Read Aloud
+                <Mic size={15} /> {t('reader.readAloudButton')}
               </button>
             )}
             {aloud?.status === 'empty' && (
-              <p className="text-sm text-slate-300">I could not hear any words that time — nothing was scored. Try once more, a little closer to the microphone.</p>
+              <p className="text-sm text-slate-300">{t('reader.aloudEmpty')}</p>
             )}
             {aloud?.status === 'error' && <p className="text-sm text-rose-300">{aloud.message}</p>}
             {aloud?.status === 'scored' && (
               <div className="space-y-3">
                 <p className="text-sm text-slate-300">
-                  Reading match: <span className="text-lg font-bold text-white">{aloud.pct}%</span> of the passage text your voice covered
-                  {aloud.passed ? ' — that counts as a comfortable read, the same as a voice note in Telegram.' : '.'}
+                  {t('reader.readingMatch')} <span className="text-lg font-bold text-white">{aloud.pct}%</span> {t('reader.readingMatchCovered')}
+                  {aloud.passed ? t('reader.readingMatchPassedSuffix') : '.'}
                 </p>
                 {aloud.fix ? (
                   <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4 flex items-start gap-3">
                     <span className="mt-0.5"><Mascot agent="nao" size={28} showName={false} /></span>
                     <div className="space-y-1">
-                      <p className="text-sm font-bold text-white">One Fix From Nao</p>
+                      <p className="text-sm font-bold text-white">{t('reader.oneFixTitle')}</p>
                       <p className="text-sm text-slate-200">
                         <span className="font-semibold text-white">{aloud.fix.h || aloud.fix.word}</span>
                         {aloud.fix.reading && aloud.fix.reading !== (aloud.fix.h || aloud.fix.word) && <span className="text-cyan-300"> （{aloud.fix.reading}）</span>}
                         {aloud.fix.meaning && <span className="text-slate-400"> — {aloud.fix.meaning}</span>}
                       </p>
-                      <p className="text-sm text-slate-300">This word did not reach your read. Say its line once more: 「{sentenceWith(String(pick.passage.text), aloud.fix.word)}」</p>
+                      <p className="text-sm text-slate-300">{t('reader.fixSayLine', { sentence: sentenceWith(String(pick.passage.text), aloud.fix.word) })}</p>
                     </div>
                   </div>
                 ) : !aloud.passed ? (
-                  <p className="text-sm text-slate-400">No single word stood out as missed — the match was spread thin across the passage. One more full read, a little slower, usually lifts it.</p>
+                  <p className="text-sm text-slate-400">{t('reader.fixNone')}</p>
                 ) : null}
               </div>
             )}
