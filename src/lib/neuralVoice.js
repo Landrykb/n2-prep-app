@@ -32,6 +32,7 @@ import { supabase, isSupabaseConfigured } from './supabaseClient.js'
 import { speakText } from './tts.js'
 import { prepareNeuralText, estimateSpeechMs } from './neuralText.js'
 import { synthesizeInBrowser, cancelBrowserSynthesis } from './edgeTts.js'
+import { resolveCast } from './voiceCast.js'
 
 const FETCH_TIMEOUT_MS = 12000
 // Network + decode slack on top of the spoken-duration estimate: a
@@ -43,6 +44,13 @@ let currentAudio = null
 let currentUrl = null
 let pendingEnd = null
 let watchdog = null
+// Turn-chain token: speakTurns plays dialogue turns back to
+// back. The token is (re)asserted after each turn's line
+// starts — speakSenseiLine stops whatever played before,
+// which would otherwise kill the chain it belongs to. An
+// external stop or a superseding line clears the token and
+// the chain quietly ends instead of talking over anyone.
+let activeChainToken = null
 
 function clearWatchdog() {
   if (watchdog) { clearTimeout(watchdog); watchdog = null }
@@ -70,6 +78,7 @@ function teardownAudio() {
  * the pending line: its onEnd fires exactly once.
  */
 export function stopNeuralSpeech() {
+  activeChainToken = null
   teardownAudio()
   const end = pendingEnd
   pendingEnd = null
@@ -91,17 +100,18 @@ async function sessionToken() {
  * edge function (signed-in users). Returns a Blob, or null when both
  * routes fail — the caller falls back to the device voice.
  */
-async function getNeuralAudio(text) {
-  const direct = await synthesizeInBrowser(text)
+async function getNeuralAudio(text, cast = 'female') {
+  const c = resolveCast(cast)
+  const direct = await synthesizeInBrowser(text, { voiceName: c.edge, pitch: c.pitch })
   if (direct) return direct
-  return fetchNeuralAudio(text)
+  return fetchNeuralAudio(text, cast)
 }
 
 /**
  * Ask the tts edge function for this line's audio. Returns a Blob, or
  * null on any failure — the caller falls back to the device voice.
  */
-async function fetchNeuralAudio(text) {
+async function fetchNeuralAudio(text, cast = 'female') {
   const token = await sessionToken()
   if (!token) return null
   const url = import.meta.env.VITE_SUPABASE_URL
@@ -117,7 +127,7 @@ async function fetchNeuralAudio(text) {
         Authorization: `Bearer ${token}`,
         apikey: anon,
       },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, voice: cast }),
       signal: ctrl.signal,
     })
     if (!res.ok) return null
@@ -132,7 +142,7 @@ async function fetchNeuralAudio(text) {
  * the caller's point of view — the fetch starts immediately and the
  * fallback decision happens inside.
  */
-export function speakSenseiLine(text, { rate = 1, onEnd, onFallback } = {}) {
+export function speakSenseiLine(text, { rate = 1, onEnd, onFallback, cast = 'female' } = {}) {
   stopNeuralSpeech()
   let endFired = false
   const fireEnd = () => {
@@ -160,7 +170,7 @@ export function speakSenseiLine(text, { rate = 1, onEnd, onFallback } = {}) {
   const rateOk = typeof rate === 'number' && rate > 0 ? rate : 1
   const horizon = Math.max(estimateSpeechMs(clean, rate), (clean.length / 6.5) * 1000 / rateOk) + WATCHDOG_SLACK_MS
   watchdog = setTimeout(fireEnd, horizon)
-  getNeuralAudio(clean).then((blob) => {
+  getNeuralAudio(clean, cast).then((blob) => {
     if (endFired) return
     if (!blob) { clearWatchdog(); deviceFallback(); return }
     try {
@@ -179,4 +189,37 @@ export function speakSenseiLine(text, { rate = 1, onEnd, onFallback } = {}) {
       }
     } catch { clearWatchdog(); deviceFallback() }
   })
+}
+
+/**
+ * Play a dialogue's turns back to back, each in its own cast
+ * (listening scripts: 女・男・店長…). onEnd fires once, after
+ * the last turn (or when the chain is stopped — the stop path
+ * completes the pending line exactly like a single line).
+ */
+export function speakTurns(turns, { onEnd } = {}) {
+  const list = (turns || []).filter((t) => t && t.text)
+  if (!list.length) { if (onEnd) onEnd(); return }
+  const token = {}
+  activeChainToken = token
+  let i = 0
+  let finished = false
+  const finish = () => {
+    if (finished) return
+    finished = true
+    if (onEnd) onEnd()
+  }
+  const next = () => {
+    if (activeChainToken !== token) { finish(); return } // stopped or superseded — still complete the caller
+    if (i >= list.length) { finish(); return }
+    const turn = list[i++]
+    speakSenseiLine(turn.text, {
+      cast: turn.cast || 'female',
+      onEnd: () => next(),
+    })
+    // Re-assert AFTER the call: starting this turn stopped the
+    // previous one, and that stop clears the token by design.
+    activeChainToken = token
+  }
+  next()
 }

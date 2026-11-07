@@ -13,13 +13,15 @@ import { SECTION_KEYS } from '../lib/levels.js'
 import Mascot from './Mascot.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { useLanguage } from '../hooks/useLanguage.js'
+import { modelCast, saveVoiceCast } from '../lib/voicePreference.js'
+import { CAST_IDS } from '../lib/voiceCast.js'
 import { downloadAllLocalData, wipeAllLocalData, requestServerAccountDeletion } from '../lib/accountDeletion.js'
 import { getTwinSyncState, subscribeTwinSync, TWIN_SYNC_EVENT } from '../lib/twinSync.js'
 import { getStateSyncState, subscribeStateSync } from '../lib/stateSync.js'
 import { validateExport, planRestore } from '../lib/restore.js'
 import { loadMetrics, summariseMetrics } from '../lib/metrics.js'
 import { estimateWorkingLevel } from '../lib/twinEstimate.js'
-import { collectLearnerState, loadDeclaredLevel, saveDeclaredLevel } from '../lib/learnerState.js'
+import { collectLearnerState, loadDeclaredLevel, saveDeclaredLevel, STATE_SYNCED_EVENT } from '../lib/learnerState.js'
 import { resolveLevelBasis } from '../lib/levelBasis.js'
 import FeedbackBox from './FeedbackBox.jsx'
 import { Upload } from 'lucide-react'
@@ -393,6 +395,12 @@ function Section({ title, children, hint }) {
 
 export default function TwinView({ setActive }) {
   const { lang, setLang, languages, t } = useLanguage()
+  const [voiceCastChoice, setVoiceCastChoice] = useState(() => modelCast())
+  useEffect(() => {
+    const onSynced = () => setVoiceCastChoice(modelCast())
+    window.addEventListener(STATE_SYNCED_EVENT, onSynced)
+    return () => window.removeEventListener(STATE_SYNCED_EVENT, onSynced)
+  }, [])
   const [twin, setTwin] = useState(() => refreshTwin())
   // Quiet sync state (Doc 04 §3): signed out, the Twin lives on this
   // device only; signed in, it mirrors to the learner's account. Shown as
@@ -689,6 +697,26 @@ export default function TwinView({ setActive }) {
                   : 'bg-bun-700 hover:bg-bun-600 border-white/10 text-slate-200'}`}
               >
                 {entry.label}
+              </button>
+            )
+          })}
+        </div>
+      </Section>
+
+      <Section title={t('settings.modelVoice')} hint={t('settings.modelVoiceHint')}>
+        <div className="flex flex-wrap gap-2">
+          {CAST_IDS.map((castId) => {
+            const active = voiceCastChoice === castId
+            return (
+              <button
+                key={castId}
+                onClick={() => { saveVoiceCast(castId); setVoiceCastChoice(castId) }}
+                aria-pressed={active}
+                className={`px-3.5 py-2 rounded-xl text-sm font-semibold border transition-colors ${active
+                  ? 'bg-[#FF6B57]/15 border-[#FF6B57] text-white'
+                  : 'bg-bun-700 hover:bg-bun-600 border-white/10 text-slate-200'}`}
+              >
+                {t(`voice.${castId}`)}
               </button>
             )
           })}

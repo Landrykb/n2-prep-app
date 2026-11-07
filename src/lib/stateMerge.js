@@ -155,6 +155,7 @@ export function mergeLearnerState(local, other) {
     promise: pickDoc(L.promise, O.promise, (d) => d.at),
     declaredLevel: pickDoc(L.declaredLevel, O.declaredLevel, (d) => d.at),
     language: pickDoc(L.language, O.language, (d) => d.at),
+    voiceCast: pickDoc(L.voiceCast, O.voiceCast, (d) => d.at),
     encounters: mergeEncounters(L.encounters, O.encounters),
     modeSpells: mergeModeSpells(L.modeSpells, O.modeSpells),
   }

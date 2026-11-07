@@ -83,9 +83,9 @@ export function escapeXml(s) {
     .replace(/'/g, '&apos;')
 }
 
-export function buildSsml(text, voiceName = EDGE_TTS_VOICE_NAME) {
+export function buildSsml(text, voiceName = EDGE_TTS_VOICE_NAME, pitch = '+0Hz') {
   return `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ja-JP">` +
-    `<voice name="${voiceName}"><prosody pitch="+0Hz" rate="+0%">${escapeXml(text)}</prosody></voice></speak>`
+    `<voice name="${voiceName}"><prosody pitch="${pitch}" rate="+0%">${escapeXml(text)}</prosody></voice></speak>`
 }
 
 /** First text frame: the speech.config selecting the output format. */
@@ -106,12 +106,12 @@ export function buildSpeechConfigFrame(stamp) {
 }
 
 /** Second text frame: the SSML carrying the line to speak. */
-export function buildSsmlFrame(text, { stamp, requestId, voiceName = EDGE_TTS_VOICE_NAME } = {}) {
+export function buildSsmlFrame(text, { stamp, requestId, voiceName = EDGE_TTS_VOICE_NAME, pitch = '+0Hz' } = {}) {
   return `X-RequestId:${requestId}\r\n` +
     'Content-Type:application/ssml+xml\r\n' +
     `X-Timestamp:${stamp}\r\n` +
     'Path:ssml\r\n\r\n' +
-    buildSsml(text, voiceName)
+    buildSsml(text, voiceName, pitch)
 }
 
 /** True when a text frame closes the turn. */
@@ -166,6 +166,7 @@ function randomId() {
  */
 export async function synthesizeInBrowser(text, {
   voiceName = EDGE_TTS_VOICE_NAME,
+  pitch = '+0Hz',
   timeoutMs = EDGE_TTS_TIMEOUT_MS,
   WebSocketImpl = globalThis.WebSocket,
   subtle = globalThis.crypto?.subtle,
@@ -215,7 +216,7 @@ export async function synthesizeInBrowser(text, {
         try {
           const stamp = new Date(now()).toUTCString()
           ws.send(buildSpeechConfigFrame(stamp))
-          ws.send(buildSsmlFrame(clean, { stamp, requestId: randomId(), voiceName }))
+          ws.send(buildSsmlFrame(clean, { stamp, requestId: randomId(), voiceName, pitch }))
         } catch { settle(null) }
       }
       ws.onmessage = async (event) => {

@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { synthesizeSpeechOgg, validateTtsText, MAX_TTS_CHARS } from './voice.ts'
+import { synthesizeSpeechOgg, validateTtsText, MAX_TTS_CHARS, resolveTtsCast } from './voice.ts'
 
 // Neural voice for the Sensei call (Doc 17 decision, 2026-11-06:
 // FREE route for now — Microsoft Edge TTS, ja-JP-NanamiNeural).
@@ -50,7 +50,8 @@ serve(async (req: Request) => {
       : 'Nothing to speak — send a non-empty "text".'
     return json({ error: message, reason: verdict.reason }, 400)
   }
-  const audio = await synthesizeSpeechOgg(verdict.text)
+  const cast = resolveTtsCast((body as { voice?: unknown } | null)?.voice)
+  const audio = await synthesizeSpeechOgg(verdict.text, cast.edge, cast.pitch)
   if (!audio) {
     // Fail closed with a distinct status: the client's contract is
     // "any non-200 → device voice", and 502 says honestly that the

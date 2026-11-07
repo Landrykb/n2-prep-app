@@ -73,6 +73,16 @@ check('2 calls/day over 3 windows', () => {
     assert.equal(slot.windowIndex, serverSlots[i].windowIndex)
   })
 })
+check('a slot born more than an hour stale starts skipped; a fresh one stays pending', () => {
+  // Day created at 12:00Z. Window A (07:00-08:00) slots before
+  // 11:00 are born-expired; window B (11:30-13:00) is fresh.
+  const now = new Date('2026-11-05T12:00:00Z')
+  const state = { settings: { enabled: true, callsPerDay: 2, windows: [{ start: '07:00', end: '08:00' }, { start: '11:30', end: '13:00' }], persistence: 'standard', senseiName: 'Sensei' }, days: {}, history: [] }
+  const day = client.ensureToday(state, now).days[todayStr(now)]
+  assert.equal(day.slots.length, 2)
+  assert.equal(day.slots[0].status, 'skipped', 'morning slot created at noon never rings')
+  assert.equal(day.slots[1].status, 'pending', 'the fresh slot can still catch up')
+})
 check('slot id is stable and namespaced', () => {
   assert.equal(port.slotIdFor('u1', '2026-11-05', 2), 'u1|2026-11-05|2')
 })

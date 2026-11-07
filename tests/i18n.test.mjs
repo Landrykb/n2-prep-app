@@ -130,4 +130,45 @@ console.log('i18n — the language slice (collect / apply / merge):')
   }
 }
 
+console.log('i18n — the voice cast slice (collect / apply / merge):')
+{
+  const store = new Map()
+  const prev = globalThis.localStorage
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  }
+  try {
+    const ls = await import('../src/lib/learnerState.js')
+    const { mergeLearnerState } = await import('../src/lib/stateMerge.js')
+    const vp = await import('../src/lib/voicePreference.js')
+
+    check('voice cast: no stored choice → no slice, model cast is the default (female)', () => {
+      assert.equal(vp.loadVoiceCast(), null)
+      assert.equal(ls.collectLearnerState().voiceCast, null)
+      assert.equal(vp.modelCast(), 'female')
+    })
+
+    check('voice cast: save validates, round-trips, merge picks the later at', () => {
+      const rec = vp.saveVoiceCast('male')
+      assert.equal(rec.cast, 'male')
+      assert.equal(vp.modelCast(), 'male')
+      assert.equal(vp.saveVoiceCast('robot')?.cast, 'male', 'invalid cast refused')
+      const doc = ls.collectLearnerState()
+      assert.equal(doc.voiceCast.cast, 'male')
+      store.clear()
+      ls.applyLearnerState(doc)
+      assert.deepEqual(vp.loadVoiceCast(), doc.voiceCast)
+      const older = { cast: 'male', at: '2026-11-07T00:00:00.000Z' }
+      const newer = { cast: 'girl', at: '2026-11-07T01:00:00.000Z' }
+      assert.deepEqual(mergeLearnerState({ voiceCast: older }, { voiceCast: newer }).voiceCast, newer)
+      assert.deepEqual(mergeLearnerState({ voiceCast: newer }, { voiceCast: older }).voiceCast, newer)
+    })
+  } finally {
+    if (prev === undefined) delete globalThis.localStorage
+    else globalThis.localStorage = prev
+  }
+}
+
 console.log(`\ni18n: ${passed} checks passed`)

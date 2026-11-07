@@ -157,10 +157,17 @@ export function ensureToday(state, now = new Date()) {
     const n = Math.max(1, Math.min(3, settings.callsPerDay || 1, settings.windows.length))
     for (let i = 0; i < n; i++) {
       const at = slotDateFor(date, settings.windows[i], i)
+      // Born-expired: a slot whose minute is already more than
+      // an hour past when the day is created (settings saved
+      // late in the day, app first opened in the evening) was
+      // never really offered — it starts as skipped and can
+      // never ring. Fresher past slots stay pending for the
+      // one catch-up offer in SenseiCall's trigger check.
+      const bornExpired = at.getTime() < now.getTime() - 60 * 60000
       day.slots.push({
         idx: i, windowIndex: i, at: at.toISOString(),
         windowLabel: `${settings.windows[i].start}–${settings.windows[i].end}`,
-        status: 'pending', // pending | ringing | completed | callback-scheduled | missed | skipped
+        status: bornExpired ? 'skipped' : 'pending', // pending | ringing | completed | callback-scheduled | missed | skipped
         catchupShown: false, callbackUsed: false,
       })
     }

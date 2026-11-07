@@ -242,8 +242,77 @@ await acheck('edgeTts: cancelBrowserSynthesis aborts an in-flight synthesis', as
   const os = readFileSync(new URL('../src/components/OneSession.jsx', import.meta.url), 'utf8')
   check('OneSession: spoken attempts auto-check, model auto-plays, retry is one tap', () => {
     assert.ok(os.includes('if (transcript.trim()) checkScene(transcript)'), 'transcript auto-checks')
-    assert.ok(os.includes('speakSenseiLine(scene.model)'), 'model line auto-plays below mastery')
+    assert.ok(os.includes('speakSenseiLine(scene.model,'), 'model line auto-plays below mastery')
     assert.ok(os.includes("setLastAttempt(null); startListening()"), 'Say It Again restarts listening in one tap')
+  })
+}
+
+// ---------- voice casts (Landry, 2026-11-07) ----------
+{
+  const vc = await import('../src/lib/voiceCast.js')
+  check('casts resolve to Edge voices: Nanami female, Keita male, pitch lifts for girl/boy', () => {
+    assert.equal(vc.resolveCast('female').edge, 'ja-JP-NanamiNeural')
+    assert.equal(vc.resolveCast('male').edge, 'ja-JP-KeitaNeural')
+    assert.equal(vc.resolveCast('girl').edge, 'ja-JP-NanamiNeural')
+    assert.notEqual(vc.resolveCast('girl').pitch, '+0Hz')
+    assert.equal(vc.resolveCast('boy').edge, 'ja-JP-KeitaNeural')
+    assert.notEqual(vc.resolveCast('boy').pitch, '+0Hz')
+    assert.equal(vc.resolveCast('nope').edge, 'ja-JP-NanamiNeural', 'unknown falls back')
+    assert.equal(server.resolveTtsCast('male').edge, 'ja-JP-KeitaNeural', 'server twin agrees')
+    assert.equal(server.resolveTtsCast('girl').pitch, vc.resolveCast('girl').pitch, 'server pitch agrees')
+  })
+
+  check('speaker labels map to casts; dialogue scripts parse into unlabelled turns', () => {
+    assert.equal(vc.castForSpeaker('女'), 'female')
+    assert.equal(vc.castForSpeaker('男'), 'male')
+    assert.equal(vc.castForSpeaker('店長'), 'male')
+    assert.equal(vc.castForSpeaker('女の子'), 'girl')
+    assert.equal(vc.castForSpeaker('男の子'), 'boy')
+    const turns = vc.parseScriptTurns('店員：いらっしゃいませ。\n客：すみません、おにぎりはどこですか。\n店員：あちらの棚です。')
+    assert.equal(turns.length, 3)
+    assert.equal(turns[0].cast, 'male')
+    assert.equal(turns[0].text, 'いらっしゃいませ。')
+    assert.ok(!turns.some((t) => t.text.includes('：')), 'labels are never spoken')
+    const convo = vc.parseScriptTurns('男：夏休み、北海道へ旅行しない？\n女：いいね。飛行機と電車、どっちがいいかな。')
+    assert.deepEqual(convo.map((t) => t.cast), ['male', 'female'])
+    assert.equal(vc.parseScriptTurns('ただの文章です。'), null, 'plain text is not a dialogue')
+    assert.equal(vc.parseScriptTurns('女：一行だけ。'), null, 'one labelled line is not a dialogue')
+  })
+
+  const { readFileSync } = await import('node:fs')
+  const scenesSrc = readFileSync(new URL('../src/data/scenes.js', import.meta.url), 'utf8')
+  const btnSrc = readFileSync(new URL('../src/components/TtsButton.jsx', import.meta.url), 'utf8')
+  check('scene partners carry casts; TtsButton plays turns and honours the model cast', () => {
+    const scenes = scenesSrc
+    const tags = scenes.match(/partnerVoice: '(female|male|girl|boy)'/g) || []
+    assert.ok(tags.length >= 22, `every scene tagged (got ${tags.length})`)
+    const btn = btnSrc
+    assert.ok(btn.includes('parseScriptTurns(text)'), 'button detects dialogues')
+    assert.ok(btn.includes('speakTurns(turns'), 'button plays turns')
+    assert.ok(btn.includes('cast || modelCast()'), 'single lines use the chosen model voice')
+  })
+}
+
+// ---------- Yobidashi pacing + ringing discipline (2026-11-07) ----------
+// Landry's live reports: the call "feels rushed" (a recognition
+// segment boundary ended his turn mid-answer), saving settings
+// rang every already-past slot in turn, and the sensei name
+// field could not be deleted. The fixes are structural; pin
+// their shapes here.
+{
+  const { readFileSync } = await import('node:fs')
+  const call = readFileSync(new URL('../src/components/SenseiCall.jsx', import.meta.url), 'utf8')
+  check('the call waits for a real silence gap, not a segment boundary', () => {
+    assert.ok(call.includes('SILENCE_GAP_MS = 2600'), 'silence gap constant')
+    assert.ok(call.includes('turn.text += finalText'), 'segments accumulate')
+    assert.ok(call.includes('turn.restarts >= 10'), 'recogniser relaunches inside one turn, capped')
+    assert.ok(call.includes('beginUserTurn(), 900'), 'a beat before the mic opens')
+  })
+  check('one catch-up ring per day; the name field edits freely', () => {
+    assert.ok(call.includes('catchupRung: true'), 'catch-up marked on the day')
+    assert.ok(call.includes("status: 'skipped' } : x"), 'later past slots skip quietly')
+    assert.ok(!call.includes("senseiName: e.target.value || 'Sensei'"), 'no mid-typing snap-back')
+    assert.ok(call.includes("trim() || 'Sensei'"), 'default applies at save')
   })
 }
 

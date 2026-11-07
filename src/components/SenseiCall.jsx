@@ -249,7 +249,7 @@ export default function SenseiCall() {
     }
     repromptRef.current += 1
     goTurn('sensei')
-    speakLine(REPROMPT_LINE, { onEnd: () => later(() => { if (turnRef.current === 'sensei') beginUserTurn() }, 250) })
+    speakLine(REPROMPT_LINE, { onEnd: () => later(() => { if (turnRef.current === 'sensei') beginUserTurn() }, 700) })
   }
 
   const beginUserTurn = () => {
@@ -312,10 +312,21 @@ export default function SenseiCall() {
         const at = new Date(slot.at)
         if (at > now) continue
         const overdueMs = now - at
-        if (overdueMs > 2 * 60000 && slot.catchupShown) continue // already offered once as a catch-up
         const isCatchup = overdueMs > 2 * 60000
+        if (isCatchup && (slot.catchupShown || d.catchupRung)) {
+          // One catch-up offer per day, total (Landry,
+          // 2026-11-07: after saving settings with several
+          // windows already past, every slot rang in turn —
+          // "it is calling me many times"). A past slot that
+          // was not the day's one catch-up is quietly skipped:
+          // it was never really offered, so it is not a miss.
+          const slots = d.slots.map((x) => (x.idx === slot.idx ? { ...x, status: 'skipped' } : x))
+          s = { ...s, days: { ...s.days, [date]: { ...d, slots } } }
+          updateState(s)
+          return
+        }
         const slots = d.slots.map((x) => (x.idx === slot.idx ? { ...x, status: 'ringing', catchupShown: isCatchup ? true : x.catchupShown } : x))
-        s = { ...s, days: { ...s.days, [date]: { ...d, slots } } }
+        s = { ...s, days: { ...s.days, [date]: { ...d, ...(isCatchup ? { catchupRung: true } : {}), slots } } }
         updateState(s)
         startRinging({ source: isCatchup ? 'catchup' : 'slot', slotIdx: slot.idx, chain: freshRingChain(profile, slot.idx) })
         return
@@ -391,7 +402,21 @@ export default function SenseiCall() {
     const { state: next, outcome } = registerMiss(s, { slotIdx, wasCallback: source === 'callback', sceneTitle: chain[0]?.title })
     updateState(next)
     setInbox(loadInbox())
-    if (outcome.kind === 'callback') setNotice(t('call.noticeCallback', { sensei: next.settings.senseiName, time: fmtTime(outcome.at) }))
+    if (outcome.kind === 'callback') {
+      // Landry (2026-11-07): "this can be a notification." The
+      // Today's-calls card below already carries the callback
+      // in-app; the announcement itself goes out as a system
+      // notification when permission already exists — never a
+      // prompt from here, and no duplicate banner.
+      setNotice('')
+      try {
+        if (typeof Notification !== 'undefined' && Notification.permission === 'granted' && 'serviceWorker' in navigator) {
+          navigator.serviceWorker.ready
+            .then((reg) => reg.showNotification(t('call.noticeCallbackTitle', { sensei: next.settings.senseiName }), { body: t('call.noticeCallback', { sensei: next.settings.senseiName, time: fmtTime(outcome.at) }), tag: 'yonde-callback' }))
+            .catch(() => {})
+        }
+      } catch { /* notifications are an enhancement */ }
+    }
     else if (outcome.kind === 'inbox') setNotice(t('call.noticeInbox'))
     else setNotice('')
     setRing(null); setPhase('idle')
@@ -408,56 +433,116 @@ export default function SenseiCall() {
   }
   const confirmMic = () => { markMicExplained(); setShowMicPrompt(false); startListening() }
 
+  // How long the learner's turn stays open after the last
+  // sound of speech before the answer counts as finished.
+  // iOS finalises a recognition segment after a breath — well
+  // under a second — so a turn must NOT end on a segment
+  // boundary: segments accumulate, and only a real silence
+  // gap ends the turn (Landry, 2026-11-07: the call "feels
+  // rushed… I am not done reading and it goes to another
+  // sentence").
+  const SILENCE_GAP_MS = 2600
+  const silenceTimerRef = useRef(null)
+  const clearSilenceTimer = () => { if (silenceTimerRef.current) { clearTimeout(silenceTimerRef.current); silenceTimerRef.current = null } }
+
   const startListening = ({ auto = false } = {}) => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SR) { if (auto) dropToManual(t('call.manualNoVoice')); return }
     stopSpeech() // half-duplex: Sensei is silenced before the mic opens
     stopRecognition()
+    clearSilenceTimer()
     const session = listenSessionRef.current
-    const rec = new SR()
-    recogRef.current = rec
-    rec.lang = 'ja-JP'; rec.interimResults = true; rec.maxAlternatives = 1
-    let gotFinal = false
-    rec.onresult = (e) => {
+    // Auto-turn state: accumulated final segments, whether the
+    // turn has been submitted, and how many times the
+    // recogniser has been relaunched inside this one turn
+    // (iOS ends sessions on its own; the turn outlives them).
+    const turn = { text: '', submitted: false, restarts: 0 }
+
+    const finishAutoTurn = () => {
+      if (turn.submitted) return
+      turn.submitted = true
+      clearSilenceTimer()
+      const text = turn.text.trim()
+      stopRecognition()
+      setInterim('')
+      if (text) {
+        setInput(text)
+        setMicError(null)
+        runCheckRef.current(text, { auto: true })
+      } else {
+        handleSilence()
+      }
+    }
+    const armSilenceTimer = () => {
+      clearSilenceTimer()
+      silenceTimerRef.current = setTimeout(() => {
+        if (listenSessionRef.current !== session) return
+        if (turnRef.current !== 'listening') return
+        finishAutoTurn()
+      }, SILENCE_GAP_MS)
+    }
+
+    const launch = () => {
       if (listenSessionRef.current !== session) return
-      let interimText = ''
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const res = e.results[i]
-        if (res.isFinal) {
-          gotFinal = true
-          const text = (res[0]?.transcript || '').trim()
-          stopRecognition()
-          setInterim('')
-          if (text) {
-            setInput(text)
+      const rec = new SR()
+      recogRef.current = rec
+      rec.lang = 'ja-JP'; rec.interimResults = true; rec.maxAlternatives = 1
+      rec.onresult = (e) => {
+        if (listenSessionRef.current !== session) return
+        let interimText = ''
+        let finalText = ''
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const res = e.results[i]
+          if (res.isFinal) finalText += res[0]?.transcript || ''
+          else interimText += res[0]?.transcript || ''
+        }
+        if (!auto) {
+          // Manual: the first final fills the box, as before.
+          if (finalText.trim()) {
+            stopRecognition()
+            setInterim('')
+            setInput(finalText.trim())
             setMicError(null)
-            if (auto) runCheckRef.current(text, { auto: true })
-          } else if (auto) {
-            handleSilence()
-          }
+          } else if (interimText) setInterim(interimText)
           return
         }
-        interimText += res[0]?.transcript || ''
+        // Auto: speech activity — a segment is NEVER the whole
+        // answer by itself. Accumulate and re-arm the gap.
+        if (finalText) turn.text += finalText
+        if (finalText || interimText) {
+          setInterim(`${turn.text}${interimText}`)
+          armSilenceTimer()
+        }
       }
-      if (interimText) setInterim(interimText)
+      rec.onerror = (e) => {
+        if (listenSessionRef.current !== session) return
+        const err = e?.error
+        if (err === 'aborted' || err === 'no-speech') return // onend drives the auto path
+        setListening(false)
+        setMicError(micErrorCopy(err))
+        if (auto) { clearSilenceTimer(); dropToManual() }
+      }
+      rec.onend = () => {
+        if (listenSessionRef.current !== session) return
+        if (!auto) { setListening(false); return }
+        if (turn.submitted || turnRef.current !== 'listening') return
+        // The recogniser ended mid-turn (an iOS habit): relaunch
+        // and keep listening — the silence gap, not the
+        // recogniser, decides when the learner is done. A cap
+        // keeps a wedged recogniser from looping forever; at
+        // the cap the turn finishes with whatever it holds.
+        if (turn.restarts >= 10) { finishAutoTurn(); return }
+        turn.restarts += 1
+        setListening(true)
+        try { launch() } catch { finishAutoTurn() }
+      }
+      setListening(true)
+      try { rec.start() } catch { setListening(false); if (auto) finishAutoTurn() }
     }
-    rec.onerror = (e) => {
-      if (listenSessionRef.current !== session) return
-      setListening(false)
-      const err = e?.error
-      if (err === 'aborted' || err === 'no-speech') return // onend drives the silence path
-      setMicError(micErrorCopy(err))
-      if (auto) dropToManual()
-    }
-    rec.onend = () => {
-      if (listenSessionRef.current !== session) return
-      setListening(false)
-      if (!gotFinal && auto && turnRef.current === 'listening') handleSilence()
-    }
-    if (auto) goTurn('listening')
+
+    if (auto) { goTurn('listening'); armSilenceTimer() }
     else { goTurn('manual'); setManualOpen(true) }
-    setListening(true)
-    try { rec.start() } catch { setListening(false); if (auto) handleSilence() }
+    launch()
   }
 
   // The automatic exchange loop: when an exchange opens, Sensei speaks
@@ -478,8 +563,8 @@ export default function SenseiCall() {
     setManualOpen(false)
     setManualNote('')
     goTurn('sensei')
-    if (senseiMutedRef.current) later(() => beginUserTurn(), 600)
-    else speakLine(scene.partner, { onEnd: () => later(() => beginUserTurn(), 350) })
+    if (senseiMutedRef.current) later(() => beginUserTurn(), 900)
+    else speakLine(scene.partner, { onEnd: () => later(() => beginUserTurn(), 900) })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, exIdx, scene])
 
@@ -611,7 +696,13 @@ export default function SenseiCall() {
 
   // ---------- settings ----------
   const saveSettings = () => {
-    let s = { ...loadCallState(), settings }
+    // An emptied name field falls back to the default HERE, at
+    // save — never while typing (the old || in onChange snapped
+    // the field back to 'Sensei' mid-delete, so the name could
+    // not be cleared to type a new one).
+    const cleaned = { ...settings, senseiName: (settings.senseiName || '').trim() || 'Sensei' }
+    setSettings(cleaned)
+    let s = { ...loadCallState(), settings: cleaned }
     const date = todayStr()
     const d = s.days[date]
     const untouched = d && d.slots.every((x) => x.status === 'pending') && !d.callback
@@ -653,8 +744,8 @@ export default function SenseiCall() {
         </div>
       )}
       {day?.callback && day.callback.status === 'pending' && phase === 'idle' && (
-        <div className="rounded-2xl bg-amber-500/10 border border-amber-500/30 p-4 text-sm text-amber-100 flex items-center gap-2">
-          <Clock size={16} /> {t('call.callbackBefore')}<strong>{fmtTime(new Date(day.callback.at))}</strong>{t('call.callbackAfter')}
+        <div className="rounded-2xl bg-amber-500/10 border border-amber-500/30 p-4 text-sm text-amber-100 flex items-start gap-2">
+          <Clock size={16} className="shrink-0 mt-0.5" /> <span>{t('call.callbackBefore')}<strong>{fmtTime(new Date(day.callback.at))}</strong>{t('call.callbackAfter')}</span>
         </div>
       )}
 
@@ -694,7 +785,7 @@ export default function SenseiCall() {
         </label>
         <div className="grid sm:grid-cols-3 gap-3">
           <label className="text-xs text-slate-400 space-y-1.5">{t('call.senseiNameLabel')}
-            <input value={settings.senseiName} onChange={(e) => setSettings((st) => ({ ...st, senseiName: e.target.value || 'Sensei' }))} className="w-full rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2 text-sm text-slate-100 focus:border-[#FF6B57] focus:outline-none" />
+            <input value={settings.senseiName} onChange={(e) => setSettings((st) => ({ ...st, senseiName: e.target.value }))} className="w-full rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2 text-sm text-slate-100 focus:border-[#FF6B57] focus:outline-none" />
           </label>
           <label className="text-xs text-slate-400 space-y-1.5">{t('call.callsPerDay')}
             <select value={settings.callsPerDay} onChange={(e) => setSettings((st) => ({ ...st, callsPerDay: Number(e.target.value) }))} className="w-full rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2 text-sm text-slate-100 focus:border-[#FF6B57] focus:outline-none">
@@ -724,12 +815,6 @@ export default function SenseiCall() {
         <div className="flex items-center gap-3">
           <button onClick={saveSettings} className="px-4 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold">{t('call.saveSettings')}</button>
           {savedNote && <span className="text-xs text-emerald-300">{savedNote}</span>}
-        </div>
-        <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4 text-xs text-slate-400 leading-relaxed">
-          <p className="text-slate-200 font-semibold text-sm mb-1 flex items-center gap-1.5"><Bell size={14} /> {t('call.honestTitle')}</p>
-          {t('call.honest1')}<em>{t('call.honestCan')}</em>{t('call.honest2')}<strong className="text-slate-200">{t('call.honestPush')}</strong>{t('call.honest3')} {reachMode === 'server'
-            ? t('call.honestServer')
-            : t('call.honestDevice')} {t('call.honest4')}
         </div>
       </section>
 

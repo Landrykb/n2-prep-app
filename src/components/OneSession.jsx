@@ -16,6 +16,7 @@ import { getPlanFor, markPlanConsumed, noteSessionForExperiment } from '../lib/p
 import Mascot from './Mascot.jsx'
 import TtsButton from './TtsButton.jsx'
 import { speakSenseiLine } from '../lib/neuralVoice.js'
+import { modelCast } from '../lib/voicePreference.js'
 import KanjiTapText from './KanjiTapText.jsx'
 import { useLanguage } from '../hooks/useLanguage.js'
 
@@ -138,7 +139,7 @@ export default function OneSession({ setActive }) {
     // plays on its own (the neural chain; a refused autoplay just
     // stays silent and the speaker button is still there).
     if (score < MASTERY && scene.model) {
-      try { speakSenseiLine(scene.model) } catch { /* best effort */ }
+      try { speakSenseiLine(scene.model, { cast: modelCast() }) } catch { /* best effort */ }
     }
     patch({ sceneAttempts: attempts, sceneBest: best, sceneDone: state.sceneDone || score >= MASTERY })
     if (score >= MASTERY && attempts > 1 && !(state.sceneBest >= MASTERY)) {
@@ -289,10 +290,17 @@ export default function OneSession({ setActive }) {
             <p className="text-xs text-slate-400 mb-1">{t('voice.partnerSays')}</p>
             <div className="flex items-start gap-2">
               <p className="text-slate-100 leading-loose flex-1"><KanjiTapText text={scene.partner} /></p>
-              <TtsButton text={scene.partner} />
+              <TtsButton text={scene.partner} cast={scene.partnerVoice || undefined} />
             </div>
           </div>
           <p className="text-sm text-slate-200"><span className="text-[#FF8A75] font-semibold">{t('voice.yourTurn')}</span> {scene.promptEn}</p>
+          {(scene.keyPhrases || []).length > 0 && (
+            <p className="text-xs text-slate-400 flex flex-wrap items-center gap-1.5">
+              {scene.keyPhrases.map((kp) => (
+                <span key={kp} className="px-2 py-0.5 rounded-full bg-bun-700/70 border border-bun-600/30 text-slate-200">{kp}</span>
+              ))}
+            </p>
+          )}
           <div className="flex gap-2">
             <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={2} placeholder={t('call.inputPlaceholder')}
               className="flex-1 rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 focus:border-[#FF6B57] focus:outline-none" />
@@ -326,7 +334,13 @@ export default function OneSession({ setActive }) {
                     <p className="text-sm text-slate-200 leading-loose flex-1">{t('call.model')} <KanjiTapText text={scene.model} /></p>
                     <TtsButton text={scene.model} />
                   </div>
-                  {lastAttempt.missing.length > 0 && <p className="text-sm text-amber-200">{t('call.missing', { words: lastAttempt.missing.join('、') })}</p>}
+                  {(scene.keyPhrases || []).length > 0 && (
+                    <p className="flex flex-wrap gap-1.5">
+                      {scene.keyPhrases.map((kp) => lastAttempt.missing.includes(kp)
+                        ? <span key={kp} className="px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/50 text-amber-200 text-xs">{kp}</span>
+                        : <span key={kp} className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/50 text-emerald-200 text-xs">{kp}</span>)}
+                    </p>
+                  )}
                   <p className="text-xs text-slate-400">{scene.commonError}</p>
                   <button onClick={() => { setInput(''); setLastAttempt(null); startListening() }} className="px-3 py-1.5 rounded-lg bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-xs font-medium flex items-center gap-1"><RotateCcw size={13} /> {t('voice.sayAgain')}</button>
                 </>
@@ -454,7 +468,6 @@ export default function OneSession({ setActive }) {
         </section>
       )}
 
-      <p className="text-center text-[11px] text-slate-600">{t('session.stateKeyNote', { key: SESSION_KEY })}</p>
     </div>
   )
 }

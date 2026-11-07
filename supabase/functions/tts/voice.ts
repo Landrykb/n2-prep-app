@@ -86,9 +86,23 @@ function escapeXml(s) {
     .replace(/'/g, '&apos;')
 }
 
-function buildSsml(text, voiceName) {
+// Voice casts (mirror of src/lib/voiceCast.js — the function
+// tree is self-contained, so the table is a deliberate copy;
+// keep the two in step). A cast picks the Edge voice and an
+// SSML pitch lift for the younger casts.
+const CASTS = {
+  female: { edge: 'ja-JP-NanamiNeural', pitch: '+0Hz' },
+  male: { edge: 'ja-JP-KeitaNeural', pitch: '+0Hz' },
+  girl: { edge: 'ja-JP-NanamiNeural', pitch: '+35Hz' },
+  boy: { edge: 'ja-JP-KeitaNeural', pitch: '+25Hz' },
+}
+export function resolveTtsCast(cast) {
+  return CASTS[cast] || CASTS.female
+}
+
+function buildSsml(text, voiceName, pitch = '+0Hz') {
   return `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ja-JP">` +
-    `<voice name="${voiceName}"><prosody pitch="+0Hz" rate="+0%">${escapeXml(text)}</prosody></voice></speak>`
+    `<voice name="${voiceName}"><prosody pitch="${pitch}" rate="+0%">${escapeXml(text)}</prosody></voice></speak>`
 }
 
 /**
@@ -96,7 +110,7 @@ function buildSsml(text, voiceName) {
  * Null on ANY failure: timeout, socket error, protocol surprise,
  * empty audio. Callers must treat voice as an enhancement.
  */
-export async function synthesizeSpeechOgg(text, voiceName = VOICE_NAME) {
+export async function synthesizeSpeechOgg(text, voiceName = VOICE_NAME, pitch = '+0Hz') {
   const clean = typeof text === 'string' ? text.trim() : ''
   if (!clean) return null
   let ws = null
@@ -129,7 +143,7 @@ export async function synthesizeSpeechOgg(text, voiceName = VOICE_NAME) {
           'Content-Type:application/ssml+xml\r\n' +
           `X-Timestamp:${stamp}\r\n` +
           'Path:ssml\r\n\r\n' +
-          buildSsml(clean, voiceName)
+          buildSsml(clean, voiceName, pitch)
         ws.send(ssmlFrame)
       }
       ws.onmessage = async (event) => {

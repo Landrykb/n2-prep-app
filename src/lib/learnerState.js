@@ -15,6 +15,7 @@ import { PROMISE_KEY, loadPromise } from './promise.js'
 import { emitLearnerStateSaved } from './stateEvents.js'
 import { ENCOUNTERS_KEY, collectEncounterWords } from './encounters.js'
 import { MODE_SPELLS_KEY, loadModeSpells } from './day30.js'
+import { VOICE_CAST_KEY, loadVoiceCast } from './voicePreference.js'
 
 export const DIAGNOSIS_HISTORY_KEY = 'jpn:diagnosisHistory:v1'
 export const DECLARED_LEVEL_KEY = 'jpn:declaredLevel:v1'
@@ -91,6 +92,7 @@ export function collectLearnerState() {
     // same document and grants them full proven credit.
     encounters: collectEncounterWords(),
     language: loadLanguage(),
+    voiceCast: loadVoiceCast(),
     // Cohort readiness (day30.js, Doc 11 §7): Twin mode spells —
     // union-merged by startedAt so the mode history (and the
     // bad-week gate measurement) survives across devices.
@@ -107,6 +109,7 @@ const SLICE_KEYS = [
   ['declaredLevel', DECLARED_LEVEL_KEY],
   ['encounters', ENCOUNTERS_KEY],
   ['language', LANGUAGE_KEY],
+  ['voiceCast', VOICE_CAST_KEY],
   ['modeSpells', MODE_SPELLS_KEY],
 ]
 
