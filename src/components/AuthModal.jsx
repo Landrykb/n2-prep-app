@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../hooks/useAuth.js'
 import { Eye, EyeOff, Loader2, X } from 'lucide-react'
 import { brand } from '../lib/brand.js'
-import { DIAG_BUILD, bridgeTelegramSession, getTelegramInitData } from '../lib/telegramAuth.js'
+import { bridgeTelegramSession, getTelegramInitData } from '../lib/telegramAuth.js'
 import { supabase } from '../lib/supabaseClient.js'
 import { useLanguage } from '../hooks/useLanguage.js'
 import Mascot from './Mascot.jsx'
@@ -118,20 +118,6 @@ export default function AuthModal({ variant = 'gate', initialMode = 'signin', on
         {telegramBridgeStatus === 'not-linked' && (
           <p className="mb-5 rounded-xl border border-sky-400/20 bg-sky-400/10 px-3 py-2 text-sm text-sky-200">
             {t('auth.telegramNotLinked')}
-          </p>
-        )}
-
-        {/* TEMPORARY DIAGNOSTICS (2026-11-07): inside Telegram's
-            webview only, one small line naming the bridge status,
-            whether Telegram's signed launch identity was present,
-            and the diag build tag — so a screenshot identifies the
-            failing branch without any network. Remove with the
-            telegram_auth_diag investigation. */}
-        {typeof window !== 'undefined' &&
-          (window.Telegram?.WebApp || (window.location?.hash ?? '').includes('tgWebApp')) && (
-          <p className="mb-5 text-center text-xs text-slate-500">
-            Telegram bridge: {telegramBridgeStatus} · launch identity:{' '}
-            {getTelegramInitData() ? `present (${getTelegramInitData().length})` : 'missing'} · {DIAG_BUILD}
           </p>
         )}
 

@@ -76,40 +76,8 @@ serve(async (req: Request) => {
     auth: { persistSession: false },
   })
 
-  // TEMPORARY DIAGNOSTICS (2026-11-07, Landry's Mini App is not
-  // recognised — the positive path never landed for him): record
-  // ONLY the stage + reason code of each attempt in
-  // telegram_auth_diag. Never initData, never hashes, never email.
-  // Remove once the failure stage is known and fixed.
-  const diag = async (stage: string, reason?: string, tgUser?: number) => {
-    try {
-      await supabaseAdmin.from('telegram_auth_diag').insert({
-        stage,
-        reason: reason ?? null,
-        tg_user: tgUser ?? null,
-      })
-    } catch { /* diagnostics must never break the door */ }
-  }
-
-  // TEMPORARY CLIENT DIAGNOSTICS (same investigation): the client
-  // reports what IT saw at bootstrap — whether Telegram's WebApp
-  // object and signed initData were present, and the bridge status
-  // it computed. Whitelisted short fields only; this branch never
-  // touches the exchange.
-  if (body && typeof body === 'object' && 'clientDiag' in body) {
-    const d = (body.clientDiag ?? {}) as Record<string, unknown>
-    const pick = (v: unknown, max: number) =>
-      typeof v === 'string' ? v.slice(0, max) : typeof v === 'number' || typeof v === 'boolean' ? String(v) : '-'
-    await diag(
-      'client',
-      `status=${pick(d.status, 24)} init=${pick(d.hasInitData, 5)} len=${pick(d.initDataLen, 6)} webapp=${pick(d.webAppPresent, 5)} platform=${pick(d.platform, 16)} session=${pick(d.hadSession, 5)}`,
-    )
-    return json({ ok: true })
-  }
-
   const validation = await validateTelegramInitData(body?.initData, botToken)
   if (!validation.ok) {
-    await diag('validation', validation.reason)
     return json({ error: 'invalid_init_data' }, 401)
   }
 
@@ -147,16 +115,13 @@ serve(async (req: Request) => {
       const jwt = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '')
       const { data: caller, error: callerError } = await supabaseAdmin.auth.getUser(jwt)
       if (callerError || !caller?.user) {
-        await diag('link_only', 'no_session', tg)
         return json({ error: 'no_session' }, 401)
       }
       const me = caller.user.id
       if (link?.user_id) {
         if (link.user_id === me) {
-          await diag('link_only', 'already', tg)
           return json({ ok: true, linked: true, already: true, user_id: me })
         }
-        await diag('link_only', 'linked_elsewhere', tg)
         return json({ error: 'linked_elsewhere' }, 409)
       }
       // One Telegram per account, both directions: an account that
@@ -169,7 +134,6 @@ serve(async (req: Request) => {
         .not('linked_at', 'is', null)
         .maybeSingle()
       if (mine && Number(mine.telegram_user_id) !== tg) {
-        await diag('link_only', 'account_has_other', tg)
         return json({ error: 'account_has_other_telegram' }, 409)
       }
       const { error: insError } = await supabaseAdmin.from('telegram_links').insert({
@@ -179,10 +143,8 @@ serve(async (req: Request) => {
         linked_at: new Date().toISOString(),
       })
       if (insError) {
-        await diag('link_only', 'insert_failed', tg)
         return json({ error: 'account_unavailable' }, 500)
       }
-      await diag('link_only', 'linked', tg)
       return json({ ok: true, linked: true, user_id: me })
     }
 
@@ -213,7 +175,6 @@ serve(async (req: Request) => {
           email,
         })
         if (genError || !gen?.user) {
-          await diag('create_user', 'failed', tg)
           return json({ error: 'account_unavailable' }, 500)
         }
         userId = gen.user.id
@@ -234,20 +195,17 @@ serve(async (req: Request) => {
         if (again?.user_id) {
           userId = again.user_id
         } else {
-          await diag('create_link', 'failed', tg)
           return json({ error: 'account_unavailable' }, 500)
         }
       } else {
         isNew = true
       }
-      await diag('create', isNew ? 'created_and_linked' : 'adopted_and_linked', tg)
     }
 
     const { data: existing, error: userError } = await supabaseAdmin.auth.admin.getUserById(userId)
     const email = existing?.user?.email
     if (userError || !existing?.user || existing.user.id !== userId || !email) {
       console.error('telegram-auth: account could not be resolved')
-      await diag('get_user', 'account_unavailable', tg)
       return json({ error: 'account_unavailable' }, 500)
     }
 
@@ -258,10 +216,8 @@ serve(async (req: Request) => {
     const tokenHash = generated?.properties?.hashed_token
     if (linkError || !generated?.user || generated.user.id !== userId || !tokenHash) {
       console.error('telegram-auth: session exchange could not be created')
-      await diag('generate_link', 'session_unavailable', tg)
       return json({ error: 'session_unavailable' }, 500)
     }
-    await diag('success', undefined, tg)
 
     // Deliberately no action_link and no email in this response:
     // the client needs only the one-time hash and the account id
@@ -269,7 +225,6 @@ serve(async (req: Request) => {
     return json({ ok: true, token_hash: tokenHash, user_id: userId, is_new: isNew })
   } catch {
     console.error('telegram-auth: exchange failed')
-    await diag('exchange', 'threw', tg)
     return json({ error: 'Service unavailable' }, 500)
   }
 })
