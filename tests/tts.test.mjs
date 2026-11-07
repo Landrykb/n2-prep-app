@@ -349,7 +349,7 @@ await acheck('edgeTts: cancelBrowserSynthesis aborts an in-flight synthesis', as
   const dict = readFileSync(new URL('../src/components/DictionaryView.jsx', import.meta.url), 'utf8')
   check('the dictionary speaker is fed the entry reading', () => {
     assert.ok(dict.includes('text={e.reading || e.word}'), 'reading first, surface as fallback')
-    assert.ok(!dict.includes('text={e.word}'), 'bare surface never spoken')
+    assert.ok(!dict.includes('<TtsButton text={e.word}'), 'no speaker is fed the bare surface (KanjiTapText displays it — that is fine)')
   })
 }
 
