@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useAuth } from '../hooks/useAuth.js'
 import { useLanguage } from '../hooks/useLanguage.js'
 import { getUserProgress, setUserProgress } from '../lib/supabaseApi.js'
+import { deliverTextFile } from '../lib/fileDeliver.js'
 import { addToQueue, loadQueue, saveQueue, queueItemId } from '../lib/queue.js'
 import { userKey } from '../lib/userKey.js'
 import { mergeAnkiProgress } from '../lib/stateMerge.js'
@@ -83,13 +84,13 @@ function MigrationCard({ cards, progress }) {
       progress,
       learnedCount: learnedIds.length,
     }
-    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'yonde-anki-backup.json'
-    a.click()
-    URL.revokeObjectURL(url)
+    // Deliver WITHOUT navigating: inside the Telegram webview
+    // an <a download> click replaces the app with the raw JSON
+    // (Landry, 2026-11-07). deliverTextFile stashes a copy
+    // on-device first, then offers the share sheet / clipboard.
+    // The import below does not wait for it — the stash is the
+    // guarantee, the delivery is a courtesy copy.
+    void deliverTextFile({ filename: 'yonde-anki-backup.json', text: JSON.stringify(backup, null, 2), mime: 'application/json' })
 
     // 2) Import the known words as graduated review cards.
     const byId = new Map(cards.map((c) => [c.id, c]))
@@ -111,7 +112,7 @@ function MigrationCard({ cards, progress }) {
     })
     saveQueue(queue)
 
-    const record = { doneAt: now.toISOString(), imported: items.length, backupDownloaded: true }
+    const record = { doneAt: now.toISOString(), imported: items.length, backupStashed: true }
     try { localStorage.setItem(MIGRATION_KEY, JSON.stringify(record)) } catch {}
     setMigration(record)
     setNote(t(items.length === 1 ? 'queue.migrationNoteOne' : 'queue.migrationNoteMany', { count: items.length }))
@@ -354,13 +355,7 @@ export default function Anki() {
   const exportCSV = () => {
     const rows = cards.map((c) => ({ front: c.front, back: c.back, tag: c.tag }))
     const csv = ['front,back,tags', ...rows.map((r) => `${r.front},${r.back},${r.tag}`)].join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'yonde-anki-cards.csv'
-    a.click()
-    URL.revokeObjectURL(url)
+    void deliverTextFile({ filename: 'yonde-anki-cards.csv', text: csv, mime: 'text/csv' })
   }
 
   if (loading) {

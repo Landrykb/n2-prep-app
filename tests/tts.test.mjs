@@ -316,4 +316,27 @@ await acheck('edgeTts: cancelBrowserSynthesis aborts an in-flight synthesis', as
   })
 }
 
+// ---------- Stale-chunk rescue + file delivery (2026-11-07) ----------
+// Two of Landry's live hits: a view tap right after a deploy
+// showed the crash screen (old bundle, dead chunk URL — a
+// reload fixed it), and the Anki progress move navigated the
+// whole Mini App to a raw JSON dump (an <a download> click
+// inside the Telegram webview). Both fixes are structural.
+{
+  const { readFileSync } = await import('node:fs')
+  const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  const anki = readFileSync(new URL('../src/components/Anki.jsx', import.meta.url), 'utf8')
+  check('lazy views reload once on a stale chunk instead of crashing', () => {
+    assert.ok(app.includes('lazyView'), 'wrapper exists')
+    assert.ok((app.match(/= lazyView\(\(\) => import\(/g) || []).length >= 15, 'all views wrapped')
+    assert.ok(app.includes('yonde:chunkReloadAt'), 'reload is rate-limited')
+  })
+  check('file delivery never navigates the app to a blob', () => {
+    assert.ok(!anki.includes("a.download = 'yonde-anki-backup.json'"), 'backup anchor download gone')
+    assert.ok(!anki.includes("a.download = 'yonde-anki-cards.csv'"), 'csv anchor download gone')
+    assert.ok(anki.includes('deliverTextFile'), 'both exports use the safe delivery')
+    assert.ok(anki.includes('backupStashed: true'), 'the record claims the stash, not a download')
+  })
+}
+
 console.log(`\ntts: ${passed} checks passed`)

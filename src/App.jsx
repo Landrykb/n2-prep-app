@@ -68,25 +68,47 @@ import Skeleton, { SkeletonText } from './components/Skeleton.jsx'
 
 // Heavy, tab-scoped views are split out so the initial bundle only carries the
 // shell, the dashboard, and the shared text/lookup helpers.
-const Anki = lazy(() => import('./components/Anki.jsx'))
-const AiTutor = lazy(() => import('./components/AiTutor.jsx'))
-const BJT = lazy(() => import('./components/BJT.jsx'))
-const N2Listening = lazy(() => import('./components/N2Listening.jsx'))
-const SpeedCards = lazy(() => import('./components/SpeedCards.jsx'))
-const DictionaryView = lazy(() => import('./components/DictionaryView.jsx'))
-const MockExam = lazy(() => import('./components/MockExam.jsx'))
-const VoiceLoop = lazy(() => import('./components/VoiceLoop.jsx'))
-const Diagnosis = lazy(() => import('./components/Diagnosis.jsx'))
-const Mining = lazy(() => import('./components/Mining.jsx'))
-const OneSession = lazy(() => import('./components/OneSession.jsx'))
-const SenseiCall = lazy(() => import('./components/SenseiCall.jsx'))
-const TwinView = lazy(() => import('./components/TwinView.jsx'))
-const GrowthLoop = lazy(() => import('./components/GrowthLoop.jsx'))
-const Reader = lazy(() => import('./components/Reader.jsx'))
-const SourcesView = lazy(() => import('./components/SourcesView.jsx'))
-const CoachLetter = lazy(() => import('./components/CoachLetter.jsx'))
-const PrivacyPolicy = lazy(() => import('./components/PrivacyPolicy.jsx'))
-const Terms = lazy(() => import('./components/Terms.jsx'))
+// Lazy views with a stale-chunk rescue. After a deploy, an app
+// left open on the old bundle asks for chunk files that no
+// longer exist; the import fails and the error boundary shows
+// "Something broke" for a perfectly healthy screen (Landry hit
+// it twice on 2026-11-07, e.g. Speed Cards right after a
+// deploy — a reload fixed it). On a chunk-load failure, reload
+// ONCE (rate-limited via sessionStorage so a genuinely broken
+// build cannot loop) to pick up the fresh bundle, then let the
+// boundary have any error that survives that.
+const lazyView = (factory) => lazy(() => factory()
+  .then((m) => { try { sessionStorage.removeItem('yonde:chunkReloadAt') } catch { /* private mode */ } return m })
+  .catch((err) => {
+    try {
+      const last = Number(sessionStorage.getItem('yonde:chunkReloadAt') || 0)
+      if (Date.now() - last > 30000) {
+        sessionStorage.setItem('yonde:chunkReloadAt', String(Date.now()))
+        window.location.reload()
+      }
+    } catch { /* storage unavailable — the boundary takes it */ }
+    throw err
+  }))
+
+const Anki = lazyView(() => import('./components/Anki.jsx'))
+const AiTutor = lazyView(() => import('./components/AiTutor.jsx'))
+const BJT = lazyView(() => import('./components/BJT.jsx'))
+const N2Listening = lazyView(() => import('./components/N2Listening.jsx'))
+const SpeedCards = lazyView(() => import('./components/SpeedCards.jsx'))
+const DictionaryView = lazyView(() => import('./components/DictionaryView.jsx'))
+const MockExam = lazyView(() => import('./components/MockExam.jsx'))
+const VoiceLoop = lazyView(() => import('./components/VoiceLoop.jsx'))
+const Diagnosis = lazyView(() => import('./components/Diagnosis.jsx'))
+const Mining = lazyView(() => import('./components/Mining.jsx'))
+const OneSession = lazyView(() => import('./components/OneSession.jsx'))
+const SenseiCall = lazyView(() => import('./components/SenseiCall.jsx'))
+const TwinView = lazyView(() => import('./components/TwinView.jsx'))
+const GrowthLoop = lazyView(() => import('./components/GrowthLoop.jsx'))
+const Reader = lazyView(() => import('./components/Reader.jsx'))
+const SourcesView = lazyView(() => import('./components/SourcesView.jsx'))
+const CoachLetter = lazyView(() => import('./components/CoachLetter.jsx'))
+const PrivacyPolicy = lazyView(() => import('./components/PrivacyPolicy.jsx'))
+const Terms = lazyView(() => import('./components/Terms.jsx'))
 import { userKey } from './lib/userKey.js'
 import { INCOMING_CALL_KEY } from './lib/calls.js'
 import { getErrorLogs, addErrorLog, reviewErrorLog, deleteErrorLog, getUserProgress, setUserProgress } from './lib/supabaseApi.js'
