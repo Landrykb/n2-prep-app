@@ -109,6 +109,44 @@ async function runTelegramBridge({ client, currentSession, initData, fetchImpl }
   return 'bridged'
 }
 
+// TEMPORARY DIAGNOSTICS (2026-11-07): the linked owner's Mini App
+// opens never reach telegram-auth at all. The app reports what it
+// saw at bootstrap — WebApp presence, initData presence/length,
+// platform, the bridge status it computed — as one fire-and-forget
+// POST the function records in telegram_auth_diag. No initData
+// content, no identity. Remove with the server-side diag.
+let clientDiagSent = false
+export function reportTelegramClientDiag(status, currentSession) {
+  if (clientDiagSent) return
+  clientDiagSent = true
+  try {
+    const webApp = globalThis.window?.Telegram?.WebApp
+    const initData = typeof webApp?.initData === 'string' ? webApp.initData : ''
+    const env = import.meta.env ?? {}
+    const supabaseUrl = typeof env.VITE_SUPABASE_URL === 'string' ? env.VITE_SUPABASE_URL.replace(/\/+$/, '') : ''
+    const anonKey = typeof env.VITE_SUPABASE_ANON_KEY === 'string' ? env.VITE_SUPABASE_ANON_KEY : ''
+    if (!supabaseUrl || !anonKey) return
+    fetch(`${supabaseUrl}/functions/v1/telegram-auth`, {
+      method: 'POST',
+      headers: {
+        apikey: anonKey,
+        Authorization: `Bearer ${anonKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        clientDiag: {
+          status: String(status ?? 'unknown'),
+          hasInitData: initData.length > 0,
+          initDataLen: initData.length,
+          webAppPresent: !!webApp,
+          platform: typeof webApp?.platform === 'string' ? webApp.platform : '',
+          hadSession: !!currentSession,
+        },
+      }),
+    }).catch(() => {})
+  } catch { /* diagnostics never break bootstrap */ }
+}
+
 export function bridgeTelegramSession(options = {}) {
   const initData = typeof options.initData === 'string'
     ? options.initData

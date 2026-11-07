@@ -5,7 +5,7 @@ import { initTwinSync, stopTwinSync } from '../lib/twinSync.js'
 import { initStateSync, stopStateSync } from '../lib/stateSync.js'
 import { adoptAnonKeys } from '../lib/anonMerge.js'
 import { syncCallWindows } from '../lib/callSync.js'
-import { bridgeTelegramSession, getTelegramInitData } from '../lib/telegramAuth.js'
+import { bridgeTelegramSession, getTelegramInitData, reportTelegramClientDiag } from '../lib/telegramAuth.js'
 import { loadGuestChoice, saveGuestChoice } from '../lib/guest.js'
 
 export const AuthProvider = ({ children }) => {
@@ -51,6 +51,7 @@ export const AuthProvider = ({ children }) => {
           client: supabase,
           currentSession,
         })
+        reportTelegramClientDiag(status, currentSession)
         if (!active) return
         setTelegramBridgeStatus(status)
         if (status === 'bridged' || status === 'already') {
@@ -58,6 +59,10 @@ export const AuthProvider = ({ children }) => {
           if (!active) return
           currentSession = refreshed.data.session
         }
+      } else if (globalThis.window?.Telegram?.WebApp) {
+        // Telegram's WebApp object exists but carried no signed
+        // launch identity — report that shape too (temporary diag).
+        reportTelegramClientDiag('skipped-no-initdata', currentSession)
       }
 
       if (active) {

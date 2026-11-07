@@ -84,6 +84,22 @@ serve(async (req: Request) => {
     } catch { /* diagnostics must never break the door */ }
   }
 
+  // TEMPORARY CLIENT DIAGNOSTICS (same investigation): the client
+  // reports what IT saw at bootstrap — whether Telegram's WebApp
+  // object and signed initData were present, and the bridge status
+  // it computed. Whitelisted short fields only; this branch never
+  // touches the exchange.
+  if (body && typeof body === 'object' && 'clientDiag' in body) {
+    const d = (body.clientDiag ?? {}) as Record<string, unknown>
+    const pick = (v: unknown, max: number) =>
+      typeof v === 'string' ? v.slice(0, max) : typeof v === 'number' || typeof v === 'boolean' ? String(v) : '-'
+    await diag(
+      'client',
+      `status=${pick(d.status, 24)} init=${pick(d.hasInitData, 5)} len=${pick(d.initDataLen, 6)} webapp=${pick(d.webAppPresent, 5)} platform=${pick(d.platform, 16)} session=${pick(d.hadSession, 5)}`,
+    )
+    return json({ ok: true })
+  }
+
   const validation = await validateTelegramInitData(body?.initData, botToken)
   if (!validation.ok) {
     await diag('validation', validation.reason)
