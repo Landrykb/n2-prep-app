@@ -28,7 +28,7 @@ export default function PrivacyPolicy({ setActive }) {
       </Section>
 
       <Section title="What lives on your device">
-        <p>Your Learner Twin (your levels by section, your error patterns, how you like to learn), your review queue, your problem profile, your diagnosis results and history, your Yobidashi call settings and call history, Saki's plans, Michi's letters, and your answers to “did that feel like studying?” — all of this is stored in this app on this device. Open <em>Your Fleet</em> to inspect it in plain language.</p>
+        <p>Your Learner Twin (your levels by section, your error patterns, how you like to learn), your review queue, your problem profile, your diagnosis results and history, your Yobidashi call settings and call history, Saki's plans, Michi's letters, and your answers to “did that feel like studying?” — all of this is stored in this app on this device. Open <em>My Twin</em> to inspect it in plain language.</p>
       </Section>
 
       <Section title="What an account adds">
@@ -56,7 +56,7 @@ export default function PrivacyPolicy({ setActive }) {
       </Section>
 
       <Section title="Your rights — see it, export it, delete it">
-        <p><strong className="text-slate-100">See it:</strong> Your Fleet shows everything the app has learned about you, and you can correct it. <strong className="text-slate-100">Export it:</strong> one tap downloads all of your data on this device as a file. <strong className="text-slate-100">Delete it:</strong> <em>Delete My Account And Data</em> (in Your Fleet) exports first if you want, then wipes everything on this device and deletes your server account. Deleting only the fleet's memory (your Twin) is also offered, if you want a fresh start without losing your account. If anything here is ever unclear, ask us — that is what the contact below is for.</p>
+        <p><strong className="text-slate-100">See it:</strong> My Twin shows everything the app has learned about you, and you can correct it. <strong className="text-slate-100">Export it:</strong> one tap downloads all of your data on this device as a file. <strong className="text-slate-100">Delete it:</strong> <em>Delete My Account And Data</em> (in My Twin) exports first if you want, then wipes everything on this device and deletes your server account. Deleting only the fleet's memory (your Twin) is also offered, if you want a fresh start without losing your account. If anything here is ever unclear, ask us — that is what the contact below is for.</p>
       </Section>
 
       <Section title="Children">
@@ -69,7 +69,7 @@ export default function PrivacyPolicy({ setActive }) {
 
       <div className="flex flex-wrap gap-2 pt-2">
         <button onClick={() => setActive?.('terms')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium">Terms Of Use</button>
-        <button onClick={() => setActive?.('twin')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium">Your Fleet — See, Export Or Delete Your Data</button>
+        <button onClick={() => setActive?.('twin')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium">My Twin — See, Export Or Delete Your Data</button>
         <button onClick={() => setActive?.('dashboard')} className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold">Back To Today</button>
       </div>
     </div>
