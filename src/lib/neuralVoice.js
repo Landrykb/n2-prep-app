@@ -44,10 +44,22 @@ import { appendErrorLog } from './errorLog.js'
 // which stage, and the platform's own reason (the play()
 // rejection name, the media error code). Normal successful
 // playback logs nothing.
+let lastVoiceFailure = null
+
 function logVoice(kind, detail = {}) {
+  lastVoiceFailure = { kind, ...detail }
   try {
     appendErrorLog({ at: new Date().toISOString(), where: 'voice', kind, ...detail })
   } catch { /* logging must never throw */ }
+}
+
+// The most recent voice failure, for the play button to show
+// under itself — the error log above is write-only in the app
+// (no screen displays it), which stranded the first diagnosis
+// round (2026-11-08): the reason has to appear where the tap
+// happened. Shape: { kind, name?, code? } or null.
+export function getLastVoiceFailure() {
+  return lastVoiceFailure
 }
 
 const FETCH_TIMEOUT_MS = 12000
@@ -130,12 +142,13 @@ export function playAudioFile(src, { onEnd, onError } = {}) {
     const mediaCode = currentAudio?.error?.code ?? null
     teardownAudio()
     if (pendingEnd === fireEnd) pendingEnd = null
-    logVoice('file-play-failed', {
+    const info = {
       name: err?.name || (mediaCode ? 'media-error' : 'unknown'),
       ...(mediaCode ? { code: mediaCode } : {}),
       src: String(src).split('/').pop() || '',
-    })
-    if (onError) onError()
+    }
+    logVoice('file-play-failed', info)
+    if (onError) onError(info)
     else if (onEnd) onEnd()
   }
   pendingEnd = fireEnd

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Volume2, Loader2 } from 'lucide-react'
 import { ttsAvailable } from '../lib/tts.js'
-import { playAudioFile, speakSenseiLine, speakTurns } from '../lib/neuralVoice.js'
+import { playAudioFile, speakSenseiLine, speakTurns, getLastVoiceFailure } from '../lib/neuralVoice.js'
 import { parseScriptTurns } from '../lib/voiceCast.js'
 import { modelCast } from '../lib/voicePreference.js'
 import { useLanguage } from '../hooks/useLanguage.js'
@@ -10,13 +10,29 @@ export default function TtsButton({ text, className = '', cast = null, audioSrc 
   const { t } = useLanguage()
   const [speaking, setSpeaking] = useState(false)
   const [fallback, setFallback] = useState(false)
+  const [failNote, setFailNote] = useState(null)
   // Neural audio needs only an Audio element; the device voice
   // needs speechSynthesis. Either one makes the button real.
   const [available] = useState(() => ttsAvailable() || typeof Audio !== 'undefined')
 
+  // A voice failure used to be invisible: every route failed
+  // silently into the next and the button just went quiet
+  // (2026-11-08, "the voices do not play anymore" — with no
+  // surface anywhere naming the failing step; the on-device
+  // error log is write-only). The reason now prints under the
+  // button itself: which route, and the platform's own name
+  // for the failure.
+  const noteFailure = (info) => {
+    const f = info || getLastVoiceFailure()
+    if (!f) return
+    const bits = [f.kind, f.name, f.code != null ? `code ${f.code}` : null].filter(Boolean)
+    if (bits.length) setFailNote(bits.join(' · '))
+  }
+
   const speak = (e) => {
     e?.stopPropagation()
     if (!available || !text) return
+    setFailNote(null)
     setSpeaking(true)
     // The neural chain first (Doc 17): Edge's Nanami from this
     // device, then the tts function, then the device voice. These
@@ -38,7 +54,7 @@ export default function TtsButton({ text, className = '', cast = null, audioSrc 
     if (audioSrc) {
       playAudioFile(audioSrc, {
         onEnd: () => setSpeaking(false),
-        onError: () => speakLive(),
+        onError: (info) => { noteFailure(info); speakLive() },
       })
       return
     }
@@ -48,7 +64,10 @@ export default function TtsButton({ text, className = '', cast = null, audioSrc 
   const speakLive = () => {
     const turns = parseScriptTurns(text)
     if (turns) {
-      speakTurns(turns, { onEnd: () => setSpeaking(false) })
+      speakTurns(turns, {
+        onEnd: () => setSpeaking(false),
+        onFallback: () => noteFailure(),
+      })
       return
     }
     speakSenseiLine(text, {
@@ -56,7 +75,7 @@ export default function TtsButton({ text, className = '', cast = null, audioSrc 
       onEnd: () => setSpeaking(false),
       // Honest label (P1-2): the device voice had to serve and it
       // has no Japanese voice — say so, as before.
-      onFallback: (res) => { if (res?.fallback) setFallback(true) },
+      onFallback: (res) => { noteFailure(); if (res?.fallback) setFallback(true) },
     })
   }
 
@@ -71,6 +90,7 @@ export default function TtsButton({ text, className = '', cast = null, audioSrc 
         {speaking ? <Loader2 size={18} className="animate-spin" /> : <Volume2 size={18} />}
       </button>
       {fallback && <span className="text-[10px] leading-tight text-amber-300/90 max-w-[110px]">{t('shell.tts.noVoice')}</span>}
+      {failNote && <span className="text-[10px] leading-tight text-amber-300/90 max-w-[180px]">voice: {failNote}</span>}
     </span>
   )
 }
