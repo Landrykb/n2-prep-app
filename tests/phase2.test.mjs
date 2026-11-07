@@ -352,6 +352,14 @@ check('telegram bridge: a different webview account → bridge to the linked acc
     'bridge',
   )
 })
+check('telegram bridge: the URL-hash copy of initData parses (script-independent launch identity)', () => {
+  const raw = 'query_id=AAE1&user=%7B%22id%22%3A522466354%7D&auth_date=1794000000&hash=abc123'
+  const hash = `#tgWebAppData=${encodeURIComponent(raw)}&tgWebAppVersion=7.0&tgWebAppPlatform=ios`
+  assert.equal(telegramAuth.initDataFromUrlHash(hash), raw)
+  assert.equal(telegramAuth.initDataFromUrlHash('#/reader'), '')
+  assert.equal(telegramAuth.initDataFromUrlHash(''), '')
+  assert.equal(telegramAuth.initDataFromUrlHash('#tgWebAppVersion=7.0'), '')
+})
 
 console.log('encounters — collect derivations + union merge (Fit v2, amendment #10):')
 {

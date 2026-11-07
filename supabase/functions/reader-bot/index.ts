@@ -131,14 +131,14 @@ const RECENT_DAYS = 14
 // The Mini App surface (Doc 16 R1): the live PWA's /reader route.
 // web_app buttons are valid in private chats with the bot — and
 // every Reader chat is private by design.
-const MINI_APP_READER_URL = 'https://jpn2easy.vercel.app/reader'
+const MINI_APP_READER_URL = 'https://jpn2easy.vercel.app/reader?tg=4'
 
 // The doors to the app itself (Doc 16 §5 amendment #7): the app
 // root, not just /reader. Every status and dead-end reply carries
 // the Open Yonde button, the chat Menu button opens the same door
 // (registered by reader-admin via setChatMenuButton), and /app is
 // the typed route to it.
-const MINI_APP_URL = 'https://jpn2easy.vercel.app'
+const MINI_APP_URL = 'https://jpn2easy.vercel.app/?tg=4'
 const appButton = (lang: BotLang) => ({
   text: bt(lang, 'app.openYonde'),
   web_app: { url: MINI_APP_URL },

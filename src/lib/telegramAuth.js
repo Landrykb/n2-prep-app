@@ -15,11 +15,36 @@ export const TELEGRAM_BRIDGE_STORAGE_PREFIX = 'yonde:telegram-auth:'
 // TEMPORARY DIAGNOSTICS build tag (2026-11-07): shown on the
 // sign-in screen inside Telegram so a screenshot proves which
 // bundle the webview actually ran. Remove with the diag code.
-export const DIAG_BUILD = 'diag3'
+export const DIAG_BUILD = 'diag4'
+
+let capturedHashInitData = null
+
+// Telegram ALSO hands the signed launch identity in the page URL
+// fragment (#tgWebAppData=<url-encoded initData>&tgWebAppVersion=
+// ...&tgWebAppPlatform=...). That copy matters: if the
+// telegram-web-app.js script fails to load inside the webview,
+// window.Telegram never appears and the WebApp copy of initData is
+// unreachable — but the URL copy is always there on a real launch.
+// Captured once, at first read: the app's own hash router may
+// rewrite the fragment later, so the first reader keeps the value.
+export function initDataFromUrlHash(hash) {
+  if (typeof hash !== 'string' || !hash.includes('tgWebAppData=')) return ''
+  try {
+    const params = new URLSearchParams(hash.replace(/^#/, ''))
+    const data = params.get('tgWebAppData')
+    return typeof data === 'string' ? data : ''
+  } catch {
+    return ''
+  }
+}
 
 export function getTelegramInitData(source) {
   const webApp = source?.Telegram?.WebApp ?? globalThis.window?.Telegram?.WebApp
-  return typeof webApp?.initData === 'string' ? webApp.initData : ''
+  if (typeof webApp?.initData === 'string' && webApp.initData) return webApp.initData
+  if (capturedHashInitData === null) {
+    capturedHashInitData = initDataFromUrlHash(globalThis.window?.location?.hash ?? '')
+  }
+  return capturedHashInitData
 }
 
 // The pure bridge decision, kept separate so the phase2 suite can
@@ -134,7 +159,8 @@ export function reportTelegramClientDiag(status, currentSession) {
   clientDiagSent = true
   try {
     const webApp = globalThis.window?.Telegram?.WebApp
-    const initData = typeof webApp?.initData === 'string' ? webApp.initData : ''
+    const initData = getTelegramInitData()
+    const hashData = initDataFromUrlHash(globalThis.window?.location?.hash ?? '')
     const env = import.meta.env ?? {}
     const supabaseUrl = typeof env.VITE_SUPABASE_URL === 'string' ? env.VITE_SUPABASE_URL.replace(/\/+$/, '') : ''
     const anonKey = typeof env.VITE_SUPABASE_ANON_KEY === 'string' ? env.VITE_SUPABASE_ANON_KEY : ''
@@ -152,7 +178,11 @@ export function reportTelegramClientDiag(status, currentSession) {
           hasInitData: initData.length > 0,
           initDataLen: initData.length,
           webAppPresent: !!webApp,
-          platform: typeof webApp?.platform === 'string' ? webApp.platform : '',
+          platform: typeof webApp?.platform === 'string'
+            ? webApp.platform
+            : hashData
+              ? 'hash-copy'
+              : '',
           hadSession: !!currentSession,
         },
       }),
@@ -166,7 +196,10 @@ export function bridgeTelegramSession(options = {}) {
     : getTelegramInitData(options.windowSource)
   if (!initData) return Promise.resolve('not-telegram')
 
-  if (bridgePromise && bridgeInitData === initData) return bridgePromise
+  // force (the Sign In With Telegram button): a deliberate tap
+  // always runs the exchange fresh — the attempt marker and the
+  // memoised promise exist to stop render loops, not people.
+  if (!options.force && bridgePromise && bridgeInitData === initData) return bridgePromise
   bridgeInitData = initData
 
   bridgePromise = (async () => {
@@ -176,8 +209,10 @@ export function bridgeTelegramSession(options = {}) {
       const digest = await initDataDigest(initData)
       if (digest) {
         markerKey = `${TELEGRAM_BRIDGE_STORAGE_PREFIX}${digest}`
-        const previous = readAttemptMarker(storage, markerKey)
-        if (previous) return previous === 'attempted' ? 'failed:attempted' : previous
+        if (!options.force) {
+          const previous = readAttemptMarker(storage, markerKey)
+          if (previous) return previous === 'attempted' ? 'failed:attempted' : previous
+        }
         writeAttemptMarker(storage, markerKey, 'attempted')
       }
 
@@ -200,4 +235,64 @@ export function bridgeTelegramSession(options = {}) {
   })()
 
   return bridgePromise
+}
+
+// --- Link management (v3, Landry's design 2026-11-07) -----------
+// The button in the app does three jobs against the same door:
+// sign in (bridgeTelegramSession above), report the link state,
+// and attach Telegram to the account already signed in here.
+
+async function telegramAuthPost(body, accessToken) {
+  const env = import.meta.env ?? {}
+  const supabaseUrl = typeof env.VITE_SUPABASE_URL === 'string' ? env.VITE_SUPABASE_URL.replace(/\/+$/, '') : ''
+  const anonKey = typeof env.VITE_SUPABASE_ANON_KEY === 'string' ? env.VITE_SUPABASE_ANON_KEY : ''
+  if (!supabaseUrl || !anonKey) return { status: 0, body: null }
+  try {
+    const response = await fetch(`${supabaseUrl}/functions/v1/telegram-auth`, {
+      method: 'POST',
+      headers: {
+        apikey: anonKey,
+        'Content-Type': 'application/json',
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify(body),
+    })
+    return { status: response.status, body: await response.json().catch(() => null) }
+  } catch {
+    return { status: 0, body: null }
+  }
+}
+
+// { linked, mine, userId } for the Telegram user who launched this
+// Mini App — mine = the link points at the session's account.
+export async function telegramLinkStatus(session) {
+  const initData = getTelegramInitData()
+  if (!initData) return { linked: false, mine: false, userId: null, reachable: false }
+  const { status, body } = await telegramAuthPost({ initData, statusOnly: true })
+  if (status !== 200 || !body) return { linked: false, mine: false, userId: null, reachable: false }
+  const userId = typeof body.user_id === 'string' ? body.user_id : null
+  return {
+    linked: body.linked === true && !!userId,
+    mine: !!userId && !!session?.user?.id && userId === session.user.id,
+    userId,
+    reachable: true,
+  }
+}
+
+// Attach this Telegram user to the signed-in account. Returns a
+// status word the UI can show: linked / already / elsewhere /
+// other-telegram / no-session / failed.
+export async function linkTelegramToSession(session) {
+  const initData = getTelegramInitData()
+  if (!initData) return 'not-telegram'
+  if (!session?.access_token) return 'no-session'
+  const { status, body } = await telegramAuthPost(
+    { initData, linkOnly: true },
+    session.access_token,
+  )
+  if (status === 200 && body?.linked) return body.already ? 'already' : 'linked'
+  if (status === 409 && body?.error === 'linked_elsewhere') return 'elsewhere'
+  if (status === 409 && body?.error === 'account_has_other_telegram') return 'other-telegram'
+  if (status === 401) return 'no-session'
+  return 'failed'
 }

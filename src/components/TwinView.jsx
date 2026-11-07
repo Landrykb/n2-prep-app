@@ -23,6 +23,7 @@ import { collectLearnerState, loadDeclaredLevel, saveDeclaredLevel } from '../li
 import { resolveLevelBasis } from '../lib/levelBasis.js'
 import FeedbackBox from './FeedbackBox.jsx'
 import { Upload } from 'lucide-react'
+import { getTelegramInitData, linkTelegramToSession, telegramLinkStatus } from '../lib/telegramAuth.js'
 
 // THE TWIN VIEW — "What your fleet knows about you" (Doc 06 §4, Doc 10 §3).
 // The Twin is VISIBLE on purpose: a learner who can inspect what the app
@@ -407,7 +408,34 @@ export default function TwinView({ setActive }) {
     window.addEventListener(TWIN_SYNC_EVENT, onSynced)
     return () => window.removeEventListener(TWIN_SYNC_EVENT, onSynced)
   }, [])
-  const { user, signOut } = useAuth()
+  const { user, session, signOut } = useAuth()
+  // Telegram link (Landry's design, 2026-11-07): "link later, from
+  // inside the app." Inside a Telegram launch the row offers the
+  // one-tap link for this account; outside Telegram it explains
+  // where the tap lives. Link state comes from telegram-auth.
+  const [tgLink, setTgLink] = useState('checking') // checking | no-telegram | not-linked | mine | elsewhere | failed
+  const [tgBusy, setTgBusy] = useState(false)
+  const [tgNote, setTgNote] = useState('')
+  useEffect(() => {
+    if (!getTelegramInitData()) { setTgLink('no-telegram'); return }
+    if (!session) return
+    let live = true
+    telegramLinkStatus(session).then((s) => {
+      if (!live) return
+      setTgLink(!s.reachable ? 'failed' : s.mine ? 'mine' : s.linked ? 'elsewhere' : 'not-linked')
+    })
+    return () => { live = false }
+  }, [session])
+  const doLinkTelegram = async () => {
+    setTgBusy(true)
+    setTgNote('')
+    const status = await linkTelegramToSession(session)
+    setTgBusy(false)
+    if (status === 'linked' || status === 'already') { setTgLink('mine'); return }
+    if (status === 'elsewhere') { setTgLink('elsewhere'); setTgNote(t('settings.telegramLinkedElsewhere')); return }
+    if (status === 'other-telegram') { setTgNote(t('settings.telegramOtherLinked')); return }
+    setTgNote(t('settings.telegramLinkFailed', { status }))
+  }
   const [delStep, setDelStep] = useState('idle') // idle | confirm | working | done
   const [delAgreed, setDelAgreed] = useState(false)
   const [delResult, setDelResult] = useState(null)
@@ -665,6 +693,27 @@ export default function TwinView({ setActive }) {
             )
           })}
         </div>
+      </Section>
+
+      <Section title={t('settings.telegram')}>
+        {tgLink === 'mine' && <p className="text-sm text-slate-300">{t('settings.telegramLinked')}</p>}
+        {tgLink === 'no-telegram' && <p className="text-sm text-slate-400">{t('settings.telegramOpenHint')}</p>}
+        {tgLink === 'elsewhere' && <p className="text-sm text-slate-300">{t('settings.telegramLinkedElsewhere')}</p>}
+        {(tgLink === 'not-linked' || tgLink === 'checking' || tgLink === 'failed') && (
+          <div>
+            <button
+              onClick={doLinkTelegram}
+              disabled={tgBusy || tgLink === 'checking' || !user}
+              className="px-4 py-2 rounded-xl bg-[#229ED9] hover:bg-[#1b8ac2] text-white text-sm font-semibold disabled:opacity-60"
+            >
+              {tgBusy ? t('settings.telegramLinking') : t('settings.telegramLinkButton')}
+            </button>
+            {tgLink === 'failed' && !tgNote && (
+              <p className="text-sm text-rose-300 mt-2">{t('settings.telegramLinkFailed', { status: 'offline' })}</p>
+            )}
+          </div>
+        )}
+        {tgNote && tgLink !== 'elsewhere' && <p className="text-sm text-rose-300 mt-2">{tgNote}</p>}
       </Section>
 
       <section className="rounded-2xl border border-bun-600/30 p-5 space-y-4">

@@ -59,9 +59,13 @@ export const AuthProvider = ({ children }) => {
           if (!active) return
           currentSession = refreshed.data.session
         }
-      } else if (globalThis.window?.Telegram?.WebApp) {
-        // Telegram's WebApp object exists but carried no signed
-        // launch identity — report that shape too (temporary diag).
+      } else if (
+        globalThis.window?.Telegram?.WebApp ||
+        (globalThis.window?.location?.hash ?? '').includes('tgWebApp')
+      ) {
+        // A Telegram launch shape (WebApp object, or Telegram's
+        // launch params in the URL) but no signed identity in
+        // either copy — report that shape too (temporary diag).
         reportTelegramClientDiag('skipped-no-initdata', currentSession)
       }
 

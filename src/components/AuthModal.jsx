@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useAuth } from '../hooks/useAuth.js'
 import { Eye, EyeOff, Loader2, X } from 'lucide-react'
 import { brand } from '../lib/brand.js'
-import { DIAG_BUILD, getTelegramInitData } from '../lib/telegramAuth.js'
+import { DIAG_BUILD, bridgeTelegramSession, getTelegramInitData } from '../lib/telegramAuth.js'
+import { supabase } from '../lib/supabaseClient.js'
 import { useLanguage } from '../hooks/useLanguage.js'
 import Mascot from './Mascot.jsx'
 
@@ -26,6 +27,28 @@ export default function AuthModal({ variant = 'gate', initialMode = 'signin', on
   const [resetting, setResetting] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  // Sign In With Telegram (Landry's design, 2026-11-07): inside a
+  // Telegram launch, one tap runs the bridge on demand — signing in
+  // the linked account, or creating the account + link on first
+  // use. The automatic bootstrap bridge stays; the button is the
+  // deliberate, retryable form of the same act.
+  const [tgBusy, setTgBusy] = useState(false)
+  const [tgError, setTgError] = useState('')
+  const inTelegram = getTelegramInitData().length > 0
+  const signInWithTelegram = async () => {
+    setTgBusy(true)
+    setTgError('')
+    try {
+      const status = await bridgeTelegramSession({ client: supabase, force: true })
+      if (status !== 'bridged' && status !== 'already') setTgError(status)
+      // On success the session lands via onAuthStateChange and the
+      // gate lifts on its own — nothing else to do here.
+    } catch {
+      setTgError('failed')
+    } finally {
+      setTgBusy(false)
+    }
+  }
 
   const submit = async (e) => {
     e.preventDefault()
@@ -104,11 +127,28 @@ export default function AuthModal({ variant = 'gate', initialMode = 'signin', on
             and the diag build tag — so a screenshot identifies the
             failing branch without any network. Remove with the
             telegram_auth_diag investigation. */}
-        {typeof window !== 'undefined' && window.Telegram?.WebApp && (
+        {typeof window !== 'undefined' &&
+          (window.Telegram?.WebApp || (window.location?.hash ?? '').includes('tgWebApp')) && (
           <p className="mb-5 text-center text-xs text-slate-500">
             Telegram bridge: {telegramBridgeStatus} · launch identity:{' '}
             {getTelegramInitData() ? `present (${getTelegramInitData().length})` : 'missing'} · {DIAG_BUILD}
           </p>
+        )}
+
+        {inTelegram && (
+          <div className="mb-5">
+            <button
+              type="button"
+              onClick={signInWithTelegram}
+              disabled={tgBusy}
+              className="w-full rounded-xl bg-[#229ED9] px-4 py-3 font-semibold text-white transition hover:bg-[#1b8ac2] disabled:opacity-60"
+            >
+              {tgBusy ? t('auth.telegramWorking') : t('auth.telegramButton')}
+            </button>
+            {tgError && (
+              <p className="mt-2 text-sm text-rose-300">{t('auth.telegramFailed', { status: tgError })}</p>
+            )}
+          </div>
         )}
 
         <form onSubmit={submit} className="space-y-4">

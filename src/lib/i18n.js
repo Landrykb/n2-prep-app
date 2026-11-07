@@ -50,6 +50,9 @@ export const CATALOGS = {
     "auth.unavailableBody": "Please try again in a little while. Your progress on this device is safe.",
     "auth.unavailableTitle": "Sign-in is not available right now",
     "auth.welcomeBack": "Welcome Back",
+    "auth.telegramButton": "Sign In With Telegram",
+    "auth.telegramWorking": "Talking to Telegram…",
+    "auth.telegramFailed": "Telegram sign-in didn't go through ({status}). Email works below too.",
     // call.*
     "call.accept": "Accept",
     "call.acceptCall": "Accept call",
@@ -510,6 +513,14 @@ export const CATALOGS = {
     // settings.*
     "settings.language": "Language",
     "settings.languageHint": "The whole app, in your language. The choice is saved to your account and follows you to every device.",
+    "settings.telegram": "Telegram",
+    "settings.telegramLinked": "Linked — the Reader bot knows this account: passages, voice notes and the morning dispatch reach you there.",
+    "settings.telegramLinkButton": "Link Telegram",
+    "settings.telegramLinking": "Linking…",
+    "settings.telegramLinkedElsewhere": "This Telegram is already linked to another Yonde account. Unlink it there first (the bot's /unlink).",
+    "settings.telegramOtherLinked": "This account is already linked to a different Telegram. Unlink it there first (the bot's /unlink).",
+    "settings.telegramLinkFailed": "That didn't link ({status}) — try again in a moment.",
+    "settings.telegramOpenHint": "Open Yonde from inside Telegram (the bot's Menu button) and linking becomes one tap here.",
     // shell.*
     "shell.bottomNav.close": "Close",
     "shell.bottomNav.label": "Quick navigation",
@@ -1280,6 +1291,9 @@ export const CATALOGS = {
     "auth.unavailableBody": "Réessayez dans un petit moment. Votre progression sur cet appareil est en sécurité.",
     "auth.unavailableTitle": "La connexion n’est pas disponible pour le moment",
     "auth.welcomeBack": "Bon retour",
+    "auth.telegramButton": "Se connecter avec Telegram",
+    "auth.telegramWorking": "Connexion à Telegram…",
+    "auth.telegramFailed": "La connexion Telegram n'a pas abouti ({status}). L'e-mail ci-dessous marche aussi.",
     // call.*
     "call.accept": "Accepter",
     "call.acceptCall": "Accepter l’appel",
@@ -1740,6 +1754,14 @@ export const CATALOGS = {
     // settings.*
     "settings.language": "Langue",
     "settings.languageHint": "Toute l’application, dans votre langue. Le choix est enregistré sur votre compte et vous suit sur tous vos appareils.",
+    "settings.telegram": "Telegram",
+    "settings.telegramLinked": "Lié — le bot Reader connaît ce compte : les passages, les notes vocales et l'envoi du matin vous y parviennent.",
+    "settings.telegramLinkButton": "Lier Telegram",
+    "settings.telegramLinking": "Liaison…",
+    "settings.telegramLinkedElsewhere": "Ce Telegram est déjà lié à un autre compte Yonde. Déliez-le d'abord là-bas (/unlink dans le bot).",
+    "settings.telegramOtherLinked": "Ce compte est déjà lié à un autre Telegram. Déliez-le d'abord là-bas (/unlink dans le bot).",
+    "settings.telegramLinkFailed": "La liaison n'a pas marché ({status}) — réessayez dans un instant.",
+    "settings.telegramOpenHint": "Ouvrez Yonde depuis Telegram (le bouton Menu du bot) et la liaison devient un seul toucher ici.",
     // shell.*
     "shell.bottomNav.close": "Fermer",
     "shell.bottomNav.label": "Navigation rapide",
@@ -2510,6 +2532,9 @@ export const CATALOGS = {
     "auth.unavailableBody": "少し待ってからもう一度試してください。この端末の進み具合は無事です。",
     "auth.unavailableTitle": "今はログインできません",
     "auth.welcomeBack": "おかえりなさい",
+    "auth.telegramButton": "Telegramでログイン",
+    "auth.telegramWorking": "Telegramに接続中…",
+    "auth.telegramFailed": "Telegramログインが通りませんでした（{status}）。下のメールでもログインできます。",
     // call.*
     "call.accept": "出る",
     "call.acceptCall": "電話に出る",
@@ -2970,6 +2995,14 @@ export const CATALOGS = {
     // settings.*
     "settings.language": "言語",
     "settings.languageHint": "アプリ全体を、あなたの言語で。選択はアカウントに保存され、どの端末でも引き継がれます。",
+    "settings.telegram": "Telegram",
+    "settings.telegramLinked": "連携済み — Reader botはこのアカウントを知っています。文章、音声メモ、朝の配信がそちらに届きます。",
+    "settings.telegramLinkButton": "Telegramを連携",
+    "settings.telegramLinking": "連携中…",
+    "settings.telegramLinkedElsewhere": "このTelegramはすでに別のYondeアカウントに連携されています。先にそちらで解除してください（botの /unlink）。",
+    "settings.telegramOtherLinked": "このアカウントはすでに別のTelegramに連携されています。先にそちらで解除してください（botの /unlink）。",
+    "settings.telegramLinkFailed": "連携できませんでした（{status}）。少し待ってからもう一度試してください。",
+    "settings.telegramOpenHint": "Telegramの中からYondeを開くと（botのMenuボタン）、ここでワンタップで連携できます。",
     // shell.*
     "shell.bottomNav.close": "閉じる",
     "shell.bottomNav.label": "クイックナビゲーション",
