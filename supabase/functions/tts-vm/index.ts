@@ -61,18 +61,35 @@ serve(async (req: Request) => {
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   if (!supabaseUrl || !anonKey || !serviceKey) return json({ error: 'Not configured' }, 500)
 
+  // Stage probes (migration 00019): one row per stage reached,
+  // so a failed tap names where it died — the 2026-11-08
+  // 'server-tts-null' taps left no job and no other trace.
+  // Defined before auth so even an auth failure leaves its row;
+  // best effort — a probe failure never affects the response.
+  const probeAdmin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
+  const probe = async (stage: string, detail = '') => {
+    try { await probeAdmin.from('tts_probe').insert({ stage, detail: detail.slice(0, 120) }) } catch { /* ignore */ }
+  }
+  await probe('arrived')
+
   const authHeader = req.headers.get('Authorization') ?? ''
   const caller = createClient(supabaseUrl, anonKey, {
     auth: { persistSession: false },
     global: { headers: { Authorization: authHeader } },
   })
   const { data: { user }, error: userError } = await caller.auth.getUser()
-  if (userError || !user) return json({ error: 'Unauthorized' }, 401)
+  if (userError || !user) {
+    await probe('auth-fail', userError?.message ?? 'no user')
+    return json({ error: 'Unauthorized' }, 401)
+  }
 
   const body = await req.json().catch(() => ({})) as { text?: unknown; voice?: unknown }
   const text = typeof body?.text === 'string' ? body.text.trim() : ''
   const cast = typeof body?.voice === 'string' && CASTS.includes(body.voice) ? body.voice : 'female'
-  if (!text || text.length > MAX_TEXT_CHARS) return json({ error: 'Text missing or too long' }, 400)
+  if (!text || text.length > MAX_TEXT_CHARS) {
+    await probe('bad-body', `len=${text.length}`)
+    return json({ error: 'Text missing or too long' }, 400)
+  }
 
   const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
 
@@ -81,7 +98,10 @@ serve(async (req: Request) => {
   const cached = await admin.storage.from(BUCKET).download(cachePath).catch(() => null)
   if (cached) {
     const bytes = new Uint8Array(await cached.arrayBuffer())
-    if (bytes.length > 0) return audioResponse(bytes)
+    if (bytes.length > 0) {
+      await probe('cache-hit')
+      return audioResponse(bytes)
+    }
   }
 
   const { data: job, error: insertError } = await admin
@@ -91,8 +111,10 @@ serve(async (req: Request) => {
     .single()
   if (insertError || !job) {
     console.error('tts-vm: job insert failed')
+    await probe('insert-fail', insertError?.message ?? 'no job row')
     return json({ error: 'Voice queue unavailable' }, 502)
   }
+  await probe('inserted')
 
   const deadline = Date.now() + WAIT_MS
   while (Date.now() < deadline) {
@@ -112,11 +134,13 @@ serve(async (req: Request) => {
       // Seed the content cache for the next identical line
       // (best effort — the bytes are already in hand).
       await admin.storage.from(BUCKET).upload(cachePath, bytes, { contentType: 'audio/mpeg', upsert: true }).catch(() => null)
+      await probe('done')
       return audioResponse(bytes)
     }
   }
   // Timed out: the job still completes on the worker and its
   // audio waits in the bucket; the caller's fallback serves this
   // tap, and a later identical line re-enqueues cleanly.
+  await probe('timeout')
   return json({ error: 'Voice worker busy' }, 504)
 })

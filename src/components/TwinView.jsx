@@ -608,14 +608,28 @@ export default function TwinView({ setActive }) {
         {patterns.length ? (
           <ul className="space-y-2">
             {patterns.map((p) => (
-              <li key={p.id} className="flex items-start gap-3 rounded-xl bg-bun-700/40 border border-bun-600/20 p-3.5">
-                <span className="mt-0.5"><Mascot agent="nao" size={26} showName={false} /></span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-white">{p.label} <span className="text-xs font-normal text-slate-400">{t('twin.trips.seen', { count: p.count, date: p.lastSeenAt ? new Date(p.lastSeenAt).toLocaleDateString() : '—' })}</span></p>
-                  <p className="text-xs text-slate-400 mt-0.5">{patternById(p.id)?.plain}</p>
-                  {p.example && <p className="text-xs text-slate-500 mt-1 truncate">{t('twin.trips.yourWords', { example: p.example })}</p>}
+              <li key={p.id} className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-3.5">
+                {/* Card layout (2026-11-08): the Remove button used
+                    to sit in the same flex row as a shrink-0 sibling —
+                    on a phone its long label ate half the card and
+                    every text line wrapped into a skinny column
+                    (Landry's screenshots). Now: title row (avatar +
+                    label + seen-meta on its own line), the fix and
+                    the learner's words at full width, and Remove as
+                    a quiet text action at the bottom — destructive
+                    actions quiet and last. */}
+                <div className="flex items-start gap-3">
+                  <span className="mt-0.5 shrink-0"><Mascot agent="nao" size={26} showName={false} /></span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-white leading-snug">{p.label}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{t('twin.trips.seen', { count: p.count, date: p.lastSeenAt ? new Date(p.lastSeenAt).toLocaleDateString() : '—' })}</p>
+                  </div>
                 </div>
-                <button onClick={() => setTwin(removePattern(p.id))} className="shrink-0 flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-bun-800 border border-bun-600/40 text-slate-400 hover:text-white transition"><X size={12} /> {t('twin.trips.remove')}</button>
+                <p className="text-[13px] leading-relaxed text-slate-300 mt-2">{patternById(p.id)?.plain}</p>
+                {p.example && <p className="text-xs text-slate-500 mt-1.5 truncate">{t('twin.trips.yourWords', { example: p.example })}</p>}
+                <div className="flex justify-end mt-2">
+                  <button onClick={() => setTwin(removePattern(p.id))} className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-200 transition px-1 py-0.5"><X size={12} /> {t('twin.trips.remove')}</button>
+                </div>
               </li>
             ))}
           </ul>
