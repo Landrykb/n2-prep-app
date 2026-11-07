@@ -125,37 +125,46 @@ import {
 } from './data.js'
 
 const nav = [
+  // Menu organisation (Landry, 2026-11-07): the old app and the
+  // new Yonde system grew into one long drawer — the daily loop
+  // first, then the fleet, then ALL the training tools in one
+  // Practice group, and reference material last in Library.
+  // --- Today: the daily loop ---
   { id: 'session', labelKey: 'shell.nav.session', shortKey: 'shell.navShort.session', icon: Play , group: 'today' },
   { id: 'dashboard', labelKey: 'shell.nav.dashboard', icon: LayoutDashboard , group: 'today' },
-  { id: 'voice', labelKey: 'shell.nav.voice', icon: Mic , group: 'library' },
-  { id: 'sensei', labelKey: 'shell.nav.sensei', shortKey: 'shell.navShort.sensei', icon: Phone , group: 'fleet' },
-  { id: 'diagnosis', labelKey: 'shell.nav.diagnosis', icon: Stethoscope , group: 'fleet' },
+  { id: 'sensei', labelKey: 'shell.nav.sensei', shortKey: 'shell.navShort.sensei', icon: Phone , group: 'today' },
+  { id: 'reader', labelKey: 'shell.nav.reader', shortKey: 'shell.navShort.reader', icon: BookOpenText , group: 'today' },
+  // --- Your Fleet: you, measured ---
   { id: 'twin', labelKey: 'shell.nav.twin', shortKey: 'shell.navShort.twin', icon: Users , group: 'fleet' },
+  { id: 'diagnosis', labelKey: 'shell.nav.diagnosis', icon: Stethoscope , group: 'fleet' },
   { id: 'loop', labelKey: 'shell.nav.loop', shortKey: 'shell.navShort.loop', icon: Repeat , group: 'fleet' },
   { id: 'coach', labelKey: 'shell.nav.coach', shortKey: 'shell.navShort.coach', icon: Mail , group: 'fleet' },
-  { id: 'mine', labelKey: 'shell.nav.mine', icon: Pickaxe , group: 'library' },
+  // --- Practice: every training tool, old and new ---
+  { id: 'voice', labelKey: 'shell.nav.voice', icon: Mic , group: 'practice' },
+  { id: 'mine', labelKey: 'shell.nav.mine', icon: Pickaxe , group: 'practice' },
+  { id: 'drills', labelKey: 'shell.nav.drills', icon: Dumbbell , group: 'practice' },
+  { id: 'speed', labelKey: 'shell.nav.speed', icon: Zap , group: 'practice' },
+  { id: 'anki', labelKey: 'shell.nav.anki', icon: Layers , group: 'practice' },
+  { id: 'n2listening', labelKey: 'shell.nav.n2listening', icon: Headphones , group: 'practice' },
+  { id: 'mock', labelKey: 'shell.nav.mock', icon: ClipboardCheck , group: 'practice' },
+  { id: 'bjt', labelKey: 'shell.nav.bjt', icon: Building2 , group: 'practice' },
+  { id: 'ai', labelKey: 'shell.nav.ai', icon: Bot , group: 'practice' },
+  { id: 'errors', labelKey: 'shell.nav.errors', icon: AlertCircle , group: 'practice' },
+  // --- Library: reference ---
   { id: 'lessons', labelKey: 'shell.nav.lessons', icon: BookOpen , group: 'library' },
-  { id: 'drills', labelKey: 'shell.nav.drills', icon: Dumbbell , group: 'library' },
-  { id: 'mock', labelKey: 'shell.nav.mock', icon: ClipboardCheck , group: 'library' },
-  { id: 'anki', labelKey: 'shell.nav.anki', icon: Layers , group: 'library' },
-  { id: 'speed', labelKey: 'shell.nav.speed', icon: Zap , group: 'library' },
   { id: 'dictionary', labelKey: 'shell.nav.dictionary', icon: Search , group: 'library' },
   { id: 'reading', labelKey: 'shell.nav.reading', icon: Eye , group: 'library' },
-  { id: 'reader', labelKey: 'shell.nav.reader', shortKey: 'shell.navShort.reader', icon: BookOpenText , group: 'library' },
-  { id: 'ai', labelKey: 'shell.nav.ai', icon: Bot , group: 'library' },
   { id: 'plan', labelKey: 'shell.nav.plan', icon: Map , group: 'library' },
   { id: 'resources', labelKey: 'shell.nav.resources', icon: Library , group: 'library' },
-  { id: 'sources', labelKey: 'shell.nav.sources', shortKey: 'shell.navShort.sources', icon: ScrollText , group: 'library' },
   { id: 'videos', labelKey: 'shell.nav.videos', icon: Play , group: 'library' },
-  { id: 'n2listening', labelKey: 'shell.nav.n2listening', icon: Headphones , group: 'library' },
-  { id: 'bjt', labelKey: 'shell.nav.bjt', icon: Building2 , group: 'library' },
-  { id: 'errors', labelKey: 'shell.nav.errors', icon: AlertCircle , group: 'library' },
+  { id: 'sources', labelKey: 'shell.nav.sources', shortKey: 'shell.navShort.sources', icon: ScrollText , group: 'library' },
 ]
 
 const navIds = nav.map((n) => n.id)
 const NAV_GROUPS = [
   { id: 'today', labelKey: 'shell.group.today' },
   { id: 'fleet', labelKey: 'shell.group.fleet' },
+  { id: 'practice', labelKey: 'shell.group.practice' },
   { id: 'library', labelKey: 'shell.group.library' },
 ]
 
