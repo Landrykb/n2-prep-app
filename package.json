@@ -24,7 +24,9 @@
     "test:i18n": "TZ=UTC node tests/i18n.test.mjs",
     "build:families": "node scripts/build-families.mjs",
     "build:variants": "node scripts/build-variants.mjs",
-    "build:sentences": "node scripts/build-sentences.mjs"
+    "build:sentences": "node scripts/build-sentences.mjs",
+    "test:corrector": "TZ=UTC node tests/corrector.test.mjs",
+    "eval:corrector": "TZ=UTC node scripts/eval-corrector.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.109.0",

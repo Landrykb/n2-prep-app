@@ -25,6 +25,7 @@ import { loadProfile, loadDiagnosis } from './profile.js'
 import { loadCallState } from './calls.js'
 import { todayStr } from './session.js'
 import { recordMetric } from './metrics.js'
+import { shadowClassify } from './correctorShadow.js'
 
 export const TWIN_KEY = 'jpn:twin:v1'
 export const DIAGNOSIS_HISTORY_KEY = 'jpn:diagnosisHistory:v1'
@@ -297,7 +298,21 @@ export function recordVoiceAttempt({ scene, text, score, missing = [] }) {
     twin.speaking.masteredEvents += 1
     bumpMethod(twin, 'voice', { proof: 1 })
   } else {
-    recordPatterns(twin, classifyVoiceError({ scene, text, missing, score }), text)
+    const patterns = classifyVoiceError({ scene, text, missing, score })
+    recordPatterns(twin, patterns, text)
+    // Corrector shadow mode (Doc 05 §4): the rules' verdict above is
+    // the only one recorded — but the same production is also sent,
+    // fire-and-forget, to the AI Corrector so the two classifications
+    // can be compared in the corrector_shadow metric (Doc 08 §4 gate).
+    // Silent when signed out / capped / unreachable; changes nothing.
+    if (patterns.length) {
+      shadowClassify({
+        production: text,
+        target: scene?.model || '',
+        context: { sceneId: scene?.id || null, targetPattern: scene?.targetPattern || '', missing },
+        ruleCategory: patterns[0],
+      })
+    }
   }
   pushAccuracy(twin, 'voice', (score || 0) / 100)
   return saveTwin(twin)
