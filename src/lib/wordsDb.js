@@ -181,3 +181,18 @@ export async function searchWords(query, limit = 30) {
   }
   return out
 }
+
+// --------------------------------------------------------------- sentences
+// Example sentences (scripts/build-sentences.mjs, docs/19): pairs from
+// the dictionary-linked Tatoeba/Tanaka set (EDRDG examples file),
+// sharded exactly like the words shards. A word with no linked pair
+// returns an honest null — the UI shows nothing for it.
+export function sentencesShardPath(id) {
+  return `${BASE}/sentences/sentences-${wordShardFor(id)}.json`
+}
+
+/** [{ jp, en }] (at most 2) for the word id, or null. */
+export async function getSentences(id) {
+  const shard = await fetchShard(sentencesShardPath(id))
+  return shard?.[String(id)] || null
+}

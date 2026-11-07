@@ -275,3 +275,48 @@ export function loadFrenchLayer() {
   }
   return frenchPromise
 }
+
+// ------------------------------------------------- attested sound families
+// The attested sound families (scripts/build-families.mjs, docs/18):
+// families whose members are confirmed by TWO sources — the derived
+// soundComponent rule AND KanjiVG's phonetic (kvg:phon) mark. Each
+// family also lists alsoComputed members (derived rule only).
+let familiesPromise = null
+export function loadFamilies() {
+  if (!familiesPromise) {
+    familiesPromise = fetch(`${BASE}/families.json`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d?.families || [])
+      .catch(() => [])
+  }
+  return familiesPromise
+}
+
+/** The shipped attested family for one component, or null. */
+export function attestedFamilyFor(families, component) {
+  if (!families || !component) return null
+  return families.find((f) => f.component === component) || null
+}
+
+// ------------------------------------------------------- KanjiVG variants
+// Variant forms (scripts/build-variants.mjs, docs/18): alternate
+// KanjiVG glyphs for a kanji (Kaisho, printed form, stroke-order
+// variants...), each with its ordered stroke paths. Only part of the
+// variant set ships (payload budget, priority order) — a kanji with
+// no entry here returns an honest null, never a guess.
+let variantsPromise = null
+export function loadVariants() {
+  if (!variantsPromise) {
+    variantsPromise = fetch(`${BASE}/variants.json`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d?.variants || {})
+      .catch(() => ({}))
+  }
+  return variantsPromise
+}
+
+/** [{ variant, note, paths }] for the kanji, or null when none ship. */
+export async function getKanjiVariants(char) {
+  const all = await loadVariants()
+  return all[char] || null
+}

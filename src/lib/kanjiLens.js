@@ -162,6 +162,11 @@ const onListOf = (entry) => {
  *   data.components : the components.json map — element -> [charsString, primaryOn]
  *   data.metaOf     : (char) -> { on, freq, jlpt, level } | null  (index or meta shape)
  *   data.radicalMembers : chars sharing the kanji's radical number (any order)
+ *   data.attested   : optional — the shipped attested family for the sound
+ *                     component ({ component, reading, members,
+ *                     alsoComputed } from kanjiDb families.json). When it
+ *                     matches the sound component, the sound row is built
+ *                     from it: attested members first, alsoComputed after.
  *
  * Returns:
  *   soundComponent : the component carrying the sound, or null
@@ -171,6 +176,9 @@ const onListOf = (entry) => {
  *                    is true when the member's own on-readings include the
  *                    shared reading — the cue is probabilistic, so both
  *                    kinds are returned and the caller must show the split.
+ *                    With data.attested, entries also carry `attested`
+ *                    (true = confirmed by two sources, false = computed).
+ *   attested       : boolean — the sound row came from an attested family
  *   parts          : { element: { chars, count, on } } per top-level component
  *   radical        : [chars] sharing the radical, capped, frequent first
  */
@@ -200,6 +208,7 @@ export function familyFor(char, meta = null, tree = null, data = {}, cap = 12) {
   }
   let sound = []
   let soundOn = ''
+  let attested = false
   if (soundComponent) {
     const entry = components[soundComponent]
     const members = entry ? [...entry[0]] : []
@@ -209,14 +218,34 @@ export function familyFor(char, meta = null, tree = null, data = {}, cap = 12) {
       const compOns = onListOf(metaOf(soundComponent))
       soundOn = onListOf(meta).find((r) => compOns.includes(r)) || compOns[0] || ''
     }
-    sound = members
-      .filter((c) => c !== char)
-      .map((c) => {
+    const fam = data.attested && data.attested.component === soundComponent ? data.attested : null
+    if (fam) {
+      // Attested family (docs/18): members confirmed by two sources
+      // lead; alsoComputed members follow with attested: false so the
+      // caller can dim them. The reading is the family's own.
+      attested = true
+      if (fam.reading) soundOn = fam.reading
+      const toRow = (c, isAttested) => {
         const ons = onListOf(metaOf(c))
-        return { char: c, on: ons[0] || '', matches: soundOn ? ons.includes(soundOn) : false }
-      })
-      .sort((a, b) => Number(b.matches) - Number(a.matches) || rank(a.char, b.char))
-      .slice(0, cap)
+        return { char: c, on: ons[0] || '', matches: soundOn ? ons.includes(soundOn) : false, attested: isAttested }
+      }
+      const attestedRows = (fam.members || []).filter((c) => c !== char).map((c) => toRow(c, true)).sort((a, b) => rank(a.char, b.char))
+      const listed = new Set(attestedRows.map((r) => r.char))
+      const computedRows = (fam.alsoComputed || [])
+        .filter((c) => c !== char && !listed.has(c))
+        .map((c) => toRow(c, false))
+        .sort((a, b) => rank(a.char, b.char))
+      sound = [...attestedRows, ...computedRows].slice(0, cap)
+    } else {
+      sound = members
+        .filter((c) => c !== char)
+        .map((c) => {
+          const ons = onListOf(metaOf(c))
+          return { char: c, on: ons[0] || '', matches: soundOn ? ons.includes(soundOn) : false }
+        })
+        .sort((a, b) => Number(b.matches) - Number(a.matches) || rank(a.char, b.char))
+        .slice(0, cap)
+    }
   }
 
   // One row per top-level component: what else is built from it.
@@ -240,5 +269,5 @@ export function familyFor(char, meta = null, tree = null, data = {}, cap = 12) {
     .sort(rank)
     .slice(0, cap)
 
-  return { soundComponent, soundOn, sound, parts, radical }
+  return { soundComponent, soundOn, sound, attested, parts, radical }
 }

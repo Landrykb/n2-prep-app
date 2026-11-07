@@ -1,0 +1,32 @@
+{
+  "generatedAt": "2026-11-07T00:00:17.749Z",
+  "sources": {
+    "examplesFile": {
+      "name": "EDRDG examples.utf — the dictionary-linked example sentences (jpn_indices linking in readable form)",
+      "url": "http://ftp.edrdg.org/pub/Nihongo/examples.utf.gz",
+      "bytes": 9700011,
+      "pairsInFile": 147836
+    },
+    "sentences": {
+      "name": "Tatoeba / Tanaka Corpus",
+      "licence": "CC BY 2.0 FR (some sentences CC0)",
+      "url": "https://tatoeba.org"
+    }
+  },
+  "method": "jmdict-linked",
+  "resolution": "B-line index tokens resolved to WordsDB entries by (1) printed JMdict (#seq) reference, (2) headword + reading against written forms and kana, (3) headword as kana word or written form; tokens resolving to more than 4 entries skipped as ambiguous",
+  "counts": {
+    "wordsInDb": 22650,
+    "wordsWithCandidates": 14730,
+    "wordsWithSentences": 14730,
+    "pairsShipped": 26313,
+    "pairsWithinPreferredLength": 25816,
+    "attachmentsConsidered": 1138632,
+    "shards": 19,
+    "payloadBytes": 2873207,
+    "budgetBytes": 3400000,
+    "maxPairsPerWord": 2,
+    "preferredMaxJpChars": 40,
+    "hardMaxJpChars": 60
+  }
+}

@@ -17,6 +17,7 @@ import {
   Sparkles,
   Filter,
   Search,
+  ScrollText,
   Layers,
   Library,
   ExternalLink,
@@ -81,6 +82,7 @@ const SenseiCall = lazy(() => import('./components/SenseiCall.jsx'))
 const TwinView = lazy(() => import('./components/TwinView.jsx'))
 const GrowthLoop = lazy(() => import('./components/GrowthLoop.jsx'))
 const Reader = lazy(() => import('./components/Reader.jsx'))
+const SourcesView = lazy(() => import('./components/SourcesView.jsx'))
 const CoachLetter = lazy(() => import('./components/CoachLetter.jsx'))
 const PrivacyPolicy = lazy(() => import('./components/PrivacyPolicy.jsx'))
 const Terms = lazy(() => import('./components/Terms.jsx'))
@@ -120,6 +122,7 @@ const nav = [
   { id: 'ai', label: 'AI Tutor', icon: Bot , group: 'library' },
   { id: 'plan', label: 'Study Plan', icon: Map , group: 'library' },
   { id: 'resources', label: 'Resources', icon: Library , group: 'library' },
+  { id: 'sources', label: 'Sources & Licences', short: 'Sources', icon: ScrollText , group: 'library' },
   { id: 'videos', label: 'Videos', icon: Play , group: 'library' },
   { id: 'n2listening', label: 'Listening', icon: Headphones , group: 'library' },
   { id: 'bjt', label: 'BJT', icon: Building2 , group: 'library' },
@@ -1795,6 +1798,7 @@ function App() {
     ai: <AiTutor context={active} />,
     plan: <StudyPlan daysToExam={daysToExam} />,
     resources: <Resources />,
+    sources: <SourcesView />,
     videos: <Videos />,
     n2listening: <N2Listening />,
     bjt: <BJT />,

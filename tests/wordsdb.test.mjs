@@ -105,4 +105,51 @@ check('display form prefers the written form containing the kanji', () => {
   assert.equal(wdb.wordDisplayForm({ kanji: [], kana: 'する' }), 'する')
 })
 
+console.log('example sentences (build-sentences.mjs, docs/19):')
+{
+  const sentManifest = readJson(path.join(DB, 'sentences.json'))
+  const sentDir = path.join(DB, 'sentences')
+  const sentShardCache = new Map()
+  function sentencesFor(id) {
+    const rel = wdb.sentencesShardPath(id).replace('/data/wordsdb/', '')
+    if (!sentShardCache.has(rel)) sentShardCache.set(rel, readJson(path.join(DB, rel)))
+    return sentShardCache.get(rel)[String(id)] || null
+  }
+
+  check('sentences: method is jmdict-linked and manifest counts agree with the shards', () => {
+    assert.equal(sentManifest.method, 'jmdict-linked')
+    assert.ok(sentManifest.sources.sentences.licence.includes('CC BY 2.0 FR'))
+    let words = 0
+    let pairs = 0
+    for (const f of fs.readdirSync(sentDir)) {
+      const shard = readJson(path.join(sentDir, f))
+      for (const [id, list] of Object.entries(shard)) {
+        words++
+        assert.ok(wordEntry(id), `${id}: sentence key must be a real word id`)
+        assert.ok(Array.isArray(list) && list.length >= 1 && list.length <= 2, `${id}: 1-2 pairs`)
+        for (const p of list) {
+          pairs++
+          assert.ok(p.jp && p.en, `${id}: pair must carry jp + en`)
+        }
+      }
+    }
+    assert.equal(words, sentManifest.counts.wordsWithSentences)
+    assert.equal(pairs, sentManifest.counts.pairsShipped)
+    assert.equal(fs.readdirSync(sentDir).length, sentManifest.counts.shards)
+  })
+
+  check('日本語 and 食べる carry real linked pairs that contain the word', () => {
+    const jpEntry = wordsForKanjiDisk('日', 100000).find((e) => (e.kanji || []).includes('日本語'))
+    assert.ok(jpEntry)
+    const jpPairs = sentencesFor(jpEntry.id)
+    assert.ok(jpPairs?.length >= 1)
+    assert.ok(jpPairs.some((p) => p.jp.includes('日本語')), 'a 日本語 sentence must contain 日本語')
+    const tabEntry = wordsForKanjiDisk('食', 100000).find((e) => (e.kanji || []).includes('食べる'))
+    assert.ok(tabEntry)
+    const tabPairs = sentencesFor(tabEntry.id)
+    assert.ok(tabPairs?.length >= 1)
+    assert.ok(tabPairs.some((p) => p.jp.includes('食')), 'a 食べる sentence must contain 食')
+  })
+}
+
 console.log(`\nwordsdb: ${passed} checks passed`)

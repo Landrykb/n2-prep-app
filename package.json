@@ -19,8 +19,11 @@
     "test:tts": "TZ=UTC node tests/tts.test.mjs",
     "test:lens": "TZ=UTC node tests/lens.test.mjs",
     "build:wordsdb": "node scripts/build-wordsdb.mjs",
- "build:french": "node scripts/build-french-merge.mjs",
-    "test:wordsdb": "TZ=UTC node tests/wordsdb.test.mjs"
+    "build:french": "node scripts/build-french-merge.mjs",
+    "test:wordsdb": "TZ=UTC node tests/wordsdb.test.mjs",
+    "build:families": "node scripts/build-families.mjs",
+    "build:variants": "node scripts/build-variants.mjs",
+    "build:sentences": "node scripts/build-sentences.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.109.0",

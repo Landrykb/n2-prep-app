@@ -178,4 +178,37 @@ check('queueHasFront matches by front under any source', () => {
   assert.equal(lens.queueHasFront(q, ''), false)
 })
 
+check('attested family （青/セイ）: attested rows lead with the flag, computed rows carry attested:false', () => {
+  const families = readJson(path.join(DB, 'families.json')).families
+  const seiMeta = metaFor('清')
+  const seiStrokes = strokesFor('清')
+  const attested = families.find((f) => f.component === '青')
+  assert.ok(attested)
+  const fam = lens.familyFor('清', seiMeta, seiStrokes.tree, {
+    components,
+    metaOf: (c) => byChar.get(c) || null,
+    radicalMembers: [],
+    attested,
+  })
+  assert.equal(fam.attested, true)
+  assert.equal(fam.soundComponent, '青')
+  assert.equal(fam.soundOn, 'セイ')
+  const hare = fam.sound.find((m) => m.char === '晴')
+  assert.ok(hare, '晴 belongs to the attested 青 family')
+  assert.equal(hare.attested, true)
+  assert.equal(hare.matches, true)
+  const yasushi = fam.sound.find((m) => m.char === '靖')
+  if (yasushi) assert.equal(yasushi.attested, false)
+  // Attested rows come before computed rows.
+  const firstComputed = fam.sound.findIndex((m) => m.attested === false)
+  if (firstComputed >= 0) assert.ok(fam.sound.slice(0, firstComputed).every((m) => m.attested === true))
+  // Without the attested input, the same kanji stays on the derived row.
+  const derived = lens.familyFor('清', seiMeta, seiStrokes.tree, {
+    components,
+    metaOf: (c) => byChar.get(c) || null,
+    radicalMembers: [],
+  })
+  assert.equal(derived.attested, false)
+})
+
 console.log(`\nlens: ${passed} checks passed`)

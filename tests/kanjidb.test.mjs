@@ -237,4 +237,105 @@ console.log('french layer — curriculum merge (build-french-merge.mjs, docs/18)
   })
 }
 
+console.log('attested sound families (build-families.mjs, docs/18):')
+{
+  const familiesDoc = readJson(path.join(DB, 'families.json'))
+  const strokesOf = (ch) => {
+    const shard = readJson(path.join(DB, db.strokesShardPath(ch).replace('/data/kanjidb/', '')))
+    return shard[ch] || null
+  }
+  const metaOf = (ch) => {
+    const shard = readJson(path.join(DB, db.metaShardPath(ch).replace('/data/kanjidb/', '')))
+    return shard[ch] || null
+  }
+
+  check('families.json: manifest counts agree with the shipped families', () => {
+    const counts = familiesDoc.manifest.counts
+    assert.equal(familiesDoc.families.length, counts.attestedFamilies)
+    assert.ok(familiesDoc.families.length <= 200)
+    assert.equal(familiesDoc.families.reduce((s, f) => s + f.members.length, 0), counts.attestedMemberships)
+    assert.equal(familiesDoc.families.reduce((s, f) => s + f.alsoComputed.length, 0), counts.computedOnlyMemberships)
+    assert.equal(counts.derivedSoundComponentKanji, manifest.counts.soundComponentDerived)
+    assert.equal(familiesDoc.manifest.validation.derivedTotalMatchesKanjidbManifest, true)
+    assert.ok(familiesDoc.families.every((f) => f.members.length >= 3))
+  })
+
+  check('families: every attested member is confirmed by BOTH sources in the real data', () => {
+    const componentsData = readJson(path.join(DB, 'components.json'))
+    for (const fam of familiesDoc.families) {
+      assert.equal(componentsData[fam.component][1], fam.reading)
+      for (const ch of fam.members) {
+        const m = metaOf(ch)
+        assert.equal(m.soundComponent, fam.component, `${ch}: derived rule must name the component`)
+        assert.ok(m.on.includes(fam.reading), `${ch}: reading must be among its on-readings`)
+        const entry = strokesOf(ch)
+        assert.ok((entry?.tree?.c || []).some((n) => n.e === fam.component && n.ph), `${ch}: KanjiVG must mark the component group phonetic`)
+      }
+      for (const ch of fam.alsoComputed) {
+        const m = metaOf(ch)
+        assert.equal(m.soundComponent, fam.component, `${ch}: alsoComputed still needs the derived rule`)
+        const entry = strokesOf(ch)
+        assert.ok(!(entry?.tree?.c || []).some((n) => n.e === fam.component && n.ph), `${ch}: alsoComputed must NOT carry the phonetic mark`)
+      }
+    }
+  })
+
+  check('青/セイ family: the six common kanji are attested; 靖 is computed only', () => {
+    const fam = familiesDoc.families.find((f) => f.component === '青')
+    assert.ok(fam, 'the 青 family must ship')
+    assert.equal(fam.reading, 'セイ')
+    for (const ch of ['情', '請', '清', '精', '静', '晴']) assert.ok(fam.members.includes(ch), `${ch} must be attested`)
+    assert.ok(fam.alsoComputed.includes('靖'))
+    assert.ok(!fam.members.includes('靖'))
+  })
+}
+
+console.log('KanjiVG variant forms (build-variants.mjs, docs/18):')
+{
+  const variantsDoc = readJson(path.join(DB, 'variants.json'))
+  const strokesOf = (ch) => {
+    const shard = readJson(path.join(DB, db.strokesShardPath(ch).replace('/data/kanjidb/', '')))
+    return shard[ch] || null
+  }
+  const { variantNote } = await import('../scripts/build-variants.mjs')
+
+  check('variants.json: investigation + counts agree; payload under budget', () => {
+    const inv = variantsDoc.manifest.investigation
+    assert.equal(inv.mainFormFiles, 6703)
+    assert.equal(inv.variantFiles, 4959)
+    assert.equal(inv.variantBaseKanji, 4076)
+    assert.equal(inv.variantBaseKanjiInOurStrokes, 4076)
+    const entries = Object.entries(variantsDoc.variants)
+    assert.equal(entries.length, variantsDoc.manifest.counts.kanjiWithVariantsShipped)
+    assert.equal(entries.reduce((s, [, l]) => s + l.length, 0), variantsDoc.manifest.counts.variantsShipped)
+    assert.ok(variantsDoc.manifest.counts.payloadBytes <= variantsDoc.manifest.counts.budgetBytes)
+    for (const [ch, list] of entries) {
+      assert.ok(strokesOf(ch), `${ch}: variants ship only for kanji with standard strokes`)
+      for (const v of list) assert.ok(v.paths.length > 0, `${ch}/${v.variant}: no paths`)
+    }
+  })
+
+  check('直 ships its Kaisho form; 語 has no variants; standard paths unaffected', () => {
+    const choku = variantsDoc.variants['直']
+    assert.ok(choku?.some((v) => v.variant === 'Kaisho' && v.paths.length === 8), '直-Kaisho with 8 paths')
+    assert.ok(choku.find((v) => v.variant === 'Kaisho').note.includes('Kaisho'))
+    assert.equal(variantsDoc.variants['語'], undefined)
+    assert.equal(strokesOf('直').paths.length, 8)
+    assert.equal(strokesOf('語').paths.length, 14)
+  })
+
+  check('variant notes come only from the documented suffix vocabulary', () => {
+    assert.equal(variantNote('Kaisho'), 'Kaisho (regular script) form')
+    assert.equal(variantNote('Insatsu'), 'printed form')
+    assert.ok(variantNote('KaishoVtLst').includes('vertical last'))
+    assert.equal(variantNote('KaishoLe'), null)
+    assert.equal(variantNote('NoDot'), null)
+    for (const list of Object.values(variantsDoc.variants)) {
+      for (const v of list) {
+        if (v.note != null) assert.equal(v.note, variantNote(v.variant), `${v.variant}: note must equal the composed gloss`)
+      }
+    }
+  })
+}
+
 console.log(`\nkanjidb: ${passed} checks passed`)
