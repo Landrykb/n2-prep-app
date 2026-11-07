@@ -1627,4 +1627,35 @@ check('kanjiReadings: an injected meaning source adds the gloss; without one the
   ])
 })
 
+// ---------- reader-serve: the web pipeline twin (amendment #16) ----------
+// The web /reader page's bank-only pick dead-ended learners the
+// bot would have fitted by generation. reader-serve runs the
+// same pipeline behind a user JWT. Its fit.ts / segment.ts must
+// stay byte-identical to the bot's — a drift would move the gate
+// on one surface only.
+{
+  const { readFileSync } = await import('node:fs')
+  const read = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8')
+  check('reader-serve fit/segment twins are byte-identical to the bot', () => {
+    assert.equal(read('../supabase/functions/reader-serve/fit.ts'), read('../supabase/functions/reader-bot/fit.ts'))
+    assert.equal(read('../supabase/functions/reader-serve/segment.ts'), read('../supabase/functions/reader-bot/segment.ts'))
+    assert.equal(read('../supabase/functions/reader-serve/deck.ts'), read('../supabase/functions/reader-bot/deck.ts'))
+  })
+  check('reader-serve contract: JWT-named caller, picked/nofit out', () => {
+    const fn = read('../supabase/functions/reader-serve/index.ts')
+    assert.ok(fn.includes('auth.getUser()'), 'caller named from the JWT')
+    assert.ok(fn.includes("status: 'picked'"), 'picked shape')
+    assert.ok(fn.includes("status: 'nofit'"), 'nofit is data, not an error')
+    assert.ok(fn.includes('tryGenerate') || fn.includes('generateDraft'), 'generation fallback present')
+    assert.ok(fn.includes('GEN_COOLDOWN_MS'), 'the generation cooldown rides along')
+    assert.ok(!fn.includes('TELEGRAM') && !fn.includes('sendMessage'), 'no Telegram surface in the web pipeline')
+  })
+  check('the web page asks the server before declaring nothing fits', () => {
+    const page = read('../src/components/Reader.jsx')
+    assert.ok(page.includes("functions.invoke('reader-serve'"), 'page invokes the serve function')
+    assert.ok(page.includes("phase === 'digging'"), 'a digging state covers the wait')
+    assert.ok(page.includes('tryServe(ctx, excluded)') || page.includes('await tryServe(ctx, excluded)'), 'another-passage uses it too')
+  })
+}
+
 console.log(`reader: ${passed} checks passed`)

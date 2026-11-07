@@ -170,7 +170,7 @@ function PassageText({ text, newWords, highlightWord }) {
 export default function Reader() {
   const { t } = useLanguage()
   const { user } = useAuth()
-  const [phase, setPhase] = useState('loading') // loading | guest | error | empty | ready
+  const [phase, setPhase] = useState('loading') // loading | digging | guest | error | empty | ready
   const [emptyKind, setEmptyKind] = useState('nofit') // nofit | shelf
   const [bandSource, setBandSource] = useState('none')
   const [displayBand, setDisplayBand] = useState('N4')
@@ -249,6 +249,49 @@ export default function Reader() {
       newKanjiCount: passageNewKanji(fit.passage.tokens, ctx.seenKanji).length,
       recycledBatch: passageRecyclesBatch(fit.passage.tokens, ctx.batchWords),
     }
+  }
+
+  // Web serve (Doc 16 amendment #16): when the local bank fits
+  // nothing, the reader-serve function runs the bot's full
+  // pipeline server-side — the same fit, plus fitted generation
+  // when the bank misses. The pick it returns is shaped exactly
+  // like a local doPick result, so present() and mining never
+  // know the difference.
+  const shapeServed = (ctx, passage, ratio, coldStart) => {
+    if (coldStart) {
+      const candidates = capCandidates(withCandidateLevels(passage, ctx.deckLevels))
+      const newWords = candidates.filter((c) => c.word && !ctx.known.has(c.h || c.word))
+      return { passage, ratio, coldStart: true, newWords, sentNewCount: newWords.length, stepLine: '', newKanjiCount: passageNewKanji(passage.tokens, ctx.seenKanji).length, recycledBatch: false }
+    }
+    const rawCandidates = Array.isArray(passage.new_word_candidates) ? passage.new_word_candidates : []
+    const newWords = rawCandidates.filter((c) => c.word && !ctx.known.has(c.h || c.word))
+    const basisLabel = ctx.resolvedBand ?? ctx.band
+    const stepLine = ctx.fitStep > 0
+      ? t('reader.stepStretch', { band: basisLabel })
+      : ctx.fitStep < 0
+        ? t('reader.stepGentler', { band: basisLabel })
+        : ''
+    return {
+      passage,
+      ratio,
+      coldStart: false,
+      newWords,
+      sentNewCount: newWords.length,
+      stepLine,
+      newKanjiCount: passageNewKanji(passage.tokens, ctx.seenKanji).length,
+      recycledBatch: passageRecyclesBatch(passage.tokens, ctx.batchWords),
+    }
+  }
+
+  const tryServe = async (ctx, excluded) => {
+    if (!isSupabaseConfigured || !supabase) return null
+    try {
+      const { data, error } = await supabase.functions.invoke('reader-serve', {
+        body: { excludeIds: (excluded || []).map(String) },
+      })
+      if (error || !data || data.status !== 'picked' || !data.passage) return null
+      return shapeServed(ctx, data.passage, data.ratio, data.coldStart === true)
+    } catch { return null }
   }
 
   const present = (next) => {
@@ -398,6 +441,15 @@ export default function Reader() {
         setDisplayBand(band)
         const first = doPick(ctx, [])
         if (first) { present(first); return }
+        // Bank miss: before declaring the shelf empty, ask the
+        // server pipeline (amendment #16) — it can fit from the
+        // full bank and generate a fitted passage, like the bot.
+        if (!cold && bank.length > 0) {
+          setPhase('digging')
+          const served = await tryServe(ctx, [])
+          if (cancelled) return
+          if (served) { present(served); return }
+        }
         setEmptyKind(bank.length === 0 || cold ? 'shelf' : 'nofit')
         setPhase('empty')
       } catch {
@@ -408,12 +460,18 @@ export default function Reader() {
     return () => { cancelled = true }
   }, [user]) // eslint-disable-line react-hooks/exhaustive-deps -- load reads the signed-in learner's world once per user
 
-  const another = () => {
+  const another = async () => {
     const ctx = ctxRef.current
     if (!ctx || !pick || busy) return
     setBusy(true)
     const excluded = [...excludedRef.current, String(pick.passage.id)]
-    const next = doPick(ctx, excluded)
+    let next = doPick(ctx, excluded)
+    if ((!next || String(next.passage.id) === String(pick.passage.id)) && !ctx.cold) {
+      // The local shelf is exhausted for this learner — the
+      // server pipeline may still fit or generate one.
+      setNote(t('reader.loading'))
+      next = await tryServe(ctx, excluded)
+    }
     if (!next || String(next.passage.id) === String(pick.passage.id)) {
       setNote(t('reader.nothingElse'))
     } else {
@@ -672,7 +730,7 @@ export default function Reader() {
         </div>
       )}
 
-      {phase === 'loading' && <p className="text-sm text-slate-400">{t('reader.loading')}</p>}
+      {(phase === 'loading' || phase === 'digging') && <p className="text-sm text-slate-400">{t('reader.loading')}</p>}
 
       {phase === 'error' && (
         <div className="rounded-2xl glass p-5 card-glow">
