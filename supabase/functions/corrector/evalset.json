@@ -1088,9 +1088,1216 @@
     "targetPattern": "たぶん + plain form + と思います"
    },
    "target": "たぶん明日は雨だと思います。"
+  },
+  {
+   "category": "particle-ha-ga",
+   "context": "Daily-life scene: describing an elephant at the zoo — the classic topic/subject pair.",
+   "correction": "The big topic takes は and the part being described takes が: 象は鼻が長い.",
+   "id": "hg-04",
+   "kind": "voice",
+   "production": "象が鼻は長いです。",
+   "rules": {
+    "commonError": "Swapping the topic and subject markers in the double-subject shape.",
+    "domain": "Daily Life",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [
+     "象は"
+    ],
+    "model": "象は鼻が長いです。",
+    "score": 56,
+    "targetPattern": "は = the big topic, が = the subject of the describing part"
+   },
+   "target": "象は鼻が長いです。"
+  },
+  {
+   "category": "particle-ha-ga",
+   "context": "Daily-life scene: looking out of the window and announcing rain the learner just noticed.",
+   "correction": "Newly noticed information takes が: 雨が降っています. は would present the rain as an established topic.",
+   "id": "hg-05",
+   "kind": "voice",
+   "production": "あ、雨は降っています。",
+   "rules": {
+    "commonError": "Marking brand-new information with は flattens the news into a topic.",
+    "domain": "Daily Life",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [
+     "雨が"
+    ],
+    "model": "あ、雨が降っています。",
+    "score": 55,
+    "targetPattern": "は (topic) vs が (new subject): weather noticed just now"
+   },
+   "target": "あ、雨が降っています。"
+  },
+  {
+   "category": "particle-ha-ga",
+   "context": "Daily-life scene: saying what you want to drink.",
+   "correction": "私は (topic) ジュースが (the wanted thing) 飲みたい — the two markers were swapped.",
+   "id": "hg-06",
+   "kind": "voice",
+   "production": "私がジュースは飲みたいです。",
+   "rules": {
+    "commonError": "が on the speaker and は on the wanted thing — both markers swapped.",
+    "domain": "Daily Life",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [
+     "私は"
+    ],
+    "model": "私はジュースが飲みたいです。",
+    "score": 57,
+    "targetPattern": "topic marker は for the speaker + subject marker が for the thing wanted"
+   },
+   "target": "私はジュースが飲みたいです。"
+  },
+  {
+   "category": "particle-ni-de",
+   "context": "Daily-life scene: telling a friend there is a bank in front of the station.",
+   "correction": "Existence （ある) takes に for the place: 駅の前に銀行があります.",
+   "id": "nd-04",
+   "kind": "voice",
+   "production": "駅の前で銀行があります。",
+   "rules": {
+    "commonError": "で with あります — nothing is happening there, the bank just exists.",
+    "domain": "Daily Life",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [
+     "に"
+    ],
+    "model": "駅の前に銀行があります。",
+    "score": 53,
+    "targetPattern": "existence: place + に + ある; action place takes で"
+   },
+   "target": "駅の前に銀行があります。"
+  },
+  {
+   "category": "particle-ni-de",
+   "context": "Work scene: saying which day the meeting falls on.",
+   "correction": "A day on the calendar is a point in time and takes に: 月曜日に会議があります.",
+   "id": "nd-05",
+   "kind": "voice",
+   "production": "月曜日で会議があります。",
+   "rules": {
+    "commonError": "で after a day of the week.",
+    "domain": "Work",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [
+     "月曜日に"
+    ],
+    "model": "月曜日に会議があります。",
+    "score": 51,
+    "targetPattern": "に for the time something happens; で for the place of an action"
+   },
+   "target": "月曜日に会議があります。"
+  },
+  {
+   "category": "particle-ni-de",
+   "context": "Daily-life scene: saying how you get to school.",
+   "correction": "The means of transport takes で: バスで学校へ行きます.",
+   "id": "nd-06",
+   "kind": "voice",
+   "production": "バスに学校へ行きます。",
+   "rules": {
+    "commonError": "に for the vehicle; に marks the destination or a point in time.",
+    "domain": "Daily Life",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [
+     "バスで"
+    ],
+    "model": "バスで学校へ行きます。",
+    "score": 54,
+    "targetPattern": "に vs で — the means of transport takes で"
+   },
+   "target": "バスで学校へ行きます。"
+  },
+  {
+   "category": "particle-wo-omission",
+   "context": "Daily-life scene: reporting you took a photo.",
+   "correction": "写真を撮りました — the object keeps its を in polite speech.",
+   "id": "wo-04",
+   "kind": "voice",
+   "production": "写真撮りました。",
+   "rules": {
+    "commonError": "The object marker を is missing — it drops out before the verb in casual speech habits.",
+    "domain": "Daily Life",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [
+     "を"
+    ],
+    "model": "写真を撮りました。",
+    "score": 47,
+    "targetPattern": "object + を + verb"
+   },
+   "target": "写真を撮りました。"
+  },
+  {
+   "category": "particle-wo-omission",
+   "context": "Work scene: confirming an email went out.",
+   "correction": "メールを送りました — を marks what was sent.",
+   "id": "wo-05",
+   "kind": "voice",
+   "production": "メール送りました。",
+   "rules": {
+    "commonError": "を is missing again — the marker drops before 送りました.",
+    "domain": "Work",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [
+     "を"
+    ],
+    "model": "メールを送りました。",
+    "score": 49,
+    "targetPattern": "object + を + verb"
+   },
+   "target": "メールを送りました。"
+  },
+  {
+   "category": "particle-wo-omission",
+   "context": "Home scene: confirming you locked up.",
+   "correction": "鍵をかけました — the thing locked takes を.",
+   "id": "wo-06",
+   "kind": "voice",
+   "production": "鍵かけました。",
+   "rules": {
+    "commonError": "The を goes missing before かけました.",
+    "domain": "Home & School",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [
+     "鍵を"
+    ],
+    "model": "鍵をかけました。",
+    "score": 50,
+    "targetPattern": "object + を + verb"
+   },
+   "target": "鍵をかけました。"
+  },
+  {
+   "category": "word-order",
+   "context": "Daily-life scene: tomorrow's trip to the station, said in English order.",
+   "correction": "Time and destination come before the verb: 私は明日駅へ行きます.",
+   "id": "or-04",
+   "kind": "voice",
+   "production": "私は行きます駅へ明日。",
+   "rules": {
+    "commonError": "Verb in the middle, time trailing at the end.",
+    "domain": "Daily Life",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [],
+    "model": "私は明日駅へ行きます。",
+    "score": 43,
+    "targetPattern": "word order: time → place へ → verb"
+   },
+   "target": "私は明日駅へ行きます。"
+  },
+  {
+   "category": "word-order",
+   "context": "Daily-life scene: reporting a gift, with the recipient trailing after the verb.",
+   "correction": "The recipient comes before the verb: 友達にプレゼントをあげました.",
+   "id": "or-05",
+   "kind": "voice",
+   "production": "彼女はプレゼントをあげました友達に。",
+   "rules": {
+    "commonError": "The に-phrase trailing after the verb, English-style.",
+    "domain": "Daily Life",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [],
+    "model": "彼女は友達にプレゼントをあげました。",
+    "score": 41,
+    "targetPattern": "word order: recipient に before the object, verb last"
+   },
+   "target": "彼女は友達にプレゼントをあげました。"
+  },
+  {
+   "category": "word-order",
+   "context": "Daily-life scene: yesterday's cinema trip, every piece after the verb.",
+   "correction": "Everything moves in front of the verb: 昨日映画館で映画を見ました.",
+   "id": "or-06",
+   "kind": "voice",
+   "production": "私たちは見ました映画を昨日映画館で。",
+   "rules": {
+    "commonError": "Verb first, details trailing — English order throughout.",
+    "domain": "Daily Life",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [],
+    "model": "私たちは昨日映画館で映画を見ました。",
+    "score": 44,
+    "targetPattern": "word order: time and place before the verb"
+   },
+   "target": "私たちは昨日映画館で映画を見ました。"
+  },
+  {
+   "category": "counter-documents",
+   "context": "City office scene: asking for ten more sheets of the application form.",
+   "correction": "Flat sheets are counted in 枚: 用紙を10枚ください.",
+   "id": "cd-04",
+   "kind": "voice",
+   "production": "用紙を10個ください。",
+   "rules": {
+    "commonError": "Counting sheets with 個.",
+    "domain": "City Office",
+    "forTags": [
+     "life-admin"
+    ],
+    "keigoNote": "",
+    "missing": [
+     "10枚"
+    ],
+    "model": "用紙を10枚ください。",
+    "score": 53,
+    "targetPattern": "Number + 枚 (counter for flat sheets)"
+   },
+   "target": "用紙を10枚ください。"
+  },
+  {
+   "category": "counter-documents",
+   "context": "Post office scene: reporting you sent two letters.",
+   "correction": "Letters are counted in 通: 手紙を2通送りました. 枚 is for loose sheets.",
+   "id": "cd-05",
+   "kind": "voice",
+   "production": "手紙を2枚送りました。",
+   "rules": {
+    "commonError": "枚 for letters — posted letters take 通.",
+    "domain": "Daily Life",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [
+     "2通"
+    ],
+    "model": "手紙を2通送りました。",
+    "score": 55,
+    "targetPattern": "Number + 通 (counter for letters and documents)"
+   },
+   "target": "手紙を2通送りました。"
+  },
+  {
+   "category": "counter-documents",
+   "context": "Queue lapse: the learner again-rated a card about counting application-form copies.",
+   "correction": "Application-form copies take 通 (or 枚 for sheets) — never 個.",
+   "id": "cd-06",
+   "kind": "queue",
+   "production": "申請書のコピー (card lapsed on Again)",
+   "rules": {
+    "back": "copies of an application form are counted in 通 or 枚",
+    "front": "申請書のコピー",
+    "note": "counter for documents: copies take 通・枚"
+   },
+   "target": "copies of a document — counted in 通 or 枚"
+  },
+  {
+   "category": "counter-people",
+   "context": "School scene: saying how many students are in the room.",
+   "correction": "People take 人: 学生が3人います.",
+   "id": "cp-04",
+   "kind": "voice",
+   "production": "学生が3ついます。",
+   "rules": {
+    "commonError": "Counting students with the general つ.",
+    "domain": "Home & School",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [
+     "3人"
+    ],
+    "model": "学生が3人います。",
+    "score": 52,
+    "targetPattern": "Number + 人 (counter for people)"
+   },
+   "target": "学生が3人います。"
+  },
+  {
+   "category": "counter-people",
+   "context": "Shop scene: saying how many staff are on shift.",
+   "correction": "Staff are people: 店員は4人です.",
+   "id": "cp-05",
+   "kind": "voice",
+   "production": "店員は4つです。",
+   "rules": {
+    "commonError": "つ for staff members.",
+    "domain": "Daily Life",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [
+     "4人"
+    ],
+    "model": "店員は4人です。",
+    "score": 50,
+    "targetPattern": "Number + 人 (counter for people)"
+   },
+   "target": "店員は4人です。"
+  },
+  {
+   "category": "counter-people",
+   "context": "Restaurant scene: booking a table and stating the party size.",
+   "correction": "Guests in service Japanese are counted in 名: 2名でお願いします.",
+   "id": "cp-06",
+   "kind": "voice",
+   "production": "予約は2つでお願いします。",
+   "rules": {
+    "commonError": "つ for a party of guests — service counters are 名.",
+    "domain": "Daily Life",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [
+     "2名"
+    ],
+    "model": "予約は2名でお願いします。",
+    "score": 54,
+    "targetPattern": "Number + 名 (polite counter for people in service settings)"
+   },
+   "target": "予約は2名でお願いします。"
+  },
+  {
+   "category": "counter-general",
+   "context": "Daily-life scene: a dealer reporting two cars bought.",
+   "correction": "Cars are machines and take 台: 車を2台買いました. 本 is for long thin things.",
+   "id": "cg-04",
+   "kind": "voice",
+   "production": "車を2本買いました。",
+   "rules": {
+    "commonError": "本 (long thin objects) for a car.",
+    "domain": "Daily Life",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [
+     "2台"
+    ],
+    "model": "車を2台買いました。",
+    "score": 52,
+    "targetPattern": "Number + 台 (counter for machines and vehicles)"
+   },
+   "target": "車を2台買いました。"
+  },
+  {
+   "category": "counter-general",
+   "context": "Work scene: saying how many emails are waiting.",
+   "correction": "Messages and cases are counted in 件: メールが5件あります.",
+   "id": "cg-05",
+   "kind": "voice",
+   "production": "メールが5本あります。",
+   "rules": {
+    "commonError": "本 for emails — 件 counts messages and matters.",
+    "domain": "Work",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [
+     "5件"
+    ],
+    "model": "メールが5件あります。",
+    "score": 51,
+    "targetPattern": "Number + 件 (counter for messages and cases)"
+   },
+   "target": "メールが5件あります。"
+  },
+  {
+   "category": "counter-general",
+   "context": "Shop scene: buying two bottles of wine.",
+   "correction": "Bottles are long and thin: ワインを2本ください. 台 counts machines.",
+   "id": "cg-06",
+   "kind": "voice",
+   "production": "ワインを2台ください。",
+   "rules": {
+    "commonError": "台 (machines) for bottles.",
+    "domain": "Daily Life",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [
+     "2本"
+    ],
+    "model": "ワインを2本ください。",
+    "score": 53,
+    "targetPattern": "Number + 本 (counter for long thin objects)"
+   },
+   "target": "ワインを2本ください。"
+  },
+  {
+   "category": "verb-form-te",
+   "context": "Home scene: asking someone to write a letter — the て-form of 書く was built from the dictionary form.",
+   "correction": "書く → 書いて: 手紙を書いてください.",
+   "id": "te-04",
+   "kind": "voice",
+   "production": "手紙を書くてください。",
+   "rules": {
+    "commonError": "Dictionary form + てください.",
+    "domain": "Home & School",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [
+     "書いて"
+    ],
+    "model": "手紙を書いてください。",
+    "score": 52,
+    "targetPattern": "〜て-form requests: 書く→書いて"
+   },
+   "target": "手紙を書いてください。"
+  },
+  {
+   "category": "verb-form-te",
+   "context": "Daily-life scene: narrating a day that chained a swim and shopping.",
+   "correction": "泳ぐ → 泳いで (ぐ becomes いで): プールで泳いで.",
+   "id": "te-05",
+   "kind": "voice",
+   "production": "プールで泳いて、買い物をしました。",
+   "rules": {
+    "commonError": "泳いて — the て-form of ぐ-verbs is いで, not いて.",
+    "domain": "Daily Life",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [
+     "泳いで"
+    ],
+    "model": "プールで泳いで、買い物をしました。",
+    "score": 51,
+    "targetPattern": "て形 chaining: ぐ verbs take いで"
+   },
+   "target": "プールで泳いで、買い物をしました。"
+  },
+  {
+   "category": "verb-form-te",
+   "context": "Daily-life scene: asking someone to hold an umbrella.",
+   "correction": "持つ → 持って (つ becomes って): 傘を持ってください.",
+   "id": "te-06",
+   "kind": "voice",
+   "production": "傘を持いてください。",
+   "rules": {
+    "commonError": "持いて — つ-verbs take って in the て-form.",
+    "domain": "Daily Life",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [
+     "持って"
+    ],
+    "model": "傘を持ってください。",
+    "score": 50,
+    "targetPattern": "〜て-form requests: 持つ→持って"
+   },
+   "target": "傘を持ってください。"
+  },
+  {
+   "category": "verb-form-nai",
+   "context": "Daily-life scene: saying you are not going to school tomorrow.",
+   "correction": "行く → 行かない: the negative stem ends in あ.",
+   "id": "na-04",
+   "kind": "voice",
+   "production": "明日は学校へ行くない。",
+   "rules": {
+    "commonError": "Dictionary form + ない.",
+    "domain": "Daily Life",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [
+     "行かない"
+    ],
+    "model": "明日は学校へ行かない。",
+    "score": 50,
+    "targetPattern": "ない-form (negative form): 行く→行かない"
+   },
+   "target": "明日は学校へ行かない。"
+  },
+  {
+   "category": "verb-form-nai",
+   "context": "Daily-life scene: saying a colleague does not speak Japanese.",
+   "correction": "話す → 話さない: す-verbs build the negative on さ.",
+   "id": "na-05",
+   "kind": "voice",
+   "production": "彼は日本語を話すない。",
+   "rules": {
+    "commonError": "話すない — keeping the す ending before ない.",
+    "domain": "Daily Life",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [
+     "話さない"
+    ],
+    "model": "彼は日本語を話さない。",
+    "score": 48,
+    "targetPattern": "negative form: 話す→話さない"
+   },
+   "target": "彼は日本語を話さない。"
+  },
+  {
+   "category": "verb-form-nai",
+   "context": "Daily-life scene: saying he is not coming today.",
+   "correction": "来る is irregular: its negative is 来ない, not 来るない.",
+   "id": "na-06",
+   "kind": "voice",
+   "production": "彼は今日来るない。",
+   "rules": {
+    "commonError": "来るない — treating the irregular verb as regular.",
+    "domain": "Daily Life",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [
+     "来ない"
+    ],
+    "model": "彼は今日来ない。",
+    "score": 52,
+    "targetPattern": "ない-form: 来る→来ない (irregular verb)"
+   },
+   "target": "彼は今日来ない。"
+  },
+  {
+   "category": "past-tense-slip",
+   "context": "Daily-life scene: talking about yesterday with a present-tense verb.",
+   "correction": "Yesterday needs the past: 昨日、本を読んだ.",
+   "id": "pt-04",
+   "kind": "voice",
+   "production": "昨日、本を読む。",
+   "rules": {
+    "commonError": "Present form under a past time word.",
+    "domain": "Daily Life",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [
+     "読んだ"
+    ],
+    "model": "昨日、本を読んだ。",
+    "score": 53,
+    "targetPattern": "past 〜た when narrating finished events"
+   },
+   "target": "昨日、本を読んだ。"
+  },
+  {
+   "category": "past-tense-slip",
+   "context": "Work scene: last month's new job, told in the dictionary form.",
+   "correction": "先月、新しい仕事を始めた — a thing begun last month is finished business.",
+   "id": "pt-05",
+   "kind": "voice",
+   "production": "先月、新しい仕事を始める。",
+   "rules": {
+    "commonError": "Dictionary form for something begun last month.",
+    "domain": "Work",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [
+     "始めた"
+    ],
+    "model": "先月、新しい仕事を始めた。",
+    "score": 51,
+    "targetPattern": "〜た-form: completed actions take the past"
+   },
+   "target": "先月、新しい仕事を始めた。"
+  },
+  {
+   "category": "past-tense-slip",
+   "context": "Daily-life scene: narrating a childhood routine.",
+   "correction": "Childhood narration is past throughout: 毎日外で遊んだ.",
+   "id": "pt-06",
+   "kind": "voice",
+   "production": "子供の時、毎日外で遊ぶ。",
+   "rules": {
+    "commonError": "Present form inside a past frame.",
+    "domain": "Daily Life",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [
+     "遊んだ"
+    ],
+    "model": "子供の時、毎日外で遊んだ。",
+    "score": 54,
+    "targetPattern": "past tense for finished periods (〜た form / ました)"
+   },
+   "target": "子供の時、毎日外で遊んだ。"
+  },
+  {
+   "category": "listening-numbers-dates",
+   "context": "Listening item: a station announcement with a departure time.",
+   "correction": "45分, not 15分 — the よんじゅうご was compressed at speed.",
+   "id": "ln-04",
+   "kind": "listening",
+   "production": "I heard: the shinkansen leaves at 9:15.",
+   "rules": {
+    "script": "新幹線は9時45分に出発します。"
+   },
+   "target": "The shinkansen leaves at 9:45."
+  },
+  {
+   "category": "listening-numbers-dates",
+   "context": "Listening item: an event organiser states the participation fee.",
+   "correction": "3千円 is 3,000 — the 千 grouping was heard as 万.",
+   "id": "ln-05",
+   "kind": "listening",
+   "production": "I heard: the fee is 30,000 yen per person.",
+   "rules": {
+    "script": "参加費は一人3千円です。"
+   },
+   "target": "The fee is 3,000 yen per person (3千円)."
+  },
+  {
+   "category": "listening-numbers-dates",
+   "context": "Listening item: an office announcement naming the meeting day.",
+   "correction": "水曜日 (Wednesday), not 木曜日 (Thursday) — the weekday flipped.",
+   "id": "ln-06",
+   "kind": "listening",
+   "production": "I heard: the meeting is on Thursday the 14th.",
+   "rules": {
+    "script": "会議は来週の水曜日、14日です。"
+   },
+   "target": "The meeting is Wednesday the 14th."
+  },
+  {
+   "category": "listening-negation",
+   "context": "Listening item: a passenger asks about a seat on the train.",
+   "correction": "空いていません is negative — the seat is taken; the ません was missed.",
+   "id": "lg-04",
+   "kind": "listening",
+   "production": "I heard: this seat is free.",
+   "rules": {
+    "script": "この席は空いていません。"
+   },
+   "target": "This seat is NOT free (it is taken)."
+  },
+  {
+   "category": "listening-negation",
+   "context": "Listening item: waiting for a colleague to arrive.",
+   "correction": "まだ来ていません = has not come yet — the negation carries the whole meaning.",
+   "id": "lg-05",
+   "kind": "listening",
+   "production": "I heard: she has already come.",
+   "rules": {
+    "script": "彼女はまだ来ていません。"
+   },
+   "target": "She has NOT come yet."
+  },
+  {
+   "category": "listening-negation",
+   "context": "Listening item: asking about payment at a small shop.",
+   "correction": "使えません = cannot use — the negative potential was missed.",
+   "id": "lg-06",
+   "kind": "listening",
+   "production": "I heard: that shop takes cards.",
+   "rules": {
+    "script": "その店はカードが使えません。"
+   },
+   "target": "That shop does NOT take cards."
+  },
+  {
+   "category": "listening-speed-drop",
+   "context": "Listening item at natural speed: a daily routine, no numbers, no negation — the learner simply lost the thread.",
+   "correction": "Nothing was mis-known; the routine sentence outran the listener. 彼は毎朝公園を走ります.",
+   "id": "ls-04",
+   "kind": "listening",
+   "production": "I caught: morning… park… and lost the rest.",
+   "rules": {
+    "script": "彼は毎朝公園を走ります。"
+   },
+   "target": "He runs in the park every morning."
+  },
+  {
+   "category": "listening-speed-drop",
+   "context": "Listening item: a family update stated once at natural speed.",
+   "correction": "The content words were known; the 勉強しています shape moved past before it landed.",
+   "id": "ls-05",
+   "kind": "listening",
+   "production": "I caught: sister… university… something about studying.",
+   "rules": {
+    "script": "姉は大学で経済を勉強しています。"
+   },
+   "target": "My older sister is studying economics at university."
+  },
+  {
+   "category": "listening-speed-drop",
+   "context": "Listening item: a weekend plan stated once at natural speed.",
+   "correction": "週末は友達と新しい映画を見ます — the plan itself was lost to speed, not to any single word.",
+   "id": "ls-06",
+   "kind": "listening",
+   "production": "I caught: weekend… friend… movie… and then it was gone.",
+   "rules": {
+    "script": "週末は友達と新しい映画を見ます。"
+   },
+   "target": "On the weekend [we] are seeing a new movie with a friend."
+  },
+  {
+   "category": "vocab-near-miss",
+   "context": "School scene: saying you borrowed a book from the teacher — the direction flipped.",
+   "correction": "借りる is borrowing (toward you); 貸す is lending (away from you).",
+   "id": "vm-04",
+   "kind": "voice",
+   "production": "先生に本を貸しました。",
+   "rules": {
+    "commonError": "Saying 貸す (lend) instead of 借りる (borrow) — the direction flipped.",
+    "domain": "Home & School",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [
+     "借りました"
+    ],
+    "model": "先生に本を借りました。",
+    "score": 59,
+    "targetPattern": "借りる (borrow) vs 貸す (lend)"
+   },
+   "target": "先生に本を借りました。"
+  },
+  {
+   "category": "vocab-near-miss",
+   "context": "Daily-life scene: describing heavy rain.",
+   "correction": "Rain is 強い (strong), not 大きい (big): 強い雨.",
+   "id": "vm-05",
+   "kind": "voice",
+   "production": "今日は大きい雨です。",
+   "rules": {
+    "commonError": "Saying 大きい雨 (big rain) instead of 強い雨 (heavy rain).",
+    "domain": "Daily Life",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [
+     "強い雨"
+    ],
+    "model": "今日は強い雨です。",
+    "score": 56,
+    "targetPattern": "強い雨 — heavy rain"
+   },
+   "target": "今日は強い雨です。"
+  },
+  {
+   "category": "vocab-near-miss",
+   "context": "Station scene: saying you change trains at the next station.",
+   "correction": "Changing trains is 乗り換える. 降りる is just getting off.",
+   "id": "vm-06",
+   "kind": "voice",
+   "production": "次の駅で降り換えます。",
+   "rules": {
+    "commonError": "Saying 降り換える instead of 乗り換える — transferring takes 乗り換え.",
+    "domain": "Daily Life",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [
+     "乗り換え"
+    ],
+    "model": "次の駅で乗り換えます。",
+    "score": 58,
+    "targetPattern": "乗り換える — to transfer (trains)"
+   },
+   "target": "次の駅で乗り換えます。"
+  },
+  {
+   "category": "pronunciation-unintelligible",
+   "context": "Voice attempt transcript: single content words only — the delay report never became a sentence.",
+   "correction": "Unrecoverable transcript — recorded as 'not caught', with no claim about the learner's actual sounds.",
+   "id": "pu-04",
+   "kind": "voice",
+   "production": "えっと…あした…でんしゃ…おくれ…",
+   "rules": {
+    "commonError": "The report dissolved into single words.",
+    "domain": "Daily Life",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [],
+    "model": "明日の電車は遅れています。",
+    "score": 10,
+    "targetPattern": "reporting a delay: 電車は遅れています"
+   },
+   "target": "明日の電車は遅れています。"
+  },
+  {
+   "category": "pronunciation-unintelligible",
+   "context": "Voice attempt transcript: an opener and one key word; the question never formed.",
+   "correction": "No recoverable production — the label means 'the words did not arrive', never 'the sounds were wrong'.",
+   "id": "pu-05",
+   "kind": "voice",
+   "production": "すみません…トイレ…あの…",
+   "rules": {
+    "commonError": "Only the key word arrived; the question never formed.",
+    "domain": "Daily Life",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [],
+    "model": "すみません、トイレはどこですか。",
+    "score": 15,
+    "targetPattern": "asking where the toilet is"
+   },
+   "target": "すみません、トイレはどこですか。"
+  },
+  {
+   "category": "pronunciation-unintelligible",
+   "context": "Voice attempt transcript: fragments of a film reaction, scored in the low teens.",
+   "correction": "Fragments only — nothing here is judged; this label exists so the fingerprint can say 'nothing arrived' instead of guessing an error.",
+   "id": "pu-06",
+   "kind": "voice",
+   "production": "きのう…えいが…たのし…",
+   "rules": {
+    "commonError": "Fragments of a review; the sentence never assembled.",
+    "domain": "Daily Life",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [],
+    "model": "昨日の映画は楽しかったです。",
+    "score": 14,
+    "targetPattern": "saying yesterday's film was fun"
+   },
+   "target": "昨日の映画は楽しかったです。"
+  },
+  {
+   "category": "keigo-direction",
+   "context": "Business scene: announcing that the department head is coming — the learner used the humble 参る for the boss.",
+   "correction": "参る humbles the mover. For the boss's movement use respectful いらっしゃいます.",
+   "id": "kd-04",
+   "kind": "voice",
+   "production": "部長が参ります。",
+   "rules": {
+    "commonError": "謙譲語 used for the boss.",
+    "domain": "Business",
+    "forTags": [
+     "keigo"
+    ],
+    "keigoNote": "Their movement rises: いらっしゃる. Yours lowers: 参る.",
+    "missing": [
+     "いらっしゃいます"
+    ],
+    "model": "部長がいらっしゃいます。",
+    "score": 51,
+    "targetPattern": "尊敬語 for the other person's actions"
+   },
+   "target": "部長がいらっしゃいます。"
+  },
+  {
+   "category": "keigo-direction",
+   "context": "Business scene: saying you will visit the client — the learner used respectful いらっしゃる for themself.",
+   "correction": "いらっしゃる raises the other person. For your own visit use humble 伺います.",
+   "id": "kd-05",
+   "kind": "voice",
+   "production": "私がいらっしゃいます。",
+   "rules": {
+    "commonError": "尊敬語 used for yourself.",
+    "domain": "Business",
+    "forTags": [
+     "keigo"
+    ],
+    "keigoNote": "Your movement lowers: 伺う. Theirs rises: いらっしゃる.",
+    "missing": [
+     "伺います"
+    ],
+    "model": "私が伺います。",
+    "score": 49,
+    "targetPattern": "謙譲語 for your own actions"
+   },
+   "target": "私が伺います。"
+  },
+  {
+   "category": "keigo-direction",
+   "context": "Business scene: reporting that the client ate — the learner used the humble いただく for the client.",
+   "correction": "いただく humbles the eater. For the client's eating use respectful 召し上がりました.",
+   "id": "kd-06",
+   "kind": "voice",
+   "production": "お客様がいただきました。",
+   "rules": {
+    "commonError": "謙譲語 used for the client.",
+    "domain": "Business",
+    "forTags": [
+     "keigo"
+    ],
+    "keigoNote": "Their eating rises: 召し上がる. Yours lowers: いただく.",
+    "missing": [
+     "召し上がりました"
+    ],
+    "model": "お客様が召し上がりました。",
+    "score": 50,
+    "targetPattern": "尊敬語 for the other person's actions"
+   },
+   "target": "お客様が召し上がりました。"
+  },
+  {
+   "category": "keigo-direction",
+   "context": "Queue lapse: a keigo vocabulary card for the respectful verb of looking.",
+   "correction": "ご覧になる is 尊敬語 — it raises the OTHER person's looking, never your own.",
+   "id": "kd-07",
+   "kind": "queue",
+   "production": "ご覧になる (card lapsed on Again)",
+   "rules": {
+    "back": "to look (respectful)",
+    "front": "ご覧になる",
+    "note": "尊敬語 respectful keigo — for the other person"
+   },
+   "target": "to look — respectful, for the other person's action"
+  },
+  {
+   "category": "keigo-direction",
+   "context": "Queue lapse: a keigo vocabulary card for the humble verb of saying.",
+   "correction": "申す is 謙譲語 — it lowers YOUR OWN speech; the other person's saying is おっしゃる.",
+   "id": "kd-08",
+   "kind": "queue",
+   "production": "申す (card lapsed on Again)",
+   "rules": {
+    "back": "to say (humble)",
+    "front": "申す",
+    "note": "謙譲語 humble keigo — for your own speech"
+   },
+   "target": "to say — humble, for your own speech"
+  },
+  {
+   "category": "keigo-over-polite",
+   "context": "Home scene: leaving the family breakfast table first — the learner used office-grade leave-taking at home.",
+   "correction": "Grammatical, but お先に失礼させていただきます is for leaving the office early. At the family table, お先に食べるね fits.",
+   "id": "ko-04",
+   "kind": "voice",
+   "production": "お先に失礼させていただきます。",
+   "rules": {
+    "commonError": "Office ceremony at the family table.",
+    "domain": "Home & School",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [],
+    "model": "お先に食べるね。",
+    "score": 60,
+    "targetPattern": "family leave-taking at home"
+   },
+   "target": "お先に食べるね。"
+  },
+  {
+   "category": "keigo-over-polite",
+   "context": "Home scene: thanking a close friend who treated you to coffee.",
+   "correction": "This is award-ceremony gratitude for a coffee between close friends. ありがとう、ごちそうさま carries it warmly.",
+   "id": "ko-05",
+   "kind": "voice",
+   "production": "この度は誠にありがとうございました。心より感謝申し上げます。",
+   "rules": {
+    "commonError": "Ceremony-grade thanks between close friends.",
+    "domain": "Home & School",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [],
+    "model": "ありがとう。ごちそうさま。",
+    "score": 61,
+    "targetPattern": "thanks between close friends"
+   },
+   "target": "ありがとう。ごちそうさま。"
+  },
+  {
+   "category": "keigo-over-polite",
+   "context": "Home scene: asking your own mother to pass the salt.",
+   "correction": "Full customer-grade ceremony for the salt, to your own mother. 塩取って says it like family.",
+   "id": "ko-06",
+   "kind": "voice",
+   "production": "恐れ入りますが、そちらのお塩をお取りいただけますでしょうか。",
+   "rules": {
+    "commonError": "Customer-grade formality inside the family.",
+    "domain": "Home & School",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [],
+    "model": "お母さん、塩取って。",
+    "score": 59,
+    "targetPattern": "small requests inside the family"
+   },
+   "target": "お母さん、塩取って。"
+  },
+  {
+   "category": "keigo-over-polite",
+   "context": "Daily-life scene: texting a childhood friend to fix a meeting time.",
+   "correction": "This is how you write to a company president, not to a childhood friend. 明日、何時がいい？ fits the friendship.",
+   "id": "ko-07",
+   "kind": "voice",
+   "production": "ご多忙のところ恐縮ではございますが、明日何時頃がよろしいでしょうか。",
+   "rules": {
+    "commonError": "Executive-grade formality to a close friend.",
+    "domain": "Daily Life",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [],
+    "model": "明日、何時がいい？",
+    "score": 62,
+    "targetPattern": "arranging plans with a close friend"
+   },
+   "target": "明日、何時がいい？"
+  },
+  {
+   "category": "keigo-over-polite",
+   "context": "Work scene: returning a borrowed pen to the junior colleague you mentor every day.",
+   "correction": "ご返却いたします is returns-desk language. ペン、ありがとう。返すね is the fitting register for your own team.",
+   "id": "ko-08",
+   "kind": "voice",
+   "production": "お借りしておりましたペンをご返却いたします。",
+   "rules": {
+    "commonError": "Formal returns language for an everyday exchange.",
+    "domain": "Work",
+    "forTags": [],
+    "keigoNote": "",
+    "missing": [],
+    "model": "ペン、ありがとう。返すね。",
+    "score": 60,
+    "targetPattern": "everyday exchanges with your own team"
+   },
+   "target": "ペン、ありがとう。返すね。"
+  },
+  {
+   "category": "keigo-under-polite",
+   "context": "Business phone scene: answering a client who asked for a document tomorrow.",
+   "correction": "わかった and 送るね are friend register. To a client: 承知しました and お送りします.",
+   "id": "ku-04",
+   "kind": "voice",
+   "production": "はい、わかった。明日送るね。",
+   "rules": {
+    "commonError": "Friend-register answers to a client.",
+    "domain": "Business",
+    "forTags": [
+     "keigo"
+    ],
+    "keigoNote": "",
+    "missing": [],
+    "model": "はい、承知しました。明日お送りします。",
+    "score": 53,
+    "targetPattern": "丁寧語 answers to a client"
+   },
+   "target": "はい、承知しました。明日お送りします。"
+  },
+  {
+   "category": "keigo-under-polite",
+   "context": "Business scene: promising a manager the report by end of day, in friend register.",
+   "correction": "出すよ promises like a friend. In a work report: 提出します.",
+   "id": "ku-05",
+   "kind": "voice",
+   "production": "レポート、今日中に出すよ。",
+   "rules": {
+    "commonError": "Casual promise forms in a formal report line.",
+    "domain": "Business",
+    "forTags": [
+     "keigo"
+    ],
+    "keigoNote": "",
+    "missing": [],
+    "model": "レポートは今日中に提出します。",
+    "score": 52,
+    "targetPattern": "丁寧語 commitments to a superior"
+   },
+   "target": "レポートは今日中に提出します。"
+  },
+  {
+   "category": "keigo-under-polite",
+   "context": "Service scene: greeting a client who arrived at reception.",
+   "correction": "どうも and 待ってて are casual speech. A client gets いらっしゃいませ and お待ちください.",
+   "id": "ku-06",
+   "kind": "voice",
+   "production": "あ、どうも。待ってて。",
+   "rules": {
+    "commonError": "Casual greeting and command forms to a client.",
+    "domain": "Business",
+    "forTags": [
+     "keigo"
+    ],
+    "keigoNote": "",
+    "missing": [],
+    "model": "いらっしゃいませ。少々お待ちください。",
+    "score": 54,
+    "targetPattern": "丁寧語 reception greetings"
+   },
+   "target": "いらっしゃいませ。少々お待ちください。"
+  },
+  {
+   "category": "keigo-under-polite",
+   "context": "Business scene: answering the company president about a matter you know.",
+   "correction": "うん and 知ってる are plain forms. To the president: 存じております.",
+   "id": "ku-07",
+   "kind": "voice",
+   "production": "うん、それは知ってる。",
+   "rules": {
+    "commonError": "Plain acknowledgement forms to the president.",
+    "domain": "Business",
+    "forTags": [
+     "keigo"
+    ],
+    "keigoNote": "",
+    "missing": [],
+    "model": "はい、その件は存じております。",
+    "score": 55,
+    "targetPattern": "丁寧語 answers to senior executives"
+   },
+   "target": "はい、その件は存じております。"
+  },
+  {
+   "category": "register-mix",
+   "context": "Business scene: a formal acknowledgement followed by a plain-form commitment.",
+   "correction": "承知しました sets a formal register; 用意する breaks it. 用意いたします keeps the promise the acknowledgement made.",
+   "id": "rm-04",
+   "kind": "voice",
+   "production": "承知しました。では、資料は私が用意する。",
+   "rules": {
+    "commonError": "Formal acknowledgement, plain commitment.",
+    "domain": "Business",
+    "forTags": [
+     "keigo"
+    ],
+    "keigoNote": "",
+    "missing": [],
+    "model": "承知しました。では、資料は私が用意いたします。",
+    "score": 53,
+    "targetPattern": "one register per exchange"
+   },
+   "target": "承知しました。では、資料は私が用意いたします。"
+  },
+  {
+   "category": "register-mix",
+   "context": "Business email scene: a formal opening line that lands on a plain だ ending.",
+   "correction": "The greeting is formal business Japanese; the だ ending drops the register mid-message. からです keeps one register.",
+   "id": "rm-05",
+   "kind": "voice",
+   "production": "お世話になっております。明日の会議は10時からだ。",
+   "rules": {
+    "commonError": "Formal opening, plain ending.",
+    "domain": "Business",
+    "forTags": [
+     "keigo"
+    ],
+    "keigoNote": "",
+    "missing": [],
+    "model": "お世話になっております。明日の会議は10時からです。",
+    "score": 54,
+    "targetPattern": "business messages in one consistent register"
+   },
+   "target": "お世話になっております。明日の会議は10時からです。"
+  },
+  {
+   "category": "register-mix",
+   "context": "Business email scene: a polite thank-you followed by a plain-form promise.",
+   "correction": "ありがとうございます sets the register; 返事する drops it. ご返事いたします holds the line.",
+   "id": "rm-06",
+   "kind": "voice",
+   "production": "ご連絡ありがとうございます。確認したらすぐ返事する。",
+   "rules": {
+    "commonError": "Polite thank-you, plain promise.",
+    "domain": "Business",
+    "forTags": [
+     "keigo"
+    ],
+    "keigoNote": "",
+    "missing": [],
+    "model": "ご連絡ありがとうございます。確認しましたら、すぐご返事いたします。",
+    "score": 52,
+    "targetPattern": "one register per exchange"
+   },
+   "target": "ご連絡ありがとうございます。確認しましたら、すぐご返事いたします。"
+  },
+  {
+   "category": "register-mix",
+   "context": "Business scene: a formal apology that lands on a plain-form commitment.",
+   "correction": "The apology is fully formal; 担当する drops the register in the same breath. 担当いたします keeps it.",
+   "id": "rm-07",
+   "kind": "voice",
+   "production": "申し訳ございませんでした。次は私が担当する。",
+   "rules": {
+    "commonError": "Formal apology, plain commitment.",
+    "domain": "Business",
+    "forTags": [
+     "keigo"
+    ],
+    "keigoNote": "",
+    "missing": [],
+    "model": "申し訳ございませんでした。次は私が担当いたします。",
+    "score": 53,
+    "targetPattern": "apology + commitment in one consistent register"
+   },
+   "target": "申し訳ございませんでした。次は私が担当いたします。"
   }
  ],
  "fields": "category = expected taxonomy id (the single most valuable error). kind routes the offline rule classifiers: voice → classifyVoiceError (rules = the scene signals production carries: model/targetPattern/commonError/keigoNote/missing/score/forTags/domain), listening → classifyListeningMiss (rules.script = the heard line), queue → classifyQueueLapse (rules = the lapsed card's front/note/back).",
- "provenance": "Constructed v1 gold set for the Corrector eval gate (Doc 08 §4). Cases are hand-built minimal pairs derived from the Doc 05 §2.2 taxonomy definitions and the shipped scene bank (src/data/scenes.js — e.g. city-certificate's 2通, city-address's 転入届/転出届, hospital-appointment's 熱がある). They are NOT real learner data and claim no user provenance. Human review status: PENDING (Landry). The set must grow toward Doc 08's 120 productions (incl. 30 keigo) with reviewed cohort cases before the Corrector can be promoted out of shadow mode.",
- "version": 1
+ "provenance": "Constructed v2 gold set for the Corrector eval gate (Doc 08 §4). 120 cases in total: the original 57 (3 per category across all 19 taxonomy ids) plus 63 further cases appended 2026-11-07, bringing every category to at least 5 cases and the keigo family (keigo-over-polite, keigo-under-polite, keigo-direction, register-mix) to 30 in total — the Doc 08 §4 Nao target shape. All cases are hand-built minimal pairs derived from the Doc 05 §2.2 taxonomy definitions and the shipped scene bank (src/data/scenes.js — e.g. city-certificate's 2通, city-address's 転入届/転出届, hospital-appointment's 熱がある). They are NOT real learner data and claim no user provenance. Human review status: PENDING (Landry). Reviewed cohort cases should still replace constructed ones over time: a constructed set can certify the plumbing and give agreement numbers, but it cannot certify judgement on real learner Japanese.",
+ "version": 2
 }

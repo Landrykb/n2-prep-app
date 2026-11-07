@@ -1,8 +1,10 @@
 // Corrector shadow-mode tests (run: TZ=UTC npm run test:corrector)
-// Pins for Doc 05 §4 + Doc 08 §4, Phase 3 step 1:
-//  1. The gold set is real: ≥40 cases, every taxonomy category ≥3,
-//     every category id imported from the CODE taxonomy (twin.js
-//     ERROR_PATTERNS) — never a copied list.
+// Pins for Doc 05 §4 + Doc 08 §4, Phase 3 steps 1–2:
+//  1. The gold set is real: v2 = exactly 120 cases, every taxonomy
+//     category ≥5 (so the §4.1 per-category gate can bind), the keigo
+//     family at 30 total, the original 57 v1 cases preserved as the
+//     set's first 57 — and every category id imported from the CODE
+//     taxonomy (twin.js ERROR_PATTERNS), never a copied list.
 //  2. The edge function's contract twin (contract.ts) carries the
 //     same taxonomy, in the same order, and its validators accept /
 //     reject exactly the shapes the function's contract promises.
@@ -30,13 +32,24 @@ const evalSet = evalRunner.loadEvalSet()
 const taxonomyIds = twin.ERROR_PATTERNS.map((p) => p.id)
 
 console.log('gold set integrity (categories from the code taxonomy):')
-check('gold set has ≥40 cases', () => {
-  assert.ok(evalSet.cases.length >= 40, `only ${evalSet.cases.length}`)
+check('gold set v2: version 2 and exactly 120 cases (the Doc 08 §4 Nao target)', () => {
+  assert.equal(evalSet.version, 2)
+  assert.equal(evalSet.cases.length, 120, `got ${evalSet.cases.length}`)
 })
-check('every taxonomy category is covered ≥3 times', () => {
+check('every taxonomy category is covered ≥5 times (the §4.1 per-category gate can bind)', () => {
   const counts = {}
   for (const c of evalSet.cases) counts[c.category] = (counts[c.category] || 0) + 1
-  for (const id of taxonomyIds) assert.ok((counts[id] || 0) >= 3, `${id}: ${counts[id] || 0}`)
+  for (const id of taxonomyIds) assert.ok((counts[id] || 0) >= 5, `${id}: ${counts[id] || 0}`)
+})
+check('the keigo family totals 30 cases across its four categories', () => {
+  const family = ['keigo-over-polite', 'keigo-under-polite', 'keigo-direction', 'register-mix']
+  const total = evalSet.cases.filter((c) => family.includes(c.category)).length
+  assert.equal(total, 30, `keigo family: ${total}`)
+})
+check('the original 57 v1 cases are preserved, in order, as the first 57', () => {
+  const prefixes = ['hg', 'nd', 'wo', 'or', 'cd', 'cp', 'cg', 'te', 'na', 'pt', 'kd', 'ko', 'ku', 'rm', 'ln', 'lg', 'ls', 'vm', 'pu']
+  const originalIds = prefixes.flatMap((p) => [`${p}-01`, `${p}-02`, `${p}-03`])
+  assert.deepEqual(evalSet.cases.slice(0, 57).map((c) => c.id), originalIds)
 })
 check('every gold category exists in the code taxonomy; no extras', () => {
   for (const c of evalSet.cases) assert.ok(taxonomyIds.includes(c.category), c.id)
@@ -114,12 +127,19 @@ check('known blind spot pinned: the rules can never return keigo-over-polite', (
   assert.equal(scored.perCategory['keigo-over-polite'].agree, 0)
   assert.ok(scored.misses.every((m) => m.category === 'keigo-over-polite'))
 })
+check('rules baseline v2: agreement is exactly total minus the blind-spot category (112/120)', () => {
+  const scored = evalRunner.scoreOver(evalSet, evalRunner.ruleClassify)
+  const blind = scored.perCategory['keigo-over-polite'].total
+  assert.equal(blind, 8)
+  assert.equal(scored.agree, scored.total - blind)
+  assert.equal(scored.total, 120)
+})
 check('the runner script executes offline and reports', () => {
   const out = execFileSync(process.execPath, ['scripts/eval-corrector.mjs'], {
     cwd: new URL('..', import.meta.url).pathname, env: { ...process.env, TZ: 'UTC' }, encoding: 'utf8',
   })
   assert.match(out, /RULES mode/)
-  assert.match(out, /keigo-over-polite\s+0\/3/)
+  assert.match(out, /keigo-over-polite\s+0\/8/)
 })
 check('gate verdict: ≥90% overall and no weak category passes; either failing blocks', () => {
   const okScored = { total: 20, agree: 19, perCategory: { a: { total: 10, agree: 9 }, b: { total: 10, agree: 10 } }, misses: [] }

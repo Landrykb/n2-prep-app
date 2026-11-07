@@ -26,6 +26,7 @@
     "build:variants": "node scripts/build-variants.mjs",
     "build:sentences": "node scripts/build-sentences.mjs",
     "test:corrector": "TZ=UTC node tests/corrector.test.mjs",
+  "test:planner-shadow": "TZ=UTC node tests/planner-shadow.test.mjs",
     "eval:corrector": "TZ=UTC node scripts/eval-corrector.mjs"
   },
   "dependencies": {

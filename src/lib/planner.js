@@ -22,6 +22,7 @@ import { loadProfile, loadDiagnosis } from './profile.js'
 import { loadTwin, saveTwin, refreshTwin, topPatterns } from './twin.js'
 import { detectMode } from './modes.js'
 import { todayStr, pickSceneForProfile, pickListeningForDiagnosis, buildSessionCards } from './session.js'
+import { shadowPlan } from './plannerShadow.js'
 
 export const PLAN_KEY = 'jpn:plan:v1'
 const MAX_CARDS = 5
@@ -265,6 +266,12 @@ export function buildPlan(forDate, { save = true } = {}) {
   if (save) {
     state.plans = { ...(state.plans || {}), [forDate]: plan }
     savePlanState(state)
+    // Planner shadow mode (Doc 05 §5.1): the saved rules plan is the
+    // one the learner gets — but a Tier A AI planner now also writes
+    // its own plan for the same day, fire-and-forget, so the two can
+    // be compared (planner_shadow metric + the local pair log).
+    // Silent when signed out / capped / unreachable; changes nothing.
+    shadowPlan(plan)
   }
   return plan
 }
