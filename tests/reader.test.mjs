@@ -1253,6 +1253,42 @@ check('kanjiReadings (seeded bank): the school-teacher letter carries its full b
   assert.deepEqual(port.kanjiReadings(row.tokens, readingOf), out)
 })
 
+const jmdictCompounds = (await import('../supabase/functions/reader-bot/jmdict-gloss.ts')).JMDICT_COMPOUNDS
+
+check('kanjiReadings (seeded bank, production wiring): compounds resolve whole, with meanings (amendments #13/#14)', () => {
+  const rows = parseSeedRows(new URL('../supabase/seed/reading_passages.sql', import.meta.url))
+  const row = rows.get('scene-school-teacher')
+  // Wired exactly as reader-bot/index.ts wires it: deck first,
+  // then the JMdict compound supplement. The segmenter chopped
+  // 面談 into 面 + 談のお… — the block must still show the word
+  // the passage actually says, whole (Landry's catch).
+  const compoundOf = (w) => {
+    const d = deckGloss[w]
+    if (d) return d
+    const s = jmdictCompounds[w]
+    return s ? { reading: s[0], meaning: s[1] } : null
+  }
+  const out = fit.kanjiReadings(
+    row.tokens,
+    (h) => deckGloss[h]?.reading,
+    (h) => deckGloss[h]?.meaning,
+    compoundOf,
+  )
+  assert.deepEqual(out, [
+    { word: '面談', reading: 'めんだん', meaning: 'interview' },
+    { word: '時間', reading: 'じかん', meaning: 'time' },
+    { word: '本日', reading: 'ほんじつ', meaning: 'today' },
+    { word: '国語', reading: 'こくご', meaning: 'national language' },
+    { word: '授業', reading: 'じゅぎょう', meaning: 'lesson' },
+    { word: '友達', reading: 'ともだち', meaning: 'friend' },
+    { word: '心配', reading: 'しんぱいする', meaning: 'to worry' },
+  ])
+  assert.deepEqual(
+    port.kanjiReadings(row.tokens, (h) => deckGloss[h]?.reading, (h) => deckGloss[h]?.meaning, compoundOf),
+    out,
+  )
+})
+
 // ---------------------------------------------------------------
 // Telegram Mini App identity validation: the suite imports the
 // PRODUCTION module used by supabase/functions/telegram-auth —
@@ -1485,6 +1521,25 @@ const botI18n = await import('../supabase/functions/reader-bot/i18n.ts')
     assert.equal(languageFromStateRow(undefined), 'en')
     assert.equal(languageFromState(null), 'en')
     assert.equal(languageFromState({ language: { lang: 'fr' } }), 'fr')
+  })
+
+  check('voice result keyboard (amendment #15): Next / Again / Push Me, routed to vnext, again:, vpush:', () => {
+    const { voiceResultKeyboard } = botI18n
+    const kb = voiceResultKeyboard('en', 'scene-school-teacher')
+    assert.deepEqual(kb, {
+      inline_keyboard: [
+        [
+          { text: 'Next Passage 📖', callback_data: 'vnext' },
+          { text: 'Read It Again', callback_data: 'again:scene-school-teacher' },
+        ],
+        [{ text: 'Push Me 🔥', callback_data: 'vpush:scene-school-teacher' }],
+      ],
+    })
+    const fr = voiceResultKeyboard('fr', 'x1')
+    assert.equal(fr.inline_keyboard[0][0].text, 'Passage Suivant 📖')
+    assert.equal(fr.inline_keyboard[1][0].callback_data, 'vpush:x1')
+    const ja = voiceResultKeyboard('ja', 'x1')
+    assert.equal(ja.inline_keyboard[0][1].callback_data, 'again:x1')
   })
 
   check('bot i18n: bt interpolates, falls back to EN, then to the key', () => {

@@ -106,6 +106,7 @@ const en: Record<string, string> = {
   'voice.matchBelow': '🔍 Heard you — reading match: {pct}% of the passage text your voice covered. That is a match against the text, not a pronunciation grade. It sits under the line where a read counts as comfortable, so nothing is marked — reads here only ever add up, never against you. Read it once more when you feel like it — hold the microphone and send another voice note whenever you\'re ready.',
   'voice.matchPass': '🔍 Heard you — reading match: {pct}% of the passage text your voice covered. That is a match against the text, not a pronunciation grade — and at that level it counts here as a comfortable read, proven out loud.',
   'voice.noPassage': '🔍 No passage from me in the last day to read back — send /read first, then read the passage aloud back to me. Your voice is the receipt.',
+  'voice.nextButton': 'Next Passage 📖',
   'voice.passageGone': '🔍 That passage is no longer on my shelf, so I cannot take your reading of it — send /read and read the new one aloud back to me.',
   'welcome': '🔍 Linked — Hori here, your Miner in Yonde.\nSend /read any time and I will dig up a short passage fitted to the words you actually know. New words come <b>bold</b>, and one tap mines them into your review queue.\nNo streaks, no nagging — reading when you feel like it is the whole design.',
 }
@@ -202,6 +203,7 @@ const fr: Record<string, string> = {
   'voice.matchBelow': '🔍 Je t\'ai entendu — correspondance de lecture : {pct}% du texte que ta voix a couvert. C\'est une correspondance avec le texte, pas une note de prononciation. Cela reste sous le seuil où une lecture compte comme confortable, donc rien n\'est marqué — ici, les lectures ne font que s\'ajouter, jamais contre toi. Relis-le une fois de plus quand tu en as envie — maintiens le microphone et envoie un autre message vocal quand tu es prêt.',
   'voice.matchPass': '🔍 Je t\'ai entendu — correspondance de lecture : {pct}% du texte que ta voix a couvert. C\'est une correspondance avec le texte, pas une note de prononciation — et à ce niveau, cela compte ici comme une lecture confortable, prouvée à voix haute.',
   'voice.noPassage': '🔍 Je n\'ai aucun texte de moi au cours du dernier jour à me relire — envoie d\'abord /read, puis relis le texte à voix haute. Ta voix est la preuve.',
+  'voice.nextButton': 'Passage Suivant 📖',
   'voice.passageGone': '🔍 Ce texte n\'est plus sur mon étagère, donc je ne peux pas recevoir ta lecture — envoie /read et relis le nouveau à voix haute.',
   'welcome': '🔍 C\'est relié — Hori, ton Mineur dans Yonde.\nEnvoie /read quand tu veux et je dénicherai un court texte ajusté aux mots que tu connais vraiment. Les mots nouveaux arrivent en <b>gras</b>, et un toucher suffit pour les miner dans ta file de révision.\nNi séries ni rappels insistants — lire quand tu en as envie, c\'est tout le principe.',
 }
@@ -298,6 +300,7 @@ const ja: Record<string, string> = {
   'voice.matchBelow': '🔍 聞こえました — 読み取りの一致度： あなたの声がカバーしたのは、テキストの{pct}%です。これはテキストとの一致で、発音の採点ではありません。無理なく読めたと数える線より下なので、何も記録されません — ここでは、読みは積み上がるだけで、あなたに不利になることは決してありません。気が向いたらもう一度読んでください — マイクを長押しして、準備ができたら別の音声メモを送ってください。',
   'voice.matchPass': '🔍 聞こえました — 読み取りの一致度： あなたの声がカバーしたのは、テキストの{pct}%です。これはテキストとの一致で、発音の採点ではありません — そしてこの水準なら、ここでは無理なく読めたこととして数えます。声に出して証明できました。',
   'voice.noPassage': '🔍 この1日で、私から読んでもらうテキストがありません — まず /read を送り、そのテキストを声に出して読んでください。あなたの声が証拠です。',
+  'voice.nextButton': '次の文章 📖',
   'voice.passageGone': '🔍 そのテキストはもう棚にないので、その読みを受けることができません — /read を送り、新しいものを声に出して読んでください。',
   'welcome': '🔍 連携できました — YondeのMiner、Horiです。\n/read を送ると、あなたが実際に知っている単語に合わせた短いテキストを探します。新しい単語は<b>太字</b>で届き、タップ1つで復習キューに入ります。\n連続記録も催促もありません。読みたいときに読むのが、この仕組みのすべてです。',
 }
@@ -387,4 +390,22 @@ export function botFittedFooter(
   else if (newKanjiCount > 1) out += bt(lang, 'footer.newKanjiMany', { count: newKanjiCount })
   if (opts.recycledBatch) out += bt(lang, 'footer.recycled')
   return out
+}
+
+// The voice-result keyboard (amendment #15): every read-aloud
+// verdict — scored or duration, pass or below — lands with the
+// three things a learner can want next: a fresh passage, the
+// same passage again (the existing again: route), or Push Me
+// (vpush:, the voice path's own push — the passage is already
+// proven, so the fit:'up' dedupe cannot be its door).
+export function voiceResultKeyboard(lang: unknown, passageId: string) {
+  return {
+    inline_keyboard: [
+      [
+        { text: bt(lang, 'voice.nextButton'), callback_data: 'vnext' },
+        { text: bt(lang, 'nofit.readAgainButton'), callback_data: `again:${passageId}` },
+      ],
+      [{ text: bt(lang, 'passage.pushMe'), callback_data: `vpush:${passageId}` }],
+    ],
+  }
 }

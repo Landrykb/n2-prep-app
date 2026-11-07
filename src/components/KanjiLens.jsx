@@ -179,7 +179,12 @@ export default function KanjiLens({ char, item }) {
     setStep(0)
     setStrokeStep(0)
     setMode('assemble')
-    setPlaying(!reduced)
+    // Autoplay on open, always (Landry, 2026-11-07: "when you open
+    // this it should trigger automatically"). The OS reduce-motion
+    // flag used to gate this, which left the stage sitting still —
+    // or, in Assemble, empty — until a tap. The animation IS the
+    // lesson here; Pause is one tap away in the stage controls.
+    setPlaying(true)
     Promise.all([getKanjiMeta(lensChar), getKanjiStrokes(lensChar)]).then(([meta, strokes]) => {
       if (cancelled) return
       setData({ meta, strokes })
@@ -193,7 +198,7 @@ export default function KanjiLens({ char, item }) {
       }
     }).catch(() => { if (!cancelled) setData({ meta: null, strokes: null }) })
     return () => { cancelled = true }
-  }, [lensChar, reduced])
+  }, [lensChar])
 
   useEffect(() => {
     let cancelled = false
@@ -282,7 +287,7 @@ export default function KanjiLens({ char, item }) {
     setStep(0)
     setStrokeStep(0)
     setPlayKey((k) => k + 1)
-    setPlaying(!reduced)
+    setPlaying(true)
   }
 
   // Loop-closing (docs/18): the word this kanji acts through, chosen
@@ -390,8 +395,8 @@ export default function KanjiLens({ char, item }) {
         const within = topComps[ci].strokes.indexOf(i)
         return (
           <path key={`${playKey}-${step}-${i}`} d={d} pathLength={1}
-            className={playing && !reduced ? 'lens-draw' : undefined}
-            style={{ strokeDasharray: 1, strokeDashoffset: playing && !reduced ? undefined : 1, animationDuration: '0.3s', animationDelay: `${within * 0.3}s`, animationPlayState: playing ? 'running' : 'paused' }}
+            className={playing ? 'lens-draw' : undefined}
+            style={{ strokeDasharray: 1, strokeDashoffset: playing ? undefined : 1, animationDuration: '0.3s', animationDelay: `${within * 0.3}s`, animationPlayState: playing ? 'running' : 'paused' }}
             fill="none" stroke={INK_ACTIVE} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
         )
       }
@@ -433,7 +438,7 @@ export default function KanjiLens({ char, item }) {
 
       <div className="flex flex-wrap gap-2 mb-4">
         {[['assemble', t('lens.modeAssemble')], ['strokes', t('lens.modeStrokeOrder')], ['draw', t('lens.modeDraw')]].map(([m, label]) => (
-          <button key={m} onClick={() => { setMode(m); if (m !== 'draw') { setPlaying(!reduced); setPlayKey((k) => k + 1) } }}
+          <button key={m} onClick={() => { setMode(m); if (m !== 'draw') { setPlaying(true); setPlayKey((k) => k + 1) } }}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium ${mode === m ? 'bg-[#FF6B57] text-white' : 'bg-bun-700 text-slate-300 hover:text-white'}`}>
             {label}
           </button>
@@ -491,15 +496,12 @@ export default function KanjiLens({ char, item }) {
             </p>
           )}
           <div className="flex flex-wrap justify-center gap-2 mt-2">
-            {reduced ? (
-              <button onClick={() => { if (stageMode === 'assemble') setStep((s) => Math.min(s + 1, topComps.length)); else setStrokeStep((s) => Math.min(s + 1, activePaths.length)) }}
-                className="px-3 py-1.5 rounded-lg bg-bun-700 text-slate-200 text-sm font-medium hover:text-white">{t('lens.stepForward')}</button>
-            ) : (
-              <button onClick={() => setPlaying((p) => !p)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bun-700 text-slate-200 text-sm font-medium hover:text-white">
-                {playing ? <Pause size={14} /> : <Play size={14} />} {playing ? t('lens.pause') : t('lens.play')}
-              </button>
-            )}
-            <button onClick={() => { setStep(0); setStrokeStep(0); setPlayKey((k) => k + 1); setPlaying(!reduced) }}
+            <button onClick={() => setPlaying((p) => !p)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bun-700 text-slate-200 text-sm font-medium hover:text-white">
+              {playing ? <Pause size={14} /> : <Play size={14} />} {playing ? t('lens.pause') : t('lens.play')}
+            </button>
+            <button onClick={() => { if (stageMode === 'assemble') setStep((s) => Math.min(s + 1, topComps.length)); else setStrokeStep((s) => Math.min(s + 1, activePaths.length)) }}
+              className="px-3 py-1.5 rounded-lg bg-bun-700 text-slate-200 text-sm font-medium hover:text-white">{t('lens.stepForward')}</button>
+            <button onClick={() => { setStep(0); setStrokeStep(0); setPlayKey((k) => k + 1); setPlaying(true) }}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bun-700 text-slate-200 text-sm font-medium hover:text-white">
               <RotateCcw size={14} /> {t('lens.replay')}
             </button>

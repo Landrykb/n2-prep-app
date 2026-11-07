@@ -3,10 +3,11 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { applyFeedback, BANDS, bandRank, buildKnownSet, capCandidates, countKnownContent, currentBatchWords, deckCreditSet, evaluateDraft, fitCallback, FOUNDATIONS_COMFY_TARGET, hasFeedbackFor, isColdStart, isDispatchDue, kanjiReadings, levelKeyboard, nextForbiddenList, parseFitCallback, passageNewKanji, passageRatio, passageRecyclesBatch, pickGentle, pickPassage, pickStarter, resolveBand, seenKanjiSet, serveBandFor, shouldAskLevel, shouldGenerate, unknownContentHeadwords, voiceReadWindow } from './fit.ts'
 import { DECK_LEVELS } from './deck.ts'
 import { DECK_GLOSS } from './gloss.ts'
+import { JMDICT_COMPOUNDS } from './jmdict-gloss.ts'
 import { segmentText } from './segment.ts'
 import { synthesizeSpeechOgg } from './voice.ts'
 import { READ_ALOUD_PASS_SCORE, firstMissedCandidate, scoreReadAloud } from './score.ts'
-import { bt, botFittedFooter, botLevelIntro, botTrialUpCopy, languageFromState, languageFromStateRow, type BotLang } from './i18n.ts'
+import { bt, botFittedFooter, botLevelIntro, botTrialUpCopy, languageFromState, languageFromStateRow, voiceResultKeyboard, type BotLang } from './i18n.ts'
 
 // Yonde Reader bot (Doc 16 §6/§7 R0, Doc 12 step 3.6).
 //
@@ -1044,6 +1045,16 @@ serve(async (req: Request) => {
         // the aid; the gloss is the other half. Deck meanings are
         // English source data in every UI language.
         (h: string) => glossBook[h]?.meaning,
+        // Amendment #14: compounds the deck does not carry as
+        // headwords, resolved across the segmenter's token cuts
+        // (面 + 談のお… → 面談） — deck first, then the JMdict
+        // compound supplement.
+        (w: string) => {
+          const d = glossBook[w]
+          if (d) return d
+          const s = (JMDICT_COMPOUNDS as Record<string, [string, string]>)[w]
+          return s ? { reading: s[0], meaning: s[1] } : null
+        },
       )
       const readingsBlock = readings.length > 0
         ? `<blockquote expandable>${bt(lang, 'passage.readingsHeader')}\n` +
@@ -1170,6 +1181,98 @@ serve(async (req: Request) => {
       }
       await answer('')
       await handleRead(chatId, { lang: await langForUser(link.user_id) })
+    }
+
+    // ---------- voice-result actions (amendment #15) ----------
+    // The verdict message's buttons. Next is a plain fresh serve
+    // (the same as /read). Push Me is the voice path's OWN push:
+    // a voice-proven passage already carries a reading_feedback
+    // row (kind 'read'), so the fit: callbacks' per-passage
+    // dedupe would swallow a fit:'up' tap whole — vpush dedupes
+    // on its own via flag instead, one push per passage, then
+    // applies the same 'up' transition and serves at the new
+    // step, exactly like the fit path.
+    const handleVoiceNext = async (cb: Record<string, unknown>) => {
+      const cbId = String(cb.id ?? '')
+      const from = (cb.from ?? {}) as Record<string, unknown>
+      const message = (cb.message ?? {}) as Record<string, unknown>
+      const chat = (message.chat ?? {}) as Record<string, unknown>
+      const chatId = Number(chat.id)
+      const answer = (text: string) =>
+        tg(botToken, 'answerCallbackQuery', { callback_query_id: cbId, text })
+      const link = Number.isFinite(chatId) ? await linkByChat(chatId) : null
+      if (!link || Number(from.id) !== chatId) {
+        await answer(bt('en', 'common.notLinkedToast'))
+        return
+      }
+      await answer('')
+      await handleRead(chatId, { lang: await langForUser(link.user_id) })
+    }
+
+    const handleVoicePush = async (cb: Record<string, unknown>) => {
+      const cbId = String(cb.id ?? '')
+      const from = (cb.from ?? {}) as Record<string, unknown>
+      const message = (cb.message ?? {}) as Record<string, unknown>
+      const chat = (message.chat ?? {}) as Record<string, unknown>
+      const chatId = Number(chat.id)
+      const passageId = String(cb.data ?? '').slice('vpush:'.length)
+      const answer = (text: string) =>
+        tg(botToken, 'answerCallbackQuery', { callback_query_id: cbId, text })
+      const link = Number.isFinite(chatId) ? await linkByChat(chatId) : null
+      if (!link || Number(from.id) !== chatId) {
+        await answer(bt('en', 'common.notLinkedToast'))
+        return
+      }
+      const lang = await langForUser(link.user_id)
+      const { data: priorRows } = await supabaseAdmin
+        .from('metrics_events')
+        .select('payload')
+        .eq('user_id', link.user_id)
+        .eq('type', 'reading_feedback')
+        .order('created_at', { ascending: false })
+        .limit(100)
+      const priors = (priorRows || []).map((r) => r.payload as Record<string, unknown>)
+      if (priors.some((p) => p && p.passageId === passageId && p.via === 'voicepush')) {
+        await answer(bt(lang, 'feedback.alreadyNoted'))
+        return
+      }
+      const paceRow = await loadState(link.user_id)
+      const paceState = (paceRow?.state ?? {}) as Record<string, unknown>
+      const { pace } = knownFor(paceState, declaredOf(link))
+      const comfyTarget = pace === 'foundations' ? FOUNDATIONS_COMFY_TARGET : undefined
+      const after = applyFeedback(
+        {
+          fit_step: link.fit_step ?? 0,
+          last_good_step: link.last_good_step ?? 0,
+          comfy_streak: link.comfy_streak ?? 0,
+        },
+        'up',
+        comfyTarget,
+      )
+      const { error } = await supabaseAdmin
+        .from('telegram_links')
+        .update({
+          fit_step: after.fit_step,
+          last_good_step: after.last_good_step,
+          comfy_streak: after.comfy_streak,
+        })
+        .eq('user_id', link.user_id)
+      if (error) {
+        await answer(bt(lang, 'common.saveFailedToast'))
+        return
+      }
+      await logEvent(link.user_id, 'reading_feedback', {
+        kind: 'up',
+        passageId,
+        via: 'voicepush',
+        fitStepAfter: after.fit_step,
+      })
+      if (after.effect === 'max') {
+        await answer(bt(lang, 'feedback.pushMax'))
+        return
+      }
+      await answer(bt(lang, 'feedback.pushing'))
+      await handleRead(chatId, { lang })
     }
 
     // ---------- mine callback ----------
@@ -1826,6 +1929,7 @@ serve(async (req: Request) => {
             botToken,
             chatId,
             bt(lang, 'voice.matchPass', { pct }) + fixLine,
+            { reply_markup: voiceResultKeyboard(lang, currentId) },
           )
           if (voiceEffect.trialUp) {
             await sendMessage(botToken, chatId, botTrialUpCopy(lang, voiceEffect.target))
@@ -1835,6 +1939,7 @@ serve(async (req: Request) => {
             botToken,
             chatId,
             bt(lang, 'voice.matchBelow', { pct }) + fixLine,
+            { reply_markup: voiceResultKeyboard(lang, currentId) },
           )
         }
         return
@@ -1855,6 +1960,7 @@ serve(async (req: Request) => {
           durationSec > win.maxSec
             ? bt(lang, 'voice.durationLong')
             : bt(lang, 'voice.durationQuick'),
+          { reply_markup: voiceResultKeyboard(lang, currentId) },
         )
         return
       }
@@ -1869,6 +1975,7 @@ serve(async (req: Request) => {
         botToken,
         chatId,
         bt(lang, 'voice.durationPlausible'),
+        { reply_markup: voiceResultKeyboard(lang, currentId) },
       )
       if (voiceEffect.trialUp) {
         await sendMessage(botToken, chatId, botTrialUpCopy(lang, voiceEffect.target))
@@ -2071,6 +2178,10 @@ serve(async (req: Request) => {
         try { await handleMine(cb) } catch (err) { console.error('reader-bot: mine failed', err) }
       } else if (String(cb.data ?? '').startsWith('again:')) {
         try { await handleAgain(cb) } catch (err) { console.error('reader-bot: again failed', err) }
+      } else if (String(cb.data ?? '') === 'vnext') {
+        try { await handleVoiceNext(cb) } catch (err) { console.error('reader-bot: voice next failed', err) }
+      } else if (String(cb.data ?? '').startsWith('vpush:')) {
+        try { await handleVoicePush(cb) } catch (err) { console.error('reader-bot: voice push failed', err) }
       } else if (String(cb.data ?? '') === 'door:read') {
         try { await handleDoorRead(cb) } catch (err) { console.error('reader-bot: door read failed', err) }
       } else if (String(cb.data ?? '').startsWith('level:')) {

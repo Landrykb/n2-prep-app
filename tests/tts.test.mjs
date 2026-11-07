@@ -210,4 +210,23 @@ await acheck('edgeTts: cancelBrowserSynthesis aborts an in-flight synthesis', as
   assert.equal(FakeSocket.instances[0].closed, true)
 })
 
+// ---------- TtsButton rides the neural chain (2026-11-07) ----------
+// Landry: the scene/model lines are what a learner listens to and
+// repeats — the device voice alone was "unnatural, difficult to
+// listen and repeat". The button must go through neuralVoice's
+// chain (Edge Nanami -> tts function -> device), with the honest
+// no-Japanese-voice label fed by the onFallback report.
+{
+  const { readFileSync } = await import('node:fs')
+  const btn = readFileSync(new URL('../src/components/TtsButton.jsx', import.meta.url), 'utf8')
+  const nv = readFileSync(new URL('../src/lib/neuralVoice.js', import.meta.url), 'utf8')
+  check('TtsButton speaks via the neural chain, not the device voice directly', () => {
+    assert.ok(btn.includes("from '../lib/neuralVoice.js'"), 'imports neuralVoice')
+    assert.ok(btn.includes('speakSenseiLine(text, {'), 'calls speakSenseiLine')
+    assert.ok(!btn.includes('speakText(text'), 'no direct speakText call remains')
+    assert.ok(btn.includes('onFallback'), 'keeps the honest fallback label wired')
+    assert.ok(nv.includes('onFallback(res)'), 'neuralVoice reports the device result')
+  })
+}
+
 console.log(`\ntts: ${passed} checks passed`)

@@ -132,7 +132,7 @@ async function fetchNeuralAudio(text) {
  * the caller's point of view — the fetch starts immediately and the
  * fallback decision happens inside.
  */
-export function speakSenseiLine(text, { rate = 1, onEnd } = {}) {
+export function speakSenseiLine(text, { rate = 1, onEnd, onFallback } = {}) {
   stopNeuralSpeech()
   let endFired = false
   const fireEnd = () => {
@@ -144,7 +144,12 @@ export function speakSenseiLine(text, { rate = 1, onEnd } = {}) {
   }
   const deviceFallback = () => {
     if (endFired) return
-    speakText(text, { rate, onEnd: fireEnd })
+    // onFallback (optional): told WHICH device result served, so a
+    // caller like TtsButton can keep its honest no-Japanese-voice
+    // label when the device voice had to read Japanese without one.
+    speakText(text, { rate, onEnd: fireEnd }).then((res) => {
+      if (onFallback) onFallback(res)
+    }).catch(() => {})
   }
   const clean = prepareNeuralText(text)
   if (!clean) { deviceFallback(); return }

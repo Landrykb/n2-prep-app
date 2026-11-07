@@ -1,23 +1,34 @@
 import { useState } from 'react'
 import { Volume2, Loader2 } from 'lucide-react'
-import { speakText, ttsAvailable } from '../lib/tts.js'
+import { ttsAvailable } from '../lib/tts.js'
+import { speakSenseiLine } from '../lib/neuralVoice.js'
 import { useLanguage } from '../hooks/useLanguage.js'
 
 export default function TtsButton({ text, className = '' }) {
   const { t } = useLanguage()
   const [speaking, setSpeaking] = useState(false)
   const [fallback, setFallback] = useState(false)
-  const [available] = useState(ttsAvailable)
+  // Neural audio needs only an Audio element; the device voice
+  // needs speechSynthesis. Either one makes the button real.
+  const [available] = useState(() => ttsAvailable() || typeof Audio !== 'undefined')
 
-  const speak = async (e) => {
+  const speak = (e) => {
     e?.stopPropagation()
     if (!available || !text) return
     setSpeaking(true)
-    const res = await speakText(text, { onend: () => setSpeaking(false), onerror: () => setSpeaking(false) })
-    // Honest label (P1-2): this device has no Japanese voice, so what the
-    // learner hears is the closest voice the browser could find.
-    if (res?.fallback) setFallback(true)
-    if (!res?.started) setSpeaking(false)
+    // The neural chain first (Doc 17): Edge's Nanami from this
+    // device, then the tts function, then the device voice. These
+    // lines are the model a learner listens to and repeats — the
+    // robotic device voice was never good enough for that job
+    // (Landry, 2026-11-07), and it was the only route this button
+    // had. speakSenseiLine stops any line still playing, so a
+    // second tap restarts cleanly, and its onEnd fires once.
+    speakSenseiLine(text, {
+      onEnd: () => setSpeaking(false),
+      // Honest label (P1-2): the device voice had to serve and it
+      // has no Japanese voice — say so, as before.
+      onFallback: (res) => { if (res?.fallback) setFallback(true) },
+    })
   }
 
   if (!available) return null

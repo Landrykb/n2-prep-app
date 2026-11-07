@@ -732,17 +732,74 @@ export const KANJI_READINGS_CAP = 40
  * (non-array tokens, empty surfaces, a missing or throwing
  * readingOf) yields fewer entries, never a crash.
  */
-export function kanjiReadings(tokens, readingOf, meaningOf) {
-  const out = []
-  if (!Array.isArray(tokens) || typeof readingOf !== 'function') return out
-  const seen = new Set()
-  for (const token of tokens) {
-    if (out.length >= KANJI_READINGS_CAP) break
-    const t = typeof token === 'string' ? { s: token, h: token } : token
+export function kanjiReadings(tokens, readingOf, meaningOf, compoundOf) {
+  if (!Array.isArray(tokens) || typeof readingOf !== 'function') return []
+  const toks = tokens.map((token) =>
+    typeof token === 'string' ? { s: token, h: token } : token,
+  )
+  // Character stream over the surfaces, in order — the compound
+  // pass (amendment #14) reads words as the LEARNER meets them,
+  // across the segmenter's token cuts: its stream chopped 面談
+  // into 面 + 談のお…, and a block built token-by-token can only
+  // ever show fragments of such a word.
+  const chars = []
+  const tokenStart = []
+  toks.forEach((t, ti) => {
+    tokenStart[ti] = chars.length
     const surface = typeof t?.s === 'string' ? t.s : ''
-    if (!surface || seen.has(surface)) continue
+    for (const ch of surface) chars.push({ ch, tok: ti })
+  })
+  const entries = []
+  const seen = new Set()
+  const consumed = new Set()
+  // Compound pass: at each kanji, the LONGEST known compound
+  // (2–4 kanji) starting there wins, and the tokens it spans are
+  // consumed — their fragments never list separately for this
+  // occurrence. compoundOf is injected like the other sources
+  // and stays optional: without it the block is exactly the
+  // per-token one.
+  if (typeof compoundOf === 'function') {
+    let i = 0
+    while (i < chars.length) {
+      if (consumed.has(chars[i].tok) || !KANJI_RE.test(chars[i].ch)) {
+        i++
+        continue
+      }
+      let runEnd = i
+      while (runEnd < chars.length && KANJI_RE.test(chars[runEnd].ch)) runEnd++
+      let matched = 0
+      for (let len = Math.min(4, runEnd - i); len >= 2; len--) {
+        const cand = chars.slice(i, i + len).map((c) => c.ch).join('')
+        if (seen.has(cand)) continue
+        let hit = null
+        try {
+          hit = compoundOf(cand)
+        } catch {
+          hit = null
+        }
+        if (hit && typeof hit.reading === 'string' && hit.reading && hit.reading !== cand) {
+          seen.add(cand)
+          entries.push({
+            pos: i,
+            entry: typeof hit.meaning === 'string' && hit.meaning
+              ? { word: cand, reading: hit.reading, meaning: hit.meaning }
+              : { word: cand, reading: hit.reading },
+          })
+          for (let k = i; k < i + len; k++) consumed.add(chars[k].tok)
+          matched = len
+          break
+        }
+      }
+      i += matched || 1
+    }
+  }
+  // Per-token pass (the original rule), skipping consumed tokens.
+  toks.forEach((t, ti) => {
+    if (consumed.has(ti)) return
+    const surface = typeof t?.s === 'string' ? t.s : ''
+    if (!surface || seen.has(surface)) return
     seen.add(surface)
-    if (!KANJI_RE.test(surface)) continue
+    if (!KANJI_RE.test(surface)) return
     const headword = typeof t?.h === 'string' && t.h ? t.h : surface
     let reading = null
     try {
@@ -750,7 +807,7 @@ export function kanjiReadings(tokens, readingOf, meaningOf) {
     } catch {
       reading = null
     }
-    if (typeof reading !== 'string' || !reading || reading === surface) continue
+    if (typeof reading !== 'string' || !reading || reading === surface) return
     // Meanings ride along only when a meaning source is injected
     // (amendment #13): the entry gains the gloss for the headword;
     // without one the entry is exactly { word, reading } as before.
@@ -762,13 +819,15 @@ export function kanjiReadings(tokens, readingOf, meaningOf) {
         meaning = null
       }
     }
-    out.push(
-      typeof meaning === 'string' && meaning
+    entries.push({
+      pos: tokenStart[ti],
+      entry: typeof meaning === 'string' && meaning
         ? { word: surface, reading, meaning }
         : { word: surface, reading },
-    )
-  }
-  return out
+    })
+  })
+  entries.sort((a, b) => a.pos - b.pos)
+  return entries.slice(0, KANJI_READINGS_CAP).map((e) => e.entry)
 }
 
 // ---------- Fit v2: encounters, seen kanji, dose, batch (amendment #10) ----------

@@ -211,4 +211,13 @@ check('attested family （青/セイ）: attested rows lead with the flag, compu
   assert.equal(derived.attested, false)
 })
 
+// Autoplay on open (Landry, 2026-11-07): the Lens assembly plays
+// when the kanji opens — the OS reduce-motion flag no longer gates
+// it, and the stage controls always carry Play/Pause.
+check('the Lens autoplays on open — no reduced-motion gate on playback', () => {
+  const src = fs.readFileSync(new URL('../src/components/KanjiLens.jsx', import.meta.url), 'utf8')
+  assert.ok(!src.includes('setPlaying(!reduced)'), 'no reduced-gated setPlaying remains')
+  assert.ok(src.includes('setPlaying(true)'), 'autoplay sets playing true')
+})
+
 console.log(`\nlens: ${passed} checks passed`)
