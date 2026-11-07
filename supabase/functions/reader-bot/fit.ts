@@ -597,13 +597,13 @@ export function hasFeedbackFor(payloads, passageId) {
  * and its tests can never drift apart. Every callback stays far
  * under Telegram's 64-byte limit ('level:N7' is 8 bytes).
  */
-export function levelKeyboard() {
+export function levelKeyboard(notSureLabel = 'Not sure') {
   return {
     inline_keyboard: [
       BANDS.map((b) => ({ text: b, callback_data: `level:${b}` })),
       [
         { text: 'N7+ 😂', callback_data: 'level:N7' },
-        { text: 'Not sure', callback_data: 'level:none' },
+        { text: notSureLabel, callback_data: 'level:none' },
       ],
     ],
   }

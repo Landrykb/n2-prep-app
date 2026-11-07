@@ -6,6 +6,7 @@ import { DECK_GLOSS } from './gloss.ts'
 import { segmentText } from './segment.ts'
 import { synthesizeSpeechOgg } from './voice.ts'
 import { READ_ALOUD_PASS_SCORE, firstMissedCandidate, scoreReadAloud } from './score.ts'
+import { bt, botFittedFooter, botLevelIntro, botTrialUpCopy, languageFromState, languageFromStateRow, type BotLang } from './i18n.ts'
 
 // Yonde Reader bot (Doc 16 §6/§7 R0, Doc 12 step 3.6).
 //
@@ -138,15 +139,18 @@ const MINI_APP_READER_URL = 'https://jpn2easy.vercel.app/reader'
 // (registered by reader-admin via setChatMenuButton), and /app is
 // the typed route to it.
 const MINI_APP_URL = 'https://jpn2easy.vercel.app'
-const APP_BUTTON = { text: 'Open Yonde', web_app: { url: MINI_APP_URL } }
-const appKeyboard = (rows: Record<string, unknown>[][] = []) => ({
-  inline_keyboard: [...rows, [APP_BUTTON]],
+const appButton = (lang: BotLang) => ({
+  text: bt(lang, 'app.openYonde'),
+  web_app: { url: MINI_APP_URL },
+})
+const appKeyboard = (lang: BotLang = 'en', rows: Record<string, unknown>[][] = []) => ({
+  inline_keyboard: [...rows, [appButton(lang)]],
 })
 
-// The morning greeting (Doc 16 R1/§9): the one line that precedes a
-// dispatched passage. Warm, short, and free of streak/nag language —
-// it greets the day; it never comments on yesterday.
-const MORNING_GREETING = '🔍 おはよう — morning. Here is today\'s passage, fitted to your words.'
+// The morning greeting (Doc 16 R1/§9) is copy key
+// 'morning.greeting' in i18n.ts: the one line that precedes a
+// dispatched passage. Warm, short, and free of streak/nag
+// language — it greets the day; it never comments on yesterday.
 
 // --- R0.5 fitted generation (Doc 16 §7: pulled forward from R1) ---
 // The bank was never written to the 95% rule, so bank-first alone
@@ -320,102 +324,15 @@ const sendMessage = (token: string, chatId: number, text: string, extra: Record<
   tg(token, 'sendMessage', { chat_id: chatId, text, parse_mode: 'HTML', ...extra })
 
 // --- copy (Hori's voice; plain language; no streak talk, ever) ---
-
-const LINK_EXPLAINER =
-  '🔍 Hori here — I run Yonde Reader. This chat is not linked yet.\n' +
-  'Open Yonde → <b>Fleet</b> → <b>Yonde Reader on Telegram</b> → <b>Connect Telegram</b>, then tap the link there. ' +
-  'It takes ten seconds, and then /read works here.'
-
-const WELCOME =
-  '🔍 Linked — Hori here, your Miner in Yonde.\n' +
-  'Send /read any time and I will dig up a short passage fitted to the words you actually know. ' +
-  'New words come <b>bold</b>, and one tap mines them into your review queue.\n' +
-  'No streaks, no nagging — reading when you feel like it is the whole design.'
-
-const HELP =
-  'Here is what I do:\n' +
-  '/read — a passage fitted to your words\n' +
-  '/app — open Yonde: sessions, the checkup, Koe\'s calls\n' +
-  '/level — tell me your level in one tap\n' +
-  '/unlink — disconnect this chat\n' +
-  '🎙 Voice read: after a passage, hold the microphone button, read it out loud, and let go to send — I listen and answer with your reading match.\n' +
-  'Reading when you feel like it is the whole design — no streaks, no nagging.'
-
-// The voice-proof instruction (Doc 16 §5 amendment #10): every
-// passage message carries this ONE line with its footer. The Read
-// It ✓ button is a self-report tap; the voice read is the performed
-// proof — but a learner who has never been told the gesture (hold
-// the microphone, read, let go) cannot discover it from a button
-// label, so the message itself teaches it, in plain words.
-const VOICE_INSTRUCTION =
-  '🎙 <b>Read it out loud:</b> hold the microphone button below, read the whole passage, and let go to send — I listen and answer with your reading match.'
-
-// The reply to the N7+ 😂 tap (Doc 16 §5 amendment #7): Hori laughs
-// WITH the learner — the joke is theirs, the warmth is real, and
-// the pace consequence is named in the same breath (foundations
-// pace: bases first, double the proof before any stretch).
-const N7_JOKE_REPLY =
-  'N7+ 😂 — the legendary level: below the test, above giving up.\n' +
-  'Deal — we start at the very beginning. Every N1 alive started below N5.\n' +
-  'And I will slow my steps down — bases first: it takes double the comfortable reads before I dare to stretch you.'
-
-// The ratchet announcement, shared by the feedback tap and both
-// voice-proof paths. The count word follows the learner's pace:
-// Three at the standard pace, Six at foundations pace — the copy
-// must never claim a count the state machine did not use.
-const trialUpCopy = (streakWord: string) =>
-  `🔍 ${streakWord} comfortable reads in a row — that level is properly yours now. ` +
-  'The next passage stretches a little past it; that is the fit hardening, one notch at a time. ' +
-  'If it overshoots, Too Hard brings us straight back.'
-const streakWordFor = (target?: number | null) =>
-  target === FOUNDATIONS_COMFY_TARGET ? 'Six' : 'Three'
-
-// The one-tap level ask (Doc 16 §5 amendment #3). It is the /read
-// response when the learner has no band basis at all — never a
-// standalone nag — and it fires at most once: once a band is
-// declared (or a diagnosis exists) /read serves instead. The
-// callback_data values are tiny by design (level:N5 = 8 bytes,
-// level:none = 10): Telegram rejects oversized button payloads
-// silently, so the whole level surface stays far under the limit.
-const LEVEL_ASK =
-  '🔍 One thing first — I do not know your level yet, and I fit every passage to it.\n' +
-  'Tap yours and reading starts now. No forms, no homework: this tap is just where we start, ' +
-  'and your checkup in Yonde is the sharper measure whenever you want it.'
-
-// The /level intro line names the CURRENT basis before offering the
-// buttons (Doc 16 §5 amendment #3) — a learner re-asking the
-// question should be told what is in charge right now. The keyboard
-// itself is levelKeyboard() from the fitting twins (pinned there so
-// the bot and the app-side tests can never drift apart). An N7
-// declarer hears the joke remembered (amendment #7): the raw 'N7'
-// resolved to N5, and the intro says what Hori made of it.
-const levelIntro = (source: string, band: string | null, joke = false) =>
-  source === 'diagnosis'
-    ? `Your checkup put you at ${band}, and a checkup always outranks a tap — I fit to it. ` +
-      'If that feels wrong, a fresh checkup in Yonde is the way to change it. ' +
-      'A tap below only sets your starting level for if no checkup were on file.'
-    : source === 'declared' && joke
-      ? 'You told me N7+ 😂 — I read that as: start me at the very beginning, at an easy pace. ' +
-        'Tap to change it, or take the checkup in Yonde for the sharper measure.'
-      : source === 'declared'
-        ? `You told me ${band} — that is the level I fit to. Tap to change it, ` +
-          'or take the checkup in Yonde for the sharper measure.'
-        : LEVEL_ASK
-
-// The starter footer (cold start, Doc 16 §5 amendment #2). It must
-// never claim fitting that did not happen: it says plainly this is a
-// starter, says why, invites mining (mined words are the first real
-// known set), and names the checkup as the switch for fitting.
-const STARTER_FOOTER =
-  'A starter, not a fitted pick — I do not know your level yet, so this one is from the easy shelf, with the new words kept few. ' +
-  'Mine any words you like: every mined word teaches me what you know. ' +
-  'Take the 10-minute checkup in Yonde and fitting switches on — from then on, every passage is measured against your words before it is sent.'
-
-// Appended to the nothing-fits reply when the learner has words but
-// no diagnosis (and is not cold): the checkup is named as the switch
-// that turns level-fitting on, in the same spirit as the footers.
-const CHECKUP_SWITCH_LINE =
-  '\nThe checkup is the switch here: take the 10-minute checkup in Yonde, and I can fit to your level, not just your queue.'
+// All user-facing furniture lives in i18n.ts (Doc 16 §5
+// amendment #11), keyed by the linked user's app language. The
+// comments that used to sit on each constant — the voice-proof
+// instruction (amendment #10), the N7+ joke reply (amendment #7),
+// the ratchet announcement, the level ask + intro (amendment #3),
+// the starter footer (amendment #2) and the checkup switch line —
+// describe copy keys there now: 'voice.instruction',
+// 'n7.jokeReply', 'trialUp', 'level.ask' / 'level.intro*',
+// 'starter.footer' and 'checkup.switch'.
 
 // The first sentence of `text` containing `word` — the mined card's
 // context line (Doc 16 §3: the card carries the sentence it came from).
@@ -564,6 +481,20 @@ serve(async (req: Request) => {
         .maybeSingle()
       return data // { state, updated_at } | null
     }
+
+    // Bot language (Doc 16 §5 amendment #11): the app's language
+    // slice is the single source of truth — no bot-side storage.
+    // Handlers that already hold a state row resolve from it
+    // directly (languageFromState); the helpers below are for the
+    // handlers that do not, and each performs the one resolution
+    // read for that update. The resolved value is then threaded
+    // through opts.lang so nested serves never resolve twice.
+    // Unlinked users and a missing slice resolve to 'en'.
+    const langForUser = async (userId: string): Promise<BotLang> =>
+      languageFromStateRow(await loadState(userId))
+    const langForLink = async (
+      link: { user_id?: string | null } | null | undefined,
+    ): Promise<BotLang> => (link?.user_id ? await langForUser(link.user_id) : 'en')
 
     // The calibrated known set (Doc 16 §5 amendment): queue fronts +
     // Twin personal vocab + below-band deck credit. The credit follows
@@ -812,17 +743,22 @@ serve(async (req: Request) => {
     // re-verifies it below before anything is sent.
     const handleRead = async (
       chatId: number,
-      opts: { declaredBand?: string | null; declaredAt?: string | null; fromLevelTap?: boolean; forceStarter?: boolean; kind?: string; againPassageId?: string } = {},
+      opts: { declaredBand?: string | null; declaredAt?: string | null; fromLevelTap?: boolean; forceStarter?: boolean; kind?: string; againPassageId?: string; lang?: BotLang } = {},
     ) => {
       const link = await linkByChat(chatId)
       if (!link) {
-        await sendMessage(botToken, chatId, LINK_EXPLAINER)
+        await sendMessage(botToken, chatId, bt('en', 'link.explainer'))
         return
       }
       const declaredBand = opts.declaredBand !== undefined ? opts.declaredBand : (link.declared_band ?? null)
       const declaredAt = opts.declaredAt !== undefined ? opts.declaredAt : (link.declared_at ?? null)
       const row = await loadState(link.user_id)
       const state = (row?.state ?? {}) as Record<string, unknown>
+      // Resolved ONCE for this serve: a caller that already
+      // resolved the language for this update passes it in;
+      // otherwise it comes from the state row just loaded — the
+      // read this handler was already making, never a second one.
+      const lang = opts.lang ?? languageFromState(state)
       const { queue, known, encounters, hasDiagnosis, band, bandSource, basisBand, joke, pace } = knownFor(state, {
         band: declaredBand,
         at: declaredAt,
@@ -860,7 +796,7 @@ serve(async (req: Request) => {
       // response in this state (never a standalone nag), and it
       // stops the moment a basis exists.
       if (!opts.fromLevelTap && shouldAskLevel({ ...link, declared_band: declaredBand }, bandSource)) {
-        await sendMessage(botToken, chatId, LEVEL_ASK, { reply_markup: levelKeyboard() })
+        await sendMessage(botToken, chatId, bt(lang, 'level.ask'), { reply_markup: levelKeyboard(bt(lang, 'level.notSure')) })
         return
       }
 
@@ -889,7 +825,7 @@ serve(async (req: Request) => {
         .select('id, band, topic, text, tokens, new_word_candidates, source, voice_file_id')
       if (bankError || !bank) {
         console.error('reader-bot: passage bank fetch failed')
-        await sendMessage(botToken, chatId, 'The reading shelf is empty on my side right now — try again a little later.')
+        await sendMessage(botToken, chatId, bt(lang, 'shelf.empty'))
         return
       }
 
@@ -912,11 +848,7 @@ serve(async (req: Request) => {
           picked = { passage: againRow as unknown as Record<string, unknown>, ratio: verified.ratio }
           again = true
         } else {
-          await sendMessage(
-            botToken,
-            chatId,
-            'That one no longer fits your words — your set has moved since it was sent. Let me find what fits today:',
-          )
+          await sendMessage(botToken, chatId, bt(lang, 'again.noLongerFits'))
         }
       }
       // Foundations pace (amendment #7): until the first ratchet
@@ -990,11 +922,12 @@ serve(async (req: Request) => {
           await sendMessage(
             botToken,
             chatId,
-            `One passage does fit your words — 「${esc(String(againPassage.topic || 'Reading'))}」 — but you read it in the last two weeks, and I hold recent reads back so /read stays fresh.\n` +
-              'It is yours again whenever you want it: tap below. And a study session in Yonde grows your words, so fresh fits follow.',
+            bt(lang, 'nofit.recent', {
+              topic: esc(String(againPassage.topic || bt(lang, 'passage.defaultTopic'))),
+            }),
             {
-              reply_markup: appKeyboard([
-                [{ text: 'Read It Again', callback_data: `again:${String(againPassage.id)}` }],
+              reply_markup: appKeyboard(lang, [
+                [{ text: bt(lang, 'nofit.readAgainButton'), callback_data: `again:${String(againPassage.id)}` }],
               ]),
             },
           )
@@ -1004,8 +937,8 @@ serve(async (req: Request) => {
           await sendMessage(
             botToken,
             chatId,
-            'I do not have your synced words yet, so I cannot fit a passage to you. Open Yonde signed in once — your queue syncs on its own — then send /read again.',
-            { reply_markup: appKeyboard() },
+            bt(lang, 'nofit.noSyncedWords'),
+            { reply_markup: appKeyboard(lang) },
           )
           return
         }
@@ -1018,14 +951,13 @@ serve(async (req: Request) => {
         // switch that turns level-fitting on; the starter track
         // above already covers the truly cold, and a declared
         // learner already has a basis.)
-        let noFit =
-          'Nothing on the shelf fits your words today — every passage in reach runs ahead of them, and I would rather send nothing than the wrong level.'
+        let noFit = bt(lang, 'nofit.base')
         if (genOutcome.attempted && genOutcome.reason !== 'cooldown') {
-          noFit += ' I also tried writing a fresh one for you just now, and my writer could not manage it this time.'
+          noFit += bt(lang, 'nofit.generated')
         }
-        noFit += '\nThe nearest way forward: a study session in Yonde — new words change the fit — then /read again.'
-        if (!cold && bandSource === 'none') noFit += CHECKUP_SWITCH_LINE
-        await sendMessage(botToken, chatId, noFit, { reply_markup: appKeyboard() })
+        noFit += bt(lang, 'nofit.forward')
+        if (!cold && bandSource === 'none') noFit += bt(lang, 'checkup.switch')
+        await sendMessage(botToken, chatId, noFit, { reply_markup: appKeyboard(lang) })
         return
       }
 
@@ -1055,48 +987,45 @@ serve(async (req: Request) => {
       // fitting that did not happen, on a basis that did not
       // happen. A starter gets its own footer for the same reason:
       // no fit was measured, so none is claimed (amendment #2).
-      let footerText = coldStart
-        ? STARTER_FOOTER
-        : bandSource === 'diagnosis'
-        ? `Fitted to your ${esc(band)} level and your queue: about ${pct}% of its words should already be familiar (an estimate) · ${newWords.length} new word${newWords.length === 1 ? '' : 's'}`
-        : bandSource === 'declared' && joke
-        ? `Fitted from the very beginning — your N7+ 😂 tap — and your queue: about ${pct}% of its words should already be familiar (an estimate) · ${newWords.length} new word${newWords.length === 1 ? '' : 's'}` +
-          '\nFrom the bases, at an easy pace — we climb when your reads get comfortable, a little slower than usual.'
-        : bandSource === 'declared'
-        ? `Fitted to the ${esc(band)} you told me and your queue: about ${pct}% of its words should already be familiar (an estimate) · ${newWords.length} new word${newWords.length === 1 ? '' : 's'}` +
-          '\nYour checkup in Yonde sharpens this whenever you want it.'
-        : `Fitted to your queue: about ${pct}% of its words should already be familiar (an estimate) · ${newWords.length} new word${newWords.length === 1 ? '' : 's'}` +
-          '\nBand N4 is a gentle default — take the 10-minute checkup in Yonde and I will fit to your real level.'
+      const passageTokens = Array.isArray(passage.tokens) ? passage.tokens : []
+      const newKanji = coldStart ? [] : passageNewKanji(passageTokens, seenKanji)
+      const recycledBatch = !coldStart && passageRecyclesBatch(passageTokens, batchWords)
+      // The footer names the fitting basis (Doc 16 §5 labelling):
+      // with a diagnosis, the learner's level (via below-band deck
+      // credit) and their queue; with a declared band, the level
+      // THEY stated and their queue — the wording says the band
+      // came from their tap, never from a measurement; with no
+      // basis, the queue only. The copy must never claim level
+      // fitting that did not happen, on a basis that did not
+      // happen. A starter gets its own footer for the same reason:
+      // no fit was measured, so none is claimed (amendment #2).
       // Adaptive fit (amendment #4): when the step is off zero the
       // footer says so in plain language — a stretch is named as a
       // stretch (with the way back named too), a gentler notch as
       // settling. Basis labelling above stays the basis; this line
       // is about where the fit AIMED today. Starters never claim
-      // it: their selection ignores the step in v1.
-      if (!coldStart && fitStep !== 0) {
-        const basisLabel = esc(basisBand ?? band)
-        footerText += fitStep > 0
-          ? `\nStretching you a little past ${basisLabel} today — Push Me works both ways: Too Hard brings us back.`
-          : `\nKeeping it a notch gentler than ${basisLabel} while it settles.`
-      }
-      // Fit v2 footer honesty (amendment #10): the new-kanji dose
-      // is said out loud — carrying new kanji is the POINT of the
-      // passage (the goal is to know more), and the readings block
-      // below is where those kanji wait. A batch-recycle pick says
-      // so too — only when this passage truly re-uses batch words.
-      // Starters skip both lines: their footer already explains
-      // that no fit was measured.
-      const passageTokens = Array.isArray(passage.tokens) ? passage.tokens : []
-      const newKanji = coldStart ? [] : passageNewKanji(passageTokens, seenKanji)
-      if (newKanji.length === 1) {
-        footerText += '\n1 kanji here is new to you — it is in the readings block, and it will keep coming back until it is yours.'
-      } else if (newKanji.length > 1) {
-        footerText += `\n${newKanji.length} kanji here are new to you — they're in the readings block, and they'll keep coming back until they're yours.`
-      }
-      const recycledBatch = !coldStart && passageRecyclesBatch(passageTokens, batchWords)
-      if (recycledBatch) {
-        footerText += '\nThis one practises the batch you are learning now — the same words again, in new sentences, until they are yours.'
-      }
+      // it: their selection ignores the step in v1. Fit v2 footer
+      // honesty (amendment #10): the new-kanji dose is said out
+      // loud — carrying new kanji is the POINT of the passage (the
+      // goal is to know more), and the readings block below is
+      // where those kanji wait. A batch-recycle pick says so too —
+      // only when this passage truly re-uses batch words. Starters
+      // skip both lines: their footer already explains that no fit
+      // was measured. botFittedFooter (i18n.ts) composes all of
+      // this in the learner's language from the same facts.
+      const footerText = coldStart
+        ? bt(lang, 'starter.footer')
+        : botFittedFooter(lang, {
+          bandSource,
+          band,
+          pct,
+          newWordCount: newWords.length,
+          joke,
+          fitStep,
+          basisBand,
+          newKanjiCount: newKanji.length,
+          recycledBatch,
+        })
       // Kanji readings breakdown (amendment #9): EVERY kanji-bearing
       // word in the passage, not just the new words — a word can be
       // "known" by deck credit while its kanji was never learned,
@@ -1112,19 +1041,22 @@ serve(async (req: Request) => {
         (h: string) => glossBook[h]?.reading,
       )
       const readingsBlock = readings.length > 0
-        ? '<blockquote expandable>📖 <b>Kanji readings</b> — tap to open\n' +
+        ? `<blockquote expandable>${bt(lang, 'passage.readingsHeader')}\n` +
           readings.map((r) => `${esc(r.word)} （${esc(r.reading)}）`).join('\n') +
           '</blockquote>'
         : null
       const lines = [
-        `🔍 Hori dug this up for you — ${esc(String(passage.topic || 'Reading'))} · ${esc(String(passage.band))}`,
+        bt(lang, 'passage.header', {
+          topic: esc(String(passage.topic || bt(lang, 'passage.defaultTopic'))),
+          band: esc(String(passage.band)),
+        }),
         '',
         renderPassage(String(passage.text), newWords),
         ...(readingsBlock ? ['', readingsBlock] : []),
         '',
         footerText,
         '',
-        VOICE_INSTRUCTION,
+        bt(lang, 'voice.instruction'),
       ]
       // Every passage send carries the adaptive-fit feedback row
       // (amendment #4) under Mine: [Read It ✓] [Push Me 🔥]
@@ -1137,25 +1069,25 @@ serve(async (req: Request) => {
       // proven once, by voice or by tap.
       const keyboardRows: Record<string, string>[][] = []
       if (newWords.length > 0) {
-        keyboardRows.push([{ text: 'Mine the New Words', callback_data: `mine:${String(passage.id)}` }])
+        keyboardRows.push([{ text: bt(lang, 'passage.mineButton'), callback_data: `mine:${String(passage.id)}` }])
       }
       keyboardRows.push([
-        { text: 'Read It ✓', callback_data: fitCallback('read', String(passage.id)) },
-        { text: 'Push Me 🔥', callback_data: fitCallback('up', String(passage.id)) },
-        { text: 'Too Hard', callback_data: fitCallback('hard', String(passage.id)) },
+        { text: bt(lang, 'passage.readIt'), callback_data: fitCallback('read', String(passage.id)) },
+        { text: bt(lang, 'passage.pushMe'), callback_data: fitCallback('up', String(passage.id)) },
+        { text: bt(lang, 'passage.tooHard'), callback_data: fitCallback('hard', String(passage.id)) },
       ])
       // The Mini App row (R1): tap-a-word lives on the PWA /reader
       // page — chat text cannot do per-word taps — so every passage
       // keyboard ends with the door to it. The chat message stays
       // fully readable on its own; this is a door, never a toll.
       keyboardRows.push([
-        { text: '📖 Open in Yonde — tap the words', web_app: { url: MINI_APP_READER_URL } },
+        { text: bt(lang, 'app.openReader'), web_app: { url: MINI_APP_READER_URL } },
       ])
       const extra: Record<string, unknown> = { reply_markup: { inline_keyboard: keyboardRows } }
       // A dispatch serve opens with the morning greeting — the one
       // sanctioned proactive line (Doc 16 §9) — then the passage.
       if (opts.kind === 'morning') {
-        await sendMessage(botToken, chatId, MORNING_GREETING)
+        await sendMessage(botToken, chatId, bt(lang, 'morning.greeting'))
       }
       await sendMessage(botToken, chatId, lines.join('\n'), extra)
       // Voice out: the passage as a voice note, AFTER the text —
@@ -1208,11 +1140,12 @@ serve(async (req: Request) => {
 
       const link = Number.isFinite(chatId) ? await linkByChat(chatId) : null
       if (!link || Number(from.id) !== chatId) {
-        await answer('This chat is not linked to a Yonde account.')
+        await answer(bt('en', 'common.notLinkedToast'))
         return
       }
-      await answer('Sending it again ✓')
-      await handleRead(chatId, { againPassageId: passageId })
+      const lang = await langForUser(link.user_id)
+      await answer(bt(lang, 'again.sending'))
+      await handleRead(chatId, { againPassageId: passageId, lang })
     }
 
     const handleDoorRead = async (cb: Record<string, unknown>) => {
@@ -1227,11 +1160,11 @@ serve(async (req: Request) => {
 
       const link = Number.isFinite(chatId) ? await linkByChat(chatId) : null
       if (!link || Number(from.id) !== chatId) {
-        await answer('This chat is not linked to a Yonde account.')
+        await answer(bt('en', 'common.notLinkedToast'))
         return
       }
       await answer('')
-      await handleRead(chatId)
+      await handleRead(chatId, { lang: await langForUser(link.user_id) })
     }
 
     // ---------- mine callback ----------
@@ -1251,9 +1184,12 @@ serve(async (req: Request) => {
       // be in the linked private chat, from the person who owns it.
       const link = Number.isFinite(chatId) ? await linkByChat(chatId) : null
       if (!link || Number(from.id) !== chatId) {
-        await answer('This chat is not linked to a Yonde account.')
+        await answer(bt('en', 'common.notLinkedToast'))
         return
       }
+      // Resolved once for this tap (amendment #11); every toast
+      // and follow-up below speaks it.
+      const lang = await langForUser(link.user_id)
 
       const { data: passage } = await supabaseAdmin
         .from('reading_passages')
@@ -1261,15 +1197,15 @@ serve(async (req: Request) => {
         .eq('id', passageId)
         .maybeSingle()
       if (!passage) {
-        await answer('That passage is no longer on the shelf.')
+        await answer(bt(lang, 'mine.passageGone'))
         return
       }
 
       const row = await loadState(link.user_id)
       if (!row?.state) {
         // Conservative by design: never fabricate a learner document.
-        await answer('Nothing synced yet.')
-        await sendMessage(botToken, chatId, 'There is nothing synced to mine into yet — open Yonde signed in once so your queue exists here, then tap Mine again.')
+        await answer(bt(lang, 'mine.nothingSyncedToast'))
+        await sendMessage(botToken, chatId, bt(lang, 'mine.nothingSynced'))
         return
       }
       const state = row.state as Record<string, unknown>
@@ -1313,7 +1249,7 @@ serve(async (req: Request) => {
           front,
           back: c.meaning || '',
           reading: c.reading || '',
-          note: `From Hori's Reader passage: 「${sentenceWith(String(passage.text), c.word)}」`,
+          note: bt(lang, 'mine.cardNote', { sentence: sentenceWith(String(passage.text), c.word) }),
           source: 'reader',
           level: String(passage.band),
           createdAt: now.toISOString(),
@@ -1331,7 +1267,7 @@ serve(async (req: Request) => {
           )
         if (error) {
           console.error('reader-bot: learner_state write-back failed')
-          await answer('Mining failed on my side — try again.')
+          await answer(bt(lang, 'mine.failedToast'))
           return
         }
         await logEvent(link.user_id, 'word_mined', {
@@ -1341,13 +1277,17 @@ serve(async (req: Request) => {
         })
       }
 
-      await answer(added > 0 ? `Mined ${added} word${added === 1 ? '' : 's'}.` : 'Nothing new to mine.')
+      await answer(
+        added > 0
+          ? bt(lang, added === 1 ? 'mine.toastOne' : 'mine.toastMany', { count: added })
+          : bt(lang, 'mine.toastNone'),
+      )
       await sendMessage(
         botToken,
         chatId,
         added > 0
-          ? `⛏ ${added} word${added === 1 ? '' : 's'} joined your review queue — they will surface in your sessions, with this passage's sentence on the card.`
-          : 'Nothing new to mine — you already know, or have already queued, every bolded word in that passage.',
+          ? bt(lang, added === 1 ? 'mine.addedOne' : 'mine.addedMany', { count: added })
+          : bt(lang, 'mine.nothingNew'),
       )
     }
 
@@ -1369,15 +1309,16 @@ serve(async (req: Request) => {
       // exactly the same standard.
       const link = Number.isFinite(chatId) ? await linkByChat(chatId) : null
       if (!link || Number(from.id) !== chatId) {
-        await answer('This chat is not linked to a Yonde account.')
+        await answer(bt('en', 'common.notLinkedToast'))
         return
       }
+      const lang = await langForUser(link.user_id)
 
       if (choice === 'none') {
         // 'Not sure' is a complete answer: no declaration is stored,
         // and the passage arrives via the starter track.
-        await answer('No problem — we start easy.')
-        await handleRead(chatId, { fromLevelTap: true, forceStarter: true })
+        await answer(bt(lang, 'level.noneToast'))
+        await handleRead(chatId, { fromLevelTap: true, forceStarter: true, lang })
         return
       }
       // 'N7' is a real answer too (amendment #7): the learners' own
@@ -1396,7 +1337,7 @@ serve(async (req: Request) => {
         .eq('user_id', link.user_id)
       if (error) {
         console.error('reader-bot: declared band write failed')
-        await answer('That did not save on my side — try again.')
+        await answer(bt(lang, 'common.saveFailedToast'))
         return
       }
       // The shared declaration contract (amendment #7): mirror the
@@ -1423,8 +1364,8 @@ serve(async (req: Request) => {
       // The metric carries the RAW value, N7 included.
       await logEvent(link.user_id, 'level_declared', { band: choice })
       if (choice === 'N7') {
-        await answer('N7+ 😂 — noted')
-        await sendMessage(botToken, chatId, N7_JOKE_REPLY)
+        await answer(bt(lang, 'level.n7Toast'))
+        await sendMessage(botToken, chatId, bt(lang, 'n7.jokeReply'))
         // The gentlest start, served like Not sure: the starter
         // track, immediately. Foundations pace (derived in
         // knownFor) governs everything after this first serve.
@@ -1433,15 +1374,16 @@ serve(async (req: Request) => {
           forceStarter: true,
           declaredBand: 'N7',
           declaredAt: declaredAtIso,
+          lang,
         })
         return
       }
-      await answer(`${choice} — got it.`)
+      await answer(bt(lang, 'level.bandToast', { band: choice }))
       // Serve immediately through the normal /read flow: the tap
       // should feel like the passage just arrives. If nothing fits
       // even with the declared credit, the normal nothing-fits copy
       // follows — the declaration is saved either way.
-      await handleRead(chatId, { fromLevelTap: true, declaredBand: choice, declaredAt: declaredAtIso })
+      await handleRead(chatId, { fromLevelTap: true, declaredBand: choice, declaredAt: declaredAtIso, lang })
     }
 
     // ---------- feedback callback (adaptive fit, amendment #4) ----------
@@ -1468,9 +1410,20 @@ serve(async (req: Request) => {
       // to exactly the same standard.
       const link = Number.isFinite(chatId) ? await linkByChat(chatId) : null
       if (!link || Number(from.id) !== chatId) {
-        await answer('This chat is not linked to a Yonde account.')
+        await answer(bt('en', 'common.notLinkedToast'))
         return
       }
+
+      // Foundations pace (amendment #7): an N7 declarer's ratchet
+      // needs double the proof — the pace is derived from the same
+      // resolveBand choke point as everything else. The state row
+      // loaded here for the pace ALSO resolves this tap's language
+      // (amendment #11): one read, both answers.
+      const paceRow = await loadState(link.user_id)
+      const paceState = (paceRow?.state ?? {}) as Record<string, unknown>
+      const lang = languageFromState(paceState)
+      const { pace } = knownFor(paceState, declaredOf(link))
+      const comfyTarget = pace === 'foundations' ? FOUNDATIONS_COMFY_TARGET : undefined
 
       // One feedback tap per passage is enough: the first tap for a
       // passage id counts, later ones are acknowledged and dropped.
@@ -1485,17 +1438,10 @@ serve(async (req: Request) => {
         .limit(100)
       const priorPayloads = (priorRows || []).map((r) => r.payload as Record<string, unknown>)
       if (hasFeedbackFor(priorPayloads, passageId)) {
-        await answer('Already noted ✓')
+        await answer(bt(lang, 'feedback.alreadyNoted'))
         return
       }
 
-      // Foundations pace (amendment #7): an N7 declarer's ratchet
-      // needs double the proof — the pace is derived from the same
-      // resolveBand choke point as everything else.
-      const paceRow = await loadState(link.user_id)
-      const paceState = (paceRow?.state ?? {}) as Record<string, unknown>
-      const { pace } = knownFor(paceState, declaredOf(link))
-      const comfyTarget = pace === 'foundations' ? FOUNDATIONS_COMFY_TARGET : undefined
       const after = applyFeedback(
         {
           fit_step: link.fit_step ?? 0,
@@ -1515,7 +1461,7 @@ serve(async (req: Request) => {
         .eq('user_id', link.user_id)
       if (error) {
         console.error('reader-bot: fit state write failed')
-        await answer('That did not save on my side — try again.')
+        await answer(bt(lang, 'common.saveFailedToast'))
         return
       }
       await logEvent(link.user_id, 'reading_feedback', {
@@ -1525,26 +1471,26 @@ serve(async (req: Request) => {
       })
 
       if (kind === 'read') {
-        await answer('Logged ✓')
+        await answer(bt(lang, 'feedback.logged'))
         if (after.effect === 'trial_up') {
           // The ratchet just fired: the step was proven comfortable
           // AND the fit trials up one. Hori says so out loud — a
           // silent difficulty jump would read as the bot drifting,
           // and the way back is named in the same breath. The count
           // word follows the pace that was actually applied.
-          await sendMessage(botToken, chatId, trialUpCopy(streakWordFor(comfyTarget)))
+          await sendMessage(botToken, chatId, botTrialUpCopy(lang, comfyTarget))
         }
       } else if (kind === 'up') {
-        await answer(after.effect === 'max' ? 'Already at full stretch' : '🔥 Pushing you')
+        await answer(after.effect === 'max' ? bt(lang, 'feedback.pushMax') : bt(lang, 'feedback.pushing'))
         // CONTINUATION (2026-11-06 late): a push is a request for
         // the harder passage, not for a promise of one — serve it
         // now, at the step just written. At 'max' nothing moved, so
         // there is nothing new to serve: the toast alone is honest.
         if (after.effect !== 'max') {
-          await handleRead(chatId)
+          await handleRead(chatId, { lang })
         }
       } else if (kind === 'hard') {
-        await answer('Stepping back to your level')
+        await answer(bt(lang, 'feedback.stepBack'))
         // THE OVERSHOOT PROTOCOL (Doc 16 §5 amendment #4): the step
         // has already returned to last_good_step above — the
         // previous known level, never a crash below it. What the
@@ -1575,7 +1521,7 @@ serve(async (req: Request) => {
         //      crossed their queue and it was STILL too hard — the
         //      original honest line: the difficulty was register,
         //      not vocabulary, and no word list can show it.
-        let explainBlock = 'It ran ahead of the words you know — that one is on me, not on you.'
+        let explainBlock = bt(lang, 'feedback.explainFallback')
         if (passage) {
           const stateRow = await loadState(link.user_id)
           const fbState = (stateRow?.state ?? {}) as Record<string, unknown>
@@ -1590,7 +1536,7 @@ serve(async (req: Request) => {
             .filter((c) => c.word && !known.has(c.h || c.word))
           if (unknownCands.length > 0) {
             const wordLines = capCandidates(unknownCands).map((c) => lineFor(c.word, c.reading, c.meaning))
-            explainBlock = `What was in it — the new words that made it a stretch:\n${wordLines.join('\n')}`
+            explainBlock = bt(lang, 'feedback.explainCandidates', { lines: wordLines.join('\n') })
           } else {
             const queueSet = buildKnownSet(queue)
             const unmetHeads = unknownContentHeadwords(passage.tokens, queueSet)
@@ -1619,14 +1565,14 @@ serve(async (req: Request) => {
             const top = items.slice(0, 12)
             if (top.length > 0) {
               const wordLines = top.map((it) => lineFor(it.word, it.reading, it.meaning))
-              explainBlock = `What was in it — the words in it that have not crossed your queue yet:\n${wordLines.join('\n')}`
+              explainBlock = bt(lang, 'feedback.explainUnmet', { lines: wordLines.join('\n') })
             }
           }
         }
         const parts = [
-          '🔍 Sorry — I got ahead of myself with that one.',
+          bt(lang, 'feedback.apology'),
           explainBlock,
-          'We are back at the level that fits you, and it will harden again gradually — a little stretch at a time, never a leap.',
+          bt(lang, 'feedback.closing'),
         ]
         await sendMessage(botToken, chatId, parts.join('\n\n'))
         // CONTINUATION (2026-11-06 late): the gracious return must
@@ -1635,7 +1581,7 @@ serve(async (req: Request) => {
         // fitted at the stepped-back state just written — arrives
         // now, as this tap's own answer. If nothing can be served,
         // handleRead's own copy says so: never silence.
-        await handleRead(chatId)
+        await handleRead(chatId, { lang })
       }
     }
 
@@ -1807,9 +1753,10 @@ serve(async (req: Request) => {
       // in the linked private chat, from the person who owns it.
       const link = Number.isFinite(chatId) ? await linkByChat(chatId) : null
       if (!link || Number(vFrom.id) !== chatId) {
-        if (Number.isFinite(chatId)) await sendMessage(botToken, chatId, LINK_EXPLAINER)
+        if (Number.isFinite(chatId)) await sendMessage(botToken, chatId, bt('en', 'link.explainer'))
         return
       }
+      const lang = await langForUser(link.user_id)
 
       // The current passage: the LATEST passage_sent for this
       // learner inside the last 24h (the same metrics-lookup
@@ -1825,7 +1772,7 @@ serve(async (req: Request) => {
         .limit(1)
       const currentId = (sentRows?.[0]?.payload as Record<string, unknown> | undefined)?.passageId
       if (typeof currentId !== 'string' || !currentId) {
-        await sendMessage(botToken, chatId, '🔍 No passage from me in the last day to read back — send /read first, then read the passage aloud back to me. Your voice is the receipt.')
+        await sendMessage(botToken, chatId, bt(lang, 'voice.noPassage'))
         return
       }
       const { data: passage } = await supabaseAdmin
@@ -1834,7 +1781,7 @@ serve(async (req: Request) => {
         .eq('id', currentId)
         .maybeSingle()
       if (!passage) {
-        await sendMessage(botToken, chatId, '🔍 That passage is no longer on my shelf, so I cannot take your reading of it — send /read and read the new one aloud back to me.')
+        await sendMessage(botToken, chatId, bt(lang, 'voice.passageGone'))
         return
       }
 
@@ -1859,35 +1806,30 @@ serve(async (req: Request) => {
         })
         const missedWord = scored.missed ? String(scored.missed.word ?? '') : ''
         const fixLine = scored.missed && missedWord
-          ? "\n\nNao's one fix — the first new word your voice skipped: " +
-            `<b>${esc(missedWord)}</b>` +
-            (scored.missed.reading && scored.missed.reading !== scored.missed.word
+          ? bt(lang, 'voice.fix', {
+            word: `<b>${esc(missedWord)}</b>`,
+            readingSuffix: scored.missed.reading && scored.missed.reading !== scored.missed.word
               ? `（${esc(String(scored.missed.reading))}）`
-              : '') +
-            (scored.missed.meaning ? ` — ${esc(String(scored.missed.meaning))}` : '') +
-            `.\nIt lives in this sentence: 「${esc(sentenceWith(String(passage.text), missedWord))}」 — say that sentence once more, with the word in it.`
+              : '',
+            meaningSuffix: scored.missed.meaning ? ` — ${esc(String(scored.missed.meaning))}` : '',
+            sentence: esc(sentenceWith(String(passage.text), missedWord)),
+          })
           : ''
         if (scored.score >= READ_ALOUD_PASS_SCORE) {
           const voiceEffect = await applyVoiceReadEffect(link, currentId, 'voice')
           await sendMessage(
             botToken,
             chatId,
-            `🔍 Heard you — reading match: ${pct}% of the passage text your voice covered. ` +
-              'That is a match against the text, not a pronunciation grade — and at that level it counts here as a comfortable read, proven out loud.' +
-              fixLine,
+            bt(lang, 'voice.matchPass', { pct }) + fixLine,
           )
           if (voiceEffect.trialUp) {
-            await sendMessage(botToken, chatId, trialUpCopy(streakWordFor(voiceEffect.target)))
+            await sendMessage(botToken, chatId, botTrialUpCopy(lang, voiceEffect.target))
           }
         } else {
           await sendMessage(
             botToken,
             chatId,
-            `🔍 Heard you — reading match: ${pct}% of the passage text your voice covered. ` +
-              'That is a match against the text, not a pronunciation grade. ' +
-              'It sits under the line where a read counts as comfortable, so nothing is marked — reads here only ever add up, never against you. ' +
-              'Read it once more when you feel like it — hold the microphone and send another voice note whenever you\'re ready.' +
-              fixLine,
+            bt(lang, 'voice.matchBelow', { pct }) + fixLine,
           )
         }
         return
@@ -1906,8 +1848,8 @@ serve(async (req: Request) => {
           botToken,
           chatId,
           durationSec > win.maxSec
-            ? '🔍 That ran long for this passage — a reading that long is usually the passage twice, or a pause in the middle. Once through, out loud, at your own pace is the receipt I can count.'
-            : '🔍 That was quick for this passage — shorter than a read-aloud of it runs. Read it aloud once through, then hold the microphone and send another voice note — your voice is the receipt.',
+            ? bt(lang, 'voice.durationLong')
+            : bt(lang, 'voice.durationQuick'),
         )
         return
       }
@@ -1921,12 +1863,10 @@ serve(async (req: Request) => {
       await sendMessage(
         botToken,
         chatId,
-        '🔍 Heard you — that is a real read, proven out loud, and it counts here as one. ' +
-          'What I cannot do yet is score it word by word: that arrives when transcription joins. ' +
-          'Until then, your voice is the receipt — and the fit treats it exactly like one.',
+        bt(lang, 'voice.durationPlausible'),
       )
       if (voiceEffect.trialUp) {
-        await sendMessage(botToken, chatId, trialUpCopy(streakWordFor(voiceEffect.target)))
+        await sendMessage(botToken, chatId, botTrialUpCopy(lang, voiceEffect.target))
       }
     }
 
@@ -2172,27 +2112,29 @@ serve(async (req: Request) => {
           // gets the explainer.
           const link = await linkByChat(chatId)
           if (!link) {
-            await sendMessage(botToken, chatId, LINK_EXPLAINER)
+            await sendMessage(botToken, chatId, bt('en', 'link.explainer'))
           } else {
             const row = await loadState(link.user_id)
             const state = (row?.state ?? {}) as Record<string, unknown>
+            // The language rides the state row just loaded — no
+            // second read for the status reply (amendment #11).
+            const lang = languageFromState(state)
             const { band, bandSource, joke } = knownFor(state, declaredOf(link))
             const basisLine =
               bandSource === 'diagnosis'
-                ? `I fit your reading to your checkup level, ${band}.`
+                ? bt(lang, 'start.basisDiagnosis', { band })
                 : bandSource === 'declared' && joke
-                  ? 'You told me N7+ 😂 — so we are building from the very beginning, at an easy pace.'
+                  ? bt(lang, 'start.basisDeclaredJoke')
                   : bandSource === 'declared'
-                    ? `I fit your reading to the ${band} you told me.`
-                    : 'You have not told me your level yet — /level asks in one tap.'
+                    ? bt(lang, 'start.basisDeclared', { band })
+                    : bt(lang, 'start.basisNone')
             await sendMessage(
               botToken,
               chatId,
-              `🔍 Hori here — this chat IS linked to your Yonde.\n${basisLine}\n` +
-                'Send /read any time for a passage at your level. Everything you mine lands in your one review queue in Yonde.',
+              bt(lang, 'start.status', { basis: basisLine }),
               {
-                reply_markup: appKeyboard([
-                  [{ text: 'Send Me a Passage', callback_data: 'door:read' }],
+                reply_markup: appKeyboard(lang, [
+                  [{ text: bt(lang, 'start.sendPassage'), callback_data: 'door:read' }],
                 ]),
               },
             )
@@ -2206,7 +2148,7 @@ serve(async (req: Request) => {
             .maybeSingle()
           const unexpired = pending && (!pending.link_expires_at || new Date(pending.link_expires_at as string) > new Date())
           if (!unexpired) {
-            await sendMessage(botToken, chatId, 'That link has expired or was already used. In Yonde → Fleet → Yonde Reader on Telegram, tap Connect Telegram for a fresh one.')
+            await sendMessage(botToken, chatId, bt('en', 'link.expired'))
           } else {
             const { error } = await supabaseAdmin
               .from('telegram_links')
@@ -2228,9 +2170,15 @@ serve(async (req: Request) => {
               .is('chat_id', null)
             if (error) {
               console.error('reader-bot: link claim failed')
-              await sendMessage(botToken, chatId, 'Linking failed on my side — try the fresh link from the app once more.')
+              await sendMessage(botToken, chatId, bt('en', 'link.failed'))
             } else {
-              await sendMessage(botToken, chatId, WELCOME, { reply_markup: appKeyboard() })
+              // Post-claim language (amendment #11): the claimed
+              // user's state row may already carry a language
+              // slice — resolve from it when it does; a user whose
+              // app has not synced a choice yet hears English
+              // until it does. No slice is ever written here.
+              const claimLang = await langForUser(pending.user_id as string)
+              await sendMessage(botToken, chatId, bt(claimLang, 'welcome'), { reply_markup: appKeyboard(claimLang) })
             }
           }
         }
@@ -2240,11 +2188,13 @@ serve(async (req: Request) => {
         // The typed door (amendment #7): the whole app, one tap —
         // the chat stays the reading shelf; sessions, the checkup
         // and Koe's calls live in Yonde itself.
+        const appLink = await linkByChat(chatId)
+        const appLang = await langForLink(appLink)
         await sendMessage(
           botToken,
           chatId,
-          'Your whole Yonde is one tap away — sessions, the checkup, Koe\'s calls, and your queue live in the app. This chat stays your reading shelf.',
-          { reply_markup: appKeyboard() },
+          bt(appLang, 'app.reply'),
+          { reply_markup: appKeyboard(appLang) },
         )
       } else if (cmd === '/level') {
         // Re-opens the one-tap question at any time (Doc 16 §5
@@ -2253,13 +2203,14 @@ serve(async (req: Request) => {
         // there is no row to declare onto.
         const link = await linkByChat(chatId)
         if (!link) {
-          await sendMessage(botToken, chatId, LINK_EXPLAINER)
+          await sendMessage(botToken, chatId, bt('en', 'link.explainer'))
         } else {
           const row = await loadState(link.user_id)
           const state = (row?.state ?? {}) as Record<string, unknown>
+          const lang = languageFromState(state)
           const { band, bandSource, joke } = knownFor(state, declaredOf(link))
-          await sendMessage(botToken, chatId, levelIntro(bandSource, bandSource === 'none' ? null : band, joke), {
-            reply_markup: levelKeyboard(),
+          await sendMessage(botToken, chatId, botLevelIntro(lang, bandSource, bandSource === 'none' ? null : band, joke), {
+            reply_markup: levelKeyboard(bt(lang, 'level.notSure')),
           })
         }
       } else if (cmd === '/unlink') {
@@ -2268,15 +2219,25 @@ serve(async (req: Request) => {
           .update({ chat_id: null, telegram_user_id: null, username: null, linked_at: null })
           .eq('chat_id', chatId)
           .select('user_id')
+        // The confirmation speaks the language the account had
+        // chosen — resolved from the just-unlinked user's state
+        // row (the slice survives unlinking; only the chat link
+        // was cleared). A chat that was never linked hears
+        // English.
+        const unlinkLang = cleared && cleared.length > 0
+          ? await langForUser(String(cleared[0].user_id))
+          : 'en'
         await sendMessage(
           botToken,
           chatId,
           cleared && cleared.length > 0
-            ? 'Unlinked. This chat will not receive Yonde Reader messages. Your queue and everything you mined stay in Yonde, untouched.'
-            : 'This chat is not linked to a Yonde account, so there was nothing to unlink.',
+            ? bt(unlinkLang, 'unlink.done')
+            : bt('en', 'unlink.notLinked'),
         )
       } else {
-        await sendMessage(botToken, chatId, HELP, { reply_markup: appKeyboard() })
+        const helpLink = await linkByChat(chatId)
+        const helpLang = await langForLink(helpLink)
+        await sendMessage(botToken, chatId, bt(helpLang, 'help'), { reply_markup: appKeyboard(helpLang) })
       }
     } catch (err) {
       console.error('reader-bot: message handling failed', err)

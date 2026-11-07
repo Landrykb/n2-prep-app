@@ -1437,11 +1437,120 @@ console.log('fit v2 — encounters, seen kanji, dose band, batch recycle (amendm
   })
 
   check('the passage message teaches the voice gesture (amendment #10)', () => {
+    // Amendment #11 moved the copy into i18n.ts: the EN catalog
+    // carries the gesture lines byte-identically, and index.ts
+    // composes them through the catalog keys.
+    const cat = readFileSync(new URL('../supabase/functions/reader-bot/i18n.ts', import.meta.url), 'utf8')
     const src = readFileSync(new URL('../supabase/functions/reader-bot/index.ts', import.meta.url), 'utf8')
-    assert.ok(src.includes('hold the microphone button below, read the whole passage'), 'passage instruction line')
-    assert.ok((src.match(/VOICE_INSTRUCTION/g) || []).length >= 2, 'instruction is composed into the passage send')
-    assert.ok(src.includes('🎙 Voice read: after a passage, hold the microphone button'), 'HELP explains the voice read')
-    assert.ok(src.includes('hold the microphone and send another voice note'), 'score replies name the gesture')
+    assert.ok(cat.includes('hold the microphone button below, read the whole passage'), 'passage instruction line')
+    assert.ok(src.includes("bt(lang, 'voice.instruction')"), 'instruction is composed into the passage send')
+    assert.ok(cat.includes('🎙 Voice read: after a passage, hold the microphone button'), 'HELP explains the voice read')
+    assert.ok(cat.includes('hold the microphone and send another voice note'), 'score replies name the gesture')
+  })
+}
+
+
+// ---------- bot i18n (Doc 16 §5 amendment #11) ----------
+// The bot speaks the linked user's app language. The catalogs
+// live in the function's own i18n.ts (Deno module world — the web
+// catalogs are deliberately NOT reused); language resolution
+// reads the synced learner-state document's language slice and
+// nothing else.
+const botI18n = await import('../supabase/functions/reader-bot/i18n.ts')
+{
+  const { BOT_CATALOGS, bt, botFittedFooter, botLevelIntro, botTrialUpCopy, languageFromState, languageFromStateRow } = botI18n
+
+  check('bot i18n: catalog parity — same key set, non-empty, in all three languages', () => {
+    const enKeys = Object.keys(BOT_CATALOGS.en).sort()
+    assert.ok(enKeys.length > 0)
+    for (const lang of ['fr', 'ja']) {
+      assert.deepEqual(Object.keys(BOT_CATALOGS[lang]).sort(), enKeys, lang)
+    }
+    for (const [lang, catalog] of Object.entries(BOT_CATALOGS)) {
+      for (const [key, value] of Object.entries(catalog)) {
+        assert.equal(typeof value, 'string', `${lang}:${key}`)
+        assert.ok(value.length > 0, `${lang}:${key} is empty`)
+      }
+    }
+  })
+
+  check('bot i18n: resolution reads the language slice — fr/ja resolve, missing or bad falls back to en', () => {
+    assert.equal(languageFromStateRow({ state: { language: { lang: 'fr', at: '2026-11-07T00:00:00Z' } } }), 'fr')
+    assert.equal(languageFromStateRow({ state: { language: { lang: 'ja', at: '2026-11-07T00:00:00Z' } } }), 'ja')
+    assert.equal(languageFromStateRow({ state: { language: { lang: 'en', at: '2026-11-07T00:00:00Z' } } }), 'en')
+    assert.equal(languageFromStateRow({ state: {} }), 'en', 'no slice')
+    assert.equal(languageFromStateRow({ state: { language: { lang: 'xx', at: 'x' } } }), 'en', 'bad value')
+    assert.equal(languageFromStateRow({ state: { language: 'fr' } }), 'en', 'malformed slice')
+    assert.equal(languageFromStateRow(null), 'en', 'no row')
+    assert.equal(languageFromStateRow(undefined), 'en')
+    assert.equal(languageFromState(null), 'en')
+    assert.equal(languageFromState({ language: { lang: 'fr' } }), 'fr')
+  })
+
+  check('bot i18n: bt interpolates, falls back to EN, then to the key', () => {
+    assert.equal(bt('fr', 'level.bandToast', { band: 'N3' }), 'N3 — compris.')
+    assert.equal(bt('xx', 'level.notSure'), 'Not sure', 'unknown lang falls back to EN')
+    assert.equal(bt('fr', 'no.such.key'), 'no.such.key', 'unknown key surfaces itself')
+  })
+
+  check('bot i18n: EN snapshots — the pinned strings are byte-identical to the pre-i18n bot', () => {
+    assert.equal(
+      bt('en', 'welcome'),
+      '🔍 Linked — Hori here, your Miner in Yonde.\n' +
+        'Send /read any time and I will dig up a short passage fitted to the words you actually know. ' +
+        'New words come <b>bold</b>, and one tap mines them into your review queue.\n' +
+        'No streaks, no nagging — reading when you feel like it is the whole design.',
+    )
+    assert.equal(
+      bt('en', 'voice.instruction'),
+      '🎙 <b>Read it out loud:</b> hold the microphone button below, read the whole passage, and let go to send — I listen and answer with your reading match.',
+    )
+    assert.equal(botLevelIntro('en', 'none', null), bt('en', 'level.ask'))
+    assert.equal(
+      botTrialUpCopy('en'),
+      '🔍 Three comfortable reads in a row — that level is properly yours now. ' +
+        'The next passage stretches a little past it; that is the fit hardening, one notch at a time. ' +
+        'If it overshoots, Too Hard brings us straight back.',
+    )
+    assert.equal(
+      botFittedFooter('en', { bandSource: 'diagnosis', band: 'N2', pct: 95, newWordCount: 3 }),
+      'Fitted to your N2 level and your queue: about 95% of its words should already be familiar (an estimate) · 3 new words',
+    )
+    assert.equal(
+      botFittedFooter('en', { bandSource: 'declared', band: 'N3', pct: 94, newWordCount: 1, fitStep: 1, basisBand: 'N3', newKanjiCount: 1, recycledBatch: true }),
+      'Fitted to the N3 you told me and your queue: about 94% of its words should already be familiar (an estimate) · 1 new word' +
+        '\nYour checkup in Yonde sharpens this whenever you want it.' +
+        '\nStretching you a little past N3 today — Push Me works both ways: Too Hard brings us back.' +
+        '\n1 kanji here is new to you — it is in the readings block, and it will keep coming back until it is yours.' +
+        '\nThis one practises the batch you are learning now — the same words again, in new sentences, until they are yours.',
+    )
+  })
+
+  check('bot i18n: FR render — translated furniture, the passage text itself untouched', () => {
+    const passageText = '今日は学校へ行きます。友達と国語の授業を受けます。'
+    const footer = botFittedFooter('fr', {
+      bandSource: 'diagnosis', band: 'N2', pct: 95, newWordCount: 3, newKanjiCount: 2,
+    })
+    const composed = `${passageText}\n\n${footer}\n\n${bt('fr', 'voice.instruction')}`
+    assert.ok(footer.startsWith('Ajusté à ton niveau N2'), 'FR footer names the basis')
+    assert.ok(footer.includes('3 nouveaux mots'), 'FR footer counts the new words')
+    assert.ok(footer.includes('2 kanji ici sont nouveaux pour toi'), 'FR footer carries the dose line')
+    assert.ok(bt('fr', 'voice.instruction').includes('maintiens le bouton microphone'), 'FR instruction teaches the gesture')
+    assert.ok(composed.includes(passageText), 'the Japanese passage text is byte-identical inside the FR message')
+    assert.equal(bt('ja', 'voice.instruction').includes('マイクボタン'), true, 'JA instruction teaches the gesture')
+  })
+
+  check('bot i18n: the level keyboard localises ONLY the Not sure label — callback data is byte-identical', () => {
+    const frKb = port.levelKeyboard('Je ne sais pas')
+    assert.deepEqual(fit.levelKeyboard('Je ne sais pas'), frKb, 'twins agree on the localised keyboard')
+    const flat = (kb) => kb.inline_keyboard.flat()
+    assert.deepEqual(
+      flat(frKb).map((b) => b.callback_data),
+      flat(port.levelKeyboard()).map((b) => b.callback_data),
+      'callback payloads unchanged by localisation',
+    )
+    assert.equal(flat(frKb).at(-1).text, 'Je ne sais pas')
+    assert.equal(flat(port.levelKeyboard()).at(-1).text, 'Not sure', 'default stays English')
   })
 }
 
