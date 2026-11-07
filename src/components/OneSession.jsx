@@ -15,6 +15,7 @@ import { recordMetric } from '../lib/metrics.js'
 import { getPlanFor, markPlanConsumed, noteSessionForExperiment } from '../lib/planner.js'
 import Mascot from './Mascot.jsx'
 import TtsButton from './TtsButton.jsx'
+import { speakSenseiLine } from '../lib/neuralVoice.js'
 import KanjiTapText from './KanjiTapText.jsx'
 import { useLanguage } from '../hooks/useLanguage.js'
 
@@ -108,14 +109,24 @@ export default function OneSession({ setActive }) {
     const rec = new SR()
     recogRef.current = rec
     rec.lang = 'ja-JP'; rec.interimResults = false; rec.maxAlternatives = 1
-    rec.onresult = (e) => { setInput(e.results[0][0].transcript || ''); setListening(false); setMicError(null) }
+    rec.onresult = (e) => {
+      const transcript = e.results[0][0].transcript || ''
+      setInput(transcript)
+      setListening(false)
+      setMicError(null)
+      // More automatic (Landry, 2026-11-07: "too much taps"): a
+      // spoken attempt checks ITSELF the moment the transcript
+      // lands — no separate Check Me tap after speaking. The
+      // button stays for typed text.
+      if (transcript.trim()) checkScene(transcript)
+    }
     rec.onerror = (e) => { setListening(false); setMicError(micErrorCopy(e?.error)) }
     rec.onend = () => setListening(false)
     setListening(true)
     try { rec.start() } catch { setListening(false) }
   }
-  const checkScene = () => {
-    const text = input.trim()
+  const checkScene = (textOverride) => {
+    const text = (typeof textOverride === 'string' ? textOverride : input).trim()
     if (!text) return
     const score = bestScore(text, scene)
     const missing = missingPhrases(text, scene)
@@ -123,6 +134,12 @@ export default function OneSession({ setActive }) {
     const best = Math.max(state.sceneBest || 0, score)
     recordVoiceAttempt({ scene, text, score, missing })
     setLastAttempt({ text, score, missing })
+    // And the fix speaks itself: below mastery, Nao's model line
+    // plays on its own (the neural chain; a refused autoplay just
+    // stays silent and the speaker button is still there).
+    if (score < MASTERY && scene.model) {
+      try { speakSenseiLine(scene.model) } catch { /* best effort */ }
+    }
     patch({ sceneAttempts: attempts, sceneBest: best, sceneDone: state.sceneDone || score >= MASTERY })
     if (score >= MASTERY && attempts > 1 && !(state.sceneBest >= MASTERY)) {
       // Mastered after getting it wrong first: the mistake joins the queue.
@@ -283,7 +300,7 @@ export default function OneSession({ setActive }) {
               <button onClick={startListening} disabled={!speechSupported || listening} className="px-3 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] disabled:opacity-40 text-white text-xs font-medium flex items-center gap-1.5">
                 {listening ? <MicOff size={14} /> : <Mic size={14} />} {listening ? t('call.listeningBtn') : t('voice.speak')}
               </button>
-              <button onClick={checkScene} disabled={!input.trim()} className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-medium">{t('voice.checkMe')}</button>
+              <button onClick={() => checkScene()} disabled={!input.trim()} className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-medium">{t('voice.checkMe')}</button>
             </div>
           </div>
           {micError && (
@@ -311,7 +328,7 @@ export default function OneSession({ setActive }) {
                   </div>
                   {lastAttempt.missing.length > 0 && <p className="text-sm text-amber-200">{t('call.missing', { words: lastAttempt.missing.join('、') })}</p>}
                   <p className="text-xs text-slate-400">{scene.commonError}</p>
-                  <button onClick={() => setInput('')} className="px-3 py-1.5 rounded-lg bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-xs font-medium flex items-center gap-1"><RotateCcw size={13} /> {t('voice.sayAgain')}</button>
+                  <button onClick={() => { setInput(''); setLastAttempt(null); startListening() }} className="px-3 py-1.5 rounded-lg bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-xs font-medium flex items-center gap-1"><RotateCcw size={13} /> {t('voice.sayAgain')}</button>
                 </>
               )}
             </div>

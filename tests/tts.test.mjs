@@ -229,4 +229,22 @@ await acheck('edgeTts: cancelBrowserSynthesis aborts an in-flight synthesis', as
   })
 }
 
+// ---------- One Session scene flow: fewer taps (2026-11-07) ----------
+// Landry: "too much taps — more automatic." A spoken attempt
+// checks itself when the transcript lands, the model line plays
+// on its own below mastery, and Say It Again restarts the mic in
+// the same tap. Each removed round is also one less webview
+// microphone prompt (iOS re-asks per recognition round in the
+// Telegram webview — the app cannot hold the grant, so it asks
+// as rarely as the flow allows).
+{
+  const { readFileSync } = await import('node:fs')
+  const os = readFileSync(new URL('../src/components/OneSession.jsx', import.meta.url), 'utf8')
+  check('OneSession: spoken attempts auto-check, model auto-plays, retry is one tap', () => {
+    assert.ok(os.includes('if (transcript.trim()) checkScene(transcript)'), 'transcript auto-checks')
+    assert.ok(os.includes('speakSenseiLine(scene.model)'), 'model line auto-plays below mastery')
+    assert.ok(os.includes("setLastAttempt(null); startListening()"), 'Say It Again restarts listening in one tap')
+  })
+}
+
 console.log(`\ntts: ${passed} checks passed`)
