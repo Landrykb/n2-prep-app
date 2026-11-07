@@ -360,17 +360,19 @@ await acheck('edgeTts: cancelBrowserSynthesis aborts an in-flight synthesis', as
 // imitate that voice. Every item carries an audio path, the file
 // exists and is non-trivial, playback goes through playAudioFile,
 // and every surface that renders a script passes the file along.
-check('every listening item carries a real pre-rendered audio file', async () => {
-  const { existsSync, statSync } = await import('node:fs')
+check('every listening item carries its pre-rendered audio URL', async () => {
+  const { LISTENING_AUDIO_SLUGS } = await import('../scripts/build-listening-audio-manifest.mjs')
   const { n2Listening } = await import('../src/data/n2Listening.js')
   const { listeningPlus } = await import('../src/data/listeningPlus.js')
   const items = [...listeningPlus, ...n2Listening]
   assert.equal(items.length, 13)
   for (const item of items) {
-    assert.ok(item.audio && item.audio.startsWith('/audio/listening/'), `${item.title} carries its audio path`)
-    const path = new URL(`../public${item.audio}`, import.meta.url)
-    assert.ok(existsSync(path), `${item.title}'s file exists`)
-    assert.ok(statSync(path).size > 20000, `${item.title}'s file is a real recording`)
+    const slug = LISTENING_AUDIO_SLUGS[item.title]
+    assert.ok(slug, `${item.title} has a manifest slug`)
+    // The files live in the public listening-audio Storage
+    // bucket (the push route is UTF-8 text — binaries cannot
+    // ride it); the URL names the manifest slug, nothing else.
+    assert.ok(item.audio && item.audio.endsWith(`/listening-audio/${slug}.ogg`), `${item.title}'s audio URL names its slug`)
   }
 })
 check('the file route is wired: player, button, and the three surfaces', async () => {

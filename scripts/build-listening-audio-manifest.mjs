@@ -50,4 +50,8 @@ const manifest = items.map((item) => {
   }
 })
 
-console.log(JSON.stringify(manifest, null, 1))
+// Print only when run as the generator; importers (the test
+// suite) take LISTENING_AUDIO_SLUGS silently.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  console.log(JSON.stringify(manifest, null, 1))
+}

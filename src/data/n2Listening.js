@@ -1,7 +1,7 @@
 export const n2Listening = [
   {
     title: '会社での打ち合わせ',
-    audio: '/audio/listening/kaisha-uchiawase.ogg',
+    audio: 'https://rcckuxwvqgtyvovwpxaw.supabase.co/storage/v1/object/public/listening-audio/kaisha-uchiawase.ogg',
     level: 'N2',
     script: '男：来週の会議の資料は揃いましたか。\n女：はい、ほとんどできていますが、最新の売上データがまだ届いていません。\n男：それはいつ届きそうですか。\n女：明日の朝には担当の営業から送ってもらえるはずです。\n男：わかりました。それを反映させて、来週月曜日の朝までには必ず印刷して配布してください。\n女：かしこまりました。',
     questions: [
@@ -29,7 +29,7 @@ export const n2Listening = [
   },
   {
     title: '不動産屋で',
-    audio: '/audio/listening/fudosan-ya.ogg',
+    audio: 'https://rcckuxwvqgtyvovwpxaw.supabase.co/storage/v1/object/public/listening-audio/fudosan-ya.ogg',
     level: 'N2',
     script: '男：このマンション、駅から徒歩7分で、南向きの部屋ですね。\n女：はい、そしてペットも一匹まで飼えます。ただし、建物の裏側は工事中で、来月まで少し騒音がするかもしれません。\n男：そうですか。家賃はいくらですか。\n女：月9万円で、共益費と駐輪場代を含みます。\n男：駐車場はありますか。\n女：はい、空きは一つだけあります。月1万5千円が追加になります。',
     questions: [
@@ -57,7 +57,7 @@ export const n2Listening = [
   },
   {
     title: 'レストランの予約',
-    audio: '/audio/listening/restaurant-yoyaku.ogg',
+    audio: 'https://rcckuxwvqgtyvovwpxaw.supabase.co/storage/v1/object/public/listening-audio/restaurant-yoyaku.ogg',
     level: 'N2',
     script: '女：あのう、来週金曜日の夜、5名で予約をお願いしたいのですが。\n男：かしこまりました。何時からのご予約ですか。\n女：19時でお願いします。\n男：申し訳ございませんが、19時は満席でして。18時半か20時半でしたらお席をご用意できますが。\n女：そうですか。では、20時半でお願いします。\n男：かしこまりました。コースのご予約でよろしいでしょうか。\n女：はい、6千円のコースをお願いします。',
     questions: [
