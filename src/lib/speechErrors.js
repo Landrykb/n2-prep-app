@@ -7,6 +7,10 @@
 // "stop listening, say nothing" — a Speak button that silently did
 // nothing, forever, for anyone who had once tapped Block.
 //
+// Each copy also carries its i18n keys (Doc 20, mic.*): surfaces
+// with a language context render t(titleKey)/t(bodyKey); the EN
+// title/body stay as the data fallback for surfaces without one.
+//
 // 'aborted' returns null on purpose: that is the user (or the app)
 // stopping recognition deliberately, and silence is correct there.
 
@@ -15,21 +19,25 @@ export function micErrorCopy(kind) {
     case 'not-allowed':
     case 'service-not-allowed':
       return {
+        titleKey: 'mic.blockedTitle', bodyKey: 'mic.blockedBody',
         title: 'The microphone is blocked',
         body: 'Your browser is not letting Yonde use the microphone. To allow it: open the site settings from the icon beside the address bar, set Microphone to Allow, then tap Speak again. Until then, typing your answer works exactly the same — nothing is lost.',
       }
     case 'audio-capture':
       return {
+        titleKey: 'mic.noneTitle', bodyKey: 'mic.noneBody',
         title: 'No microphone found',
         body: 'This device does not seem to have a working microphone right now. Typing your answer works exactly the same — nothing is lost.',
       }
     case 'no-speech':
       return {
+        titleKey: 'mic.noSpeechTitle', bodyKey: 'mic.noSpeechBody',
         title: 'I didn\'t catch that',
         body: 'No speech came through. Try once more, a little closer to the microphone or somewhere quieter — or type your answer instead.',
       }
     case 'network':
       return {
+        titleKey: 'mic.networkTitle', bodyKey: 'mic.networkBody',
         title: 'Speech recognition needs a connection',
         body: 'Your browser turns speech into text with an online service, and it could not be reached. Typing your answer works exactly the same.',
       }
@@ -37,6 +45,7 @@ export function micErrorCopy(kind) {
       return null
     default:
       return {
+        titleKey: 'mic.stoppedTitle', bodyKey: 'mic.stoppedBody',
         title: 'Listening stopped',
         body: 'Something interrupted the microphone. Tap Speak to try again, or type your answer — typing counts the same.',
       }

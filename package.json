@@ -21,6 +21,7 @@
     "build:wordsdb": "node scripts/build-wordsdb.mjs",
     "build:french": "node scripts/build-french-merge.mjs",
     "test:wordsdb": "TZ=UTC node tests/wordsdb.test.mjs",
+    "test:i18n": "TZ=UTC node tests/i18n.test.mjs",
     "build:families": "node scripts/build-families.mjs",
     "build:variants": "node scripts/build-variants.mjs",
     "build:sentences": "node scripts/build-sentences.mjs"

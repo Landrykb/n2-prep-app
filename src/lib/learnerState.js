@@ -3,7 +3,7 @@
 // cloud sync (stateSync.js) in the same shape the merge logic
 // (stateMerge.js) consumes:
 //
-//   { queue, profile, diagnosis, diagnosisHistory, promise, declaredLevel, encounters }
+//   { queue, profile, diagnosis, diagnosisHistory, promise, declaredLevel, encounters, language }
 //
 // Local storage stays the offline source of truth; this module only
 // reads/writes the existing keys. Diagnosis history writes go through
@@ -17,6 +17,7 @@ import { ENCOUNTERS_KEY, collectEncounterWords } from './encounters.js'
 
 export const DIAGNOSIS_HISTORY_KEY = 'jpn:diagnosisHistory:v1'
 export const DECLARED_LEVEL_KEY = 'jpn:declaredLevel:v1'
+export const LANGUAGE_KEY = 'jpn:language:v1'
 export const STATE_SYNCED_EVENT = 'jpn:state-synced'
 
 export function loadDiagnosisHistory() {
@@ -49,6 +50,33 @@ export function saveDeclaredLevel(band) {
   return record
 }
 
+// The UI language (Doc 20): { lang: 'en'|'fr'|'ja', at: <ISO> } — the
+// same single-document contract as declaredLevel. Per-user and
+// account-bound: the choice rides the synced state document, so it
+// follows the account to every device; the localStorage key doubles
+// as the instant-boot mirror the LanguageProvider reads first.
+// No stored choice → null → the UI is English, exactly as before.
+export const LANGUAGE_IDS = ['en', 'fr', 'ja']
+
+export function loadLanguage() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(LANGUAGE_KEY) || 'null')
+    return parsed && LANGUAGE_IDS.includes(parsed.lang) ? parsed : null
+  } catch { return null }
+}
+
+/** Record a language choice (validated) and notify the save-event
+ *  bus so stateSync pushes the new state document. */
+export function saveLanguage(lang) {
+  if (!LANGUAGE_IDS.includes(lang)) return loadLanguage()
+  const record = { lang, at: new Date().toISOString() }
+  try {
+    localStorage.setItem(LANGUAGE_KEY, JSON.stringify(record))
+    emitLearnerStateSaved()
+  } catch { /* storage unavailable — the choice simply stays unset */ }
+  return record
+}
+
 export function collectLearnerState() {
   return {
     queue: loadQueue(),
@@ -61,6 +89,7 @@ export function collectLearnerState() {
     // (encounters.js) — the server-side fit reads them from this
     // same document and grants them full proven credit.
     encounters: collectEncounterWords(),
+    language: loadLanguage(),
   }
 }
 
@@ -72,6 +101,7 @@ const SLICE_KEYS = [
   ['promise', PROMISE_KEY],
   ['declaredLevel', DECLARED_LEVEL_KEY],
   ['encounters', ENCOUNTERS_KEY],
+  ['language', LANGUAGE_KEY],
 ]
 
 /** Write a (merged) state document back to the local keys, verbatim —

@@ -105,9 +105,10 @@ export function mergeEncounters(localWords, otherWords) {
 
 /**
  * Merge two learner-state documents ({ queue, profile, diagnosis,
- * diagnosisHistory, promise, declaredLevel, encounters }). Returns a
- * new document; inputs untouched. declaredLevel is a single document
- * like the others — the newer declaration (its `at`) wins whole.
+ * diagnosisHistory, promise, declaredLevel, encounters, language }).
+ * Returns a new document; inputs untouched. declaredLevel and
+ * language are single documents like the others — the newer one
+ * (its `at`) wins whole.
  * Encounters union (above): met words are never un-met by a merge.
  */
 export function mergeLearnerState(local, other) {
@@ -120,6 +121,7 @@ export function mergeLearnerState(local, other) {
     diagnosisHistory: mergeDiagnosisHistory(L.diagnosisHistory, O.diagnosisHistory),
     promise: pickDoc(L.promise, O.promise, (d) => d.at),
     declaredLevel: pickDoc(L.declaredLevel, O.declaredLevel, (d) => d.at),
+    language: pickDoc(L.language, O.language, (d) => d.at),
     encounters: mergeEncounters(L.encounters, O.encounters),
   }
 }

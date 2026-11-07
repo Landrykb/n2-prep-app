@@ -6,10 +6,12 @@ import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { AuthProvider } from './contexts/AuthContext.jsx'
 import { KanjiModalProvider } from './contexts/KanjiModalContext.jsx'
 import { FuriganaProvider } from './contexts/FuriganaContext.jsx'
+import { LanguageProvider } from './contexts/LanguageContext.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <AuthProvider>
+      <LanguageProvider>
       <FuriganaProvider>
         <KanjiModalProvider>
           <ErrorBoundary>
@@ -17,6 +19,7 @@ createRoot(document.getElementById('root')).render(
           </ErrorBoundary>
         </KanjiModalProvider>
       </FuriganaProvider>
+      </LanguageProvider>
     </AuthProvider>
   </StrictMode>,
 )
