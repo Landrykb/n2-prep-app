@@ -12,6 +12,11 @@
 
 export const TELEGRAM_BRIDGE_STORAGE_PREFIX = 'yonde:telegram-auth:'
 
+// TEMPORARY DIAGNOSTICS build tag (2026-11-07): shown on the
+// sign-in screen inside Telegram so a screenshot proves which
+// bundle the webview actually ran. Remove with the diag code.
+export const DIAG_BUILD = 'diag3'
+
 export function getTelegramInitData(source) {
   const webApp = source?.Telegram?.WebApp ?? globalThis.window?.Telegram?.WebApp
   return typeof webApp?.initData === 'string' ? webApp.initData : ''
@@ -65,7 +70,7 @@ async function runTelegramBridge({ client, currentSession, initData, fetchImpl }
   const env = import.meta.env ?? {}
   const supabaseUrl = typeof env.VITE_SUPABASE_URL === 'string' ? env.VITE_SUPABASE_URL.replace(/\/+$/, '') : ''
   const anonKey = typeof env.VITE_SUPABASE_ANON_KEY === 'string' ? env.VITE_SUPABASE_ANON_KEY : ''
-  if (!client || !supabaseUrl || !anonKey) return 'failed'
+  if (!client || !supabaseUrl || !anonKey) return 'failed:config'
 
   let session = currentSession
   if (session === undefined) {
@@ -73,20 +78,28 @@ async function runTelegramBridge({ client, currentSession, initData, fetchImpl }
     session = data?.session ?? null
   }
 
-  const response = await fetchImpl(`${supabaseUrl}/functions/v1/telegram-auth`, {
-    method: 'POST',
-    headers: {
-      apikey: anonKey,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ initData }),
-  })
+  // Failure statuses carry their stage (temporary diagnostics,
+  // 2026-11-07): fetch / httpNNN / shape / otp. Success and
+  // decision values are unchanged.
+  let response
+  try {
+    response = await fetchImpl(`${supabaseUrl}/functions/v1/telegram-auth`, {
+      method: 'POST',
+      headers: {
+        apikey: anonKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ initData }),
+    })
+  } catch {
+    return 'failed:fetch'
+  }
 
   if (response.status === 403) {
     const body = await response.json().catch(() => null)
-    return body?.error === 'not_linked' ? 'not-linked' : 'failed'
+    return body?.error === 'not_linked' ? 'not-linked' : 'failed:http403'
   }
-  if (!response.ok) return 'failed'
+  if (!response.ok) return `failed:http${response.status}`
 
   const body = await response.json().catch(() => null)
   const decision = telegramBridgeDecision({
@@ -96,7 +109,7 @@ async function runTelegramBridge({ client, currentSession, initData, fetchImpl }
   })
   if (decision === 'already') return 'already'
   if (decision !== 'bridge' || typeof body?.token_hash !== 'string' || !body.token_hash) {
-    return 'failed'
+    return 'failed:shape'
   }
 
   // Installed @supabase/supabase-js 2.109.0 types VerifyTokenHashParams
@@ -105,7 +118,7 @@ async function runTelegramBridge({ client, currentSession, initData, fetchImpl }
     token_hash: body.token_hash,
     type: 'magiclink',
   })
-  if (error || !data?.session || data.session.user?.id !== body.user_id) return 'failed'
+  if (error || !data?.session || data.session.user?.id !== body.user_id) return 'failed:otp'
   return 'bridged'
 }
 
@@ -164,7 +177,7 @@ export function bridgeTelegramSession(options = {}) {
       if (digest) {
         markerKey = `${TELEGRAM_BRIDGE_STORAGE_PREFIX}${digest}`
         const previous = readAttemptMarker(storage, markerKey)
-        if (previous) return previous === 'attempted' ? 'failed' : previous
+        if (previous) return previous === 'attempted' ? 'failed:attempted' : previous
         writeAttemptMarker(storage, markerKey, 'attempted')
       }
 
