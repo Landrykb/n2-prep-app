@@ -29,17 +29,16 @@
 //                  (payload.count, else 1 per event), call_outcome
 //                  kept. Nothing older is ever folded in.
 
+import { t as translate } from './i18n.js'
+import { modeLabel } from './modes.js'
+
 export const LOOP_ORDER = ['michi', 'saki', 'koe', 'nao', 'hori', 'tsuku']
 
-const MODE_LABELS = {
-  surge: 'Surge',
-  cruise: 'Cruise',
-  slump: 'Slump',
-  badweek: 'Bad Week',
-  event: 'Event Approach',
-}
-
-const plural = (n, one, many) => (n === 1 ? one : many)
+// I18N ROUND 2: every stat/detail string composes through a translator.
+// Callers with a language pass `tr` (GrowthLoop passes the UI translator);
+// callers without one (the node tests, other lib code) get English — the
+// EN catalog values are byte-identical to the pre-catalogue literals.
+const enTr = (key, vars) => translate('en', key, vars)
 
 /**
  * Per-agent live stat + "in your loop right now" detail.
@@ -52,15 +51,16 @@ const plural = (n, one, many) => (n === 1 ? one : many)
  */
 export function agentLoopStats({ twin, metrics = [], tomorrowPlan = null, topPattern = null, workingLevel = null, tr = null } = {}) {
   const t = twin || {}
+  const T = tr || enTr
   const events = Array.isArray(metrics) ? metrics : []
   const vocab = t.vocab || {}
   const bySource = vocab.bySource || {}
 
   const diagnoses = events.filter((e) => e.type === 'diagnosis_completed').length
-  const modeLabel = MODE_LABELS[t.mode] || 'Cruise'
+  const modeLbl = modeLabel(t.mode || 'cruise', T)
   const michiDetail = workingLevel?.band
-    ? `Mode: ${modeLabel} · working level ${workingLevel.band} (an estimate, from your activity)`
-    : `Mode: ${modeLabel}`
+    ? T('loop.stat.modeWorking', { mode: modeLbl, band: workingLevel.band })
+    : T('loop.stat.mode', { mode: modeLbl })
 
   const kept = t.rhythm?.callsKept || 0
   const attempts = t.speaking?.attempts || 0
@@ -73,16 +73,16 @@ export function agentLoopStats({ twin, metrics = [], tomorrowPlan = null, topPat
   const fromMining = bySource.mining || 0
   const mined = fromReader + fromMining
   const horiParts = []
-  if (fromReader > 0) horiParts.push(`${fromReader} from the Reader`)
-  if (fromMining > 0) horiParts.push(`${fromMining} from your documents`)
+  if (fromReader > 0) horiParts.push(T('loop.stat.fromReader', { n: fromReader }))
+  if (fromMining > 0) horiParts.push(T('loop.stat.fromMining', { n: fromMining }))
 
   return {
     michi: {
-      stat: diagnoses > 0 ? `${diagnoses} ${plural(diagnoses, 'checkup', 'checkups')} read` : null,
+      stat: diagnoses > 0 ? T(diagnoses === 1 ? 'loop.stat.checkupOne' : 'loop.stat.checkupMany', { n: diagnoses }) : null,
       detail: michiDetail,
     },
     saki: {
-      stat: tomorrowPlan ? `~${tomorrowPlan.minutes} min planned for tomorrow` : null,
+      stat: tomorrowPlan ? T('loop.stat.plannedTomorrow', { minutes: tomorrowPlan.minutes }) : null,
       // The plan line resolves from its catalog keys when a translator
       // is passed (GrowthLoop); otherwise the stored English note —
       // the record of the plan — is shown as-is.
@@ -93,18 +93,18 @@ export function agentLoopStats({ twin, metrics = [], tomorrowPlan = null, topPat
     },
     koe: {
       stat: kept > 0
-        ? `${kept} ${plural(kept, 'call', 'calls')} taken`
+        ? T(kept === 1 ? 'loop.stat.callsTakenOne' : 'loop.stat.callsTakenMany', { n: kept })
         : attempts > 0
-          ? `${attempts} speaking ${plural(attempts, 'attempt', 'attempts')}`
+          ? T(attempts === 1 ? 'loop.stat.speakingOne' : 'loop.stat.speakingMany', { n: attempts })
           : null,
-      detail: mastered > 0 ? `${mastered} ${plural(mastered, 'scene', 'scenes')} mastered in Voice Loop` : null,
+      detail: mastered > 0 ? T(mastered === 1 ? 'loop.stat.scenesMasteredOne' : 'loop.stat.scenesMasteredMany', { n: mastered }) : null,
     },
     nao: {
-      stat: slips > 0 ? `${slips} ${plural(slips, 'slip', 'slips')} spotted` : null,
-      detail: topPattern?.label ? `Your current one fix: ${topPattern.label}` : null,
+      stat: slips > 0 ? T(slips === 1 ? 'loop.stat.slipsOne' : 'loop.stat.slipsMany', { n: slips }) : null,
+      detail: topPattern?.label ? T('loop.stat.oneFix', { label: topPattern.label }) : null,
     },
     hori: {
-      stat: mined > 0 ? `${mined} words mined into your queue` : null,
+      stat: mined > 0 ? T(mined === 1 ? 'loop.stat.wordsMinedOne' : 'loop.stat.wordsMinedMany', { n: mined }) : null,
       detail: horiParts.length ? horiParts.join(' · ') : null,
     },
     // No honest local count exists for foundry output (see header).
@@ -124,10 +124,10 @@ export function loopCentre(twin) {
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 const TILE_ORDER = [
-  { id: 'proof', label: 'Proof Points' },
-  { id: 'minutes', label: 'Minutes Of Practice' },
-  { id: 'mined', label: 'Words Mined' },
-  { id: 'calls', label: 'Calls Taken' },
+  { id: 'proof', label: 'Proof Points', labelKey: 'loop.tile.proof' },
+  { id: 'minutes', label: 'Minutes Of Practice', labelKey: 'loop.tile.minutes' },
+  { id: 'mined', label: 'Words Mined', labelKey: 'loop.tile.mined' },
+  { id: 'calls', label: 'Calls Taken', labelKey: 'loop.tile.calls' },
 ]
 
 /**
@@ -158,6 +158,6 @@ export function weekStrip(metrics = [], now = new Date()) {
   const tiles = TILE_ORDER
     .filter((t) => sums[t.id] > 0)
     .slice(0, 3)
-    .map((t) => ({ id: t.id, label: t.label, value: sums[t.id] }))
+    .map((t) => ({ id: t.id, label: t.label, labelKey: t.labelKey, value: sums[t.id] }))
   return { tiles, hasData: tiles.length > 0, sums }
 }

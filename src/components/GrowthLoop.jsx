@@ -238,7 +238,7 @@ export default function GrowthLoop({ setActive }) {
                 <span className="text-sm font-semibold text-white leading-none">
                   {m.name} <span style={{ color: m.color }}>{m.kanji}</span>
                 </span>
-                <span className="text-[11px] text-slate-400 leading-none">{m.role}</span>
+                <span className="text-[11px] text-slate-400 leading-none">{m.roleKey ? t(m.roleKey) : m.role}</span>
                 {st.stat && (
                   <span
                     className="text-[11px] font-medium leading-tight text-center rounded-full px-2 py-0.5 mt-0.5"
@@ -261,9 +261,9 @@ export default function GrowthLoop({ setActive }) {
           <div>
             <h3 className="text-lg font-bold text-white">
               {sel.name} <span style={{ color: sel.color }}>{sel.kanji}</span>
-              <span className="text-sm font-medium text-slate-400"> · {sel.role}</span>
+              <span className="text-sm font-medium text-slate-400"> · {sel.roleKey ? t(sel.roleKey) : sel.role}</span>
             </h3>
-            <p className="text-sm text-slate-300">{sel.job}</p>
+            <p className="text-sm text-slate-300">{sel.jobKey ? t(sel.jobKey) : sel.job}</p>
           </div>
         </div>
         <div className="space-y-2 text-sm">
@@ -295,10 +295,10 @@ export default function GrowthLoop({ setActive }) {
         <h3 className="text-base font-semibold text-white">{t('loop.week.title')}</h3>
         {week.hasData ? (
           <div className="grid grid-cols-3 gap-3">
-            {week.tiles.map((t) => (
-              <div key={t.id} className="rounded-xl bg-white/[0.03] border border-white/5 px-3 py-3 text-center">
-                <p className="text-2xl font-bold text-white">{t.value}</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">{t.label}</p>
+            {week.tiles.map((tile) => (
+              <div key={tile.id} className="rounded-xl bg-white/[0.03] border border-white/5 px-3 py-3 text-center">
+                <p className="text-2xl font-bold text-white">{tile.value}</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">{tile.labelKey ? t(tile.labelKey) : tile.label}</p>
               </div>
             ))}
           </div>

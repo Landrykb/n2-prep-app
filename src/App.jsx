@@ -744,7 +744,7 @@ function KanjiDetail({ item, showBack, setShowBack }) {
 
           {item.storyFr && (
             <div className="rounded-xl bg-bun-700/30 border border-bun-600/20 p-4 mb-6">
-              <h3 className="text-sm font-bold text-cyan-300 mb-2">Histoire (FR)</h3>
+              <h3 className="text-sm font-bold text-cyan-300 mb-2">{t('lessons.storyFrTitle')}</h3>
               <KanjiTapText text={item.storyFr} className="text-slate-300 text-sm" />
             </div>
           )}
@@ -806,7 +806,7 @@ function GrammarDetail({ item, showBack, setShowBack }) {
 
           {item.sceneFr && (
             <div className="rounded-xl bg-bun-700/30 border border-bun-600/20 p-4 mb-6">
-              <h3 className="text-sm font-bold text-cyan-300 mb-2">Scénario (FR)</h3>
+              <h3 className="text-sm font-bold text-cyan-300 mb-2">{t('lessons.sceneFrTitle')}</h3>
               <KanjiTapText text={item.sceneFr} className="text-slate-300 text-sm" />
             </div>
           )}
@@ -852,7 +852,7 @@ function VocabDetail({ item, showBack, setShowBack }) {
 
           {item.storyFr && (
             <div className="rounded-xl bg-bun-700/30 border border-bun-600/20 p-4 mb-6">
-              <h3 className="text-sm font-bold text-cyan-300 mb-2">Image mémorielle (FR)</h3>
+              <h3 className="text-sm font-bold text-cyan-300 mb-2">{t('lessons.memoryFrTitle')}</h3>
               <KanjiTapText text={item.storyFr} className="text-slate-300 text-sm" />
             </div>
           )}
@@ -874,6 +874,7 @@ function VocabDetail({ item, showBack, setShowBack }) {
 }
 
 function Drills() {
+  const { t } = useLanguage()
   const { user } = useAuth()
   const [mode, setMode] = useState('daily')
   const [filter, setFilter] = useState('all')
@@ -928,7 +929,7 @@ function Drills() {
 
   useEffect(() => { setIndex(0); setSelected(null); setAnswered(false); setScore(0); setFinished(false) }, [mode, filter])
 
-  if (pool.length === 0) return <div className="text-center py-20 text-slate-400"><p>No questions in this filter yet.</p></div>
+  if (pool.length === 0) return <div className="text-center py-20 text-slate-400"><p>{t('legacy.drills.emptyFilter')}</p></div>
   const question = pool[index]
 
   const handleSelect = (i) => {
@@ -1000,11 +1001,11 @@ function Drills() {
     return (
       <div className='max-w-2xl mx-auto text-center py-12 animate-fade-in'>
         <div className='w-20 h-20 mx-auto rounded-full bg-bun-700 flex items-center justify-center text-4xl mb-6'>{pct >= 70 ? '🎉' : '🔥'}</div>
-        <h2 className='text-3xl font-bold text-white mb-2'>Daily 10 Complete</h2>
-        <p className='text-lg text-slate-300 mb-6'>{daily.score || 0} / {pool.length} correct · {pct}%</p>
+        <h2 className='text-3xl font-bold text-white mb-2'>{t('legacy.drills.completeDaily')}</h2>
+        <p className='text-lg text-slate-300 mb-6'>{t('legacy.drills.scoreLine', { score: daily.score || 0, total: pool.length, pct })}</p>
         <div className='h-3 w-64 mx-auto rounded-full bg-bun-700 overflow-hidden mb-8'><div className={`h-full ${pct >= 70 ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: pct + '%' }} /></div>
         <div className='flex justify-center gap-4'>
-          <button onClick={() => { setMode('free'); setFilter('all') }} className='px-6 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-medium transition'>Free Practice</button>
+          <button onClick={() => { setMode('free'); setFilter('all') }} className='px-6 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-medium transition'>{t('legacy.drills.freePractice')}</button>
         </div>
       </div>
     )
@@ -1015,15 +1016,15 @@ function Drills() {
     return (
       <div className="max-w-2xl mx-auto text-center py-12 animate-fade-in">
         <div className="w-20 h-20 mx-auto rounded-full bg-bun-700 flex items-center justify-center text-4xl mb-6">{pct >= 70 ? '🎉' : '🔥'}</div>
-        <h2 className='text-3xl font-bold text-white mb-2'>{mode === 'daily' ? 'Daily 10 Complete' : 'Drill Complete'}</h2>
-        <p className="text-lg text-slate-300 mb-6">{score} / {pool.length} correct · {pct}%</p>
+        <h2 className='text-3xl font-bold text-white mb-2'>{mode === 'daily' ? t('legacy.drills.completeDaily') : t('legacy.drills.completeDrill')}</h2>
+        <p className="text-lg text-slate-300 mb-6">{t('legacy.drills.scoreLine', { score, total: pool.length, pct })}</p>
         <div className="h-3 w-64 mx-auto rounded-full bg-bun-700 overflow-hidden mb-8"><div className={`h-full ${pct >= 70 ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: pct + '%' }} /></div>
         <div className="flex justify-center gap-4">
-          <button onClick={restart} className="px-6 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-medium transition"><RotateCcw size={16} className="inline mr-2" /> Retry</button>
+          <button onClick={restart} className="px-6 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-medium transition"><RotateCcw size={16} className="inline mr-2" /> {t('legacy.drills.retry')}</button>
           {mode === 'free' ? (
-            <button onClick={() => setFilter('all')} className='px-6 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-white font-medium transition'>All Questions</button>
+            <button onClick={() => setFilter('all')} className='px-6 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-white font-medium transition'>{t('legacy.drills.allQuestions')}</button>
           ) : (
-            <button onClick={() => setMode('free')} className='px-6 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-white font-medium transition'>Free Practice</button>
+            <button onClick={() => setMode('free')} className='px-6 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-white font-medium transition'>{t('legacy.drills.freePractice')}</button>
           )}
         </div>
       </div>
@@ -1034,16 +1035,16 @@ function Drills() {
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className='flex items-center gap-3 flex-wrap'>
-          <h2 className='text-2xl font-bold text-white'>Drills</h2>
-          <span className='text-xs text-slate-500 hidden sm:inline'>{mode === 'daily' ? 'Daily 10' : 'Free Practice'}</span>
+          <h2 className='text-2xl font-bold text-white'>{t('legacy.drills.title')}</h2>
+          <span className='text-xs text-slate-500 hidden sm:inline'>{mode === 'daily' ? t('legacy.drills.daily10') : t('legacy.drills.freePractice')}</span>
           <div className='flex p-1 rounded-lg bg-bun-700/40 border border-bun-600/30'>
             {['daily', 'free'].map((m) => (
               <button
                 key={m}
                 onClick={() => setMode(m)}
-                className={`px-3 py-1 rounded-md text-xs font-medium capitalize transition ${mode === m ? 'bg-[#FF6B57] text-white' : 'text-slate-400 hover:text-white'}`}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition ${mode === m ? 'bg-[#FF6B57] text-white' : 'text-slate-400 hover:text-white'}`}
               >
-                {m}
+                {m === 'daily' ? t('legacy.drills.modeDaily') : t('legacy.drills.modeFree')}
               </button>
             ))}
           </div>
@@ -1051,16 +1052,16 @@ function Drills() {
         <div className="flex items-center gap-2 text-sm">
           <Filter size={16} className="text-slate-400" />
           {['all', 'vocabulary', 'grammar'].map((f) => (
-            <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1 rounded-lg border transition capitalize ${filter === f ? 'bg-[#FF6B57]/20 border-[#FF6B57]/50 text-[#FFA08D]' : 'bg-bun-700/40 border-bun-600/30 text-slate-400 hover:text-white'}`}>{f}</button>
+            <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1 rounded-lg border transition ${filter === f ? 'bg-[#FF6B57]/20 border-[#FF6B57]/50 text-[#FFA08D]' : 'bg-bun-700/40 border-bun-600/30 text-slate-400 hover:text-white'}`}>{f === 'all' ? t('legacy.drills.filterAll') : f === 'vocabulary' ? t('legacy.drills.filterVocabulary') : t('legacy.drills.filterGrammar')}</button>
           ))}
         </div>
       </div>
       <div className="h-2 w-full rounded-full bg-bun-700 overflow-hidden"><div className="h-full bg-gradient-to-r from-[#71368A] to-cyan-500 transition-all" style={{ width: ((index + (answered ? 1 : 0)) / pool.length) * 100 + '%' }} /></div>
       <div className="rounded-3xl glass p-6 sm:p-8 card-glow">
-        <div className='flex items-center justify-between mb-4'><span className='text-sm text-slate-400'>{question.type} · {question.format}</span><span className='text-sm text-slate-400'>{mode === 'daily' ? 'Daily 10 · ' : ''}{index + 1} / {pool.length}</span></div>
+        <div className='flex items-center justify-between mb-4'><span className='text-sm text-slate-400'>{question.type} · {question.format}</span><span className='text-sm text-slate-400'>{mode === 'daily' ? t('legacy.drills.dailyPrefix') : ''}{index + 1} / {pool.length}</span></div>
         <div className="rounded-2xl bg-bun-700/40 border border-bun-600/20 p-5 mb-6">
           <KanjiTapText text={question.prompt} className="text-lg text-slate-100" />
-          {question.target && <p className="text-sm text-[#FF8A75] mt-3">Target: 「<KanjiTapText text={question.target} className="text-[#FF8A75]" />」</p>}
+          {question.target && <p className="text-sm text-[#FF8A75] mt-3">{t('legacy.drills.targetLabel')} 「<KanjiTapText text={question.target} className="text-[#FF8A75]" />」</p>}
         </div>
         <div className="grid sm:grid-cols-2 gap-3 mb-6">
           {question.options.map((opt, i) => {
@@ -1081,7 +1082,7 @@ function Drills() {
           <div className="rounded-2xl bg-gradient-to-r from-[#71368A]/30 to-[#FF6B57]/20 border border-[#FF6B57]/20 p-5 mb-6 animate-fade-in">
             <div className="flex items-center gap-2 mb-2">
               {question.options[selected].correct ? <CheckCircle2 size={18} className="text-emerald-400" /> : <XCircle size={18} className="text-rose-400" />}
-              <span className="font-bold text-white">{question.options[selected].correct ? 'Correct' : 'Not quite'}</span>
+              <span className="font-bold text-white">{question.options[selected].correct ? t('legacy.drills.correct') : t('legacy.drills.notQuite')}</span>
             </div>
             <KanjiTapText text={question.explanation} className="text-slate-300" />
             <p className="text-sm text-slate-400 mt-2"><KanjiTapText text={question.hint} className="text-slate-400" /></p>
@@ -1091,14 +1092,14 @@ function Drills() {
           <div className="flex items-center justify-between">
             {!question.options[selected].correct && (
               <button onClick={tryAgain} className="px-6 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-slate-200 font-medium transition flex items-center gap-2">
-                <RotateCcw size={16} /> Try again
+                <RotateCcw size={16} /> {t('legacy.drills.tryAgain')}
               </button>
             )}
-            <button onClick={next} className="ml-auto px-6 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-medium transition">{index + 1 === pool.length ? 'Finish' : 'Next'}</button>
+            <button onClick={next} className="ml-auto px-6 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-medium transition">{index + 1 === pool.length ? t('legacy.drills.finish') : t('legacy.drills.next')}</button>
           </div>
         )}
       </div>
-      <p className="text-center text-sm text-slate-500">Score: {score} / {index + (answered ? 1 : 0)}</p>
+      <p className="text-center text-sm text-slate-500">{t('legacy.drills.scoreFooter', { score, answered: index + (answered ? 1 : 0) })}</p>
     </div>
   )
 }
@@ -1111,6 +1112,7 @@ const resourceIcon = {
 }
 
 function Resources() {
+  const { t } = useLanguage()
   const [playing, setPlaying] = useState(null)
   const byCategory = resources.reduce((acc, r) => {
     acc[r.category] = [...(acc[r.category] || []), r]
@@ -1119,7 +1121,7 @@ function Resources() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-white">N2 Resource Library</h2>
+      <h2 className="text-2xl font-bold text-white">{t('legacy.resources.title')}</h2>
       {Object.entries(byCategory).map(([cat, list]) => (
         <div key={cat}>
           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">{cat}</h3>
@@ -1136,7 +1138,7 @@ function Resources() {
                         <Play size={28} className="ml-1" />
                       </div>
                     </div>
-                    <p className="absolute bottom-0 inset-x-0 p-2 text-[10px] text-slate-300 bg-gradient-to-t from-black/70 to-transparent">Click to watch in focus</p>
+                    <p className="absolute bottom-0 inset-x-0 p-2 text-[10px] text-slate-300 bg-gradient-to-t from-black/70 to-transparent">{t('legacy.resources.watchHint')}</p>
                   </button>
                 )}
                 <div className="flex items-start justify-between mb-3">
@@ -1162,6 +1164,7 @@ function Resources() {
 }
 
 function ReadingView() {
+  const { t } = useLanguage()
   const [sub, setSub] = useState('passages')
   const [active, setActive] = useState(0)
   const [answered, setAnswered] = useState([])
@@ -1196,10 +1199,10 @@ function ReadingView() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <h2 className="text-2xl font-bold text-white">Daily Reading</h2>
+        <h2 className="text-2xl font-bold text-white">{t('legacy.reading.title')}</h2>
         <div className="flex p-1 rounded-xl bg-bun-700/60 border border-bun-600/40">
           {['passages', 'strategy'].map((s) => (
-            <button key={s} onClick={() => setSub(s)} className={`px-4 py-2 rounded-lg text-sm font-medium transition capitalize ${sub === s ? 'bg-[#FF6B57] text-white shadow' : 'text-slate-400 hover:text-white'}`}>{s}</button>
+            <button key={s} onClick={() => setSub(s)} className={`px-4 py-2 rounded-lg text-sm font-medium transition ${sub === s ? 'bg-[#FF6B57] text-white shadow' : 'text-slate-400 hover:text-white'}`}>{s === 'passages' ? t('legacy.reading.tabPassages') : t('legacy.reading.tabStrategy')}</button>
           ))}
         </div>
       </div>
@@ -1211,7 +1214,7 @@ function ReadingView() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Type a kanji, reading, or meaning to see its image..."
+              placeholder={t('legacy.reading.searchPlaceholder')}
               className="w-full rounded-xl bg-bun-800 border border-bun-600/40 pl-10 pr-4 py-3 text-slate-100 placeholder-slate-500 focus:border-[#FF6B57] focus:outline-none"
             />
             {query && results.length > 0 && (
@@ -1237,20 +1240,20 @@ function ReadingView() {
                 className={`text-left rounded-2xl p-4 border transition ${active === i ? 'bg-[#FF6B57]/15 border-[#FF6B57]/40' : 'bg-bun-800/60 border-bun-600/30 hover:border-bun-500/40'}`}
               >
                 <p className="font-semibold text-white text-sm">{p.title}</p>
-                <p className="text-xs text-slate-400 mt-1">{p.level} · {p.time} min</p>
+                <p className="text-xs text-slate-400 mt-1">{t('legacy.reading.cardMeta', { level: p.level, time: p.time })}</p>
               </button>
             ))}
           </div>
 
           <div className="rounded-3xl glass p-6 sm:p-8 card-glow">
             <h3 className="text-xl font-bold text-white mb-2">{passage.title}</h3>
-            <p className="text-xs text-slate-400 mb-6">{passage.level} · target time {passage.time} min</p>
+            <p className="text-xs text-slate-400 mb-6">{t('legacy.reading.targetTime', { level: passage.level, time: passage.time })}</p>
 
             <div className="rounded-2xl bg-bun-700/40 border border-bun-600/20 p-6 mb-8 leading-loose text-lg text-slate-100">
               <Furigana text={passage.text} glossary={passage.glossary} />
             </div>
 
-            <h4 className="text-sm font-bold text-[#FF8A75] mb-3 flex items-center gap-2"><Brain size={16} /> Visual Glossary — click a word to see its image</h4>
+            <h4 className="text-sm font-bold text-[#FF8A75] mb-3 flex items-center gap-2"><Brain size={16} /> {t('legacy.reading.glossaryTitle')}</h4>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
               {passage.glossary.map((g, i) => (
                 <div key={i} className="group rounded-xl bg-bun-700/40 border border-bun-600/30 p-4 hover:border-[#FF6B57]/40 transition">
@@ -1267,7 +1270,7 @@ function ReadingView() {
               ))}
             </div>
 
-            <h4 className="text-sm font-bold text-cyan-300 mb-3">Passage Questions</h4>
+            <h4 className="text-sm font-bold text-cyan-300 mb-3">{t('legacy.reading.questionsTitle')}</h4>
             <div className="space-y-5">
               {passage.questions.map((q, qi) => (
                 <div key={qi} className="rounded-2xl bg-bun-700/30 border border-bun-600/20 p-5">
@@ -1316,17 +1319,13 @@ function ReadingView() {
             ))}
           </div>
           <div className="rounded-3xl glass p-6 card-glow">
-            <h3 className="text-lg font-bold text-white mb-4">Suggested Timing Targets</h3>
+            <h3 className="text-lg font-bold text-white mb-4">{t('legacy.reading.timingTitle')}</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
-                <thead className="text-slate-500 border-b border-bun-600/30"><tr><th className="py-2 pr-6">Passage</th><th className="py-2 pr-6">Questions</th><th className="py-2 pr-6">Time</th><th className="py-2">Focus</th></tr></thead>
+                <thead className="text-slate-500 border-b border-bun-600/30"><tr><th className="py-2 pr-6">{t('legacy.reading.thPassage')}</th><th className="py-2 pr-6">{t('legacy.reading.thQuestions')}</th><th className="py-2 pr-6">{t('legacy.reading.thTime')}</th><th className="py-2">{t('legacy.reading.thFocus')}</th></tr></thead>
                 <tbody className="text-slate-300">
-                  {[
-                    ['Short', '2', '3 min total', 'Question stem first'],
-                    ['Medium', '3', '9 min total', 'Thematic shifts'],
-                    ['Long', '2', '9 min total', 'Intro & conclusion'],
-                  ].map((row, i) => (
-                    <tr key={i} className="border-b border-bun-600/20 last:border-0">{row.map((cell, j) => <td key={j} className="py-2 pr-6">{cell}</td>)}</tr>
+                  {['short', 'medium', 'long'].map((rowId) => (
+                    <tr key={rowId} className="border-b border-bun-600/20 last:border-0">{[1, 2, 3, 4].map((j) => <td key={j} className="py-2 pr-6">{t(`legacy.reading.cell.${rowId}.${j}`)}</td>)}</tr>
                   ))}
                 </tbody>
               </table>
@@ -1339,27 +1338,28 @@ function ReadingView() {
 }
 
 function StudyPlan({ daysToExam }) {
+  const { t } = useLanguage()
   const activeStage = daysToExam > 120 ? 1 : daysToExam > 60 ? 2 : 3
   const weekFocus = daysToExam > 120
-    ? 'Learn 20 new kanji/vocab + 5 grammar patterns per week. Do not worry about speed yet.'
+    ? t('legacy.plan.focus1')
     : daysToExam > 90
-    ? 'Shift to pattern recognition. Drill 30 questions a day and review every wrong answer.'
+    ? t('legacy.plan.focus2')
     : daysToExam > 45
-    ? 'Timed reading + mock drills. Turn weak areas into cards and ask the AI tutor daily.'
-    : 'Only mock tests, error log, and audio shadowing. Sleep > new content at this point.'
+    ? t('legacy.plan.focus3')
+    : t('legacy.plan.focus4')
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-white">JLPT Study Plan</h2>
+      <h2 className="text-2xl font-bold text-white">{t('legacy.plan.title')}</h2>
       <div className="rounded-3xl glass p-6 card-glow border-l-4 border-[#FF6B57]">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <p className="text-xs text-slate-400 uppercase tracking-wider">Current focus · {daysToExam} days left</p>
+            <p className="text-xs text-slate-400 uppercase tracking-wider">{t('legacy.plan.currentFocus', { days: daysToExam })}</p>
             <h3 className="text-lg font-bold text-white mt-1">{weekFocus}</h3>
           </div>
           <div className="px-4 py-2 rounded-xl bg-bun-700/50 text-center">
             <p className="text-2xl font-bold text-white">{daysToExam}</p>
-            <p className="text-xs text-slate-400">days to N2</p>
+            <p className="text-xs text-slate-400">{t('legacy.plan.daysTo', { level: 'N2' })}</p>
           </div>
         </div>
       </div>
@@ -1369,8 +1369,8 @@ function StudyPlan({ daysToExam }) {
             <div className={`absolute top-0 left-0 w-1.5 h-full ${p.stage === 1 ? 'bg-gradient-to-b from-cyan-400 to-blue-500' : 'bg-gradient-to-b from-[#71368A] to-[#FF6B57]'}`} />
             <div className="ml-4">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Stage {p.stage}</span>
-                {p.stage === activeStage && <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#FF6B57]/20 text-[#FF8A75]">active</span>}
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t('legacy.plan.stage', { n: p.stage })}</span>
+                {p.stage === activeStage && <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#FF6B57]/20 text-[#FF8A75]">{t('legacy.plan.active')}</span>}
               </div>
               <h3 className="text-lg font-bold text-white mt-1">{p.phase}</h3>
               <p className="text-sm text-slate-400 mt-2 mb-4">{p.focus}</p>
@@ -1420,6 +1420,7 @@ const FALLBACK_VIDEOS = [
 ]
 
 function Videos() {
+  const { t } = useLanguage()
   const { isSupabaseConfigured } = useAuth()
   const [videos, setVideos] = useState([])
   const [loading, setLoading] = useState(!isSupabaseConfigured)
@@ -1454,7 +1455,7 @@ function Videos() {
         const unique = all.filter((v, i, a) => a.findIndex((x) => x.id === v.id) === i)
         if (!cancelled) setVideos(unique)
       } catch (err) {
-        if (!cancelled) setError(err.message || 'Could not load videos.')
+        if (!cancelled) setError(err.message || t('legacy.videos.loadError'))
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -1466,7 +1467,7 @@ function Videos() {
   if (!isSupabaseConfigured) {
     return (
       <div className="max-w-2xl mx-auto text-center py-20">
-        <p className="text-slate-400">Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to see videos.</p>
+        <p className="text-slate-400">{t('legacy.videos.notConfigured')}</p>
       </div>
     )
   }
@@ -1495,21 +1496,21 @@ function Videos() {
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-2xl font-bold text-white">N2 Video Dojo</h2>
-        <p className="text-sm text-slate-400 mt-1">Click any video to open a focused player. Use the fullscreen button inside the player to go full screen.</p>
+        <h2 className="text-2xl font-bold text-white">{t('legacy.videos.title')}</h2>
+        <p className="text-sm text-slate-400 mt-1">{t('legacy.videos.subtitle')}</p>
       </div>
       {loading && (
         <div className="flex items-center gap-2 text-slate-400">
-          <Loader2 size={20} className="animate-spin" /> Finding the best N2 videos…
+          <Loader2 size={20} className="animate-spin" /> {t('legacy.videos.loading')}
         </div>
       )}
       {error && <p className="text-rose-300">{error}</p>}
       {!loading && !error && videos.length === 0 && (
         <div className="space-y-6">
           <p className="text-amber-300 text-sm bg-amber-900/20 rounded-xl p-4">
-            YouTube search came back empty. The curated fallback below is shown while you check the YouTube Data API.
+            {t('legacy.videos.emptyNotice')}
           </p>
-          <h3 className="text-lg font-bold text-white">Featured N2 videos</h3>
+          <h3 className="text-lg font-bold text-white">{t('legacy.videos.featured')}</h3>
           <div className="grid md:grid-cols-2 gap-6">
             {FALLBACK_VIDEOS.map(renderCard)}
           </div>
@@ -1535,6 +1536,7 @@ function Videos() {
 }
 
 function ErrorLog() {
+  const { t } = useLanguage()
   const { user, isSupabaseConfigured } = useAuth()
   const [logs, setLogs] = useState([])
   const [section, setSection] = useState('Vocabulary')
@@ -1621,31 +1623,31 @@ function ErrorLog() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">Error Log</h2>
-        <span className="text-xs text-slate-500">{isSupabaseConfigured ? 'Synced to your account' : 'Stored locally'}</span>
+        <h2 className="text-2xl font-bold text-white">{t('legacy.errors.title')}</h2>
+        <span className="text-xs text-slate-500">{isSupabaseConfigured ? t('legacy.errors.synced') : t('legacy.errors.local')}</span>
       </div>
       <form onSubmit={add} className="rounded-3xl glass p-6 card-glow space-y-4">
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1.5">Section</label>
+          <label className="block text-sm font-medium text-slate-300 mb-1.5">{t('legacy.errors.sectionLabel')}</label>
           <select value={section} onChange={(e) => setSection(e.target.value)} className="w-full rounded-xl bg-bun-900 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 focus:border-[#FF6B57] focus:outline-none">
-            <option>Vocabulary</option><option>Grammar</option><option>Reading</option><option>Listening</option>
+            <option value="Vocabulary">{t('legacy.errors.section.vocabulary')}</option><option value="Grammar">{t('legacy.errors.section.grammar')}</option><option value="Reading">{t('legacy.errors.section.reading')}</option><option value="Listening">{t('legacy.errors.section.listening')}</option>
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1.5">What did you miss?</label>
-          <input value={mistake} onChange={(e) => setMistake(e.target.value)} placeholder="e.g. 延期 → えんき" className="w-full rounded-xl bg-bun-900 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-[#FF6B57] focus:outline-none" />
+          <label className="block text-sm font-medium text-slate-300 mb-1.5">{t('legacy.errors.mistakeLabel')}</label>
+          <input value={mistake} onChange={(e) => setMistake(e.target.value)} placeholder={t('legacy.errors.mistakePlaceholder')} className="w-full rounded-xl bg-bun-900 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-[#FF6B57] focus:outline-none" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1.5">Why?</label>
-          <input value={cause} onChange={(e) => setCause(e.target.value)} placeholder="e.g. Confused えんき with えんぎ" className="w-full rounded-xl bg-bun-900 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-[#FF6B57] focus:outline-none" />
+          <label className="block text-sm font-medium text-slate-300 mb-1.5">{t('legacy.errors.causeLabel')}</label>
+          <input value={cause} onChange={(e) => setCause(e.target.value)} placeholder={t('legacy.errors.causePlaceholder')} className="w-full rounded-xl bg-bun-900 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-[#FF6B57] focus:outline-none" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-1.5">Fix / rule</label>
-          <input value={fix} onChange={(e) => setFix(e.target.value)} placeholder="e.g. 延 stretches = en, 期 = ki" className="w-full rounded-xl bg-bun-900 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-[#FF6B57] focus:outline-none" />
+          <label className="block text-sm font-medium text-slate-300 mb-1.5">{t('legacy.errors.fixLabel')}</label>
+          <input value={fix} onChange={(e) => setFix(e.target.value)} placeholder={t('legacy.errors.fixPlaceholder')} className="w-full rounded-xl bg-bun-900 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-[#FF6B57] focus:outline-none" />
         </div>
         <button type="submit" disabled={saving} className="px-6 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] disabled:opacity-60 text-white text-sm font-medium transition flex items-center justify-center gap-2">
           {saving ? <Loader2 size={16} className="animate-spin" /> : null}
-          Add Entry
+          {t('legacy.errors.addEntry')}
         </button>
       </form>
 
@@ -1656,10 +1658,10 @@ function ErrorLog() {
           <Skeleton className="h-24 w-full" />
         </div>
       ) : logs.length === 0 ? (
-        <p className="text-center text-slate-500 py-8">No errors logged yet. Review this 30 min before each mock.</p>
+        <p className="text-center text-slate-500 py-8">{t('legacy.errors.empty')}</p>
       ) : (
         <div className="space-y-3">
-          <p className="text-xs text-slate-400">Spaced repetition: each review pushes the next one further — 1, 1, 2, 4, 7, 14, 30 days. Click “Mark reviewed” to move the card forward.</p>
+          <p className="text-xs text-slate-400">{t('legacy.errors.srsNote')}</p>
           {logs.map((l) => {
             const isDue = l.next_review && new Date(l.next_review) <= new Date()
             const days = srs[Math.min((l.review_count || 0) + 1, srs.length - 1)]
@@ -1667,17 +1669,17 @@ function ErrorLog() {
               <div key={l.id} className={`rounded-2xl glass p-4 card-glow flex items-start justify-between gap-3 ${isDue ? 'ring-1 ring-rose-500/40' : ''}`}>
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                    <Badge color={l.section === 'Vocabulary' ? 'emerald' : l.section === 'Grammar' ? 'plum' : 'amber'}>{l.section}</Badge>
+                    <Badge color={l.section === 'Vocabulary' ? 'emerald' : l.section === 'Grammar' ? 'plum' : 'amber'}>{{ Vocabulary: t('legacy.errors.section.vocabulary'), Grammar: t('legacy.errors.section.grammar'), Reading: t('legacy.errors.section.reading'), Listening: t('legacy.errors.section.listening') }[l.section] || l.section}</Badge>
                     <span className="text-xs text-slate-400">{new Date(l.created_at).toLocaleDateString()}</span>
-                    {isDue && <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-600/20 text-rose-300">due</span>}
+                    {isDue && <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-600/20 text-rose-300">{t('legacy.errors.due')}</span>}
                   </div>
                   <p className="font-semibold text-slate-100"><KanjiTapText text={l.mistake} className="text-slate-100 font-semibold" /></p>
-                  {l.cause && <p className="text-sm text-rose-300 mt-1">Cause: <KanjiTapText text={l.cause} className="text-rose-300" /></p>}
-                  {l.fix && <p className="text-sm text-emerald-300 mt-1">Fix: <KanjiTapText text={l.fix} className="text-emerald-300" /></p>}
+                  {l.cause && <p className="text-sm text-rose-300 mt-1">{t('legacy.errors.causePrefix')} <KanjiTapText text={l.cause} className="text-rose-300" /></p>}
+                  {l.fix && <p className="text-sm text-emerald-300 mt-1">{t('legacy.errors.fixPrefix')} <KanjiTapText text={l.fix} className="text-emerald-300" /></p>}
                 </div>
                 <div className="flex flex-col items-end gap-2 shrink-0">
-                  <button onClick={() => markReview(l)} title={`Mark as reviewed; next review in ${days} ${days === 1 ? 'day' : 'days'}`} className="text-xs px-2.5 py-1 rounded-lg bg-[#FF6B57]/20 text-[#FF8A75] hover:bg-[#FF6B57]/30 transition">Mark reviewed · next in {days}d</button>
-                  <button onClick={() => remove(l.id)} className="text-xs text-slate-500 hover:text-rose-400">Delete</button>
+                  <button onClick={() => markReview(l)} title={t(days === 1 ? 'legacy.errors.markReviewedTitleOne' : 'legacy.errors.markReviewedTitleMany', { days })} className="text-xs px-2.5 py-1 rounded-lg bg-[#FF6B57]/20 text-[#FF8A75] hover:bg-[#FF6B57]/30 transition">{t('legacy.errors.markReviewed', { days })}</button>
+                  <button onClick={() => remove(l.id)} className="text-xs text-slate-500 hover:text-rose-400">{t('legacy.errors.delete')}</button>
                 </div>
               </div>
             )

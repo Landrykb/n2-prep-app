@@ -1,6 +1,8 @@
 import { Component } from 'react'
 import Mascot from './Mascot.jsx'
 import { appendErrorLog } from '../lib/errorLog.js'
+import { t as translate } from '../lib/i18n.js'
+import { loadLanguage } from '../lib/learnerState.js'
 
 // Crash boundary (P1-8). Before this, a render error anywhere in the
 // shell unmounted the whole app to a blank dark screen — for a learner
@@ -34,6 +36,10 @@ export default class ErrorBoundary extends Component {
 
   render() {
     if (!this.state.error) return this.props.children
+    // A class component has no hooks: resolve copy with the pure
+    // translator in the language stored on this device (the crash may
+    // have taken the provider down with the tree).
+    const t = (key) => translate(loadLanguage()?.lang || 'en', key)
     return (
       <div className="min-h-screen bg-bun-900 text-slate-100 flex items-center justify-center p-6">
         <div className="max-w-md w-full rounded-3xl glass p-8 card-glow text-center space-y-4">
@@ -42,16 +48,14 @@ export default class ErrorBoundary extends Component {
             <Mascot agent="michi" size={44} showName={false} />
             <Mascot agent="nao" size={44} showName={false} />
           </div>
-          <h1 className="text-xl font-bold text-white">Something broke on this screen</h1>
+          <h1 className="text-xl font-bold text-white">{t('shell.error.title')}</h1>
           <p className="text-sm text-slate-300">
-            The fleet is resting while it recovers. <span className="text-white font-semibold">Your data is on this device and safe</span> —
-            your queue, diagnosis, promise and history are stored locally (and in your account when you are signed in).
-            A crashed screen has not lost them.
+            {t('shell.error.bodyA')}<span className="text-white font-semibold">{t('shell.error.bodySafe')}</span>{t('shell.error.bodyB')}
           </p>
-          <p className="text-xs text-slate-500">The error was written to a small log on this device. Nothing was sent anywhere. You can share it from Your Fleet → Privacy, Terms And Your Account if it keeps happening.</p>
+          <p className="text-xs text-slate-500">{t('shell.error.note')}</p>
           <div className="flex justify-center gap-3 pt-2">
-            <button onClick={() => window.location.reload()} className="px-5 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold">Reload The App</button>
-            <button onClick={() => this.setState({ error: null })} className="px-5 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-200 text-sm font-medium">Try This Screen Again</button>
+            <button onClick={() => window.location.reload()} className="px-5 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold">{t('shell.error.reload')}</button>
+            <button onClick={() => this.setState({ error: null })} className="px-5 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-200 text-sm font-medium">{t('shell.error.retry')}</button>
           </div>
         </div>
       </div>

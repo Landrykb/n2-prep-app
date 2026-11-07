@@ -101,9 +101,9 @@ export function ProofLadderView({ diagnosis, profile }) {
           <div key={h.id} className={`flex items-start gap-3 rounded-xl border p-3 ${h.status === 'reached' ? 'bg-emerald-500/10 border-emerald-500/30' : h.status === 'next' ? 'bg-[#FF6B57]/15 border-[#FF6B57]/40' : 'bg-bun-700/30 border-bun-600/20 opacity-75'}`}>
             <span className="mt-0.5 shrink-0">{h.status === 'reached' ? <CheckCircle2 size={17} className="text-emerald-300" /> : h.status === 'next' ? <HeartPulse size={17} className="text-[#FF8A75]" /> : <Lock size={15} className="text-slate-500" />}</span>
             <div className="min-w-0">
-              <p className="text-sm font-bold text-white">{h.label} {h.status === 'next' && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-[#FF6B57] text-white align-middle">{t('problem.badgeNext')}</span>}{h.status === 'reached' && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-600/60 text-emerald-100 align-middle">{t('problem.badgeReached')}</span>}</p>
-              <p className="text-xs text-slate-400">{t('problem.ladderProof', { proof: h.proof })}</p>
-              <p className="text-xs text-slate-300">{t('problem.ladderUnlocks', { unlocks: h.unlocks })}</p>
+              <p className="text-sm font-bold text-white">{h.labelKey ? t(h.labelKey) : h.label} {h.status === 'next' && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-[#FF6B57] text-white align-middle">{t('problem.badgeNext')}</span>}{h.status === 'reached' && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-600/60 text-emerald-100 align-middle">{t('problem.badgeReached')}</span>}</p>
+              <p className="text-xs text-slate-400">{t('problem.ladderProof', { proof: h.proofKey ? t(h.proofKey) : h.proof })}</p>
+              <p className="text-xs text-slate-300">{t('problem.ladderUnlocks', { unlocks: h.unlocksKey ? t(h.unlocksKey) : h.unlocks })}</p>
             </div>
           </div>
         ))}

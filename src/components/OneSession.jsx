@@ -16,6 +16,7 @@ import { getPlanFor, markPlanConsumed, noteSessionForExperiment } from '../lib/p
 import Mascot from './Mascot.jsx'
 import TtsButton from './TtsButton.jsx'
 import KanjiTapText from './KanjiTapText.jsx'
+import { useLanguage } from '../hooks/useLanguage.js'
 
 // ONE SESSION — the North Star made literal. Press start and the app runs
 // the whole day for you: one voice scene for your problem, up to five of
@@ -23,7 +24,13 @@ import KanjiTapText from './KanjiTapText.jsx'
 // no choices. Leaving mid-session saves your place (jpn:session:v1) and
 // coming back continues right there — a paused session is saved progress,
 // never an unfinished one.
-const STEP_LABELS = ['Your scene', 'Your cards', 'Listening']
+// Step labels resolve through the catalogs at render (session.step*).
+const STEP_KEYS = ['session.stepScene', 'session.stepCards', 'session.stepListening']
+
+// The effort answers are STORED values (lib/session.js saveEffort, Twin
+// effort signals) — display maps the stored value to a catalog key; the
+// stored values themselves never change.
+const EFFORT_KEYS = { 'Not really': 'session.effortNotReally', 'A bit': 'session.effortABit', 'Yes': 'session.effortYes' }
 
 function freshState(profile, diagnosis, queue, variant) {
   const date = todayStr()
@@ -44,11 +51,14 @@ function freshState(profile, diagnosis, queue, variant) {
     segmentStartAt: new Date().toISOString(),
     sceneBest: 0, sceneAttempts: 0, sceneDone: false, listeningPicked: null, done: false,
     planMode: plan?.mode || null, planNote: plan?.note || null,
+    planNoteKey: plan?.noteKey || null, planNoteVars: plan?.noteVars || null,
+    planSceneTitle: plan?.sceneTitle || null, planCardBudget: plan?.cardBudget ?? null, planMinutes: plan?.minutes ?? null,
     planExperiment: plan?.experiment || null, recorded: false, bonus: false,
   }
 }
 
 export default function OneSession({ setActive }) {
+  const { t } = useLanguage()
   const profile = useMemo(loadProfile, [])
   const diagnosis = useMemo(loadDiagnosis, [])
   const [queue, setQueue] = useState(loadQueue)
@@ -215,17 +225,17 @@ export default function OneSession({ setActive }) {
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <div className="text-center space-y-2 pt-2">
-        <p className="flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#FF8A75]"><Sparkles size={14} /> One Session — that’s the whole day</p>
-        {state.done && <div className="mb-3"><Mascot agent="michi" size={64} showName={false} motion="hop" label="Michi, your coach, celebrating a finished session" /></div>}
-        <h2 className="text-2xl sm:text-3xl font-bold text-white">{state.done ? 'Session saved. Day done.' : isBusy ? 'Busy day — just the scene' : 'Press nothing. Just follow along.'}</h2>
+        <p className="flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#FF8A75]"><Sparkles size={14} /> {t('session.eyebrow')}</p>
+        {state.done && <div className="mb-3"><Mascot agent="michi" size={64} showName={false} motion="hop" label={t('session.mascotDoneLabel', { name: 'Michi' })} /></div>}
+        <h2 className="text-2xl sm:text-3xl font-bold text-white">{state.done ? t('session.titleDone') : isBusy ? t('session.titleBusy') : t('session.titleStart')}</h2>
         <p className="text-sm text-slate-400 max-w-xl mx-auto">
           {state.step > 0 && !state.done
-            ? 'Welcome back to your session — it kept your place. Pick up right here.'
-            : 'One real scene for your problem, a few of your own cards, one listening bite. Leave whenever you need to — your place is saved, and what you did counts.'}
+            ? t('session.resumeLine')
+            : t('session.introLine')}
         </p>
         {!state.done && (
           <button onClick={() => switchVariant(isBusy ? 'full' : 'busy')} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-bun-800/70 border border-bun-600/40 text-slate-300 hover:text-white transition">
-            <Coffee size={12} /> {isBusy ? 'Actually, I have time for the full session' : 'Only have ~3 minutes today? Busy-day version'}
+            <Coffee size={12} /> {isBusy ? t('session.toFull') : t('session.toBusy')}
           </button>
         )}
       </div>
@@ -235,7 +245,7 @@ export default function OneSession({ setActive }) {
           {(isBusy ? [0] : [0, 1, 2]).map((s) => (
             <div key={s} className="flex-1">
               <div className={`h-1.5 rounded-full ${state.step >= s ? 'bg-gradient-to-r from-[#71368A] to-cyan-500' : 'bg-bun-700'}`} />
-              <p className={`text-[10px] mt-1.5 text-center ${state.step === s ? 'text-[#FF8A75] font-semibold' : 'text-slate-500'}`}>{STEP_LABELS[s]}</p>
+              <p className={`text-[10px] mt-1.5 text-center ${state.step === s ? 'text-[#FF8A75] font-semibold' : 'text-slate-500'}`}>{t(STEP_KEYS[s])}</p>
             </div>
           ))}
           <span className="text-xs text-slate-500 shrink-0 pl-2">{Math.floor(elapsedSec / 60)}:{String(elapsedSec % 60).padStart(2, '0')}</span>
@@ -245,7 +255,9 @@ export default function OneSession({ setActive }) {
       {!state.done && state.planNote && state.step === 0 && (
         <div className="rounded-2xl bg-sky-500/10 border border-sky-500/25 p-4 flex items-start gap-3">
           <Mascot agent="saki" size={32} showName={false} />
-          <p className="text-sm text-slate-200"><span className="font-semibold text-white">Saki prepared today:</span> {state.planNote}</p>
+          <p className="text-sm text-slate-200"><span className="font-semibold text-white">{t('session.planPrefix', { name: 'Saki' })}</span> {state.planNoteKey
+            ? t(state.planNoteKey, { title: state.planSceneTitle, cards: state.planCardBudget, minutes: state.planMinutes, reason: t(state.planNoteVars?.reasonKey || 'planner.reasonMatched', state.planNoteVars?.reasonVars || {}) })
+            : state.planNote}</p>
         </div>
       )}
 
@@ -254,68 +266,68 @@ export default function OneSession({ setActive }) {
         <section className="rounded-2xl glass p-5 sm:p-6 card-glow space-y-4">
           <div>
             <h3 className="text-lg font-bold text-white">{scene.title}</h3>
-            <p className="text-xs text-slate-400">{scene.domain} · {scene.level} · chosen for your problem today</p>
+            <p className="text-xs text-slate-400">{t('session.sceneMeta', { domain: scene.domain, level: scene.level })}</p>
           </div>
           <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4">
-            <p className="text-xs text-slate-400 mb-1">Your partner says:</p>
+            <p className="text-xs text-slate-400 mb-1">{t('voice.partnerSays')}</p>
             <div className="flex items-start gap-2">
               <p className="text-slate-100 leading-loose flex-1"><KanjiTapText text={scene.partner} /></p>
               <TtsButton text={scene.partner} />
             </div>
           </div>
-          <p className="text-sm text-slate-200"><span className="text-[#FF8A75] font-semibold">Your turn — say this, your way:</span> {scene.promptEn}</p>
+          <p className="text-sm text-slate-200"><span className="text-[#FF8A75] font-semibold">{t('voice.yourTurn')}</span> {scene.promptEn}</p>
           <div className="flex gap-2">
-            <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={2} placeholder="Speak with the mic, or type your Japanese here…"
+            <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={2} placeholder={t('call.inputPlaceholder')}
               className="flex-1 rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 focus:border-[#FF6B57] focus:outline-none" />
             <div className="flex flex-col gap-2">
               <button onClick={startListening} disabled={!speechSupported || listening} className="px-3 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] disabled:opacity-40 text-white text-xs font-medium flex items-center gap-1.5">
-                {listening ? <MicOff size={14} /> : <Mic size={14} />} {listening ? 'Listening…' : 'Speak'}
+                {listening ? <MicOff size={14} /> : <Mic size={14} />} {listening ? t('call.listeningBtn') : t('voice.speak')}
               </button>
-              <button onClick={checkScene} disabled={!input.trim()} className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-medium">Check me</button>
+              <button onClick={checkScene} disabled={!input.trim()} className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-medium">{t('voice.checkMe')}</button>
             </div>
           </div>
           {micError && (
           <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
-            <p className="text-sm font-semibold text-amber-200">{micError.title}</p>
-            <p className="text-xs text-amber-100/80 mt-0.5">{micError.body}</p>
+            <p className="text-sm font-semibold text-amber-200">{micError.titleKey ? t(micError.titleKey) : micError.title}</p>
+            <p className="text-xs text-amber-100/80 mt-0.5">{micError.bodyKey ? t(micError.bodyKey) : micError.body}</p>
           </div>
             )}
-            {!speechSupported && <p className="text-xs text-slate-500">Voice recognition isn’t available in this browser — typing your version works the same way here.</p>}
+            {!speechSupported && <p className="text-xs text-slate-500">{t('voice.noVoice')}</p>}
 
           {lastAttempt && (
             <div className={`rounded-xl border p-4 space-y-2 ${lastAttempt.score >= MASTERY ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-bun-700/40 border-bun-600/20'}`}>
               <p className="text-sm text-slate-200">「{lastAttempt.text}」 <span className={`font-bold ${lastAttempt.score >= MASTERY ? 'text-emerald-300' : 'text-amber-300'}`}>{lastAttempt.score}%</span></p>
               {lastAttempt.score >= MASTERY ? (
-                <p className="text-sm text-emerald-200 flex items-center gap-2"><CheckCircle2 size={15} /> Clean. That’s the scene, in your voice.</p>
+                <p className="text-sm text-emerald-200 flex items-center gap-2"><CheckCircle2 size={15} /> {t('session.attemptClean')}</p>
               ) : (
                 <>
                   <div className="flex items-center gap-2">
                     <Mascot agent="nao" size={26} showName={false} />
-                    <p className="text-xs text-slate-300"><span className="font-semibold text-white">Nao, your fixer — one thing:</span> here is the model line.</p>
+                    <p className="text-xs text-slate-300"><span className="font-semibold text-white">{t('session.naoPrefix', { name: 'Nao' })}</span> {t('session.naoBody')}</p>
                   </div>
                   <div className="flex items-start gap-2">
-                    <p className="text-sm text-slate-200 leading-loose flex-1">Model: <KanjiTapText text={scene.model} /></p>
+                    <p className="text-sm text-slate-200 leading-loose flex-1">{t('call.model')} <KanjiTapText text={scene.model} /></p>
                     <TtsButton text={scene.model} />
                   </div>
-                  {lastAttempt.missing.length > 0 && <p className="text-sm text-amber-200">Missing: {lastAttempt.missing.join('、')}</p>}
+                  {lastAttempt.missing.length > 0 && <p className="text-sm text-amber-200">{t('call.missing', { words: lastAttempt.missing.join('、') })}</p>}
                   <p className="text-xs text-slate-400">{scene.commonError}</p>
-                  <button onClick={() => setInput('')} className="px-3 py-1.5 rounded-lg bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-xs font-medium flex items-center gap-1"><RotateCcw size={13} /> Say it again</button>
+                  <button onClick={() => setInput('')} className="px-3 py-1.5 rounded-lg bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-xs font-medium flex items-center gap-1"><RotateCcw size={13} /> {t('voice.sayAgain')}</button>
                 </>
               )}
             </div>
           )}
-          {state.sceneAttempts > 0 && !sceneCleared && <p className="text-xs text-slate-500">Best so far: {state.sceneBest}% — {MASTERY}% is “clean”, and getting closer counts too. The scene stays in your queue either way.</p>}
+          {state.sceneAttempts > 0 && !sceneCleared && <p className="text-xs text-slate-500">{t('session.bestSoFar', { best: state.sceneBest, mastery: MASTERY })}</p>}
 
           {sceneCleared && (
             <button onClick={() => (isBusy ? finish() : advanceTo(1))} className="w-full py-3 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-semibold flex items-center justify-center gap-2 transition">
-              {isBusy ? 'Finish my busy-day session' : 'Continue — your cards'} <ChevronRight size={17} />
+              {isBusy ? t('session.finishBusy') : t('session.toCards')} <ChevronRight size={17} />
             </button>
           )}
           {!sceneCleared && state.sceneAttempts > 0 && (
-            <button onClick={() => (isBusy ? finish() : advanceTo(1))} className="w-full py-2 text-xs text-slate-400 hover:text-slate-200 transition">Move on for now — this scene will come back in your queue</button>
+            <button onClick={() => (isBusy ? finish() : advanceTo(1))} className="w-full py-2 text-xs text-slate-400 hover:text-slate-200 transition">{t('session.moveOn')}</button>
           )}
           {state.sceneAttempts === 0 && (
-            <p className="text-[11px] text-slate-600 text-center">Leaving now? Everything so far is saved — this exact scene will be waiting.</p>
+            <p className="text-[11px] text-slate-600 text-center">{t('session.leavingNote')}</p>
           )}
         </section>
       )}
@@ -324,30 +336,30 @@ export default function OneSession({ setActive }) {
       {!state.done && state.step === 1 && (
         <section className="rounded-2xl glass p-5 sm:p-6 card-glow space-y-4">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-lg font-bold text-white">Your cards</h3>
-            <span className="text-xs text-slate-400">{(state.ratedIds || []).length} of {sessionCards.length} done in this session</span>
+            <h3 className="text-lg font-bold text-white">{t('session.cardsTitle')}</h3>
+            <span className="text-xs text-slate-400">{t('session.cardsProgress', { done: (state.ratedIds || []).length, total: sessionCards.length })}</span>
           </div>
           {card ? (
             <div className="space-y-3">
               <button onClick={() => setFlipped((f) => !f)} className="w-full text-left rounded-2xl bg-bun-700/40 border border-bun-600/30 p-6 min-h-[130px] hover:border-[#FF6B57]/40 transition">
-                <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-2">From {card.source}{card.level ? ` · ${card.level}` : ''} · tap to flip</p>
+                <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-2">{t('session.cardsFrom', { source: card.source })}{card.level ? t('session.cardsLevelBit', { level: card.level }) : ''}{t('session.cardsTapFlip')}</p>
                 {!flipped ? <p className="text-lg text-white leading-loose">{card.front}</p> : (
                   <span><span className="block text-lg text-emerald-200 leading-loose">{card.back}</span>{card.note && <span className="block text-xs text-slate-400 mt-2">{card.note}</span>}</span>
                 )}
               </button>
               {flipped && previews ? (
                 <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => rateCard(Rating.Again)} className="px-3 py-3 rounded-xl bg-rose-600/80 hover:bg-rose-500 text-white text-sm font-semibold">Again<span className="block text-[10px] opacity-80 font-normal">{previews[Rating.Again].label}</span></button>
-                  <button onClick={() => rateCard(Rating.Good)} className="px-3 py-3 rounded-xl bg-emerald-600/80 hover:bg-emerald-500 text-white text-sm font-semibold">Good<span className="block text-[10px] opacity-80 font-normal">{previews[Rating.Good].label}</span></button>
+                  <button onClick={() => rateCard(Rating.Again)} className="px-3 py-3 rounded-xl bg-rose-600/80 hover:bg-rose-500 text-white text-sm font-semibold">{t('queue.rateAgain')}<span className="block text-[10px] opacity-80 font-normal">{previews[Rating.Again].label}</span></button>
+                  <button onClick={() => rateCard(Rating.Good)} className="px-3 py-3 rounded-xl bg-emerald-600/80 hover:bg-emerald-500 text-white text-sm font-semibold">{t('queue.rateGood')}<span className="block text-[10px] opacity-80 font-normal">{previews[Rating.Good].label}</span></button>
                 </div>
               ) : (
-                <p className="text-xs text-slate-500 text-center">Say it (or think it) out loud first — then flip. Producing it is the learning.</p>
+                <p className="text-xs text-slate-500 text-center">{t('session.cardsHint')}</p>
               )}
             </div>
           ) : (
             <div className="space-y-3">
-              <p className="text-sm text-slate-300">{sessionCards.length ? 'All of today’s cards in this session are done. Nicely paced.' : 'Your queue has nothing waiting right now — your own mistakes and mined sentences will fill it as you use the app. That’s a clear desk, not a gap.'}</p>
-              <button onClick={() => advanceTo(2)} className="w-full py-3 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-semibold flex items-center justify-center gap-2 transition">Continue — one listening bite <ChevronRight size={17} /></button>
+              <p className="text-sm text-slate-300">{sessionCards.length ? t('session.cardsAllDone') : t('session.cardsEmpty')}</p>
+              <button onClick={() => advanceTo(2)} className="w-full py-3 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-semibold flex items-center justify-center gap-2 transition">{t('session.toListening')} <ChevronRight size={17} /></button>
             </div>
           )}
         </section>
@@ -357,12 +369,12 @@ export default function OneSession({ setActive }) {
       {!state.done && state.step === 2 && (
         <section className="rounded-2xl glass p-5 sm:p-6 card-glow space-y-4">
           <div>
-            <h3 className="text-lg font-bold text-white flex items-center gap-2"><Headphones size={18} className="text-teal-300" /> One listening bite</h3>
-            <p className="text-xs text-slate-400">{bite.title} · {bite.level}{diagnosis?.weakest === 'listening' ? ' · picked because listening is your weakest section' : diagnosis ? ` · at your diagnosed level (${diagnosis.jlptEstimate})` : ''} — try it in one play, like the real exam</p>
+            <h3 className="text-lg font-bold text-white flex items-center gap-2"><Headphones size={18} className="text-teal-300" /> {t('session.listeningTitle')}</h3>
+            <p className="text-xs text-slate-400">{t('session.listeningMeta', { title: bite.title, level: bite.level })}{diagnosis?.weakest === 'listening' ? t('session.listeningWeakest') : diagnosis ? t('session.listeningLevel', { estimate: diagnosis.jlptEstimate }) : ''}{t('session.listeningSuffix')}</p>
           </div>
           <div className="flex items-center gap-3">
             <TtsButton text={bite.script} className="px-4 py-2 text-sm font-medium" />
-            <span className="text-sm text-slate-300">Listen first, answer after — the transcript stays hidden.</span>
+            <span className="text-sm text-slate-300">{t('session.listeningHint')}</span>
           </div>
           <p className="text-white">{biteQuestion.prompt}</p>
           <div className="grid gap-2">
@@ -380,7 +392,7 @@ export default function OneSession({ setActive }) {
           {(state.listeningPicked !== null && state.listeningPicked !== undefined) && (
             <div className="space-y-3">
               <p className="text-sm text-slate-300">{biteQuestion.explanation}</p>
-              <button onClick={finish} className="w-full py-3 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-semibold flex items-center justify-center gap-2 transition">Finish session <ChevronRight size={17} /></button>
+              <button onClick={finish} className="w-full py-3 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-semibold flex items-center justify-center gap-2 transition">{t('session.finish')} <ChevronRight size={17} /></button>
             </div>
           )}
         </section>
@@ -391,41 +403,41 @@ export default function OneSession({ setActive }) {
         <section className="rounded-2xl glass p-6 sm:p-8 card-glow space-y-5 text-center">
           <CheckCircle2 size={40} className="text-emerald-400 mx-auto" />
           <div>
-            <h3 className="text-2xl font-bold text-white">{isBusy ? 'Busy-day session done.' : 'That was today. All of it.'}</h3>
+            <h3 className="text-2xl font-bold text-white">{isBusy ? t('session.endTitleBusy') : t('session.endTitle')}</h3>
             <p className="text-sm text-slate-300 mt-2 max-w-lg mx-auto">
-              About {minutesSpent} minute{minutesSpent === 1 ? '' : 's'}: one scene in your own voice{!isBusy && (state.ratedIds || []).length ? `, ${(state.ratedIds || []).length} of your cards` : ''}{!isBusy ? ', one listening bite at your level' : ''}. It didn’t feel like a lesson — that’s the design. The repetitions you did are already scheduled to come back spaced, in new scenes, until they stick.
+              {t(minutesSpent === 1 ? 'session.endAboutOne' : 'session.endAboutMany', { minutes: minutesSpent })}{t('session.endSceneBit')}{!isBusy && (state.ratedIds || []).length ? t('session.endCardsBit', { count: (state.ratedIds || []).length }) : ''}{!isBusy ? t('session.endBiteBit') : ''}{t('session.endTail')}
             </p>
           </div>
           <div className="rounded-xl bg-bun-700/40 border border-bun-600/30 p-4 text-left">
             <p className="text-sm text-slate-200">
               {diagnosis
-                ? <>Where you stand: estimated <span className="text-white font-semibold">{diagnosis.jlptEstimate}</span>{reachedRung ? <> · latest height in reach: <span className="text-white font-semibold">{reachedRung.label}</span></> : ''}{nextRung ? <> · next height: <span className="text-[#FF8A75] font-semibold">{nextRung.label}</span> — {nextRung.proof}</> : ''}</>
-                : 'No diagnosis yet — run the 10-minute health check once, and this screen will show your ladder position and your next height.'}
+                ? <>{t('session.endStand')}<span className="text-white font-semibold">{diagnosis.jlptEstimate}</span>{reachedRung ? <>{t('session.endReached')}<span className="text-white font-semibold">{reachedRung.labelKey ? t(reachedRung.labelKey) : reachedRung.label}</span></> : ''}{nextRung ? <>{t('session.endNext')}<span className="text-[#FF8A75] font-semibold">{nextRung.labelKey ? t(nextRung.labelKey) : nextRung.label}</span>{t('session.endNextProof', { proof: nextRung.proofKey ? t(nextRung.proofKey) : nextRung.proof })}</> : ''}</>
+                : t('session.endNoDiagnosis')}
             </p>
           </div>
           <div className="space-y-2">
-            <p className="text-sm font-semibold text-white">One honest check: did that feel like studying?</p>
+            <p className="text-sm font-semibold text-white">{t('session.effortQuestion')}</p>
             <div className="flex flex-wrap justify-center gap-2">
               {['Not really', 'A bit', 'Yes'].map((a) => (
-                <button key={a} onClick={() => chooseEffort(a)} className={`px-4 py-2 rounded-full text-sm font-medium border transition ${effort === a ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-bun-700/60 text-slate-200 border-bun-600/40 hover:text-white'}`}>{a}</button>
+                <button key={a} onClick={() => chooseEffort(a)} className={`px-4 py-2 rounded-full text-sm font-medium border transition ${effort === a ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-bun-700/60 text-slate-200 border-bun-600/40 hover:text-white'}`}>{t(EFFORT_KEYS[a])}</button>
               ))}
             </div>
-            {effort && <p className="text-xs text-emerald-300">{effort === 'Not really' ? 'That’s the target state. Come back tomorrow — same small size.' : 'Noted — the sessions stay small either way. Tomorrow is the same size, never bigger by surprise.'}</p>}
+            {effort && <p className="text-xs text-emerald-300">{effort === 'Not really' ? t('session.effortReplyNotReally') : t('session.effortReplyOther')}</p>}
           </div>
           {bonusAvailable > 0 && (
             <div className="rounded-xl bg-[#FF6B57]/10 border border-[#FF6B57]/30 p-4 space-y-2">
-              <p className="text-sm text-slate-200">You’re climbing this week — that’s a Surge, in the app’s own bookkeeping. More is on offer if you want it, never owed if you don’t.</p>
-              <button onClick={startBonus} className="px-5 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 text-white text-sm font-semibold">Keep Going — A Few More Cards</button>
+              <p className="text-sm text-slate-200">{t('session.surgeText')}</p>
+              <button onClick={startBonus} className="px-5 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 text-white text-sm font-semibold">{t('session.surgeButton')}</button>
             </div>
           )}
           <div className="flex flex-wrap justify-center gap-2 pt-1">
-            <button onClick={() => setActive?.('dashboard')} className="px-5 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold flex items-center gap-1.5"><Play size={15} /> Back to Today</button>
-            <button onClick={() => setActive?.('diagnosis')} className="px-5 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium">See my diagnosis & ladder</button>
+            <button onClick={() => setActive?.('dashboard')} className="px-5 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold flex items-center gap-1.5"><Play size={15} /> {t('session.backToday')}</button>
+            <button onClick={() => setActive?.('diagnosis')} className="px-5 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium">{t('session.seeDiagnosis')}</button>
           </div>
         </section>
       )}
 
-      <p className="text-center text-[11px] text-slate-600">Session state key: {SESSION_KEY} — saved on this device as you go.</p>
+      <p className="text-center text-[11px] text-slate-600">{t('session.stateKeyNote', { key: SESSION_KEY })}</p>
     </div>
   )
 }

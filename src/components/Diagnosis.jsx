@@ -7,6 +7,7 @@ import { questions as bankQuestions } from '../data.js'
 import { selectDiagnosisItems, sectionComponent } from '../lib/diagnosisItems.js'
 import { JLPT_LEVELS, jlptLevel, estimateBjtScore, bjtBandForScore, SECTION_KEYS } from '../lib/levels.js'
 import { loadProfile, saveDiagnosis, DIAGNOSIS_KEY } from '../lib/profile.js'
+import { saveDiagnosisDraft, loadDiagnosisDraft, clearDiagnosisDraft } from '../lib/diagnosisDraft.js'
 import { recordDiagnosis, diagnosisDeltas, recordReading, loadDiagnosisHistory } from '../lib/twin.js'
 import { recordMetric } from '../lib/metrics.js'
 import Mascot from './Mascot.jsx'
@@ -58,6 +59,9 @@ export default function Diagnosis({ setActive }) {
   const [rCorrect, setRCorrect] = useState(0)
   const [poolNote, setPoolNote] = useState('')
   const [result, setResult] = useState(() => { try { return JSON.parse(localStorage.getItem(DIAGNOSIS_KEY) || 'null') } catch { return null } })
+  // Audit #6: a fresh in-progress draft (< 7 days, current bank version)
+  // is offered for resume on the intro screen.
+  const [draftOffer, setDraftOffer] = useState(() => loadDiagnosisDraft())
   const usedRef = useRef(new Set())
   const profile = useMemo(loadProfile, [])
 
@@ -82,7 +86,35 @@ export default function Diagnosis({ setActive }) {
     })
   }
 
+  // Persist the in-progress run on every answer-driven state change, so
+  // closing the app mid-check loses nothing. While an answer reveal is
+  // showing (picked set), the pre-answer save stands — resuming lands on
+  // the un-answered question, never a double-counted one.
+  useEffect(() => {
+    if (!['quiz', 'listening', 'reading'].includes(phase)) return
+    if (picked) return
+    saveDiagnosisDraft({ phase, step, levelIdx, current, answers, itemSet, lIdx, lCorrect, rIdx, rCorrect, poolNote, usedWords: [...usedRef.current] })
+  }, [phase, step, levelIdx, current, answers, itemSet, lIdx, lCorrect, rIdx, rCorrect, poolNote, picked])
+
+  const resumeDraft = async () => {
+    const s = draftOffer?.state
+    if (!s) { setDraftOffer(null); return }
+    // nextQuestion closes over `dict` — load the full dictionary FIRST,
+    // exactly like start() does, then restore the run state onto it.
+    const d = await loadDictionary(); setDict(d)
+    usedRef.current = new Set(s.usedWords || [])
+    setAnswers(s.answers || []); setStep(s.step || 0); setLevelIdx(s.levelIdx ?? 2); setPicked(null)
+    setItemSet(s.itemSet || null); setLIdx(s.lIdx || 0); setLCorrect(s.lCorrect || 0)
+    setRIdx(s.rIdx || 0); setRCorrect(s.rCorrect || 0); setPoolNote(s.poolNote || '')
+    setCurrent(s.current || null)
+    setDraftOffer(null)
+    setPhase(s.phase)
+  }
+
+  const startOverDraft = () => { clearDiagnosisDraft(); setDraftOffer(null) }
+
   const start = async () => {
+    clearDiagnosisDraft(); setDraftOffer(null)
     const d = await loadDictionary(); setDict(d)
     usedRef.current = new Set()
     setAnswers([]); setStep(0); setLevelIdx(2); setPicked(null)
@@ -158,6 +190,7 @@ export default function Diagnosis({ setActive }) {
         generatedItems: [...(itemSet?.listening || []), ...(itemSet?.reading || [])].filter((i) => i.generated).length,
       },
     }
+    clearDiagnosisDraft()
     saveDiagnosis(res)
     // Diagnosis history (jpn:diagnosisHistory:v1) + Twin section levels —
     // written by diagnosis code only, so trends stay honest (Doc 04 §5).
@@ -196,6 +229,16 @@ export default function Diagnosis({ setActive }) {
           <p className="text-sm text-slate-300">{t('diag.introBefore')}<span className="text-white font-semibold">{t('diag.introLine')}</span>{t('diag.introAfter', { suffix: profile ? t('diag.introProfileSuffix') : '' })}</p>
           {poolNote && phase === 'intro' && <p className="text-sm text-amber-200 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2">{poolNote}</p>}
           {result && <p className="text-sm text-slate-400">{t('diag.lastCheckBefore')}<span className="text-white font-semibold">{result.jlptEstimate}</span>{t('diag.lastCheckAfter', { total: result.total, weakest: result.weakest, bjt: result.bjtScore, band: result.bjtBand, date: new Date(result.at).toLocaleDateString() })}</p>}
+          {draftOffer && (
+            <div className="rounded-xl border border-[#FF6B57]/40 bg-[#FF6B57]/10 p-4 space-y-2">
+              <p className="text-sm font-semibold text-white">{t('diag.resumeTitle')}</p>
+              <p className="text-sm text-slate-300">{t('diag.resumeBody', { date: new Date(draftOffer.savedAt).toLocaleDateString() })}</p>
+              <div className="flex flex-wrap gap-2">
+                <button onClick={resumeDraft} className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold">{t('diag.resumeButton')}</button>
+                <button onClick={startOverDraft} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium">{t('diag.startOverButton')}</button>
+              </div>
+            </div>
+          )}
           <button onClick={start} className="px-5 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold">{result ? t('diag.rerun') : t('diag.start')}</button>
           {result && promise && <PromisePanel promise={promise} />}
           {result && <div className="pt-2"><ProofLadderView diagnosis={result} profile={profile} /></div>}

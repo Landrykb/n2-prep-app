@@ -64,14 +64,17 @@ export function loadDiagnosis() {
 
 // The Proof Ladder: heights, what each one unlocks, and where the learner
 // stands. Status comes from the diagnosis estimate when there is one.
+// I18N ROUND 2: each rung also carries labelKey/proofKey/unlocksKey into
+// the catalogs (ladder.*); label/proof/unlocks stay as the English data
+// (and the fallback for anything that renders without a translator).
 export const PROOF_LADDER = [
-  { id: 'foundation', label: 'N5–N4 foundation', proof: 'JLPT N5 80 / N4 90 · every section ≥ 19/60', unlocks: 'Daily life without panic; Specified Skilled Worker floor', jlptOrder: 1 },
-  { id: 'bridge', label: 'N3 bridge', proof: 'JLPT N3 95/180', unlocks: 'Everyday Japan handled alone — counters, calls, school', jlptOrder: 2 },
-  { id: 'n2', label: 'N2 — the job filter', proof: 'JLPT N2 90/180', unlocks: 'Passes the résumé filter · HSP +10 pts · B2 evidence for language roles', jlptOrder: 3 },
-  { id: 'bjt400', label: 'BJT 400', proof: 'BJT ≥ 400 (upper J3)', unlocks: 'Counts as the N2 category for HSP points · B2 evidence', jlptOrder: 3 },
-  { id: 'bjt480', label: 'BJT 480', proof: 'BJT ≥ 480 (inside J2)', unlocks: 'Counts as the N1 category for HSP points (15 pts)', jlptOrder: 4 },
-  { id: 'n1', label: 'N1', proof: 'JLPT N1 100/180', unlocks: 'Client-facing, legal/medical, management-track roles · HSP +15 pts', jlptOrder: 4 },
-  { id: 'j1', label: 'BJT J1 / J1+', proof: 'BJT 530–599 (J1) · 600–800 (J1+)', unlocks: 'Appropriate — then sufficient — communication in any business situation', jlptOrder: 5 },
+  { id: 'foundation', label: 'N5–N4 foundation', proof: 'JLPT N5 80 / N4 90 · every section ≥ 19/60', unlocks: 'Daily life without panic; Specified Skilled Worker floor', jlptOrder: 1 , labelKey: 'ladder.foundation.label', proofKey: 'ladder.foundation.proof', unlocksKey: 'ladder.foundation.unlocks' },
+  { id: 'bridge', label: 'N3 bridge', proof: 'JLPT N3 95/180', unlocks: 'Everyday Japan handled alone — counters, calls, school', jlptOrder: 2 , labelKey: 'ladder.bridge.label', proofKey: 'ladder.bridge.proof', unlocksKey: 'ladder.bridge.unlocks' },
+  { id: 'n2', label: 'N2 — the job filter', proof: 'JLPT N2 90/180', unlocks: 'Passes the résumé filter · HSP +10 pts · B2 evidence for language roles', jlptOrder: 3 , labelKey: 'ladder.n2.label', proofKey: 'ladder.n2.proof', unlocksKey: 'ladder.n2.unlocks' },
+  { id: 'bjt400', label: 'BJT 400', proof: 'BJT ≥ 400 (upper J3)', unlocks: 'Counts as the N2 category for HSP points · B2 evidence', jlptOrder: 3 , labelKey: 'ladder.bjt400.label', proofKey: 'ladder.bjt400.proof', unlocksKey: 'ladder.bjt400.unlocks' },
+  { id: 'bjt480', label: 'BJT 480', proof: 'BJT ≥ 480 (inside J2)', unlocks: 'Counts as the N1 category for HSP points (15 pts)', jlptOrder: 4 , labelKey: 'ladder.bjt480.label', proofKey: 'ladder.bjt480.proof', unlocksKey: 'ladder.bjt480.unlocks' },
+  { id: 'n1', label: 'N1', proof: 'JLPT N1 100/180', unlocks: 'Client-facing, legal/medical, management-track roles · HSP +15 pts', jlptOrder: 4 , labelKey: 'ladder.n1.label', proofKey: 'ladder.n1.proof', unlocksKey: 'ladder.n1.unlocks' },
+  { id: 'j1', label: 'BJT J1 / J1+', proof: 'BJT 530–599 (J1) · 600–800 (J1+)', unlocks: 'Appropriate — then sufficient — communication in any business situation', jlptOrder: 5 , labelKey: 'ladder.j1.label', proofKey: 'ladder.j1.proof', unlocksKey: 'ladder.j1.unlocks' },
 ]
 
 const JLPT_ORDER = { N5: 0, N4: 1, N3: 2, N2: 3, N1: 4, 'N1+': 5 }

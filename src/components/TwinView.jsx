@@ -528,8 +528,8 @@ export default function TwinView({ setActive }) {
               <Mascot agent={m.id} size={38} showName={false} />
               <div>
                 <p className="text-sm font-bold text-white">{m.name} <span className="text-slate-400 font-medium">· {m.kanji}</span></p>
-                <p className="text-xs text-[#FF8A75]">{m.role}</p>
-                <p className="text-xs text-slate-400 mt-0.5">{m.job}</p>
+                <p className="text-xs text-[#FF8A75]">{m.roleKey ? t(m.roleKey) : m.role}</p>
+                <p className="text-xs text-slate-400 mt-0.5">{m.jobKey ? t(m.jobKey) : m.job}</p>
               </div>
             </div>
           ))}

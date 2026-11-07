@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { mascotById, brand } from '../lib/brand.js'
+import { useLanguage } from '../hooks/useLanguage.js'
 
 // MASCOT — the fleet's faces. Real character art (Doc 13, Landry-approved
 // 2026-11-05) lives in public/fleet/<id>.png — cut out, transparent.
@@ -18,14 +19,16 @@ import { mascotById, brand } from '../lib/brand.js'
 const RHYTHM = { koe: 3.1, nao: 3.7, saki: 4.1, tsuku: 3.4, hori: 3.9, michi: 4.4 }
 
 export default function Mascot({ agent, size = 40, mood = 'happy', showName = true, label, motion = 'idle' }) {
+  const { t } = useLanguage()
   const m = mascotById(agent)
+  const roleText = m.roleKey ? t(m.roleKey) : m.role
   const resting = mood === 'resting'
   const [imgOk, setImgOk] = useState(true)
   const motionClass = motion === 'none' ? '' : motion === 'bounce' ? 'mascot-bounce' : motion === 'hop' ? 'mascot-hop' : resting ? 'mascot-sway' : 'mascot-bob'
   const rhythm = RHYTHM[m.id] || 3.4
   const showShadow = imgOk && size >= 48 && (motion === 'idle' || motion === 'bounce')
   return (
-    <span className="inline-flex items-center gap-2 shrink-0" role="img" aria-label={label || `${m.name}, ${m.role}`}>
+    <span className="inline-flex items-center gap-2 shrink-0" role="img" aria-label={label || `${m.name}, ${roleText}`}>
       {imgOk ? (
         <span aria-hidden="true" className="relative inline-flex flex-col items-center select-none" style={{ width: Math.round(size * 1.12) }}>
           <img
@@ -76,7 +79,7 @@ export default function Mascot({ agent, size = 40, mood = 'happy', showName = tr
       {showName && (
         <span className="leading-tight">
           <span className="block text-sm font-bold text-white">{m.name}</span>
-          <span className="block text-[11px] text-slate-400">{m.role}</span>
+          <span className="block text-[11px] text-slate-400">{roleText}</span>
         </span>
       )}
     </span>

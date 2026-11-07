@@ -30,6 +30,13 @@ import { quizPool } from './dictionary.js'
 export const LEVEL_IDS = ['N5', 'N4', 'N3', 'N2', 'N1']
 export const ITEMS_PER_SECTION = 2
 
+// The item-bank/selection scheme version. There is no upstream bank
+// version to read — the SELECTION SCHEME is the versioned thing: pools,
+// banding, rotation and the generated-item frames in this module. Bump
+// this whenever a change would make an in-progress diagnosis draft
+// (lib/diagnosisDraft.js) meaningless to resume.
+export const DIAGNOSIS_ITEMS_VERSION = 1
+
 const shuffle = (arr) => [...arr].sort(() => Math.random() - 0.5)
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)]
 

@@ -8,6 +8,7 @@ import Mascot from './Mascot.jsx'
 import MicPrompt from './MicPrompt.jsx'
 import { micExplained, markMicExplained } from '../lib/micConsent.js'
 import { micErrorCopy } from '../lib/speechErrors.js'
+import { useLanguage } from '../hooks/useLanguage.js'
 import TtsButton from './TtsButton.jsx'
 import KanjiTapText from './KanjiTapText.jsx'
 
@@ -57,6 +58,7 @@ function loadMastered() {
 }
 
 export default function VoiceLoop() {
+  const { t } = useLanguage()
   const profile = useMemo(loadProfile, [])
   // Problem-first ordering: scenes matching the learner's pains come first.
   const ordered = useMemo(() => {
@@ -136,7 +138,7 @@ export default function VoiceLoop() {
           note: `Your earlier version: 「${first.text}」 (${first.score}%). Missing: ${first.missing.join('、') || scene.targetPattern}. ${scene.commonError}`,
           source: 'voice', level: scene.level,
         }])
-        setSavedNote('Mastered — and your earlier mistake was saved to your review queue, so it comes back spaced, in a new scene, until it stays fixed.')
+        setSavedNote(t('voice.savedMastered'))
       }
     }
   }
@@ -149,23 +151,23 @@ export default function VoiceLoop() {
       note: `Your version: 「${last.text}」 (${last.score}%). Missing: ${last.missing.join('、') || scene.targetPattern}. ${scene.commonError}`,
       source: 'voice', level: scene.level,
     }])
-    setSavedNote(added ? 'Saved to your review queue (Today → review).' : 'That mistake is already in your queue.')
+    setSavedNote(added ? t('voice.savedQueue') : t('voice.savedAlready'))
   }
 
   return (
     <div className="space-y-6">
       <div>
-        <div className="flex items-center gap-2 mb-1"><MessageSquare size={20} className="text-[#FF8A75]" /><h2 className="text-2xl font-bold text-white">Voice Loop</h2></div>
-        <p className="text-sm text-slate-400">Your version first. Correction second. Repeat until it’s clean — then your mistakes join your review queue. {mastered.size}/{scenes.length} scenes mastered.{profile?.pains?.length ? ' Scenes matching your problem are listed first.' : ''}</p>
+        <div className="flex items-center gap-2 mb-1"><MessageSquare size={20} className="text-[#FF8A75]" /><h2 className="text-2xl font-bold text-white">{t('voice.title')}</h2></div>
+        <p className="text-sm text-slate-400">{t('voice.subtitle', { mastered: mastered.size, total: scenes.length })}{profile?.pains?.length ? t('voice.subtitlePains') : ''}</p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex p-1 rounded-xl bg-bun-700/60 border border-bun-600/40">
-          <button onClick={() => setMode('roleplay')} className={`px-3 py-1.5 rounded-lg text-xs font-medium ${mode === 'roleplay' ? 'bg-[#FF6B57] text-white' : 'text-slate-400'}`}>Roleplay: say your version</button>
-          <button onClick={() => setMode('shadow')} className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 ${mode === 'shadow' ? 'bg-[#FF6B57] text-white' : 'text-slate-400'}`}><Ear size={13} /> Shadowing</button>
+          <button onClick={() => setMode('roleplay')} className={`px-3 py-1.5 rounded-lg text-xs font-medium ${mode === 'roleplay' ? 'bg-[#FF6B57] text-white' : 'text-slate-400'}`}>{t('voice.modeRoleplay')}</button>
+          <button onClick={() => setMode('shadow')} className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 ${mode === 'shadow' ? 'bg-[#FF6B57] text-white' : 'text-slate-400'}`}><Ear size={13} /> {t('voice.modeShadow')}</button>
         </div>
         <select value={domain} onChange={(e) => { setDomain(e.target.value); setIdx(0) }} className="bg-bun-900 border border-bun-600/40 rounded-lg px-2 py-2 text-sm text-slate-200 focus:outline-none focus:border-[#FF6B57]">
-          <option value="all">All domains</option>
+          <option value="all">{t('voice.allDomains')}</option>
           {SCENE_DOMAINS.map((d) => <option key={d} value={d}>{d}</option>)}
         </select>
       </div>
@@ -182,13 +184,13 @@ export default function VoiceLoop() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="text-lg font-bold text-white">{scene.title}</h3>
-            <p className="text-xs text-slate-400">{scene.domain} · {scene.level} · target pattern: {scene.targetPattern}</p>
+            <p className="text-xs text-slate-400">{t('voice.sceneMeta', { domain: scene.domain, level: scene.level, pattern: scene.targetPattern })}</p>
           </div>
-          {isMastered && <span className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"><CheckCircle2 size={13} /> Mastered</span>}
+          {isMastered && <span className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"><CheckCircle2 size={13} /> {t('voice.mastered')}</span>}
         </div>
 
         <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4">
-          <p className="text-xs text-slate-400 mb-1">Your partner says:</p>
+          <p className="text-xs text-slate-400 mb-1">{t('voice.partnerSays')}</p>
           <div className="flex items-start gap-2">
             <p className="text-slate-100 leading-loose flex-1"><KanjiTapText text={scene.partner} /></p>
             <TtsButton text={scene.partner} />
@@ -197,48 +199,48 @@ export default function VoiceLoop() {
 
         {mode === 'roleplay' && (
           <>
-            <p className="text-sm text-slate-200"><span className="text-[#FF8A75] font-semibold">Your turn — say this, your way:</span> {scene.promptEn}</p>
+            <p className="text-sm text-slate-200"><span className="text-[#FF8A75] font-semibold">{t('voice.yourTurn')}</span> {scene.promptEn}</p>
             {showMicPrompt && <MicPrompt onUseMic={confirmMic} onTypeInstead={() => setShowMicPrompt(false)} />}
             <div className="flex gap-2">
-              <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={2} placeholder="Speak with the mic, or type your Japanese here…"
+              <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={2} placeholder={t('call.inputPlaceholder')}
                 className="flex-1 rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 focus:border-[#FF6B57] focus:outline-none" />
               <div className="flex flex-col gap-2">
                 <button onClick={requestListening} disabled={!speechSupported || listening} className="px-3 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] disabled:opacity-40 text-white text-xs font-medium flex items-center gap-1.5">
-                  {listening ? <MicOff size={14} /> : <Mic size={14} />} {listening ? 'Listening…' : 'Speak'}
+                  {listening ? <MicOff size={14} /> : <Mic size={14} />} {listening ? t('call.listeningBtn') : t('voice.speak')}
                 </button>
-                <button onClick={check} disabled={!input.trim()} className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-medium">Check me</button>
+                <button onClick={check} disabled={!input.trim()} className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-medium">{t('voice.checkMe')}</button>
               </div>
             </div>
             {micError && (
               <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
-                <p className="text-sm font-semibold text-amber-200">{micError.title}</p>
-                <p className="text-xs text-amber-100/80 mt-0.5">{micError.body}</p>
+                <p className="text-sm font-semibold text-amber-200">{micError.titleKey ? t(micError.titleKey) : micError.title}</p>
+                <p className="text-xs text-amber-100/80 mt-0.5">{micError.bodyKey ? t(micError.bodyKey) : micError.body}</p>
               </div>
             )}
-            {!speechSupported && <p className="text-xs text-slate-500">Voice recognition isn’t available in this browser — typing your version works exactly the same way here.</p>}
+            {!speechSupported && <p className="text-xs text-slate-500">{t('voice.noVoice')}</p>}
 
             {attempts.map((a, i) => (
               <div key={i} className={`rounded-xl border p-4 space-y-2 ${a.score >= MASTERY ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-bun-700/40 border-bun-600/20'}`}>
-                <p className="text-sm text-slate-200">Attempt {i + 1}: 「{a.text}」 <span className={`font-bold ${a.score >= MASTERY ? 'text-emerald-300' : 'text-amber-300'}`}>{a.score}%</span></p>
-                {a.score < MASTERY && <p className="text-xs text-slate-400">Repeat until you reach {MASTERY}% — that repetition, not the first try, is the learning.</p>}
+                <p className="text-sm text-slate-200">{t('voice.attemptPrefix', { n: i + 1, text: a.text })} <span className={`font-bold ${a.score >= MASTERY ? 'text-emerald-300' : 'text-amber-300'}`}>{a.score}%</span></p>
+                {a.score < MASTERY && <p className="text-xs text-slate-400">{t('voice.repeatHint', { mastery: MASTERY })}</p>}
               </div>
             ))}
 
             {last && (
               <div className="rounded-xl bg-bun-900/50 border border-[#FF6B57]/20 p-4 space-y-3">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-bold text-white flex items-center gap-2"><Mascot agent="nao" size={28} showName={false} /><Sparkles size={15} className="text-[#FF8A75]" /> Correction — from Nao, your fixer</p>
-                  <div className="flex items-center gap-2"><TtsButton text={scene.model} /><span className="text-xs text-slate-400 flex items-center gap-1"><Volume2 size={12} /> hear the model</span></div>
+                  <p className="text-sm font-bold text-white flex items-center gap-2"><Mascot agent="nao" size={28} showName={false} /><Sparkles size={15} className="text-[#FF8A75]" /> {t('voice.correctionTitle', { name: 'Nao' })}</p>
+                  <div className="flex items-center gap-2"><TtsButton text={scene.model} /><span className="text-xs text-slate-400 flex items-center gap-1"><Volume2 size={12} /> {t('voice.hearModel')}</span></div>
                 </div>
                 <p className="text-slate-100 leading-loose"><KanjiTapText text={scene.model} /></p>
-                {scene.alternatives?.[0] && <p className="text-xs text-slate-400">Also natural: {scene.alternatives[0]}</p>}
-                {last.missing.length > 0 && <p className="text-sm text-amber-200">Missing key phrase{last.missing.length > 1 ? 's' : ''}: {last.missing.join('、')}</p>}
-                <p className="text-xs text-slate-300"><span className="text-[#FF8A75] font-semibold">Keigo / register:</span> {scene.keigoNote}</p>
-                <p className="text-xs text-rose-200"><span className="font-semibold">Common error:</span> {scene.commonError}</p>
+                {scene.alternatives?.[0] && <p className="text-xs text-slate-400">{t('voice.alsoNatural', { text: scene.alternatives[0] })}</p>}
+                {last.missing.length > 0 && <p className="text-sm text-amber-200">{t(last.missing.length > 1 ? 'voice.missingMany' : 'voice.missingOne', { list: last.missing.join('、') })}</p>}
+                <p className="text-xs text-slate-300"><span className="text-[#FF8A75] font-semibold">{t('voice.keigoLabel')}</span> {scene.keigoNote}</p>
+                <p className="text-xs text-rose-200"><span className="font-semibold">{t('voice.commonErrorLabel')}</span> {scene.commonError}</p>
                 {savedNote && <p className="text-xs text-emerald-300">{savedNote}</p>}
                 <div className="flex flex-wrap gap-2">
-                  {!isMastered && <button onClick={() => setInput('')} className="px-3 py-1.5 rounded-lg bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-xs font-medium flex items-center gap-1"><RotateCcw size={13} /> Say it again</button>}
-                  {last.score < MASTERY && <button onClick={saveMistakeNow} className="px-3 py-1.5 rounded-lg bg-bun-700 hover:bg-bun-600 text-slate-200 text-xs font-medium flex items-center gap-1"><Save size={13} /> Save this mistake to my queue</button>}
+                  {!isMastered && <button onClick={() => setInput('')} className="px-3 py-1.5 rounded-lg bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-xs font-medium flex items-center gap-1"><RotateCcw size={13} /> {t('voice.sayAgain')}</button>}
+                  {last.score < MASTERY && <button onClick={saveMistakeNow} className="px-3 py-1.5 rounded-lg bg-bun-700 hover:bg-bun-600 text-slate-200 text-xs font-medium flex items-center gap-1"><Save size={13} /> {t('voice.saveMistake')}</button>}
                 </div>
               </div>
             )}
@@ -247,36 +249,36 @@ export default function VoiceLoop() {
 
         {mode === 'shadow' && (
           <div className="space-y-4">
-            <p className="text-sm text-slate-300">Shadowing: first make sure you <em>understand</em> the line — shadowing words you don’t understand is just parroting. Listen twice, then speak along, almost simultaneously, matching rhythm and pitch.</p>
+            <p className="text-sm text-slate-300">{t('voice.shadowIntroA')}<em>{t('voice.shadowIntroEm')}</em>{t('voice.shadowIntroB')}</p>
             <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4 flex items-start gap-2">
               <p className="text-slate-100 leading-loose flex-1"><KanjiTapText text={scene.model} /></p>
               <TtsButton text={scene.model} />
             </div>
             {showMicPrompt && <MicPrompt onUseMic={confirmMic} onTypeInstead={() => setShowMicPrompt(false)} />}
             <div className="flex gap-2">
-              <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={2} placeholder="After shadowing, type what you actually said — self-check honestly…"
+              <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={2} placeholder={t('voice.shadowPlaceholder')}
                 className="flex-1 rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 focus:border-[#FF6B57] focus:outline-none" />
               <div className="flex flex-col gap-2">
-                <button onClick={requestListening} disabled={!speechSupported || listening} className="px-3 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] disabled:opacity-40 text-white text-xs font-medium flex items-center gap-1.5">{listening ? <MicOff size={14} /> : <Mic size={14} />} {listening ? 'Listening…' : 'Speak'}</button>
-                <button onClick={check} disabled={!input.trim()} className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-medium">Self-check</button>
+                <button onClick={requestListening} disabled={!speechSupported || listening} className="px-3 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] disabled:opacity-40 text-white text-xs font-medium flex items-center gap-1.5">{listening ? <MicOff size={14} /> : <Mic size={14} />} {listening ? t('call.listeningBtn') : t('voice.speak')}</button>
+                <button onClick={check} disabled={!input.trim()} className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-medium">{t('voice.selfCheck')}</button>
               </div>
             </div>
             {micError && (
               <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
-                <p className="text-sm font-semibold text-amber-200">{micError.title}</p>
-                <p className="text-xs text-amber-100/80 mt-0.5">{micError.body}</p>
+                <p className="text-sm font-semibold text-amber-200">{micError.titleKey ? t(micError.titleKey) : micError.title}</p>
+                <p className="text-xs text-amber-100/80 mt-0.5">{micError.bodyKey ? t(micError.bodyKey) : micError.body}</p>
               </div>
             )}
-            {last && <p className="text-sm text-slate-200">Shadow match: <span className={`font-bold ${last.score >= MASTERY ? 'text-emerald-300' : 'text-amber-300'}`}>{last.score}%</span>{last.missing.length ? <> · missing: {last.missing.join('、')}</> : ''}</p>}
+            {last && <p className="text-sm text-slate-200">{t('voice.shadowMatch')} <span className={`font-bold ${last.score >= MASTERY ? 'text-emerald-300' : 'text-amber-300'}`}>{last.score}%</span>{last.missing.length ? <>{t('voice.shadowMissing', { list: last.missing.join('、') })}</> : ''}</p>}
             <div className="space-y-2">
-              {[['heard', 'I listened twice and understood every word first'], ['matched', 'I matched the timing and intonation, not just the words'], ['meaning', 'I could explain what this line means and when to use it']].map(([key, label]) => (
+              {[['heard', 'voice.shadowCheckHeard'], ['matched', 'voice.shadowCheckMatched'], ['meaning', 'voice.shadowCheckMeaning']].map(([key, labelKey]) => (
                 <label key={key} className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
-                  <input type="checkbox" checked={shadowChecks[key]} onChange={(e) => setShadowChecks((c) => ({ ...c, [key]: e.target.checked }))} className="accent-[#FF6B57]" /> {label}
+                  <input type="checkbox" checked={shadowChecks[key]} onChange={(e) => setShadowChecks((c) => ({ ...c, [key]: e.target.checked }))} className="accent-[#FF6B57]" /> {t(labelKey)}
                 </label>
               ))}
             </div>
             {shadowChecks.heard && shadowChecks.matched && shadowChecks.meaning && last && last.score >= 60 && (
-              <p className="text-sm text-emerald-300 flex items-center gap-2"><CheckCircle2 size={15} /> Shadowing round complete. Do the same 30–60 seconds again tomorrow — that’s where it becomes automatic.</p>
+              <p className="text-sm text-emerald-300 flex items-center gap-2"><CheckCircle2 size={15} /> {t('voice.shadowComplete')}</p>
             )}
           </div>
         )}

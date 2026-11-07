@@ -518,4 +518,142 @@ console.log('guest entry + first-run catalogs (Doc 12 audit #1/#2, fixed 2026-11
   })
 }
 
+// ——— I18N ROUND 2 ———
+console.log('i18n round 2 — promise mirrors, loop stats, diagnosis draft:')
+{
+  const { t: tr2 } = await import('../src/lib/i18n.js')
+  const enTr2 = (k, v) => tr2('en', k, v)
+  const frTr2 = (k, v) => tr2('fr', k, v)
+  const { computeSixtyDayPromise, resolvePromiseText } = await import('../src/lib/promise.js')
+
+  const resolveAll = (p, tr) => ({
+    height: resolvePromiseText(tr, p.heightKey, p.height),
+    reasoning: p.reasoning.map((line, i) => resolvePromiseText(tr, p.reasoningKeys[i], line)),
+    plan: p.plan.map((line, i) => resolvePromiseText(tr, p.planKeys[i], line)),
+    honesty: resolvePromiseText(tr, { key: p.honestyKey }, p.honesty),
+  })
+
+  check('promise (next-level): resolving the key mirrors in EN reproduces the stored text exactly', () => {
+    const p = computeSixtyDayPromise({ jlptEstimate: 'N3', sections: { language: 45, reading: 40, listening: 42 }, total: 127 }, {})
+    assert.equal(p.kind, 'next-level')
+    assert.deepEqual(resolveAll(p, enTr2), { height: p.height, reasoning: p.reasoning, plan: p.plan, honesty: p.honesty })
+  })
+
+  check('promise (rescue, section below the line): EN byte-identity incl. nested section label + life line', () => {
+    const p = computeSixtyDayPromise({ jlptEstimate: 'N2', sections: { language: 30, reading: 12, listening: 28 }, total: 70 }, {})
+    assert.equal(p.kind, 'rescue')
+    assert.deepEqual(resolveAll(p, enTr2), { height: p.height, reasoning: p.reasoning, plan: p.plan, honesty: p.honesty })
+    assert.ok(p.height.includes('handle one full day of real life'), p.height)
+  })
+
+  check('promise (BJT side line + N1 margin): EN byte-identity incl. the note suffix', () => {
+    const p = computeSixtyDayPromise({ jlptEstimate: 'N3', sections: { language: 45, reading: 40, listening: 42 }, total: 127, bjtScore: 350, bjtBand: 'J3' }, { pains: ['keigo'] })
+    assert.equal(p.reasoning.length, 4)
+    assert.ok(p.reasoning[3].includes('next line is 400 (the N2-category line'), p.reasoning[3])
+    assert.deepEqual(resolveAll(p, enTr2), { height: p.height, reasoning: p.reasoning, plan: p.plan, honesty: p.honesty })
+    const n1 = computeSixtyDayPromise({ jlptEstimate: 'N1', sections: { language: 40, reading: 38, listening: 35 }, total: 113 }, { persona: 'parent' })
+    assert.equal(n1.kind, 'n1-margin')
+    assert.deepEqual(resolveAll(n1, enTr2), { height: n1.height, reasoning: n1.reasoning, plan: n1.plan, honesty: n1.honesty })
+  })
+
+  check('promise: a user-written real-life goal carries no life key and passes through untouched', () => {
+    const p = computeSixtyDayPromise({ jlptEstimate: 'N2', sections: { language: 30, reading: 12, listening: 28 }, total: 70 }, { realLifeGoal: 'Survive the PTA meeting' })
+    assert.equal(p.lifeKey, null)
+    assert.ok(p.height.includes('survive the PTA meeting'), p.height)
+    assert.equal(resolvePromiseText(enTr2, p.heightKey, p.height), p.height)
+    assert.equal(resolvePromiseText(frTr2, p.heightKey, p.height).includes('survive the PTA meeting'), true)
+  })
+
+  check('promise: the same mirrors resolve in French (render-time language, stored record untouched)', () => {
+    const p = computeSixtyDayPromise({ jlptEstimate: 'N3', sections: { language: 45, reading: 40, listening: 42 }, total: 127 }, {})
+    const fr = resolveAll(p, frTr2)
+    assert.ok(fr.height.startsWith('Réussir N2'), fr.height)
+    assert.ok(fr.reasoning[0].startsWith('Votre bilan vous estime'), fr.reasoning[0])
+    assert.ok(p.height.startsWith('Pass N2'), p.height)
+  })
+
+  const { agentLoopStats } = await import('../src/lib/loopStats.js')
+  const loopTwin = {
+    mode: 'cruise',
+    rhythm: { callsKept: 3 },
+    speaking: { attempts: 0, masteredScenes: 2 },
+    fingerprint: { a: { count: 7 } },
+    vocab: { bySource: { reader: 4, mining: 6 } },
+  }
+  const loopMetrics = [{ type: 'diagnosis_completed', at: new Date().toISOString() }, { type: 'diagnosis_completed', at: new Date().toISOString() }]
+
+  check('loopStats: no translator → English, byte-identical to the pre-catalogue strings', () => {
+    const s = agentLoopStats({ twin: loopTwin, metrics: loopMetrics })
+    assert.equal(s.michi.stat, '2 checkups read')
+    assert.equal(s.michi.detail, 'Mode: Cruise')
+    assert.equal(s.saki.stat, null)
+    assert.equal(s.koe.stat, '3 calls taken')
+    assert.equal(s.koe.detail, '2 scenes mastered in Voice Loop')
+    assert.equal(s.nao.stat, '7 slips spotted')
+    assert.equal(s.hori.stat, '10 words mined into your queue')
+    assert.equal(s.hori.detail, '4 from the Reader · 6 from your documents')
+  })
+
+  check('loopStats: a French translator localises every stat and the mode line', () => {
+    const s = agentLoopStats({ twin: loopTwin, metrics: loopMetrics, tr: frTr2 })
+    assert.equal(s.michi.stat, '2 bilans lus')
+    assert.equal(s.michi.detail, 'Mode : Croisière')
+    assert.equal(s.koe.stat, '3 appels passés')
+    assert.equal(s.koe.detail, '2 scènes maîtrisées dans le Voice Loop')
+    assert.equal(s.nao.stat, '7 erreurs repérées')
+    assert.equal(s.hori.stat, '10 mots minés vers votre file')
+    assert.equal(s.hori.detail, '4 depuis le Reader · 6 depuis vos documents')
+  })
+
+  // Diagnosis draft lifecycle (audit #6) with a localStorage fake.
+  const store = new Map()
+  const prevLS = globalThis.localStorage
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  }
+  try {
+    const draft = await import('../src/lib/diagnosisDraft.js')
+    const runState = { phase: 'quiz', step: 3, levelIdx: 3, current: { kind: 'vocab', level: 'N2', prompt: 'p', options: [] }, answers: [{ level: 'N3', correct: true, kind: 'vocab' }], itemSet: null, lIdx: 0, lCorrect: 0, rIdx: 0, rCorrect: 0, poolNote: '', usedWords: ['猫'] }
+    const now = new Date('2026-11-07T10:00:00Z')
+
+    check('diagnosis draft: save → load round-trips the run state, stamped with the bank version', () => {
+      assert.equal(draft.saveDiagnosisDraft(runState, now), true)
+      const loaded = draft.loadDiagnosisDraft(now)
+      assert.ok(loaded)
+      assert.equal(loaded.bankVersion, 1)
+      assert.deepEqual(loaded.state, runState)
+    })
+
+    check('diagnosis draft: a draft 7 days old or older is refused; 6 days is fine', () => {
+      assert.ok(draft.loadDiagnosisDraft(new Date('2026-11-13T09:59:59Z')))
+      assert.equal(draft.loadDiagnosisDraft(new Date('2026-11-14T10:00:00Z')), null)
+      assert.equal(draft.isDraftFresh(draft.makeDiagnosisDraft(runState, now), new Date('2026-11-20T10:00:00Z')), false)
+    })
+
+    check('diagnosis draft: bank-version mismatch and malformed drafts are refused', () => {
+      const stale = draft.makeDiagnosisDraft(runState, now); stale.bankVersion = 99
+      store.set(draft.DIAGNOSIS_DRAFT_KEY, JSON.stringify(stale))
+      assert.equal(draft.loadDiagnosisDraft(now), null)
+      store.set(draft.DIAGNOSIS_DRAFT_KEY, '{not json')
+      assert.equal(draft.loadDiagnosisDraft(now), null)
+      store.set(draft.DIAGNOSIS_DRAFT_KEY, JSON.stringify({ v: 1, bankVersion: 1, savedAt: now.toISOString(), state: { phase: 'result', answers: [] } }))
+      assert.equal(draft.loadDiagnosisDraft(now), null)
+      store.set(draft.DIAGNOSIS_DRAFT_KEY, JSON.stringify({ v: 1, bankVersion: 1, savedAt: now.toISOString(), state: { phase: 'quiz', answers: [], current: null } }))
+      assert.equal(draft.loadDiagnosisDraft(now), null)
+    })
+
+    check('diagnosis draft: clear removes it (finish / start-over path)', () => {
+      draft.saveDiagnosisDraft(runState, now)
+      assert.ok(draft.loadDiagnosisDraft(now))
+      draft.clearDiagnosisDraft()
+      assert.equal(draft.loadDiagnosisDraft(now), null)
+    })
+  } finally {
+    if (prevLS === undefined) delete globalThis.localStorage
+    else globalThis.localStorage = prevLS
+  }
+}
+
 console.log(`\nphase2: ${passed} checks passed (incl. scheduler-auth)`)
