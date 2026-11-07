@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Mail, PenLine } from 'lucide-react'
 import { refreshTwin, topPatterns, diagnosisDeltas, loadDiagnosisHistory } from '../lib/twin.js'
+import { shadowCoachLetter } from '../lib/coachShadow.js'
 import { loadCallState } from '../lib/calls.js'
 import { detectMode } from '../lib/modes.js'
 import { SECTION_KEYS } from '../lib/levels.js'
@@ -120,6 +121,15 @@ export default function CoachLetter() {
   )
 
   const writeMine = () => setLetters(saveLetter(key, generateCoachLetter()))
+
+  // Coach SHADOW MODE (Doc 05 §9.1): when this week's rules letter is
+  // on screen — freshly written or re-opened — Michi's AI shadow
+  // writes its own letter from the same facts, once per week, and
+  // the pair is logged for comparison. Invisible by design: it can
+  // never change what renders here.
+  useEffect(() => {
+    if (current) shadowCoachLetter(current)
+  }, [current])
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
