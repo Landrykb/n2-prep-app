@@ -83,10 +83,67 @@ function trimDraftToFit(text: string, max = 1200): string | null {
   return cut.slice(0, boundary + 1)
 }
 
-async function generateDraft(band: string, topic: string, chars: number, forbidden: string[]): Promise<{ text: string | null; reason: string }> {
+
+// Model chain (2026-11-08): relying on 'openrouter/free'
+// alone silently broke production generation — the router's
+// free pool changed (Nov 2026 catalogue: mostly tiny, code and
+// reasoning models) and every response came back in a shape
+// the old parser rejected: generation_failed { reason:
+// 'bad_response', attempts: 0 } on every attempt, both
+// surfaces, for two days, while /read kept answering with the
+// one benched passage. Each attempt now walks NAMED free
+// models (verified present in the catalogue the day this
+// shipped; Gemma first — multilingual, instruction-tuned),
+// and the parser accepts the shapes those models actually
+// return. READER_MODEL, when set, is tried first.
+const GEN_MODEL_CHAIN = [
+  'google/gemma-4-31b-it:free',
+  'google/gemma-4-26b-a4b-it:free',
+  'openrouter/free',
+]
+
+function genModels(): string[] {
+  const pinned = Deno.env.get('READER_MODEL') ?? ''
+  const chain = pinned ? [pinned, ...GEN_MODEL_CHAIN] : [...GEN_MODEL_CHAIN]
+  return [...new Set(chain)]
+}
+
+// Pull the passage text out of a chat-completions response,
+// tolerantly: plain string content (the classic shape),
+// content as an array of parts (several free providers),
+// the legacy completions `text` field, an error object riding
+// a 200, or a reasoning model that spent its whole answer
+// thinking (reasoning_only — chain-of-thought is not a
+// passage and is never served as one).
+function extractContent(data: unknown): { text: string | null; reason: string } {
+  if (!data || typeof data !== 'object') return { text: null, reason: 'bad_response' }
+  const d = data as Record<string, unknown>
+  if (d.error) return { text: null, reason: 'api_error' }
+  const choices = d.choices as Array<Record<string, unknown>> | undefined
+  const choice = choices?.[0]
+  if (!choice) return { text: null, reason: 'bad_response' }
+  const message = choice.message as Record<string, unknown> | undefined
+  const content = message?.content
+  if (typeof content === 'string' && content.trim()) return { text: content, reason: 'ok' }
+  if (Array.isArray(content)) {
+    const joined = content
+      .map((part) => {
+        const p = part as Record<string, unknown> | null
+        return typeof p?.text === 'string' ? p.text : ''
+      })
+      .join('')
+    if (joined.trim()) return { text: joined, reason: 'ok' }
+  }
+  if (typeof choice.text === 'string' && choice.text.trim()) return { text: choice.text, reason: 'ok' }
+  if (typeof message?.reasoning === 'string' && (message.reasoning as string).trim()) {
+    return { text: null, reason: 'reasoning_only' }
+  }
+  return { text: null, reason: 'bad_response' }
+}
+
+async function generateDraft(band: string, topic: string, chars: number, forbidden: string[], model: string): Promise<{ text: string | null; reason: string }> {
   const key = Deno.env.get('OPENROUTER_API_KEY') ?? ''
   if (!key) return { text: null, reason: 'no_key' }
-  const model = Deno.env.get('READER_MODEL') ?? 'openrouter/free'
   const system =
     'You write short, natural Japanese reading passages for a language-learning app. ' +
     'Write plain, warm, everyday Japanese at exactly the requested JLPT level, using mostly simple everyday words. ' +
@@ -124,8 +181,9 @@ async function generateDraft(band: string, topic: string, chars: number, forbidd
       return { text: null, reason: `http_${res.status}` }
     }
     const data = await res.json().catch(() => null)
-    const raw = data?.choices?.[0]?.message?.content
-    if (typeof raw !== 'string') return { text: null, reason: 'bad_response' }
+    const extracted = extractContent(data)
+    if (extracted.text === null) return { text: null, reason: extracted.reason }
+    const raw = extracted.text
     const cleaned = raw.replace(/```[a-z]*\n?/gi, '').replace(/```/g, '').trim()
     if (cleaned.length < 30) return { text: null, reason: 'too_short' }
     const text = trimDraftToFit(cleaned)
@@ -288,9 +346,12 @@ serve(async (req: Request) => {
       const chars = GEN_LENGTH_BY_BAND[serveBand] ?? 200
       let forbidden: string[] = []
       let calls = 0
+      const models = genModels()
+      let lastModel = ''
       let lastReason: string | null = null
       for (let attempt = 1; attempt <= GEN_MAX_ATTEMPTS; attempt++) {
-        const { text: draft, reason } = await generateDraft(serveBand, topic, chars, forbidden)
+        lastModel = models[(attempt - 1) % models.length]
+        const { text: draft, reason } = await generateDraft(serveBand, topic, chars, forbidden, lastModel)
         if (draft === null) {
           lastReason = reason
           console.error(`reader-serve: generation attempt ${attempt} produced no draft reason=${reason}`)
@@ -324,7 +385,7 @@ serve(async (req: Request) => {
           const { error: insertError } = await supabaseAdmin.from('reading_passages').insert(passage)
           if (insertError) console.error('reader-serve: foundry passage cache insert failed')
           await logEvent('passage_generated', {
-            passageId, band: serveBand, topic, attempts: attempt, ratio: Math.round(verdict.ratio * 1000) / 1000, surface: 'web',
+            passageId, band: serveBand, topic, attempts: attempt, ratio: Math.round(verdict.ratio * 1000) / 1000, model: lastModel, surface: 'web',
           })
           picked = { passage, ratio: verdict.ratio }
           generated = true
@@ -335,7 +396,7 @@ serve(async (req: Request) => {
       }
       if (!picked) {
         genReason = lastReason
-        await logEvent('generation_failed', { band: serveBand, topic, attempts: calls, reason: lastReason, surface: 'web' })
+        await logEvent('generation_failed', { band: serveBand, topic, attempts: calls, reason: lastReason, model: lastModel, surface: 'web' })
       }
     }
   }
