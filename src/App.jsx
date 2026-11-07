@@ -494,10 +494,6 @@ function Sidebar({ active, setActive, mobileOpen, setMobileOpen, guest = false, 
               </button>
             </div>
           )}
-          <div className="rounded-xl bg-bun-700/60 p-4 border border-bun-600/30">
-            <p className="text-sm font-semibold text-slate-100">{t('shell.footer.title')}</p>
-            <p className="text-xs text-slate-400 mt-1">{t('shell.footer.body')}</p>
-          </div>
         </div>
       </aside>
       {mobileOpen && <div onClick={() => setMobileOpen(false)} className="fixed inset-0 bg-black/50 z-20 lg:hidden" />}
