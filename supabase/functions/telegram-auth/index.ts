@@ -64,14 +64,31 @@ serve(async (req: Request) => {
   }
 
   const body = await req.json().catch(() => null) as Record<string, unknown> | null
-  const validation = await validateTelegramInitData(body?.initData, botToken)
-  if (!validation.ok) {
-    return json({ error: 'invalid_init_data' }, 401)
-  }
 
   const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
     auth: { persistSession: false },
   })
+
+  // TEMPORARY DIAGNOSTICS (2026-11-07, Landry's Mini App is not
+  // recognised — the positive path never landed for him): record
+  // ONLY the stage + reason code of each attempt in
+  // telegram_auth_diag. Never initData, never hashes, never email.
+  // Remove once the failure stage is known and fixed.
+  const diag = async (stage: string, reason?: string, tgUser?: number) => {
+    try {
+      await supabaseAdmin.from('telegram_auth_diag').insert({
+        stage,
+        reason: reason ?? null,
+        tg_user: tgUser ?? null,
+      })
+    } catch { /* diagnostics must never break the door */ }
+  }
+
+  const validation = await validateTelegramInitData(body?.initData, botToken)
+  if (!validation.ok) {
+    await diag('validation', validation.reason)
+    return json({ error: 'invalid_init_data' }, 401)
+  }
 
   const findLink = async (column: 'telegram_user_id' | 'chat_id') => {
     const { data, error } = await supabaseAdmin
@@ -91,6 +108,7 @@ serve(async (req: Request) => {
     // shape. New claims store both explicitly.
     const link = (await findLink('telegram_user_id')) ?? (await findLink('chat_id'))
     if (!link?.user_id || !link.linked_at) {
+      await diag('link_lookup', 'not_linked', validation.telegramUserId)
       return json({ error: 'not_linked' }, 403)
     }
 
@@ -98,6 +116,7 @@ serve(async (req: Request) => {
     const email = existing?.user?.email
     if (userError || !existing?.user || existing.user.id !== link.user_id || !email) {
       console.error('telegram-auth: linked account could not be resolved')
+      await diag('get_user', 'account_unavailable', validation.telegramUserId)
       return json({ error: 'account_unavailable' }, 500)
     }
 
@@ -108,8 +127,10 @@ serve(async (req: Request) => {
     const tokenHash = generated?.properties?.hashed_token
     if (linkError || !generated?.user || generated.user.id !== link.user_id || !tokenHash) {
       console.error('telegram-auth: session exchange could not be created')
+      await diag('generate_link', 'session_unavailable', validation.telegramUserId)
       return json({ error: 'session_unavailable' }, 500)
     }
+    await diag('success', undefined, validation.telegramUserId)
 
     // Deliberately no action_link and no email in this response:
     // the client needs only the one-time hash and the account id
@@ -117,6 +138,7 @@ serve(async (req: Request) => {
     return json({ ok: true, token_hash: tokenHash, user_id: link.user_id })
   } catch {
     console.error('telegram-auth: exchange failed')
+    await diag('exchange', 'threw', validation.telegramUserId)
     return json({ error: 'Service unavailable' }, 500)
   }
 })
