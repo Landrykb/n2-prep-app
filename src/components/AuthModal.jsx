@@ -1,18 +1,28 @@
 import { useState } from 'react'
 import { useAuth } from '../hooks/useAuth.js'
-import { Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Eye, EyeOff, Loader2, X } from 'lucide-react'
 import { brand } from '../lib/brand.js'
 import { useLanguage } from '../hooks/useLanguage.js'
 import Mascot from './Mascot.jsx'
 
-export default function AuthModal() {
-  const { signUp, signIn, isSupabaseConfigured, telegramBridgeStatus } = useAuth()
+// Two doors, one component (Doc 12 audit #1):
+//   variant 'gate'    — the signed-out wall on first load. Adds
+//                       [Continue As Guest]: into the app on the local
+//                       guest path, no account, choice remembered.
+//   variant 'overlay' — opened deliberately from inside the app (a
+//                       guest tapping Create Your Account). Dismissible;
+//                       on sign-in the AuthContext effect adopts the
+//                       guest's work into the account (anonMerge +
+//                       stateSync), exactly as from the gate.
+export default function AuthModal({ variant = 'gate', initialMode = 'signin', onClose } = {}) {
+  const { signUp, signIn, resetPassword, continueAsGuest, isSupabaseConfigured, telegramBridgeStatus } = useAuth()
   const { t } = useLanguage()
-  const [mode, setMode] = useState('signin')
+  const [mode, setMode] = useState(initialMode)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [show, setShow] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [resetting, setResetting] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
 
@@ -34,6 +44,26 @@ export default function AuthModal() {
     }
   }
 
+  const forgotPassword = async () => {
+    setError('')
+    setMessage('')
+    if (!email.trim()) {
+      setError(t('auth.resetNeedsEmail'))
+      return
+    }
+    setResetting(true)
+    try {
+      const { error: err } = await resetPassword(email.trim())
+      if (err) throw err
+      // Honest copy: sent either way — never confirms the account exists.
+      setMessage(t('auth.resetSent'))
+    } catch (err) {
+      setError(err.message || t('auth.fallbackError'))
+    } finally {
+      setResetting(false)
+    }
+  }
+
   if (!isSupabaseConfigured) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-bun-900 p-6">
@@ -48,7 +78,12 @@ export default function AuthModal() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-bun-900/95 p-6">
-      <div className="w-full max-w-md rounded-3xl glass p-8 card-glow">
+      <div className="relative w-full max-w-md rounded-3xl glass p-8 card-glow">
+        {variant === 'overlay' && onClose && (
+          <button onClick={onClose} aria-label={t('shell.menu.close')} className="absolute right-4 top-4 p-2 rounded-lg bg-bun-700 text-slate-400 hover:text-white">
+            <X size={16} />
+          </button>
+        )}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4"><Mascot agent="koe" size={56} mood="happy" showName={false} /></div>
           <p className="text-xs font-semibold tracking-[0.2em] uppercase text-[#FF8A75]">{brand.name} · {brand.tagline}</p>
@@ -105,6 +140,14 @@ export default function AuthModal() {
           </button>
         </form>
 
+        {mode === 'signin' && (
+          <div className="mt-3 text-center">
+            <button onClick={forgotPassword} disabled={resetting} className="text-sm text-slate-400 hover:text-slate-200 font-medium disabled:opacity-60">
+              {resetting ? '…' : t('auth.forgotPassword')}
+            </button>
+          </div>
+        )}
+
         <div className="mt-6 text-center text-sm text-slate-400">
           {mode === 'signin' ? t('auth.newHere') : t('auth.haveAccount')}{' '}
           <button
@@ -114,6 +157,18 @@ export default function AuthModal() {
             {mode === 'signin' ? t('auth.signUp') : t('auth.signIn')}
           </button>
         </div>
+
+        {variant === 'gate' && (
+          <div className="mt-8 border-t border-bun-600/30 pt-6 text-center">
+            <button
+              onClick={continueAsGuest}
+              className="w-full py-2.5 rounded-xl bg-bun-700/70 hover:bg-bun-700 border border-bun-600/40 text-slate-200 font-medium transition"
+            >
+              {t('auth.continueAsGuest')}
+            </button>
+            <p className="text-xs text-slate-500 mt-2">{t('auth.guestHint')}</p>
+          </div>
+        )}
       </div>
     </div>
   )

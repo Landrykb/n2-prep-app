@@ -50,7 +50,7 @@ const plural = (n, one, many) => (n === 1 ? one : many)
  *   topPattern   — { label } of the Twin's top error pattern, or null
  *   workingLevel — { band } from twinEstimate, or null
  */
-export function agentLoopStats({ twin, metrics = [], tomorrowPlan = null, topPattern = null, workingLevel = null } = {}) {
+export function agentLoopStats({ twin, metrics = [], tomorrowPlan = null, topPattern = null, workingLevel = null, tr = null } = {}) {
   const t = twin || {}
   const events = Array.isArray(metrics) ? metrics : []
   const vocab = t.vocab || {}
@@ -83,7 +83,13 @@ export function agentLoopStats({ twin, metrics = [], tomorrowPlan = null, topPat
     },
     saki: {
       stat: tomorrowPlan ? `~${tomorrowPlan.minutes} min planned for tomorrow` : null,
-      detail: tomorrowPlan?.note || null,
+      // The plan line resolves from its catalog keys when a translator
+      // is passed (GrowthLoop); otherwise the stored English note —
+      // the record of the plan — is shown as-is.
+      detail: !tomorrowPlan ? null
+        : tr && tomorrowPlan.noteKey
+          ? tr(tomorrowPlan.noteKey, { title: tomorrowPlan.sceneTitle, cards: tomorrowPlan.cardBudget, minutes: tomorrowPlan.minutes, reason: tr(tomorrowPlan.noteVars?.reasonKey || 'planner.reasonMatched', tomorrowPlan.noteVars?.reasonVars || {}) })
+          : tomorrowPlan.note || null,
     },
     koe: {
       stat: kept > 0

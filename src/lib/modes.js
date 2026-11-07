@@ -19,28 +19,34 @@ import { recordModeSpellsForTwin } from './day30.js'
 import { daysSinceLastVisit } from './profile.js'
 import { getExamSetting } from './examDate.js'
 import { resolveExamDate, daysUntil } from './nextJLPT.js'
+import { t as translate } from './i18n.js'
 
+// Labels and Michi's one-liners live in the language catalogs
+// (mode.<id>.label / mode.<id>.line — Doc 20, first-run slice,
+// 2026-11-07): the data carries KEYS, consumers resolve at render
+// with their bound translator. Lib-internal consumers (Coach facts,
+// the stored letter) resolve with the English default, so stored
+// records keep their generation language.
 export const MODES = {
-  surge: {
-    id: 'surge', label: 'Surge',
-    michiLine: 'You’re climbing — this is a stretch week. If you want more today, your session has room to grow. Wanting more is earned, never assumed.',
-  },
-  cruise: {
-    id: 'cruise', label: 'Cruise',
-    michiLine: 'Steady week. Same small size, same direction — that steadiness is exactly what compounds.',
-  },
-  slump: {
-    id: 'slump', label: 'Slump',
-    michiLine: 'The last few days were heavy going, so Saki made today smaller on purpose. Small and finished beats big and avoided — every time.',
-  },
-  badweek: {
-    id: 'badweek', label: 'Bad Week',
-    michiLine: 'We kept your place. Nothing piled up, nothing is owed — the fleet just rested with you. One tiny win is all today asks.',
-  },
-  event: {
-    id: 'event', label: 'Event Approach',
-    michiLine: 'Your exam is close now, so everything narrows to rehearsal. General progress pauses without penalty and resumes right after.',
-  },
+  surge: { id: 'surge', labelKey: 'mode.surge.label', lineKey: 'mode.surge.line' },
+  cruise: { id: 'cruise', labelKey: 'mode.cruise.label', lineKey: 'mode.cruise.line' },
+  slump: { id: 'slump', labelKey: 'mode.slump.label', lineKey: 'mode.slump.line' },
+  badweek: { id: 'badweek', labelKey: 'mode.badweek.label', lineKey: 'mode.badweek.line' },
+  event: { id: 'event', labelKey: 'mode.event.label', lineKey: 'mode.event.line' },
+}
+
+const enTr = (key, vars) => translate('en', key, vars)
+
+/** Mode label in the caller's language (English when no translator is passed). */
+export function modeLabel(modeId, tr = enTr) {
+  const m = MODES[modeId]
+  return m ? tr(m.labelKey) : modeId
+}
+
+/** Michi's one-liner for the mode, same resolution rule as modeLabel. */
+export function modeLine(modeId, tr = enTr) {
+  const m = MODES[modeId]
+  return m ? tr(m.lineKey) : ''
 }
 
 function avg(nums) {

@@ -3,37 +3,43 @@
 // profile — the app starts from the person's problem, not from features.
 
 import { emitLearnerStateSaved } from './stateEvents.js'
+import { t as translate } from './i18n.js'
+
+// Onboarding option copy lives in the language catalogs (Doc 20,
+// first-run slice 2026-11-07): the data below carries KEYS
+// (profile.persona.* / profile.pain.* / profile.target.*), consumers
+// resolve at render. derivePlan composes its line through a
+// translator argument — components pass their bound t; lib-internal
+// callers get the English default, byte-identical to the old strings.
+const enTr = (key, vars) => translate('en', key, vars)
 
 export const PROFILE_KEY = 'jpn:profile:v1'
 export const DIAGNOSIS_KEY = 'jpn:diagnosis:v1'
 export const LAST_VISIT_KEY = 'jpn:last-visit:v1'
 
 export const PERSONAS = [
-  { id: 'resident', label: 'Resident worker in Japan', desc: 'Living and working here — Japanese is daily life, not a hobby' },
-  { id: 'job-hunter', label: 'Job hunter needing N2+', desc: 'Blocked at the résumé filter until the level is on paper' },
-  { id: 'student', label: 'Student', desc: 'Building toward study, work, or a longer future in Japan' },
-  { id: 'ssw', label: 'Specified Skilled Worker', desc: 'Needs solid everyday + workplace Japanese to grow' },
-  { id: 'business', label: 'Business professional (BJT / keigo)', desc: 'Meetings, clients, email — register is the job' },
-  { id: 'parent', label: 'Parent in Japan', desc: 'School notes, city office, hospital — for your family, not just you' },
+  { id: 'resident', labelKey: 'profile.persona.resident.label', descKey: 'profile.persona.resident.desc' },
+  { id: 'job-hunter', labelKey: 'profile.persona.job-hunter.label', descKey: 'profile.persona.job-hunter.desc' },
+  { id: 'student', labelKey: 'profile.persona.student.label', descKey: 'profile.persona.student.desc' },
+  { id: 'ssw', labelKey: 'profile.persona.ssw.label', descKey: 'profile.persona.ssw.desc' },
+  { id: 'business', labelKey: 'profile.persona.business.label', descKey: 'profile.persona.business.desc' },
+  { id: 'parent', labelKey: 'profile.persona.parent.label', descKey: 'profile.persona.parent.desc' },
 ]
-
 export const PAINS = [
-  { id: 'habit', label: 'My habit keeps breaking', desc: 'Start for 1–2 days, then life happens and the app dies', focus: ['dashboard', 'anki'] },
-  { id: 'speaking', label: 'I can read, but I can’t speak', desc: 'Recognition is fine — production freezes', focus: ['voice', 'speed'] },
-  { id: 'listening', label: 'I fail the listening section', desc: 'One play, natural speed, gone before I process it', focus: ['n2listening', 'voice'] },
-  { id: 'slipped', label: 'My Japanese slipped after years in Japan', desc: 'It was better before I slowed down', focus: ['diagnosis', 'voice', 'anki'] },
-  { id: 'blocked-job', label: 'Blocked from jobs / promotion / visa points', desc: 'The level is the gate, not the work itself', focus: ['mock', 'diagnosis', 'bjt'] },
-  { id: 'keigo', label: 'I freeze in meetings / keigo', desc: 'I know what to say — not how to say it at work', focus: ['voice', 'bjt'] },
-  { id: 'life-admin', label: 'Can’t handle city office / hospital / school alone', desc: 'Real tasks in Japanese still need a helper', focus: ['voice', 'mine'] },
+  { id: 'habit', labelKey: 'profile.pain.habit.label', descKey: 'profile.pain.habit.desc', focus: ['dashboard', 'anki'] },
+  { id: 'speaking', labelKey: 'profile.pain.speaking.label', descKey: 'profile.pain.speaking.desc', focus: ['voice', 'speed'] },
+  { id: 'listening', labelKey: 'profile.pain.listening.label', descKey: 'profile.pain.listening.desc', focus: ['n2listening', 'voice'] },
+  { id: 'slipped', labelKey: 'profile.pain.slipped.label', descKey: 'profile.pain.slipped.desc', focus: ['diagnosis', 'voice', 'anki'] },
+  { id: 'blocked-job', labelKey: 'profile.pain.blocked-job.label', descKey: 'profile.pain.blocked-job.desc', focus: ['mock', 'diagnosis', 'bjt'] },
+  { id: 'keigo', labelKey: 'profile.pain.keigo.label', descKey: 'profile.pain.keigo.desc', focus: ['voice', 'bjt'] },
+  { id: 'life-admin', labelKey: 'profile.pain.life-admin.label', descKey: 'profile.pain.life-admin.desc', focus: ['voice', 'mine'] },
 ]
-
 export const PROOF_TARGETS = [
-  { id: 'jlpt', label: 'A JLPT level (N5 → N1)', desc: 'Pass with margin — overall mark AND every section ≥ 19/60' },
-  { id: 'bjt', label: 'A BJT band (J5 → J1+)', desc: 'Business Japanese that employers can score 0–800' },
-  { id: 'hsp', label: 'Highly Skilled Professional points', desc: 'N1 = 15 pts · N2 = 10 pts · BJT ≥480 = N1 category · ≥400 = N2 category' },
-  { id: 'real-life', label: 'A real-life height', desc: 'First meeting in Japanese · immigration alone · the job interview itself' },
+  { id: 'jlpt', labelKey: 'profile.target.jlpt.label', descKey: 'profile.target.jlpt.desc' },
+  { id: 'bjt', labelKey: 'profile.target.bjt.label', descKey: 'profile.target.bjt.desc' },
+  { id: 'hsp', labelKey: 'profile.target.hsp.label', descKey: 'profile.target.hsp.desc' },
+  { id: 'real-life', labelKey: 'profile.target.real-life.label', descKey: 'profile.target.real-life.desc' },
 ]
-
 export function loadProfile() {
   try {
     const raw = localStorage.getItem(PROFILE_KEY)
@@ -81,19 +87,28 @@ export function ladderWithStatus(diagnosis) {
   })
 }
 
-const TAB_LABELS = {
-  dashboard: 'Your capped Today session', anki: 'Review queue (max 10 new)', voice: 'Voice Loop scene',
-  n2listening: 'Listening — one play, no transcript first', mock: 'Timed mock exam', diagnosis: 'Health-check diagnosis',
-  bjt: 'BJT trainer', mine: 'Mine your own documents', speed: 'Speed Cards', errors: 'Error Log review', lessons: 'Grammar pattern',
+const TAB_KEYS = {
+  dashboard: 'profile.tab.dashboard',
+  anki: 'profile.tab.anki',
+  voice: 'profile.tab.voice',
+  n2listening: 'profile.tab.n2listening',
+  mock: 'profile.tab.mock',
+  diagnosis: 'profile.tab.diagnosis',
+  bjt: 'profile.tab.bjt',
+  mine: 'profile.tab.mine',
+  speed: 'profile.tab.speed',
+  errors: 'profile.tab.errors',
+  lessons: 'profile.tab.lessons',
 }
 
 /**
  * Derive today's prescription from profile + diagnosis.
  * Returns { line, actions: [{tab, label, reason}], focusNote }.
  */
-export function derivePlan(profile, diagnosis) {
+export function derivePlan(profile, diagnosis, tr = enTr) {
   const painIds = profile?.pains || []
   const pains = PAINS.filter((p) => painIds.includes(p.id))
+  const painLabel = (p) => tr(p.labelKey)
   const focusTabs = []
   for (const p of pains) for (const t of p.focus) if (!focusTabs.includes(t)) focusTabs.push(t)
 
@@ -102,28 +117,48 @@ export function derivePlan(profile, diagnosis) {
   if (weakest === 'language' && !focusTabs.includes('lessons')) focusTabs.unshift('lessons')
   if (weakest === 'reading' && !focusTabs.includes('reading')) focusTabs.unshift('reading')
 
+  const tabLabel = (tab) => (TAB_KEYS[tab] ? tr(TAB_KEYS[tab]) : tr('profile.tab.reading'))
   const actions = focusTabs.slice(0, 4).map((tab) => ({
     tab,
-    label: TAB_LABELS[tab] || tab,
-    reason: pains.find((p) => p.focus.includes(tab))?.label || (diagnosis && weakest ? `Your weakest section: ${weakest}` : 'From your diagnosis'),
+    label: tabLabel(tab),
+    reason: (() => {
+      const pain = pains.find((p) => p.focus.includes(tab))
+      if (pain) return painLabel(pain)
+      return diagnosis && weakest ? tr('profile.reasonWeakest', { section: weakest }) : tr('profile.reasonFromDiagnosis')
+    })(),
   }))
   if (!actions.length) {
     actions.push(
-      { tab: 'diagnosis', label: TAB_LABELS.diagnosis, reason: 'Start with the checkup — 10 minutes' },
-      { tab: 'voice', label: TAB_LABELS.voice, reason: 'One real scene, spoken out loud' },
-      { tab: 'anki', label: TAB_LABELS.anki, reason: 'A small, winnable queue' },
+      { tab: 'diagnosis', label: tabLabel('diagnosis'), reason: tr('profile.reasonStartCheckup') },
+      { tab: 'voice', label: tabLabel('voice'), reason: tr('profile.reasonVoice') },
+      { tab: 'anki', label: tabLabel('anki'), reason: tr('profile.reasonQueue') },
     )
   }
 
-  const personaLabel = PERSONAS.find((p) => p.id === profile?.persona)?.label
-  const mainPain = pains[0]?.label
-  const targetLabel = PROOF_TARGETS.find((t) => t.id === profile?.proofTarget)?.label
+  const personaEntry = PERSONAS.find((p) => p.id === profile?.persona)
+  const personaLabel = personaEntry ? tr(personaEntry.labelKey) : undefined
+  const mainPainEntry = pains[0]
+  const mainPain = mainPainEntry ? painLabel(mainPainEntry) : undefined
+  const targetEntry = PROOF_TARGETS.find((t) => t.id === profile?.proofTarget)
+  const targetLabel = targetEntry ? tr(targetEntry.labelKey) : undefined
+  // The pain is woven into the sentence: lower-case its first letter
+  // unless it already starts a sentence ("I …"), in whichever language
+  // the label was resolved.
+  const woven = (label) => (label.charAt(0) === 'I' && label.charAt(1) === ' ' ? label : label.charAt(0).toLowerCase() + label.slice(1))
   let line
-  if (!profile) line = 'Tell the app what hurts first — then today’s plan is built around your problem, not around features.'
-  else if (diagnosis) line = `${mainPain ? `Your problem: ${mainPain.charAt(0) === 'I' && mainPain.charAt(1) === ' ' ? mainPain : mainPain.charAt(0).toLowerCase() + mainPain.slice(1)}. ` : ''}Your checkup says ${diagnosis.jlptEstimate} level with ${weakest} weakest — today attacks exactly that, on the way to ${targetLabel || 'your next height'}.`
-  else line = `${personaLabel ? `${personaLabel}. ` : ''}${mainPain ? `What hurts: ${mainPain.charAt(0) === 'I' && mainPain.charAt(1) === ' ' ? mainPain : mainPain.charAt(0).toLowerCase() + mainPain.slice(1)}. ` : ''}Run the 10-minute diagnosis once, and today’s plan sharpens itself around your weakest section.`
+  if (!profile) line = tr('profile.lineNoProfile')
+  else if (diagnosis) line = tr('profile.lineDiagnosis', {
+    painPart: mainPain ? tr('profile.lineYourProblem', { pain: woven(mainPain) }) : '',
+    level: diagnosis.jlptEstimate,
+    weakest,
+    target: targetLabel || tr('profile.lineNextHeight'),
+  })
+  else line = tr('profile.lineNoDiagnosis', {
+    personaPart: personaLabel ? tr('profile.linePersona', { persona: personaLabel }) : '',
+    painPart: mainPain ? tr('profile.lineWhatHurts', { pain: woven(mainPain) }) : '',
+  })
 
-  return { line, actions, focusNote: pains.map((p) => p.label).join(' · ') }
+  return { line, actions, focusNote: pains.map((p) => painLabel(p)).join(' · ') }
 }
 
 export function daysSinceLastVisit(now = new Date()) {

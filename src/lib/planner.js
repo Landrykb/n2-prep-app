@@ -23,6 +23,16 @@ import { loadTwin, saveTwin, refreshTwin, topPatterns } from './twin.js'
 import { detectMode } from './modes.js'
 import { todayStr, pickSceneForProfile, pickListeningForDiagnosis, buildSessionCards } from './session.js'
 import { shadowPlan } from './plannerShadow.js'
+import { t as translate } from './i18n.js'
+
+// Plan lines live in the language catalogs (Doc 20, first-run slice
+// 2026-11-07): scene picks carry a reason KEY + vars, and the plan
+// stores noteKey/noteVars next to the English `note`. The stored
+// `note` stays byte-identical English — the planner-shadow contract
+// and the Coach facts read it as the record of what was planned —
+// while Today renders the same line from the keys in the learner's
+// language. Older stored plans have no keys and render their `note`.
+const enTr = (key, vars) => translate('en', key, vars)
 
 export const PLAN_KEY = 'jpn:plan:v1'
 const MAX_CARDS = 5
@@ -78,7 +88,7 @@ function fingerprintScene(twin, dateStr) {
       let h = 0
       const key = `${dateStr}|fp|${p.id}`
       for (let i = 0; i < key.length; i++) h = (Math.imul(31, h) + key.charCodeAt(i)) | 0
-      return { scene: candidates[Math.abs(h) % candidates.length], reason: `your most repeated slip lately: ${p.label}` }
+      return { scene: candidates[Math.abs(h) % candidates.length], reasonKey: 'planner.reasonFingerprint', reasonVars: { label: p.label } }
     }
   }
   return null
@@ -94,11 +104,11 @@ function strongestScene(profile, dateStr) {
   const bestDomain = Object.entries(byDomain).sort((a, b) => b[1] - a[1])[0]?.[0]
   if (bestDomain) {
     const fresh = scenes.find((s) => s.domain === bestDomain && !masteredIds.includes(s.id))
-    if (fresh) return { scene: fresh, reason: `a fresh scene from ${bestDomain} — the area where you’re strongest` }
+    if (fresh) return { scene: fresh, reasonKey: 'planner.reasonStrongestFresh', reasonVars: { domain: bestDomain } }
     const again = scenes.find((s) => s.domain === bestDomain)
-    if (again) return { scene: again, reason: `a scene from ${bestDomain} — your strongest ground, to restart on` }
+    if (again) return { scene: again, reasonKey: 'planner.reasonStrongestAgain', reasonVars: { domain: bestDomain } }
   }
-  return { scene: pickSceneForProfile(profile, dateStr), reason: 'a scene matched to your problem' }
+  return { scene: pickSceneForProfile(profile, dateStr), reasonKey: 'planner.reasonMatched', reasonVars: {} }
 }
 
 function eventScene(diagnosis, dateStr) {
@@ -114,7 +124,7 @@ function eventScene(diagnosis, dateStr) {
   let h = 0
   for (let i = 0; i < dateStr.length; i++) h = (Math.imul(31, h) + dateStr.charCodeAt(i)) | 0
   const top = pool.slice(0, 3)
-  return { scene: top[Math.abs(h) % top.length], reason: `rehearsal at your exam level (${want})` }
+  return { scene: top[Math.abs(h) % top.length], reasonKey: 'planner.reasonEvent', reasonVars: { level: want } }
 }
 
 // ----------------------------------------------------------- card choice
@@ -225,9 +235,9 @@ export function buildPlan(forDate, { save = true } = {}) {
   if (signals.comeback && mode !== 'event') pick = strongestScene(profile, forDate)
   else if (mode === 'event') pick = eventScene(diagnosis, forDate)
   else if (experiment?.variable === 'scene-source' && experiment.variant === 'problem-first') {
-    pick = { scene: pickSceneForProfile(profile, forDate), reason: 'the problem you named (today’s quiet test)' }
+    pick = { scene: pickSceneForProfile(profile, forDate), reasonKey: 'planner.reasonExperiment', reasonVars: {} }
   } else {
-    pick = fingerprintScene(twin, forDate) || { scene: pickSceneForProfile(profile, forDate), reason: 'a scene matched to your problem' }
+    pick = fingerprintScene(twin, forDate) || { scene: pickSceneForProfile(profile, forDate), reasonKey: 'planner.reasonMatched', reasonVars: {} }
   }
 
   const budget = experiment?.variable === 'card-budget' ? Number(experiment.variant) || MAX_CARDS : MAX_CARDS
@@ -236,13 +246,15 @@ export function buildPlan(forDate, { save = true } = {}) {
   const top = topPatterns(twin, 1)[0]
   const minutes = Math.max(3, Math.round(3 + cards.length * 0.5 + 2))
 
-  const modeReason = {
-    slump: 'Saki made this one smaller on purpose — re-wins only, nothing new',
-    badweek: 'just a tiny win, from your strongest ground',
-    event: 'narrowed to rehearsal — your exam is close',
-    surge: 'you’re climbing, so this one has room to stretch',
-    cruise: pick.reason,
-  }[mode]
+  const modeReasonKeys = {
+    slump: 'planner.reasonSlump',
+    badweek: 'planner.reasonBadweek',
+    event: 'planner.reasonEventMode',
+    surge: 'planner.reasonSurge',
+  }
+  const reasonKey = mode === 'cruise' ? pick.reasonKey : modeReasonKeys[mode]
+  const reasonVars = mode === 'cruise' ? pick.reasonVars || {} : {}
+  const modeReason = enTr(reasonKey, reasonVars)
 
   const plan = {
     forDate,
@@ -261,7 +273,9 @@ export function buildPlan(forDate, { save = true } = {}) {
     source: 'rules-v1',
     createdAt: new Date().toISOString(),
     consumed: false,
-    note: `${pick.scene.title} — ${cards.length} card${cards.length === 1 ? '' : 's'}, one listening bite, about ${minutes} minutes. Why this: ${modeReason}.`,
+    note: enTr(cards.length === 1 ? 'planner.noteOne' : 'planner.noteMany', { title: pick.scene.title, cards: cards.length, minutes, reason: modeReason }),
+    noteKey: cards.length === 1 ? 'planner.noteOne' : 'planner.noteMany',
+    noteVars: { reasonKey, reasonVars },
   }
   if (save) {
     state.plans = { ...(state.plans || {}), [forDate]: plan }

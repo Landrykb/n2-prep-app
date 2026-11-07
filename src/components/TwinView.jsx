@@ -6,7 +6,7 @@ import {
   refreshTwin, loadTwin, deleteTwin, topPatterns, removePattern,
   learningStyleRows, diagnosisDeltas, patternById, loadDiagnosisHistory,
 } from '../lib/twin.js'
-import { detectMode, MODES } from '../lib/modes.js'
+import { detectMode, modeLabel } from '../lib/modes.js'
 import { day30Status, loadModeSpells, modeSpellsSummary } from '../lib/day30.js'
 import { PERSONAS, PAINS, PROOF_TARGETS } from '../lib/profile.js'
 import { SECTION_KEYS } from '../lib/levels.js'
@@ -607,9 +607,9 @@ export default function TwinView({ setActive }) {
       <div className="grid gap-6 lg:grid-cols-2">
         <Section title={t('twin.life.title')} hint={t('twin.life.hint')}>
           <ul className="text-sm text-slate-300 space-y-1.5">
-            <li><span className="text-slate-500">{t('twin.life.youAre')}</span> {persona?.label || t('twin.life.notSet')}</li>
-            <li><span className="text-slate-500">{t('twin.life.whatHurts')}</span> {(twin.life?.pains || []).map((id) => PAINS.find((p) => p.id === id)?.label).filter(Boolean).join(' · ') || t('twin.life.notSet')}</li>
-            <li><span className="text-slate-500">{t('twin.life.climbing')}</span> {target?.label || t('twin.life.notSet')}</li>
+            <li><span className="text-slate-500">{t('twin.life.youAre')}</span> {persona ? t(persona.labelKey) : t('twin.life.notSet')}</li>
+            <li><span className="text-slate-500">{t('twin.life.whatHurts')}</span> {(twin.life?.pains || []).map((id) => PAINS.find((p) => p.id === id)).filter(Boolean).map((p) => t(p.labelKey)).join(' · ') || t('twin.life.notSet')}</li>
+            <li><span className="text-slate-500">{t('twin.life.climbing')}</span> {target ? t(target.labelKey) : t('twin.life.notSet')}</li>
           </ul>
           <button onClick={() => setActive?.('dashboard')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1">{t('twin.life.changeProblem')} <ChevronRight size={14} /></button>
         </Section>
@@ -623,9 +623,9 @@ export default function TwinView({ setActive }) {
               <li><span className="text-slate-500">{t('twin.rhythm.proofPace')}</span> {m.minutesPerProofPoint !== null
                 ? <>{t(m.sessions === 1 ? 'twin.rhythm.proofValueOne' : 'twin.rhythm.proofValue', { per: m.minutesPerProofPoint, minutes: m.minutes, sessions: m.sessions, proof: m.proofPoints, kept: m.callsKept, partial: m.callsPartial, missed: m.callsMissed })}</>
                 : t('twin.rhythm.proofNone')}</li>) })()}
-            <li className="flex items-center gap-2 pt-1"><Mascot agent="michi" size={28} showName={false} /><span><span className="text-slate-500">{t('twin.rhythm.rightNow')}</span> {meta.label} {t('twin.rhythm.rightNowSuffix')}</span></li>
+            <li className="flex items-center gap-2 pt-1"><Mascot agent="michi" size={28} showName={false} /><span><span className="text-slate-500">{t('twin.rhythm.rightNow')}</span> {modeLabel(meta.id, t)} {t('twin.rhythm.rightNowSuffix')}</span></li>
             {(() => { const summary = modeSpellsSummary(loadModeSpells()); return summary.length ? (
-              <li><span className="text-slate-500">{t('twin.rhythm.modes30')}</span> {summary.map((s) => t('twin.rhythm.modeDays', { mode: MODES[s.mode]?.label || s.mode, days: s.days })).join(' · ')}</li>
+              <li><span className="text-slate-500">{t('twin.rhythm.modes30')}</span> {summary.map((s) => t('twin.rhythm.modeDays', { mode: modeLabel(s.mode, t), days: s.days })).join(' · ')}</li>
             ) : null })()}
           </ul>
           <button onClick={() => setActive?.('coach')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1"><Mail size={14} /> {t('twin.rhythm.readLetter')}</button>

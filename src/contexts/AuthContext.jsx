@@ -6,11 +6,21 @@ import { initStateSync, stopStateSync } from '../lib/stateSync.js'
 import { adoptAnonKeys } from '../lib/anonMerge.js'
 import { syncCallWindows } from '../lib/callSync.js'
 import { bridgeTelegramSession, getTelegramInitData } from '../lib/telegramAuth.js'
+import { loadGuestChoice, saveGuestChoice } from '../lib/guest.js'
 
 export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(isSupabaseConfigured)
   const [telegramBridgeStatus, setTelegramBridgeStatus] = useState('not-telegram')
+  // Guest entry (Doc 12 audit #1): the choice is remembered on this
+  // device, so a learner who chose guest once is never re-gated on
+  // load. `guest` only matters while there is no session.
+  const [guest, setGuest] = useState(() => loadGuestChoice() !== null)
+
+  const continueAsGuest = () => {
+    saveGuestChoice()
+    setGuest(true)
+  }
 
   useEffect(() => {
     if (!supabase) return
@@ -95,9 +105,17 @@ export const AuthProvider = ({ children }) => {
     loading,
     telegramBridgeStatus,
     isSupabaseConfigured,
+    guest,
+    continueAsGuest,
     signUp: (email, password) => supabase?.auth.signUp({ email, password }),
     signIn: (email, password) => supabase?.auth.signInWithPassword({ email, password }),
     signOut: () => supabase?.auth.signOut(),
+    // Password reset (Doc 12 audit #1): the reset email links back to
+    // the app's canonical origin (production: https://jpn2easy.vercel.app).
+    // The UI copy never confirms whether the email has an account.
+    resetPassword: (email) => supabase?.auth.resetPasswordForEmail(email, {
+      redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/` : 'https://jpn2easy.vercel.app/',
+    }),
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

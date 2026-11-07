@@ -37,8 +37,8 @@ export function OnboardingFlow({ initial, onDone, onClose }) {
         <div className="grid gap-2 sm:grid-cols-2">
           {PERSONAS.map((p) => (
             <button key={p.id} onClick={() => setPersona(p.id)} className={`text-left rounded-xl border p-3 transition ${persona === p.id ? 'bg-[#FF6B57]/20 border-[#FF6B57]/50' : 'bg-bun-700/40 border-bun-600/30 hover:bg-bun-700/60'}`}>
-              <p className="text-sm font-semibold text-white">{p.label}</p>
-              <p className="text-xs text-slate-400 mt-0.5">{p.desc}</p>
+              <p className="text-sm font-semibold text-white">{t(p.labelKey)}</p>
+              <p className="text-xs text-slate-400 mt-0.5">{t(p.descKey)}</p>
             </button>
           ))}
         </div>
@@ -51,8 +51,8 @@ export function OnboardingFlow({ initial, onDone, onClose }) {
             const on = pains.includes(p.id)
             return (
               <button key={p.id} onClick={() => togglePain(p.id)} className={`text-left rounded-xl border p-3 transition ${on ? 'bg-rose-500/10 border-rose-500/40' : 'bg-bun-700/40 border-bun-600/30 hover:bg-bun-700/60'}`}>
-                <p className="text-sm font-semibold text-white flex items-center gap-2">{on ? <CheckCircle2 size={15} className="text-rose-300 shrink-0" /> : <Circle size={15} className="text-slate-500 shrink-0" />}{p.label}</p>
-                <p className="text-xs text-slate-400 mt-0.5 ml-6">{p.desc}</p>
+                <p className="text-sm font-semibold text-white flex items-center gap-2">{on ? <CheckCircle2 size={15} className="text-rose-300 shrink-0" /> : <Circle size={15} className="text-slate-500 shrink-0" />}{t(p.labelKey)}</p>
+                <p className="text-xs text-slate-400 mt-0.5 ml-6">{t(p.descKey)}</p>
               </button>
             )
           })}
@@ -62,10 +62,10 @@ export function OnboardingFlow({ initial, onDone, onClose }) {
       <section className="space-y-3">
         <h3 className="text-sm font-bold text-white">{t('problem.q3')}</h3>
         <div className="grid gap-2 sm:grid-cols-2">
-          {PROOF_TARGETS.map((t) => (
-            <button key={t.id} onClick={() => setProofTarget(t.id)} className={`text-left rounded-xl border p-3 transition ${proofTarget === t.id ? 'bg-emerald-500/10 border-emerald-500/40' : 'bg-bun-700/40 border-bun-600/30 hover:bg-bun-700/60'}`}>
-              <p className="text-sm font-semibold text-white">{t.label}</p>
-              <p className="text-xs text-slate-400 mt-0.5">{t.desc}</p>
+          {PROOF_TARGETS.map((target) => (
+            <button key={target.id} onClick={() => setProofTarget(target.id)} className={`text-left rounded-xl border p-3 transition ${proofTarget === target.id ? 'bg-emerald-500/10 border-emerald-500/40' : 'bg-bun-700/40 border-bun-600/30 hover:bg-bun-700/60'}`}>
+              <p className="text-sm font-semibold text-white">{t(target.labelKey)}</p>
+              <p className="text-xs text-slate-400 mt-0.5">{t(target.descKey)}</p>
             </button>
           ))}
         </div>

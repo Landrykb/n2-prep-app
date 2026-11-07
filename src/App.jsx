@@ -412,7 +412,7 @@ function Header({ active, daysToExam, user, onSignOut, isSupabaseConfigured, onT
   )
 }
 
-function Sidebar({ active, setActive, mobileOpen, setMobileOpen }) {
+function Sidebar({ active, setActive, mobileOpen, setMobileOpen, guest = false, onCreateAccount }) {
   const { t } = useLanguage()
   return (
     <>
@@ -453,7 +453,16 @@ function Sidebar({ active, setActive, mobileOpen, setMobileOpen }) {
             </div>
           ))}
         </nav>
-        <div className="shrink-0 p-6 border-t border-bun-600/30">
+        <div className="shrink-0 p-6 border-t border-bun-600/30 space-y-3">
+          {guest && onCreateAccount && (
+            <div className="rounded-xl bg-bun-700/60 p-4 border border-[#FF6B57]/30">
+              <p className="text-sm font-semibold text-slate-100">{t('shell.guestCardTitle')}</p>
+              <p className="text-xs text-slate-400 mt-1">{t('shell.guestCardBody')}</p>
+              <button onClick={onCreateAccount} className="mt-3 w-full px-3 py-2 rounded-lg bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold transition">
+                {t('auth.createAccountTitle')}
+              </button>
+            </div>
+          )}
           <div className="rounded-xl bg-bun-700/60 p-4 border border-bun-600/30">
             <p className="text-sm font-semibold text-slate-100">{t('shell.footer.title')}</p>
             <p className="text-xs text-slate-400 mt-1">{t('shell.footer.body')}</p>
@@ -1681,9 +1690,14 @@ function ErrorLog() {
 
 function App() {
   const { t } = useLanguage()
-  const { user, loading, isSupabaseConfigured, signOut } = useAuth()
+  const { user, loading, isSupabaseConfigured, signOut, guest } = useAuth()
   const [active, setActive] = useHashRoute('dashboard', navIds)
   const [mobileOpen, setMobileOpen] = useState(false)
+  // Guest → account door (Doc 12 audit #1): the AuthModal as a
+  // dismissible overlay, opened deliberately (sidebar Create Your
+  // Account). It closes itself the moment a session lands.
+  const [authOverlay, setAuthOverlay] = useState(false)
+  useEffect(() => { if (user) setAuthOverlay(false) }, [user])
   const [streak, setStreak] = useState(0)
   const [dictionary, setDictionary] = useState(localDictionary)
   const { nextExam, daysToExam, examLabel, setting: examSetting, setSetting: setExamSetting } = useExamDate()
@@ -1827,7 +1841,10 @@ function App() {
     )
   }
 
-  if (isSupabaseConfigured && !user) {
+  // The sign-in gate stands only until the learner chooses a door:
+  // an account, or guest (remembered on this device — the gate never
+  // reappears on load for a guest; Doc 12 audit #1).
+  if (isSupabaseConfigured && !user && !guest) {
     return <AuthModal />
   }
 
@@ -1835,7 +1852,17 @@ function App() {
     <div className="min-h-screen bg-bun-900 text-slate-100 flex">
       {/* Paints the notch strip so the translucent status bar is not a gap. */}
       <div className="status-bar-scrim lg:hidden" aria-hidden="true" />
-      <Sidebar active={active} setActive={setActive} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
+      <Sidebar
+        active={active}
+        setActive={setActive}
+        mobileOpen={mobileOpen}
+        setMobileOpen={setMobileOpen}
+        guest={isSupabaseConfigured && !user && guest}
+        onCreateAccount={() => setAuthOverlay(true)}
+      />
+      {authOverlay && !user && (
+        <AuthModal variant="overlay" initialMode="signup" onClose={() => setAuthOverlay(false)} />
+      )}
       <main className="flex-1 min-w-0 flex flex-col">
         <div className="pt-safe bg-bun-900/80 backdrop-blur sticky top-0 z-30">
           <Header

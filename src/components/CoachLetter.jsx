@@ -3,7 +3,7 @@ import { Mail, PenLine } from 'lucide-react'
 import { refreshTwin, topPatterns, diagnosisDeltas, loadDiagnosisHistory } from '../lib/twin.js'
 import { shadowCoachLetter } from '../lib/coachShadow.js'
 import { loadCallState } from '../lib/calls.js'
-import { detectMode } from '../lib/modes.js'
+import { detectMode, modeLabel } from '../lib/modes.js'
 import { SECTION_KEYS } from '../lib/levels.js'
 import Mascot from './Mascot.jsx'
 
@@ -43,7 +43,7 @@ function saveLetter(key, letter) {
 
 export function generateCoachLetter(now = new Date()) {
   const twin = refreshTwin()
-  const { mode, meta } = detectMode(now)
+  const { mode } = detectMode(now)
   const start = weekStart(now)
   const startMs = start.getTime()
   const inWeek = (iso) => iso && new Date(iso).getTime() >= startMs
@@ -104,7 +104,7 @@ export function generateCoachLetter(now = new Date()) {
     weekStart: isoWeekKey(now),
     generatedAt: now.toISOString(),
     mode,
-    modeLabel: meta.label,
+    modeLabel: modeLabel(mode),
     paragraphs,
     citedNumbers: cited,
     source: 'rules-v1',

@@ -28,7 +28,7 @@
 import { recordMetric } from './metrics.js'
 import { refreshTwin, twinSummaryForAi, topPatterns, diagnosisDeltas, loadDiagnosisHistory } from './twin.js'
 import { loadCallState } from './calls.js'
-import { detectMode } from './modes.js'
+import { detectMode, modeLabel } from './modes.js'
 import { SECTION_KEYS } from './levels.js'
 
 export const COACH_SHADOW_ENABLED = true
@@ -163,7 +163,7 @@ export function coachWeekKey(now = new Date()) {
 }
 
 export function buildCoachWeekFacts(now = new Date(), twin = refreshTwin()) {
-  const { mode, meta } = detectMode(now)
+  const { mode } = detectMode(now)
   const startMs = weekStart(now).getTime()
   const inWeek = (iso) => iso && new Date(iso).getTime() >= startMs
 
@@ -197,7 +197,7 @@ export function buildCoachWeekFacts(now = new Date(), twin = refreshTwin()) {
   return {
     weekStart: coachWeekKey(now),
     mode,
-    modeLabel: meta.label,
+    modeLabel: modeLabel(mode),
     sessionCount,
     minutes,
     proof,

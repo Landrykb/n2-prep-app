@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Calendar, Target, Layers, Mic, Stethoscope, Pickaxe, ClipboardCheck, ChevronRight, RefreshCw, Flame, CheckCircle2, Play, Coffee, Phone, Mail } from 'lucide-react'
 import { brand } from '../lib/brand.js'
 import { loadCallState } from '../lib/calls.js'
-import { detectMode } from '../lib/modes.js'
+import { detectMode, modeLabel, modeLine } from '../lib/modes.js'
 import { getPlanFor, tomorrowStr } from '../lib/planner.js'
 import { recordQueueRating, loadDiagnosisHistory } from '../lib/twin.js'
 import {
@@ -148,7 +148,7 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const plan = useMemo(() => derivePlan(profile, diagnosis), [profile, diagnosis])
+  const plan = useMemo(() => derivePlan(profile, diagnosis, t), [profile, diagnosis, t])
   // The fleet's read of the week (Doc 05 §7 modes — detected by code from
   // Twin signals) and Saki's plan for tomorrow, shown before the day starts.
   const modeInfo = useMemo(() => { try { return detectMode() } catch { return null } }, [])
@@ -200,8 +200,8 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
         <section className="rounded-2xl glass p-4 card-glow flex items-start gap-3">
           <Mascot agent="michi" size={38} mood={modeInfo.mode === 'badweek' ? 'resting' : 'happy'} />
           <div>
-            <p className="text-sm text-slate-200"><span className="font-semibold text-white">{t('today.michiCoach')}</span> {modeInfo.meta.michiLine}</p>
-            <p className="text-[11px] text-slate-500 mt-1">{t('today.modeWeek', { brand: brand.name, tagline: brand.tagline, label: modeInfo.meta.label })}</p>
+            <p className="text-sm text-slate-200"><span className="font-semibold text-white">{t('today.michiCoach')}</span> {modeLine(modeInfo.mode, t)}</p>
+            <p className="text-[11px] text-slate-500 mt-1">{t('today.modeWeek', { brand: brand.name, tagline: brand.tagline, label: modeLabel(modeInfo.mode, t) })}</p>
           </div>
         </section>
       )}
@@ -239,7 +239,9 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
         <section className="rounded-2xl glass p-4 card-glow flex items-start gap-3">
           <Mascot agent="saki" size={38} mood={modeInfo?.mode === 'badweek' ? 'resting' : 'happy'} />
           <div className="flex-1">
-            <p className="text-sm text-slate-200"><span className="font-semibold text-white">{t('today.tomorrowBySaki')}</span> {tomorrowPlan.note}</p>
+            <p className="text-sm text-slate-200"><span className="font-semibold text-white">{t('today.tomorrowBySaki')}</span> {tomorrowPlan.noteKey
+              ? t(tomorrowPlan.noteKey, { title: tomorrowPlan.sceneTitle, cards: tomorrowPlan.cardBudget, minutes: tomorrowPlan.minutes, reason: t(tomorrowPlan.noteVars?.reasonKey || 'planner.reasonMatched', tomorrowPlan.noteVars?.reasonVars || {}) })
+              : tomorrowPlan.note}</p>
             {tomorrowPlan.experiment && <p className="text-xs text-slate-400 mt-1">{t('today.tomorrowExperiment', { variant: tomorrowPlan.experiment.variantLabel })}</p>}
             <p className="text-[11px] text-slate-500 mt-1">{t('today.tomorrowFooter')}</p>
           </div>

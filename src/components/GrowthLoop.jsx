@@ -133,6 +133,7 @@ export default function GrowthLoop({ setActive }) {
     tomorrowPlan,
     topPattern: top ? { label: top.label } : null,
     workingLevel: est.band ? { band: est.band } : null,
+    tr: t,
   })
   const centre = loopCentre(twin)
   const week = weekStrip(metrics)

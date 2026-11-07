@@ -431,4 +431,91 @@ console.log('encounters — collect derivations + union merge (Fit v2, amendment
   })
 }
 
+
+console.log('guest entry + first-run catalogs (Doc 12 audit #1/#2, fixed 2026-11-07):')
+{
+  const guest = await import('../src/lib/guest.js')
+  const { adoptAnonKeys } = await import('../src/lib/anonMerge.js')
+  const mkStorage = () => {
+    const m = new Map()
+    return {
+      get length() { return m.size },
+      key: (i) => [...m.keys()][i] ?? null,
+      getItem: (k) => (m.has(k) ? m.get(k) : null),
+      setItem: (k, v) => m.set(k, String(v)),
+      removeItem: (k) => m.delete(k),
+    }
+  }
+
+  check('guest choice persists on the device (the gate does not return on load)', () => {
+    const st = mkStorage()
+    assert.equal(guest.loadGuestChoice(st), null)
+    const rec = guest.saveGuestChoice(st, new Date('2026-11-07T00:00:00.000Z'))
+    assert.equal(rec.at, '2026-11-07T00:00:00.000Z')
+    assert.deepEqual(guest.loadGuestChoice(st), rec)
+    guest.clearGuestChoice(st)
+    assert.equal(guest.loadGuestChoice(st), null)
+  })
+
+  check('guest sign-in adopts the guest work via the AuthContext session path (adoptAnonKeys)', () => {
+    const st = mkStorage()
+    guest.saveGuestChoice(st)
+    st.setItem('n2:anon:progress', JSON.stringify({ streak: 4 }))
+    st.setItem('n2:anon:settings', JSON.stringify({ furigana: true }))
+    // AuthContext's session effect calls exactly this on sign-in.
+    assert.equal(adoptAnonKeys('user-1', st), 2)
+    assert.equal(JSON.parse(st.getItem('n2:user-1:progress')).streak, 4)
+    assert.equal(st.getItem('n2:anon:progress'), null)
+    assert.equal(adoptAnonKeys('user-1', st), 0) // idempotent — second sign-in adopts nothing
+    // Account data wins over a leftover anon copy.
+    st.setItem('n2:anon:progress', JSON.stringify({ streak: 1 }))
+    assert.equal(adoptAnonKeys('user-1', st), 0)
+    assert.equal(JSON.parse(st.getItem('n2:user-1:progress')).streak, 4)
+  })
+
+  const { derivePlan, PERSONAS, PAINS, PROOF_TARGETS } = await import('../src/lib/profile.js')
+  const { modeLabel, modeLine } = await import('../src/lib/modes.js')
+  const { t: translate } = await import('../src/lib/i18n.js')
+  const frTr = (k, v) => translate('fr', k, v)
+
+  check('onboarding option data carries keys that resolve in all three languages', () => {
+    for (const entry of [...PERSONAS, ...PAINS, ...PROOF_TARGETS]) {
+      for (const lang of ['en', 'fr', 'ja']) {
+        assert.notEqual(translate(lang, entry.labelKey), entry.labelKey, `${lang} ${entry.labelKey}`)
+        assert.notEqual(translate(lang, entry.descKey), entry.descKey, `${lang} ${entry.descKey}`)
+      }
+    }
+    assert.equal(translate('en', PERSONAS[0].labelKey), 'Resident worker in Japan')
+    assert.equal(translate('en', PAINS[1].descKey), 'Recognition is fine — production freezes')
+  })
+
+  check('derivePlan English (default translator) is byte-identical to the pre-catalog output', () => {
+    const cold = derivePlan(null, null)
+    assert.equal(cold.line, 'Tell the app what hurts first — then today’s plan is built around your problem, not around features.')
+    assert.deepEqual(cold.actions, [
+      { tab: 'diagnosis', label: 'Health-check diagnosis', reason: 'Start with the checkup — 10 minutes' },
+      { tab: 'voice', label: 'Voice Loop scene', reason: 'One real scene, spoken out loud' },
+      { tab: 'anki', label: 'Review queue (max 10 new)', reason: 'A small, winnable queue' },
+    ])
+    const noDiag = derivePlan({ persona: 'resident', pains: ['speaking'], proofTarget: 'jlpt' }, null)
+    assert.equal(noDiag.line, 'Resident worker in Japan. What hurts: I can read, but I can’t speak. Run the 10-minute diagnosis once, and today’s plan sharpens itself around your weakest section.')
+    const withDiag = derivePlan({ persona: 'resident', pains: ['habit'], proofTarget: 'jlpt' }, { jlptEstimate: 'N3', weakest: 'listening' })
+    assert.equal(withDiag.line, 'Your problem: my habit keeps breaking. Your checkup says N3 level with listening weakest — today attacks exactly that, on the way to A JLPT level (N5 → N1).')
+    assert.deepEqual(withDiag.actions.map((a) => [a.tab, a.label, a.reason]), [
+      ['n2listening', 'Listening — one play, no transcript first', 'Your weakest section: listening'],
+      ['dashboard', 'Your capped Today session', 'My habit keeps breaking'],
+      ['anki', 'Review queue (max 10 new)', 'My habit keeps breaking'],
+    ])
+    assert.equal(withDiag.focusNote, 'My habit keeps breaking')
+  })
+
+  check('derivePlan + modes resolve in French through the caller’s translator', () => {
+    const fr = derivePlan({ persona: 'resident', pains: ['habit'], proofTarget: 'jlpt' }, { jlptEstimate: 'N3', weakest: 'listening' }, frTr)
+    assert.ok(fr.line.startsWith('Votre problème : mon habitude se brise sans arrêt. Votre bilan dit un niveau N3'), fr.line)
+    assert.equal(modeLabel('badweek'), 'Bad Week')
+    assert.equal(modeLine('cruise'), 'Steady week. Same small size, same direction — that steadiness is exactly what compounds.')
+    assert.equal(modeLabel('event', frTr), 'Approche de l’examen')
+  })
+}
+
 console.log(`\nphase2: ${passed} checks passed (incl. scheduler-auth)`)
