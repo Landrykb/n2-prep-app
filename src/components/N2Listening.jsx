@@ -53,7 +53,7 @@ export default function N2Listening() {
           </div>
           <p className="text-xs text-slate-500">JLPTでは音声は一度だけ流れます。まず聞いてから、日本語の質問に答えてください。</p>
           <div className="flex flex-wrap gap-2">
-            <TtsButton text={item.script} className="px-3 py-1.5 text-sm font-medium" />
+            <TtsButton text={item.script} audioSrc={item.audio || null} className="px-3 py-1.5 text-sm font-medium" />
             <button onClick={() => setShowTranscript((s) => !s)} className="px-3 py-1.5 rounded-lg bg-bun-700 text-slate-300 hover:bg-bun-600 text-xs font-medium">
               {showTranscript ? 'Hide transcript' : 'Show transcript'}
             </button>

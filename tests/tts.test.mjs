@@ -353,4 +353,39 @@ await acheck('edgeTts: cancelBrowserSynthesis aborts an in-flight synthesis', as
   })
 }
 
+// ---------- pre-rendered listening audio (2026-11-07) ----------
+// Fixed listening scripts ship their neural audio in the bundle:
+// the live chain can fall back to the device robot voice when the
+// webview's Edge connection stalls, and a learner must never
+// imitate that voice. Every item carries an audio path, the file
+// exists and is non-trivial, playback goes through playAudioFile,
+// and every surface that renders a script passes the file along.
+check('every listening item carries a real pre-rendered audio file', async () => {
+  const { existsSync, statSync } = await import('node:fs')
+  const { n2Listening } = await import('../src/data/n2Listening.js')
+  const { listeningPlus } = await import('../src/data/listeningPlus.js')
+  const items = [...listeningPlus, ...n2Listening]
+  assert.equal(items.length, 13)
+  for (const item of items) {
+    assert.ok(item.audio && item.audio.startsWith('/audio/listening/'), `${item.title} carries its audio path`)
+    const path = new URL(`../public${item.audio}`, import.meta.url)
+    assert.ok(existsSync(path), `${item.title}'s file exists`)
+    assert.ok(statSync(path).size > 20000, `${item.title}'s file is a real recording`)
+  }
+})
+check('the file route is wired: player, button, and the three surfaces', async () => {
+  const { readFileSync } = await import('node:fs')
+  const voice = readFileSync(new URL('../src/lib/neuralVoice.js', import.meta.url), 'utf8')
+  assert.ok(voice.includes('export function playAudioFile'), 'the module plays files')
+  const btn = readFileSync(new URL('../src/components/TtsButton.jsx', import.meta.url), 'utf8')
+  assert.ok(btn.includes('audioSrc'), 'the button takes audioSrc')
+  assert.ok(btn.includes('playAudioFile(audioSrc'), 'the file plays first')
+  for (const rel of ['../src/components/N2Listening.jsx', '../src/components/OneSession.jsx', '../src/components/MockExam.jsx']) {
+    const src = readFileSync(new URL(rel, import.meta.url), 'utf8')
+    assert.ok(src.includes('audioSrc={'), `${rel} passes its audio`)
+  }
+  const exam = readFileSync(new URL('../src/lib/mockExam.js', import.meta.url), 'utf8')
+  assert.ok(exam.includes('audio: l.audio'), 'mock groups keep the audio field')
+})
+
 console.log(`\ntts: ${passed} checks passed`)

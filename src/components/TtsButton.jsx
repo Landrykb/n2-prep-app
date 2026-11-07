@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { Volume2, Loader2 } from 'lucide-react'
 import { ttsAvailable } from '../lib/tts.js'
-import { speakSenseiLine, speakTurns } from '../lib/neuralVoice.js'
+import { playAudioFile, speakSenseiLine, speakTurns } from '../lib/neuralVoice.js'
 import { parseScriptTurns } from '../lib/voiceCast.js'
 import { modelCast } from '../lib/voicePreference.js'
 import { useLanguage } from '../hooks/useLanguage.js'
 
-export default function TtsButton({ text, className = '', cast = null }) {
+export default function TtsButton({ text, className = '', cast = null, audioSrc = null }) {
   const { t } = useLanguage()
   const [speaking, setSpeaking] = useState(false)
   const [fallback, setFallback] = useState(false)
@@ -31,6 +31,21 @@ export default function TtsButton({ text, className = '', cast = null }) {
     // line: an explicit cast when the caller knows the speaker
     // (a scene partner), otherwise the learner's own model
     // voice — the voice they imitate should be theirs to pick.
+    // Pre-rendered audio (fixed content — the listening
+    // scripts): play the bundled file, rendered once in the
+    // real neural casts. Only if the file itself fails does
+    // the live chain below take over.
+    if (audioSrc) {
+      playAudioFile(audioSrc, {
+        onEnd: () => setSpeaking(false),
+        onError: () => speakLive(),
+      })
+      return
+    }
+    speakLive()
+  }
+
+  const speakLive = () => {
     const turns = parseScriptTurns(text)
     if (turns) {
       speakTurns(turns, { onEnd: () => setSpeaking(false) })

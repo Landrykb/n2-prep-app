@@ -404,7 +404,7 @@ export default function OneSession({ setActive }) {
             <p className="text-xs text-slate-400">{t('session.listeningMeta', { title: bite.title, level: bite.level })}{diagnosis?.weakest === 'listening' ? t('session.listeningWeakest') : diagnosis ? t('session.listeningLevel', { estimate: diagnosis.jlptEstimate }) : ''}{t('session.listeningSuffix')}</p>
           </div>
           <div className="flex items-center gap-3">
-            <TtsButton text={bite.script} className="px-4 py-2 text-sm font-medium" />
+            <TtsButton text={bite.script} audioSrc={bite.audio || null} className="px-4 py-2 text-sm font-medium" />
             <span className="text-sm text-slate-300">{t('session.listeningHint')}</span>
           </div>
           <p className="text-white">{biteQuestion.prompt}</p>

@@ -85,6 +85,48 @@ export function stopNeuralSpeech() {
   if (end) end()
 }
 
+/**
+ * Play a pre-rendered audio file (the listening scripts' fixed
+ * audio, public/audio/listening/). Fixed content should not ride
+ * the live synthesis chain: when the webview's Edge connection
+ * stalls, the chain falls back to the device robot voice —
+ * exactly what the learner must never imitate (Landry,
+ * 2026-11-07, Listening page). A bundled file plays instantly,
+ * in the real neural voices the turns were rendered with, and
+ * stopNeuralSpeech() stops it like any other line. onError
+ * fires when the file cannot play, so the caller can fall back
+ * to live synthesis.
+ */
+export function playAudioFile(src, { onEnd, onError } = {}) {
+  stopNeuralSpeech()
+  if (!src || typeof Audio === 'undefined') { if (onError) onError(); return }
+  let endFired = false
+  const fireEnd = () => {
+    if (endFired) return
+    endFired = true
+    teardownAudio()
+    if (pendingEnd === fireEnd) pendingEnd = null
+    if (onEnd) onEnd()
+  }
+  const fail = () => {
+    if (endFired) return
+    endFired = true
+    teardownAudio()
+    if (pendingEnd === fireEnd) pendingEnd = null
+    if (onError) onError()
+    else if (onEnd) onEnd()
+  }
+  pendingEnd = fireEnd
+  try {
+    const audio = new Audio(src)
+    currentAudio = audio
+    audio.onended = fireEnd
+    audio.onerror = fail
+    const played = audio.play()
+    if (played && typeof played.catch === 'function') played.catch(fail)
+  } catch { fail() }
+}
+
 /** The signed-in user's access token, or null (guest / signed out). */
 async function sessionToken() {
   if (!isSupabaseConfigured || !supabase) return null

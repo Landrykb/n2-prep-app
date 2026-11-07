@@ -339,7 +339,7 @@ export default function MockExam({ setActive }) {
         {group.listening && (
           <div className="rounded-2xl bg-bun-700/40 border border-bun-600/20 p-5 mb-5">
             <div className="flex items-center gap-3 flex-wrap">
-              <TtsButton text={group.listening.script} className="px-3 py-2 text-sm font-medium" />
+              <TtsButton text={group.listening.script} audioSrc={group.listening.audio || null} className="px-3 py-2 text-sm font-medium" />
               <div>
                 <p className="text-sm font-medium text-slate-200">{group.listening.title}</p>
                 <p className="text-[11px] text-slate-500">Replays allowed in this practice mock — the real exam plays audio only once or twice.</p>

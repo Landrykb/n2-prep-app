@@ -3,7 +3,8 @@
 
 export const listeningPlus = [
   {
-    title: 'コンビニで', level: 'N5',
+    title: 'コンビニで',
+    audio: '/audio/listening/konbini.ogg', level: 'N5',
     script: '店員：いらっしゃいませ。\n客：すみません、おにぎりはどこですか。\n店員：あちらの棚です。飲み物もいかがですか。\n客：じゃあ、お茶もください。全部でいくらですか。\n店員：450円です。袋は要りますか。\n客：はい、お願いします。',
     questions: [
       { prompt: '客は何を買いますか。', options: [{ label: 'おにぎりだけ', correct: false }, { label: 'おにぎりとお茶', correct: true }, { label: 'お茶だけ', correct: false }, { label: 'パンとお茶', correct: false }], explanation: 'おにぎりとお茶を買う。' },
@@ -11,7 +12,8 @@ export const listeningPlus = [
     ],
   },
   {
-    title: '友達との約束', level: 'N5',
+    title: '友達との約束',
+    audio: '/audio/listening/tomodachi-yakusoku.ogg', level: 'N5',
     script: '女：明日、映画を見に行きませんか。\n男：いいですね。何時に会いますか。\n女：10時に駅の前で会いましょう。\n男：分かりました。遅れないで行きます。',
     questions: [
       { prompt: '二人は明日何をしますか。', options: [{ label: '映画を見に行く', correct: true }, { label: '買い物に行く', correct: false }, { label: '勉強する', correct: false }, { label: '電車に乗る', correct: false }], explanation: '映画を見に行く約束をしている。' },
@@ -19,7 +21,8 @@ export const listeningPlus = [
     ],
   },
   {
-    title: '道を聞く', level: 'N4',
+    title: '道を聞く',
+    audio: '/audio/listening/michi-kiku.ogg', level: 'N4',
     script: '女：すみません、郵便局はどこですか。\n男：この道をまっすぐ行って、二つ目の信号を右に曲がると、左側にあります。\n女：ここから遠いですか。\n男：歩いて5分ぐらいです。銀行の隣ですよ。',
     questions: [
       { prompt: '郵便局はどこにありますか。', options: [{ label: '一つ目の信号の右側', correct: false }, { label: '二つ目の信号を曲がった左側', correct: true }, { label: '駅の前', correct: false }, { label: '銀行の中', correct: false }], explanation: '二つ目の信号を右に曲がると左側にある。' },
@@ -27,7 +30,8 @@ export const listeningPlus = [
     ],
   },
   {
-    title: 'アルバイトの電話', level: 'N4',
+    title: 'アルバイトの電話',
+    audio: '/audio/listening/arubaito-denwa.ogg', level: 'N4',
     script: '女：もしもし、アルバイトの募集を見て電話しました。\n店長：ありがとうございます。週に何日ぐらい働けますか。\n女：学校があるので、週に3日、夕方から働けます。\n店長：では、面接はいつがいいですか。金曜日の4時はいかがですか。\n女：はい、大丈夫です。履歴書を持って行きます。',
     questions: [
       { prompt: '女性は週に何日働けますか。', options: [{ label: '毎日', correct: false }, { label: '週に2日', correct: false }, { label: '週に3日', correct: true }, { label: '週に5日', correct: false }], explanation: '学校があるので週に3日だけ働ける。' },
@@ -35,7 +39,8 @@ export const listeningPlus = [
     ],
   },
   {
-    title: '旅行の計画', level: 'N3',
+    title: '旅行の計画',
+    audio: '/audio/listening/ryoko-keikaku.ogg', level: 'N3',
     script: '男：夏休み、北海道へ旅行しない？\n女：いいね。飛行機と電車、どっちがいいかな。\n男：飛行機の方が速いけど、高いよ。早めに予約すれば安くなるらしい。\n女：じゃあ、今週中に予約しよう。ホテルは駅の近くが便利だね。',
     questions: [
       { prompt: '二人はどうやって北海道へ行くことにしそうですか。', options: [{ label: '電車', correct: false }, { label: '飛行機', correct: true }, { label: '船', correct: false }, { label: '車', correct: false }], explanation: '飛行機を早めに予約すれば安くなると話している。' },
@@ -43,7 +48,8 @@ export const listeningPlus = [
     ],
   },
   {
-    title: '健康診断の結果', level: 'N3',
+    title: '健康診断の結果',
+    audio: '/audio/listening/kenko-shindan.ogg', level: 'N3',
     script: '医者：検査の結果ですが、少し血圧が高めですね。\n男：薬を飲んだ方がいいですか。\n医者：今はまだ大丈夫です。塩分を控えて、毎日少し運動してください。\n男：分かりました。次の検査はいつですか。\n医者：3か月後にまた来てください。',
     questions: [
       { prompt: '医者は男の人に何をするように言いましたか。', options: [{ label: '薬を飲むこと', correct: false }, { label: '塩分を控えて運動すること', correct: true }, { label: '仕事を休むこと', correct: false }, { label: 'すぐ入院すること', correct: false }], explanation: '薬はまだ不要で、塩分を控えて運動するように言っている。' },
@@ -51,7 +57,8 @@ export const listeningPlus = [
     ],
   },
   {
-    title: '引っ越しの相談', level: 'N2',
+    title: '引っ越しの相談',
+    audio: '/audio/listening/hikkoshi-sodan.ogg', level: 'N2',
     script: '女：来月、職場の近くに引っ越そうと思っているんです。\n男：家賃は今より高くなりませんか。\n女：少し高くなりますが、通勤時間が短くなるので、その分、資格の勉強に使えます。\n男：なるほど。更新料や礼金のことも考えると、最初の費用は結構かかりますよ。',
     questions: [
       { prompt: '女性が引っ越したい一番の理由は何ですか。', options: [{ label: '家賃が安くなるから', correct: false }, { label: '通勤時間を勉強に使いたいから', correct: true }, { label: '部屋が広くなるから', correct: false }, { label: '職場に近い友達がいるから', correct: false }], explanation: '通勤時間が短くなり、その分を資格の勉強に使えると言っている。' },
@@ -59,7 +66,8 @@ export const listeningPlus = [
     ],
   },
   {
-    title: '会議の日程変更', level: 'N1',
+    title: '会議の日程変更',
+    audio: '/audio/listening/kaigi-nittei.ogg', level: 'N1',
     script: '女：来週の定例会議ですが、部長が出張から戻れないため、木曜日への変更を余儀なくされました。\n男：木曜日は取引先との打ち合わせが入っています。重なってしまいますね。\n女：では、打ち合わせの後に回すか、来週に延期するか、どちらかで調整しましょう。資料は変更前に配布しておいてください。',
     questions: [
       { prompt: '会議が変更になった理由は何ですか。', options: [{ label: '資料が間に合わないから', correct: false }, { label: '部長が出張から戻れないから', correct: true }, { label: '会議室が使えないから', correct: false }, { label: '取引先の都合', correct: false }], explanation: '部長が出張から戻れないため変更を余儀なくされた。' },
@@ -67,7 +75,8 @@ export const listeningPlus = [
     ],
   },
   {
-    title: '環境問題のニュース', level: 'N1',
+    title: '環境問題のニュース',
+    audio: '/audio/listening/kankyo-news.ogg', level: 'N1',
     script: 'アナウンサー：市は来年度から、プラスチックごみの分別をより厳格化する方針を明らかにしました。背景には、リサイクル率の伸び悩みがあります。市民からは利便性の低下を懸念する声も上がっていますが、市は説明会を通じて理解を求めていく考えです。',
     questions: [
       { prompt: '市が来年度から行うことは何ですか。', options: [{ label: 'ごみ収集を有料化する', correct: false }, { label: 'プラスチックごみの分別を厳しくする', correct: true }, { label: 'リサイクルをやめる', correct: false }, { label: '説明会を中止する', correct: false }], explanation: '分別の厳格化方針を明らかにしたと言っている。' },
@@ -75,7 +84,8 @@ export const listeningPlus = [
     ],
   },
   {
-    title: '新しい制度の説明', level: 'N1',
+    title: '新しい制度の説明',
+    audio: '/audio/listening/seido-setsumei.ogg', level: 'N1',
     script: '男：今回の制度改正は、一見すると手続きの簡素化に見えますが、実は申請者の負担が増える側面もあります。\n女：とおっしゃいますと。\n男：従来は窓口で済んだ確認が、事前にオンラインで完結させなければならない。デジタルに不慣れな方への配慮が不可欠でしょう。',
     questions: [
       { prompt: '男性は制度改正についてどう考えていますか。', options: [{ label: '完全に良い改正だ', correct: false }, { label: '便利になる反面、負担が増える面もある', correct: true }, { label: '何も変わらない', correct: false }, { label: '廃止すべきだ', correct: false }], explanation: '簡素化に見えるが申請者の負担が増える側面もあると言っている。' },

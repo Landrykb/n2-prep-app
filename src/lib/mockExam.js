@@ -228,7 +228,7 @@ export function buildMockExam(length = 'quick', seed = Date.now() % 2147483647, 
   const listeningGroups = shuffleWithSeed(listeningPool, seed + 8).slice(0, plan.listening).map((l) => ({
     name: '問題1 聴解',
     intro: '音声を聞いて、質問と選択肢から最もよい答えを選びなさい。',
-    listening: { title: l.title, script: l.script },
+    listening: { title: l.title, script: l.script, audio: l.audio },
     questions: l.questions.map((q) => ({
       id: id(), type: 'listening', group: '問題1 聴解',
       prompt: q.prompt, options: q.options, explanation: q.explanation,
