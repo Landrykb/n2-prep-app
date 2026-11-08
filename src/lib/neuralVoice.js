@@ -314,29 +314,45 @@ export function speakSenseiLine(text, { rate = 1, onEnd, onFallback, cast = 'fem
   // (~6.5 chars/second) — plus network slack.
   const rateOk = typeof rate === 'number' && rate > 0 ? rate : 1
   const horizon = Math.max(estimateSpeechMs(clean, rate), (clean.length / 6.5) * 1000 / rateOk) + WATCHDOG_SLACK_MS
-  watchdog = setTimeout(fireEnd, horizon)
-  getNeuralAudio(clean, cast, browserTimeoutMs).then((source) => {
+  let retried = false
+  const armWatchdog = () => { clearWatchdog(); watchdog = setTimeout(fireEnd, horizon) }
+  // A stream that breaks mid-line is NOT the line ending. Until
+  // 2026-11-08 the error handler simply fired the line's end, so
+  // in the call Sensei cut herself off mid-sentence and the mic
+  // opened over her (Landry's report). Recover instead: one fresh
+  // fetch (the line is cached server-side by now, so the retry is
+  // fast), then the device voice finishes the line audibly rather
+  // than the conversation advancing in silence.
+  const recover = (err) => {
     if (endFired) return
-    if (!source) { clearWatchdog(); deviceFallback(); return }
-    try {
-      // An https URL streams natively (the listening-file path);
-      // a Blob rides an object URL (the browser Edge route).
-      currentUrl = typeof source === 'string' ? source : URL.createObjectURL(source)
-      const audio = sharedAudio()
-      audio.src = currentUrl
-      currentAudio = audio
-      const r = typeof rate === 'number' && rate > 0 ? rate : 1
-      try { audio.playbackRate = r } catch { /* default rate is fine */ }
-      audio.onended = fireEnd
-      audio.onerror = fireEnd // a broken stream ends the line; never re-speak over it
-      const played = audio.play()
-      if (played && typeof played.catch === 'function') {
-        // Autoplay refused (no user-gesture credit left): the device
-        // voice was primed by the Accept tap, so fall back to it.
-        played.catch((err) => { logVoice('blob-play-rejected', { name: err?.name || 'unknown' }); if (!endFired) { clearWatchdog(); teardownAudio(); deviceFallback() } })
-      }
-    } catch { clearWatchdog(); deviceFallback() }
-  })
+    logVoice('stream-recovered', { name: err?.name || 'unknown', retried })
+    clearWatchdog()
+    teardownAudio()
+    if (!retried) { retried = true; attempt() } else { deviceFallback() }
+  }
+  const attempt = () => {
+    armWatchdog()
+    getNeuralAudio(clean, cast, browserTimeoutMs).then((source) => {
+      if (endFired) return
+      if (!source) { clearWatchdog(); deviceFallback(); return }
+      try {
+        // An https URL streams natively (the listening-file path);
+        // a Blob rides an object URL (the browser Edge route).
+        currentUrl = typeof source === 'string' ? source : URL.createObjectURL(source)
+        const audio = sharedAudio()
+        audio.src = currentUrl
+        currentAudio = audio
+        try { audio.playbackRate = rateOk } catch { /* default rate is fine */ }
+        audio.onended = fireEnd
+        audio.onerror = () => recover(new Error('stream-error'))
+        const played = audio.play()
+        if (played && typeof played.catch === 'function') {
+          played.catch((err) => { logVoice('blob-play-rejected', { name: err?.name || 'unknown' }); recover(err) })
+        }
+      } catch { clearWatchdog(); deviceFallback() }
+    })
+  }
+  attempt()
 }
 
 /**

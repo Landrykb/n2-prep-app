@@ -416,6 +416,11 @@ check('the server route is tts-vm and taps prime the output', async () => {
   const ttsvm = readFileSync(new URL('../supabase/functions/tts-vm/index.ts', import.meta.url), 'utf8')
   assert.ok(ttsvm.includes('createSignedUrl'), 'tts-vm answers with a signed Storage URL')
   assert.ok(voice.includes('export function primeAudioOutput'), 'audio output priming is exported')
+  // A mid-line stream error must never read as the line ending
+  // (in the call, that cut Sensei off and opened the mic over
+  // her): the line recovers once, then falls back audibly.
+  assert.ok(voice.includes('stream-recovered'), 'mid-line stream errors are recovered, not treated as line ends')
+  assert.ok(voice.includes('audio.onerror = () => recover'), 'the error handler recovers instead of firing the end')
   assert.ok(voice.includes('sharedAudio()'), 'playback uses one shared audio element')
   const btn = readFileSync(new URL('../src/components/TtsButton.jsx', import.meta.url), 'utf8')
   assert.ok(btn.includes('primeAudioOutput()'), 'the play button primes inside its tap')
