@@ -355,6 +355,26 @@ export function recordSessionSummary({ minutes = 0, accuracy01 = null, lapseRate
   return saveTwin(twin)
 }
 
+/**
+ * A finished Listening dialogue (the Listening tab). Listening sits
+ * on Koe's side of the fleet, and this tab used to be an island:
+ * answers changed nothing outside their own score line. Now a
+ * finished dialogue lands in the Twin's listening method stats and
+ * accuracy trail, a miss classifies into the error fingerprint
+ * (numbers/dates, negation, speed — the same patterns the One
+ * Session listening step feeds, so What Trips You Up can point
+ * back here), and the run joins the metrics ledger.
+ */
+export function recordListeningResult({ correct = 0, total = 0, script = '' } = {}) {
+  if (!total) return loadTwin()
+  let twin = loadTwin()
+  bumpMethod(twin, 'listening', { sessions: 1, proof: correct === total ? 1 : 0 })
+  pushAccuracy(twin, 'listening', correct / total)
+  if (correct < total) recordPatterns(twin, classifyListeningMiss(script), '')
+  recordMetric('listening_completed', { correct, total })
+  return saveTwin(twin)
+}
+
 /** Sensei Call outcomes. */
 export function recordCallOutcome({ kept, bestScore = null, partial = false }) {
   let twin = loadTwin()

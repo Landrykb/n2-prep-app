@@ -15,8 +15,8 @@ What you know about the platform:
 - Yonde is a PWA built around a fleet: a Today home with one light session, the Yobidashi (Koe calls the learner for a few minutes of spoken practice), a Voice Loop of real-life scenes, a Diagnosis that tells the truth by section, a personal review queue (FSRS), Mining (learners paste real Japanese documents and learn from them), a BJT trainer, level-matched mock exams, and a library of lessons, reading and listening. There is no streak and no punishment — the fleet adapts to the learner's week.
 - N2 study covers ~150 kanji lessons, grammar patterns (e.g. 〜わけがない, 〜ざるを得ない, 〜ものだ, 〜ことになっている), N2 vocabulary, common words, reading passages, and multiple-choice drills.
 - BJT study covers J1–J5 business vocabulary, honorifics (sonkeigo / kenjougo), Japanese reading passages with Japanese questions, and listening scripts.
-- SRS uses an Anki-style scheduler; the error log records mistakes and their fixes.
-- The dashboard shows the next JLPT date and daily actions (SRS, grammar, reading, AI tutor, error review, BJT drill).
+- The fleet is six agents around each learner's Twin (their personal model of what they know and what trips them up): Michi writes one reflective letter a week, Saki plans each day's One Session, Koe makes the Yobidashi spoken-practice calls, Nao turns slips into fixes, Hori fits Reader passages to the learner's real level (in the app and on Telegram) and mines new words from them, and Tsuku creates fresh fitted passages. Everything the learner misses — drills, mocks, BJT, scenes, listening — lands in ONE FSRS review queue; there is no second list. The error log is a written record of slips that also feeds that queue.
+- Today shows one light session and the Proof Ladder (real task, JLPT levels, BJT 400/480, N1, J1). There are no streaks and no punishment mechanics anywhere.
 
 Teaching rules:
 - Answer in plain text only. Do NOT use Markdown, bold, italics, code fences, or tables. Use line breaks and simple numbered or lettered lists if needed.
@@ -52,9 +52,12 @@ serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    const { message, history = [], mode = 'ask', context = '' } = await req.json()
+    const { message, history = [], mode = 'ask', context = '', learner = '' } = await req.json()
     if (!message || typeof message !== 'string' || message.length > 2000) {
       return new Response(JSON.stringify({ error: 'Invalid message' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+    if (typeof learner !== 'string' || learner.length > 1500) {
+      return new Response(JSON.stringify({ error: 'Invalid learner context' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
     if (typeof context !== 'string' || context.length > 120) {
       return new Response(JSON.stringify({ error: 'Invalid context' }), { status: 400, headers: { ...corsHeaders, 'Type': 'application/json' } })
@@ -75,6 +78,12 @@ serve(async (req: Request) => {
       : ''
 
     let systemPrompt = JPN2EASY_PERSONA + contextBlock
+    if (learner) {
+      // The learner block comes from the Twin on the client (fleet
+      // coherence, 2026-11-08): pitch help by it, never recite it
+      // back verbatim.
+      systemPrompt += `\n\nWhat the fleet knows about this learner (from their Twin — pitch your help by it, do not recite it back verbatim):\n${learner}`
+    }
     let sources: any[] = []
 
     if (mode === 'review') {
@@ -93,7 +102,7 @@ serve(async (req: Request) => {
         .map((e: any, i: number) => `${i + 1}. [${e.section}] ${e.mistake}${e.cause ? ` (cause: ${e.cause})` : ''}${e.fix ? ` (fix: ${e.fix})` : ''}`)
         .join('\n') || 'No errors logged yet.'
 
-      systemPrompt += `\n\nThe learner wants a review of their recent error log. Here are their most recent errors:\n${errorContext}\n\nAnalyze the patterns. Pick 2-3 weak areas, explain each briefly with a Japanese example, and give concrete next steps using Yonde's fleet and library. End with one follow-up question.`
+      systemPrompt += `\n\nThe learner wants a review of their recent error log. Here are their most recent errors:\n${errorContext}\n\nAnalyze the patterns. Combine this log with the Twin's top recurring slips from the fleet block above when both are present. Pick 2-3 weak areas, explain each briefly with a Japanese example, and give concrete next steps using Yonde's fleet and library. End with one follow-up question.`
     } else if (context !== 'bjt' && !context.startsWith('n2listening')) {
       // Use N2 vector search for N2-study pages
       const embedModel = Deno.env.get('OPENROUTER_EMBEDDING_MODEL') ?? 'liquid/lfm-2.5-embedding-350m:free'

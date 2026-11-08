@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { useAuth } from '../hooks/useAuth.js'
 import { useLanguage } from '../hooks/useLanguage.js'
 import { getUserProgress, setUserProgress } from '../lib/supabaseApi.js'
@@ -9,7 +9,7 @@ import { userKey } from '../lib/userKey.js'
 import { mergeAnkiProgress } from '../lib/stateMerge.js'
 import { recordEncounters, ankiEncounterWords } from '../lib/encounters.js'
 import KanjiTapText from './KanjiTapText.jsx'
-import { Download, ExternalLink, Loader2, RotateCcw, Search, Settings, Shuffle, CheckCircle2, XCircle, Layers } from 'lucide-react'
+import { Download, ExternalLink, Loader2, RotateCcw, Search, Settings, Shuffle, CheckCircle2, XCircle } from 'lucide-react'
 
 const SRS = [1, 3, 7, 14, 30, 90, 180]
 // P1-4: progress used to live under one global key ('n2:anki-progress'),
@@ -62,77 +62,59 @@ function graduatedState(count, now = new Date()) {
   }
 }
 
-// One-time, USER-INITIATED move of legacy Anki progress into the ONE queue.
-// Safety rules (Doc 08 §6): a JSON backup downloads FIRST; legacy progress
-// is never deleted or altered; the move is idempotent (flag + queue dedupe)
-// and never runs on its own.
-function MigrationCard({ cards, progress }) {
+// Fleet coherence (Landry, 2026-11-08): the move runs ITSELF.
+// "Normally it should not ask the user to move progress — the
+// app should already function that way." Opening this tab now
+// imports any learned word that is not yet in the ONE queue,
+// silently, as a graduated review card (its legacy count becomes
+// its FSRS step, as before). Safety rules kept from the manual
+// era: a JSON backup is stashed on-device FIRST (localStorage
+// 'jpn:anki-backup:latest' — no share prompt, no asking), legacy
+// progress is never deleted or altered, and the move is
+// idempotent (front dedupe against the queue). Returns how many
+// words were imported.
+function autoImportAnkiProgress(cards, progress, noteFor) {
+  const learnedIds = Object.keys(progress?.count || {}).filter((id) => (progress.count[id] || 0) > 0)
+  if (!cards.length || !learnedIds.length) return 0
+  const inQueue = new Set(loadQueue().filter((i) => i.source === 'anki').map((i) => i.front))
+  const byId = new Map(cards.map((c) => [c.id, c]))
+  const missing = learnedIds.map((id) => byId.get(id)).filter((c) => c && !inQueue.has(c.front))
+  if (!missing.length) return 0
+  const now = new Date()
+  const backup = { exportedAt: now.toISOString(), kind: 'yonde-anki-legacy-backup', progress, learnedCount: learnedIds.length }
+  try { localStorage.setItem('jpn:anki-backup:latest', JSON.stringify(backup)) } catch {}
+  const items = missing.map((c) => ({
+    front: c.front,
+    back: c.back,
+    level: c.level,
+    source: 'anki',
+    note: noteFor(progress.count[c.id]),
+  }))
+  addToQueue(items, now)
+  const graduated = loadQueue().map((item) => {
+    const card = items.find((i) => queueItemId('anki', i.front) === item.id)
+    if (!card) return item
+    const legacy = missing.find((c) => c.front === card.front)
+    const count = legacy ? (progress.count[legacy.id] || 1) : 1
+    return { ...item, fsrs: graduatedState(count, now) }
+  })
+  saveQueue(graduated)
+  const prev = loadMigration()
+  const record = { doneAt: now.toISOString(), imported: (prev?.imported || 0) + items.length, backupStashed: true, auto: true }
+  try { localStorage.setItem(MIGRATION_KEY, JSON.stringify(record)) } catch {}
+  return items.length
+}
+
+// The only trace the auto-import leaves on this screen: one
+// quiet line saying the words already live in the queue.
+function MigrationNote({ migration }) {
   const { t } = useLanguage()
-  const [migration, setMigration] = useState(loadMigration)
-  const [note, setNote] = useState('')
-  const learnedIds = useMemo(
-    () => Object.keys(progress?.count || {}).filter((id) => (progress.count[id] || 0) > 0),
-    [progress],
-  )
-
-  const doMigration = () => {
-    if (!cards.length || !learnedIds.length) return
-    const now = new Date()
-    // 1) Backup first — always, before anything is written anywhere.
-    const backup = {
-      exportedAt: now.toISOString(),
-      kind: 'yonde-anki-legacy-backup',
-      progress,
-      learnedCount: learnedIds.length,
-    }
-    // Deliver WITHOUT navigating: inside the Telegram webview
-    // an <a download> click replaces the app with the raw JSON
-    // (Landry, 2026-11-07). deliverTextFile stashes a copy
-    // on-device first, then offers the share sheet / clipboard.
-    // The import below does not wait for it — the stash is the
-    // guarantee, the delivery is a courtesy copy.
-    void deliverTextFile({ filename: 'yonde-anki-backup.json', text: JSON.stringify(backup, null, 2), mime: 'application/json' })
-
-    // 2) Import the known words as graduated review cards.
-    const byId = new Map(cards.map((c) => [c.id, c]))
-    const items = learnedIds.map((id) => byId.get(id)).filter(Boolean).map((c) => ({
-      front: c.front,
-      back: c.back,
-      level: c.level,
-      source: 'anki',
-      note: t('queue.migrationItemNote', { count: progress.count[c.id] }),
-    }))
-    addToQueue(items, now)
-    const queue = loadQueue().map((item) => {
-      if (item.source !== 'anki') return item
-      const card = items.find((i) => queueItemId('anki', i.front) === item.id)
-      if (!card) return item
-      const legacy = cards.find((c) => c.front === card.front)
-      const count = legacy ? (progress.count[legacy.id] || 1) : 1
-      return { ...item, fsrs: graduatedState(count, now) }
-    })
-    saveQueue(queue)
-
-    const record = { doneAt: now.toISOString(), imported: items.length, backupStashed: true }
-    try { localStorage.setItem(MIGRATION_KEY, JSON.stringify(record)) } catch {}
-    setMigration(record)
-    setNote(t(items.length === 1 ? 'queue.migrationNoteOne' : 'queue.migrationNoteMany', { count: items.length }))
-  }
-
+  if (!migration?.imported) return null
   return (
-    <div className="rounded-2xl glass p-5 card-glow space-y-3 text-left">
-      <h3 className="font-bold text-white flex items-center gap-2"><Layers size={17} className="text-[#FF8A75]" /> {t('queue.migrationTitle')}</h3>
-      {migration ? (
-        <p className="text-sm text-emerald-300 flex items-start gap-2"><CheckCircle2 size={16} className="shrink-0 mt-0.5" /> {t('queue.migrationDone', { date: new Date(migration.doneAt).toLocaleDateString(), count: migration.imported })}</p>
-      ) : (
-        <>
-          <p className="text-sm text-slate-300">{t('queue.migrationIntroStart')} <strong className="text-white">{t('queue.migrationOneQueue')}</strong> {t('queue.migrationIntroMiddle')} <strong className="text-white">{t(learnedIds.length === 1 ? 'queue.migrationLearnedWord' : 'queue.migrationLearnedWords', { count: learnedIds.length })}</strong> {t('queue.migrationIntroEnd')} <em>{t('queue.migrationFirst')}</em>{t('queue.migrationIntroTail')}</p>
-          <button onClick={doMigration} disabled={!learnedIds.length || !cards.length} className="px-4 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] disabled:opacity-40 text-white text-sm font-semibold">{t('queue.migrationButton')}</button>
-          {!learnedIds.length && <p className="text-xs text-slate-500">{t('queue.migrationNothing')}</p>}
-        </>
-      )}
-      {note && <p className="text-xs text-slate-400">{note}</p>}
-    </div>
+    <p className="text-xs text-slate-500 flex items-center gap-1.5 text-left">
+      <CheckCircle2 size={13} className="text-emerald-400 shrink-0" />
+      {t('queue.migrationDone', { date: new Date(migration.doneAt).toLocaleDateString(), count: migration.imported })}
+    </p>
   )
 }
 
@@ -191,6 +173,19 @@ export default function Anki() {
   const [flipped, setFlipped] = useState(false)
   const { user } = useAuth()
   const { t } = useLanguage()
+
+  // The progress move runs itself on open (see
+  // autoImportAnkiProgress) — no button, no asking.
+  const [migration, setMigration] = useState(loadMigration)
+  const autoImportedRef = useRef(false)
+  useEffect(() => {
+    if (!cards.length || autoImportedRef.current) return
+    autoImportedRef.current = true
+    try {
+      const n = autoImportAnkiProgress(cards, progress, (count) => t('queue.migrationItemNote', { count }))
+      if (n > 0) setMigration(loadMigration())
+    } catch { /* never blocks */ }
+  }, [cards, progress, t])
 
   useEffect(() => {
     let cancelled = false
@@ -336,7 +331,7 @@ export default function Anki() {
     // One queue (integration audit #6): this tab's private ladder
     // used to be a parallel SRS universe — a rating here changed
     // nothing in Today, the plan, or the Twin. The rating now ALSO
-    // lands in the ONE queue (source 'anki', the MigrationCard's
+    // lands in the ONE queue (source 'anki', the auto-import's
     // door, live): the card joins the queue if it is not there,
     // and the FSRS state advances by the same rating (Anki quality
     // 0–3 maps onto the queue's 1–4). The tab's own progress above
@@ -408,7 +403,7 @@ export default function Anki() {
           <button onClick={() => setMode('all')} className="px-5 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-slate-200 text-sm font-medium transition">{t('queue.studyAll')}</button>
           <button onClick={exportCSV} className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition"><Download size={16} className="inline mr-2" /> {t('queue.exportCsv')}</button>
         </div>
-        <MigrationCard cards={cards} progress={progress} />
+        <MigrationNote migration={migration} />
       </div>
     )
   }
@@ -417,7 +412,7 @@ export default function Anki() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-28 sm:pb-24">
-      <MigrationCard cards={cards} progress={progress} />
+      <MigrationNote migration={migration} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-2xl font-bold text-white">{t('queue.title')}</h2>
         <div className="flex gap-2">
@@ -478,13 +473,13 @@ export default function Anki() {
         </div>
 
         <div className="h-2 w-full rounded-full bg-bun-700 overflow-hidden">
-          <div className="h-full bg-gradient-to-r from-[#71368A] to-cyan-500 transition-all" style={{ width: `${progressPct}%` }} />
+          <div className="h-full bg-[#FF6B57] transition-all" style={{ width: `${progressPct}%` }} />
         </div>
         <p className="text-xs text-slate-500 text-right">{t('queue.sessionProgress', { index, total: queue.length })}</p>
       </div>
 
       <div className="rounded-3xl glass p-8 sm:p-12 card-glow text-center min-h-[360px] flex flex-col items-center justify-center">
-        <div className={`w-24 h-24 rounded-2xl bg-gradient-to-br ${current.level === 'N1' ? 'from-rose-500 to-red-600' : current.level === 'N2' ? 'from-orange-500 to-amber-600' : current.level === 'N3' ? 'from-yellow-500 to-amber-600' : current.level === 'N4' ? 'from-emerald-500 to-teal-600' : 'from-cyan-500 to-blue-600'} flex items-center justify-center text-4xl shadow-xl mb-6`}>
+        <div className="w-24 h-24 rounded-2xl bg-bun-700 border border-bun-600/40 flex items-center justify-center text-4xl shadow-xl mb-6">
           {current.image}
         </div>
         <p className="text-sm text-slate-400 mb-2 uppercase tracking-wide">{current.tag} · {current.level}</p>
@@ -503,7 +498,7 @@ export default function Anki() {
           <button onClick={() => rate(0)} className="py-2.5 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-200 text-sm font-medium hover:bg-rose-500/30 transition flex items-center justify-center gap-1"><XCircle size={14} /> {t('queue.rateAgain')}</button>
           <button onClick={() => rate(1)} className="py-2.5 rounded-xl bg-orange-500/20 border border-orange-500/40 text-orange-200 text-sm font-medium hover:bg-orange-500/30 transition">{t('queue.rateHard')}</button>
           <button onClick={() => rate(2)} className="py-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 text-sm font-medium hover:bg-emerald-500/30 transition flex items-center justify-center gap-1"><CheckCircle2 size={14} /> {t('queue.rateGood')}</button>
-          <button onClick={() => rate(3)} className="py-2.5 rounded-xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-200 text-sm font-medium hover:bg-cyan-500/30 transition">{t('queue.rateEasy')}</button>
+          <button onClick={() => rate(3)} className="py-2.5 rounded-xl bg-teal-500/20 border border-teal-500/40 text-teal-200 text-sm font-medium hover:bg-teal-500/30 transition">{t('queue.rateEasy')}</button>
         </div>
       )}
     </div>

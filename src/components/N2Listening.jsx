@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Headphones } from 'lucide-react'
 import { n2Listening } from '../data/n2Listening.js'
 import { listeningPlus } from '../data/listeningPlus.js'
+import { recordListeningResult } from '../lib/twin.js'
 import TtsButton from './TtsButton.jsx'
 import KanjiTapText from './KanjiTapText.jsx'
 import MiniQuiz from './MiniQuiz.jsx'
@@ -26,7 +27,7 @@ export default function N2Listening() {
           <Headphones size={20} className="text-[#FF8A75]" />
           <h2 className="text-2xl font-bold text-white">Listening — N5 to N1</h2>
         </div>
-        <p className="text-sm text-slate-400">JLPT-style listening at every level. Press play, listen, then answer the Japanese questions. The transcript is hidden until you reveal it — the real exam gives you one play and no transcript.</p>
+        <p className="text-sm text-slate-400">Press play, listen, then answer. Results land in your Twin — misses become patterns the fleet works on.</p>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -46,7 +47,7 @@ export default function N2Listening() {
       </div>
 
       {item && (
-        <div className="rounded-2xl glass p-5 card-glow space-y-4">
+        <div className="rounded-2xl bg-[#151129] border border-white/5 p-5 space-y-4">
           <div>
             <h3 className="text-lg font-bold text-white">{item.title}</h3>
             <p className="text-xs text-slate-400">{item.level} · listen first, then answer</p>
@@ -63,7 +64,17 @@ export default function N2Listening() {
               <KanjiTapText text={item.script} />
             </div>
           )}
-          <MiniQuiz key={`${item.title}-${active}`} questions={item.questions} />
+          <MiniQuiz
+            key={`${item.title}-${active}`}
+            questions={item.questions}
+            onResult={({ correct, total }) => {
+              // Fleet integration (Landry, 2026-11-08): a finished
+              // dialogue is no longer an island — the Twin's
+              // listening trail, the error fingerprint and the
+              // metrics ledger all hear about it.
+              try { recordListeningResult({ correct, total, script: item.script }) } catch { /* never blocks */ }
+            }}
+          />
         </div>
       )}
     </div>

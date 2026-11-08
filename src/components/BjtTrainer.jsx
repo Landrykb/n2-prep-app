@@ -3,6 +3,8 @@ import { Timer, Award, FileText, CheckCircle2, XCircle } from 'lucide-react'
 import { bjtTrainerItems } from '../data/bjtTrainer.js'
 import { estimateBjtScore, bjtBandForScore } from '../lib/levels.js'
 import { recordMetric } from '../lib/metrics.js'
+import { addToQueue } from '../lib/queue.js'
+import { recordQueueRating } from '../lib/twin.js'
 import TtsButton from './TtsButton.jsx'
 import KanjiTapText from './KanjiTapText.jsx'
 
@@ -89,7 +91,30 @@ export default function BjtTrainer() {
       localStorage.setItem(BJT_ATTEMPTS_KEY, JSON.stringify([...list, attempt].slice(-20)))
     } catch { /* ignore */ }
     recordMetric('bjt_attempt', { correct: scored.correct, answered: scored.answered, total: totalQuestions, estScore, band: band.id })
-  }, [finishedAll, estScore, band, scored, totalQuestions])
+    // Fleet integration (Landry, 2026-11-08): the trainer's
+    // misses join the ONE queue too — a finished run used to
+    // leave nothing behind but a score. (The Twin's BJT register
+    // estimate stays diagnosis-owned, as documented above.)
+    try {
+      for (const it of bjtTrainerItems) {
+        const picks = answers[it.id] || []
+        it.questions.forEach((q, qi) => {
+          const pick = picks[qi]
+          if (pick === null || pick === undefined || q.options[pick]?.correct) return
+          const right = (q.options || []).find((o) => o.correct)
+          const front = q.prompt || it.title
+          const added = addToQueue([{
+            front,
+            back: right ? `Correct: ${right.label}${q.explanation ? ` — ${q.explanation}` : ''}` : (q.explanation || ''),
+            note: 'BJT Trainer',
+            source: 'bjt',
+          }])
+          const queued = added?.queue?.find((x) => x.front === front && x.source === 'bjt')
+          if (queued) recordQueueRating(queued, 1)
+        })
+      }
+    } catch { /* never blocks */ }
+  }, [finishedAll, estScore, band, scored, totalQuestions, answers])
   const itemPicks = item ? (answers[item.id] || Array(item.questions.length).fill(null)) : []
   const itemAnswered = itemPicks.filter((p) => p !== null && p !== undefined).length
 

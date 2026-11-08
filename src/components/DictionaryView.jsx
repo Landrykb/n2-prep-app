@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search, Loader2, BookOpen, X } from 'lucide-react'
+import { Search, Loader2, BookOpen, X, Plus, Check } from 'lucide-react'
 import { localDictionary, loadDictionary, search, LEVELS } from '../lib/dictionary.js'
+import { addToQueue, loadQueue } from '../lib/queue.js'
+import { recordEncounters } from '../lib/encounters.js'
 import { useKanjiModal } from '../hooks/useKanjiModal.js'
 import TtsButton from './TtsButton.jsx'
 import KanjiTapText from './KanjiTapText.jsx'
@@ -21,6 +23,14 @@ export default function DictionaryView() {
   const [query, setQuery] = useState('')
   const [levels, setLevels] = useState([])
   const { open } = useKanjiModal()
+  // Fleet integration (Landry, 2026-11-08): a looked-up word can
+  // be kept in the ONE queue from here, and opening its detail
+  // counts it as genuinely met (the Reader's fit credits it).
+  const [inQueue, setInQueue] = useState(() => { try { return new Set(loadQueue().map((i) => i.front)) } catch { return new Set() } })
+  const keepWord = (e) => {
+    try { addToQueue([{ front: e.word, back: e.meaning, reading: e.reading, level: e.level, source: 'dictionary' }]) } catch { /* never blocks */ }
+    setInQueue((cur) => new Set(cur).add(e.word))
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -48,7 +58,7 @@ export default function DictionaryView() {
         </div>
       </header>
 
-      <div className="rounded-2xl glass p-4 card-glow space-y-3">
+      <div className="rounded-2xl bg-[#151129] border border-white/5 p-4 space-y-3">
         <div className="relative">
           <Search size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
           <input
@@ -104,7 +114,7 @@ export default function DictionaryView() {
 
       <ul className="space-y-2">
         {results.map((e) => (
-          <li key={`${e.word}|${e.reading}|${e.level}`} className="rounded-xl glass p-3.5 flex items-start justify-between gap-3">
+          <li key={`${e.word}|${e.reading}|${e.level}`} className="rounded-xl bg-[#151129] border border-white/5 p-3.5 flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-baseline gap-2 flex-wrap">
                 <span className="text-xl font-semibold text-white break-all">
@@ -119,12 +129,21 @@ export default function DictionaryView() {
               {/* Speak the READING, never the kanji surface: the engine picks its own reading for 明日 (あした) even on the あす entry — Landry, 2026-11-07. */}
               <TtsButton text={e.reading || e.word} className="p-1.5" />
               <button
-                onClick={() => open({ _type: e.type || 'Vocab', _key: e.word, word: e.word, char: e.word.length === 1 ? e.word : undefined, reading: e.reading, meaning: e.meaning, image: e.image })}
+                onClick={() => { try { recordEncounters([e.word]) } catch { /* never blocks */ } open({ _type: e.type || 'Vocab', _key: e.word, word: e.word, char: e.word.length === 1 ? e.word : undefined, reading: e.reading, meaning: e.meaning, image: e.image }) }}
                 aria-label={`Show details for ${e.word}`}
                 title="Visual breakdown"
                 className="p-1.5 rounded-lg bg-bun-800/60 text-slate-400 hover:text-[#FF8A75]"
               >
                 <BookOpen size={15} />
+              </button>
+              <button
+                onClick={() => keepWord(e)}
+                disabled={inQueue.has(e.word)}
+                aria-label={inQueue.has(e.word) ? `${e.word} is in your queue` : `Add ${e.word} to your queue`}
+                title={inQueue.has(e.word) ? 'In your queue' : 'Add to my queue'}
+                className={`p-1.5 rounded-lg transition ${inQueue.has(e.word) ? 'text-emerald-400' : 'bg-bun-800/60 text-slate-400 hover:text-[#FF8A75]'}`}
+              >
+                {inQueue.has(e.word) ? <Check size={15} /> : <Plus size={15} />}
               </button>
             </div>
           </li>

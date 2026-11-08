@@ -13,6 +13,35 @@ import {
 } from '../data/bjt.js'
 import { supabase } from '../lib/supabaseClient.js'
 import { shuffleWithSeed } from '../lib/shuffle.js'
+import { addToQueue } from '../lib/queue.js'
+import { recordQueueRating } from '../lib/twin.js'
+import { recordMetric } from '../lib/metrics.js'
+
+// Fleet integration (Landry, 2026-11-08): a finished BJT set is
+// no longer an island — misses join the ONE queue as cards and
+// the run lands in the metrics ledger, exactly like the mock.
+// BJT questions carry { prompt, options: [{label, correct}],
+// explanation }.
+function mirrorBjt(kind) {
+  return ({ correct, total, misses }) => {
+    try {
+      for (const q of misses || []) {
+        const right = (q.options || []).find((o) => o.correct)
+        const front = q.target ? `${q.target} — ${q.prompt}` : q.prompt
+        const added = addToQueue([{
+          front,
+          back: right ? `Correct: ${right.label}${q.explanation ? ` — ${q.explanation}` : ''}` : (q.explanation || ''),
+          note: `BJT · ${kind}`,
+          source: 'bjt',
+          level: q.level || '',
+        }])
+        const item = added?.queue?.find((x) => x.front === front && x.source === 'bjt')
+        if (item) recordQueueRating(item, 1)
+      }
+    } catch { /* never blocks */ }
+    try { recordMetric('bjt_completed', { kind, correct, total }) } catch { /* never blocks */ }
+  }
+}
 import TtsButton from './TtsButton.jsx'
 import KanjiTapText from './KanjiTapText.jsx'
 import MiniQuiz from './MiniQuiz.jsx'
@@ -126,7 +155,7 @@ export default function BJT() {
             <Building2 size={20} className="text-[#FF8A75]" />
             <h2 className="text-2xl font-bold text-white">BJT + N2 Prep</h2>
           </div>
-          <p className="text-sm text-slate-400">Prepare for either BJT or N2. BJT can be taken anytime — use the drills and videos when you feel ready.</p>
+          <p className="text-sm text-slate-400">Prepare for BJT or N2.</p>
         </div>
       </div>
 
@@ -159,7 +188,7 @@ export default function BJT() {
             </div>
           </div>
           <p className="text-sm text-slate-400">5 random questions up to {target === 'all' ? 'mixed levels' : target}. N2 business items are labeled where relevant.</p>
-          <MiniQuiz key={daily.map((q) => q.id).join(',')} questions={daily} />
+          <MiniQuiz key={daily.map((q) => q.id).join(',')} questions={daily} onResult={mirrorBjt('daily')} />
         </section>
       )}
 
@@ -261,7 +290,7 @@ export default function BJT() {
             <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-5 leading-loose text-slate-100">
               <KanjiTapText text={bjtPassages[passageIdx].text} />
             </div>
-            <MiniQuiz key={passageIdx} questions={bjtPassages[passageIdx].questions} />
+            <MiniQuiz key={passageIdx} questions={bjtPassages[passageIdx].questions} onResult={mirrorBjt('reading')} />
           </div>
         </section>
       )}
@@ -294,7 +323,7 @@ export default function BJT() {
                 <KanjiTapText text={bjtListening[listenIdx].script} />
               </div>
             )}
-            <MiniQuiz key={listenIdx} questions={bjtListening[listenIdx].questions} />
+            <MiniQuiz key={listenIdx} questions={bjtListening[listenIdx].questions} onResult={mirrorBjt('listening')} />
           </div>
         </section>
       )}

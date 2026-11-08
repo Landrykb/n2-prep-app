@@ -13,6 +13,8 @@ import { loadMockHistory, saveMockAttempt } from '../lib/mockStore.js'
 import { setAiPrefill } from '../lib/aiPrefill.js'
 import { addErrorLog } from '../lib/supabaseApi.js'
 import { recordMetric } from '../lib/metrics.js'
+import { addToQueue } from '../lib/queue.js'
+import { recordQueueRating } from '../lib/twin.js'
 import { userKey } from '../lib/userKey.js'
 import KanjiTapText from './KanjiTapText.jsx'
 import TtsButton from './TtsButton.jsx'
@@ -141,6 +143,14 @@ export default function MockExam({ setActive }) {
       } else {
         localLogs.unshift({ id: nowMs() + localLogs.length, ...entry })
       }
+      // Fleet integration (Landry, 2026-11-08): the same miss
+      // also joins the ONE queue — the log alone was a dead end
+      // the fleet never reviewed.
+      try {
+        const added = addToQueue([{ front: entry.mistake, back: entry.fix, note: `Mock · ${group.name}`, source: 'mock' }])
+        const item = added?.queue?.find((x) => x.front === entry.mistake && x.source === 'mock')
+        if (item) recordQueueRating(item, 1)
+      } catch { /* never blocks */ }
     }
     if (!user) localStorage.setItem(userKey(user, 'error-log'), JSON.stringify(localLogs))
   }
@@ -259,8 +269,7 @@ export default function MockExam({ setActive }) {
             </button>
           ))}
         </div>
-        <p className="text-xs text-slate-500 text-center">Progress is saved in this tab — a refresh will not lose your attempt.</p>
-        <p className="text-xs text-slate-500 text-center">Furigana and kanji lookup are disabled during the test, like the real exam.</p>
+
       </div>
     )
   }
@@ -304,7 +313,7 @@ export default function MockExam({ setActive }) {
       </div>
 
       <div className="h-2 w-full rounded-full bg-bun-700 overflow-hidden">
-        <div className="h-full bg-gradient-to-r from-[#71368A] to-cyan-500 transition-all" style={{ width: `${(answeredCount / flat.length) * 100}%` }} />
+        <div className="h-full bg-[#FF6B57] transition-all" style={{ width: `${(answeredCount / flat.length) * 100}%` }} />
       </div>
 
       {/* question grid */}
@@ -435,7 +444,7 @@ function ScoreBar({ label, value, max = 60 }) {
         <span className="text-slate-200 font-semibold">{value} / {max}</span>
       </div>
       <div className="h-2.5 rounded-full bg-bun-700 overflow-hidden">
-        <div className={`h-full rounded-full ${value >= 19 ? 'bg-gradient-to-r from-[#71368A] to-cyan-500' : 'bg-rose-500'}`} style={{ width: `${pct}%` }} />
+        <div className={`h-full rounded-full ${value >= 19 ? 'bg-emerald-400' : 'bg-rose-500'}`} style={{ width: `${pct}%` }} />
       </div>
     </div>
   )

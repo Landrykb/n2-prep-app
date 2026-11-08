@@ -252,7 +252,7 @@ export default function SpeedCards() {
                   key={lv}
                   onClick={() => toggleLevel(lv)}
                   aria-pressed={levels.includes(lv)}
-                  className={`px-3.5 py-2 rounded-full text-sm font-medium transition ${levels.includes(lv) ? 'bg-cyan-600 text-white' : 'bg-bun-800 text-slate-300 hover:text-white border border-bun-600/40'}`}
+                  className={`px-3.5 py-2 rounded-full text-sm font-medium transition ${levels.includes(lv) ? 'bg-[#FF6B57] text-white' : 'bg-bun-800 text-slate-300 hover:text-white border border-bun-600/40'}`}
                 >
                   {lv}
                 </button>
@@ -268,7 +268,7 @@ export default function SpeedCards() {
                   key={t}
                   onClick={() => setTimeLimit(t)}
                   aria-pressed={timeLimit === t}
-                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium transition ${timeLimit === t ? 'bg-cyan-600 text-white' : 'bg-bun-800 text-slate-300 border border-bun-600/40'}`}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium transition ${timeLimit === t ? 'bg-[#FF6B57] text-white' : 'bg-bun-800 text-slate-300 border border-bun-600/40'}`}
                 >
                   <Clock size={14} /> {t}s
                 </button>
@@ -302,7 +302,7 @@ export default function SpeedCards() {
 
           <div className="h-2 w-full bg-bun-900 rounded-full overflow-hidden" role="timer" aria-label="Time remaining">
             <div
-              className={`h-full rounded-full transition-[width] duration-100 ease-linear ${urgent ? 'bg-rose-500' : 'bg-gradient-to-r from-[#71368A] to-cyan-400'}`}
+              className={`h-full rounded-full transition-[width] duration-100 ease-linear ${urgent ? 'bg-rose-500' : 'bg-[#FF6B57]'}`}
               style={{ width: `${pct}%` }}
             />
           </div>

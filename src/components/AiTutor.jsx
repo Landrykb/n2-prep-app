@@ -3,30 +3,58 @@ import { useAuth } from '../hooks/useAuth.js'
 import { supabase } from '../lib/supabaseClient.js'
 import { consumeAiPrefill } from '../lib/aiPrefill.js'
 import { loadDiagnosis } from '../lib/profile.js'
+import { loadTwin, topPatterns } from '../lib/twin.js'
+import { loadQueue } from '../lib/queue.js'
 import RichText from './RichText.jsx'
 import TtsButton from './TtsButton.jsx'
 import { Send, Loader2, Sparkles, RotateCcw, Copy, Check, Flag } from 'lucide-react'
 
+// Fleet coherence (Landry, 2026-11-08): four doors, not ten —
+// everything else is a free-text ask away in the input below.
 function quickActions(level) {
   const L = level || 'N2'
   return [
-    { label: `Explain ${L} Grammar`, prompt: `Explain one high-value ${L} grammar point with a Japanese example and a plain-English breakdown.`, mode: 'ask' },
-    { label: 'Explain BJT Keigo', prompt: 'What is the difference between 尊敬語 and 謙譲語? Give a workplace example.', mode: 'ask' },
-    { label: `${L} Vocab`, prompt: `Teach me one high-value ${L} word and show me how to use it in a real sentence.`, mode: 'ask' },
     { label: `Quiz Me ${L}`, prompt: `Give me one JLPT ${L} multiple-choice question. Do not reveal the answer yet.`, mode: 'quiz' },
-    { label: 'BJT Question', prompt: 'Give me one BJT business Japanese multiple-choice question. Do not reveal the answer yet.', mode: 'quiz' },
     { label: 'Review My Errors', prompt: 'Review my recent errors and recommend the next 3 things to study.', mode: 'review' },
     { label: '7-Day Plan', prompt: 'Based on my recent activity, suggest a focused 7-day study plan.', mode: 'review' },
     { label: 'Kanji Story', prompt: `Pick one ${L} kanji and tell me a mnemonic story to remember it.`, mode: 'ask' },
-    { label: 'Listening Tip', prompt: `Give me one tip for improving JLPT ${L} listening and a short example sentence.`, mode: 'ask' },
-    { label: 'Make A Sentence', prompt: `Give me one useful ${L} example sentence and explain the grammar in it.`, mode: 'ask' },
   ]
 }
 
 function tutorGreeting(level) {
-  const base = 'Hi! I am your Yonde tutor — one of the fleet that learns how you learn. I can help with JLPT N5–N1 and beyond, BJT business Japanese, kanji, grammar, reading, listening, keigo, or study strategy.'
-  const pitch = level ? `\n\nYour last diagnosis put you around ${level}, so I will pitch answers there unless you ask for another level.` : ''
-  return `${base}${pitch}\n\nType a question below or tap a quick topic to get started.`
+  const base = 'Hi! I am your Yonde tutor — I can see what your fleet has been learning about you, so my answers are pitched to your real weak points.'
+  const pitch = level ? ` Your last diagnosis put you around ${level}.` : ''
+  return `${base}${pitch}`
+}
+
+// What the fleet knows, in one compact block for the chat
+// function: the Twin's top recurring slips, the diagnosis and
+// its weakest section, and the state of the one review queue.
+// The tutor READS the fleet through this; free chat does not
+// write back (unstructured answers are not measurements).
+function tutorContext() {
+  try {
+    const lines = []
+    const diagnosis = loadDiagnosis()
+    if (diagnosis?.jlptEstimate) {
+      lines.push(`Diagnosis estimate: ${diagnosis.jlptEstimate}${diagnosis.total ? ` (${diagnosis.total}/180)` : ''}.`)
+      const sections = diagnosis.sections && typeof diagnosis.sections === 'object' ? Object.entries(diagnosis.sections).filter(([, v]) => typeof v === 'number') : []
+      if (sections.length) {
+        const weakest = sections.reduce((a, b) => (b[1] < a[1] ? b : a))
+        lines.push(`Weakest diagnosis section: ${weakest[0]} (${weakest[1]}/60).`)
+      }
+    }
+    const twin = loadTwin()
+    const patterns = topPatterns(twin, 3).map((p) => p.plain || p.label || p.id).filter(Boolean)
+    if (patterns.length) lines.push(`Top recurring slips right now: ${patterns.join('; ')}.`)
+    const queue = loadQueue()
+    if (queue.length) {
+      const now = Date.now()
+      const due = queue.filter((i) => i.fsrs?.due && new Date(i.fsrs.due).getTime() <= now).length
+      lines.push(`Review queue: ${queue.length} cards, ${due} due now.`)
+    }
+    return lines.join('\n')
+  } catch { return '' }
 }
 export default function AiTutor({ context = '', compact = false }) {
   const level = (() => { try { return loadDiagnosis()?.jlptEstimate || null } catch { return null } })()
@@ -127,7 +155,7 @@ export default function AiTutor({ context = '', compact = false }) {
       const base = historyBase || messages
       const history = base.filter((msg) => msg.role === 'user' || msg.role === 'assistant').slice(-12).map(({ role, content }) => ({ role, content }))
       const { data, error } = await supabase.functions.invoke('chat', {
-        body: { message: text, history, mode, context },
+        body: { message: text, history, mode, context, learner: tutorContext() },
       })
       if (error) throw error
       setMessages((m) => [...m, { role: 'assistant', content: data.answer || 'No response.', sources: data.sources || [], pending: true }])

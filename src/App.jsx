@@ -36,6 +36,7 @@ import {
   Stethoscope,
   Pickaxe,
   Phone,
+  Plus,
   Repeat,
   Users,
   Mail,
@@ -50,6 +51,10 @@ import { findStudyItem } from './lib/findStudyItem.js'
 import { localDictionary, loadDictionary, lookup } from './lib/dictionary.js'
 import { loadDiagnosis } from './lib/profile.js'
 import { loadPromise } from './lib/promise.js'
+import { addToQueue, loadQueue } from './lib/queue.js'
+import { recordQueueRating, recordReading } from './lib/twin.js'
+import { recordMetric } from './lib/metrics.js'
+import { recordEncounters } from './lib/encounters.js'
 import { KANJI_LEVELS, loadKanjiLevel, loadAllKanji } from './lib/kanjiData.js'
 import { getKanjiMeta, getKanjiStrokes } from './lib/kanjiDb.js'
 import { wordsForKanji, wordDisplayForm } from './lib/wordsDb.js'
@@ -111,7 +116,7 @@ const PrivacyPolicy = lazyView(() => import('./components/PrivacyPolicy.jsx'))
 const Terms = lazyView(() => import('./components/Terms.jsx'))
 import { userKey } from './lib/userKey.js'
 import { INCOMING_CALL_KEY } from './lib/calls.js'
-import { getErrorLogs, addErrorLog, reviewErrorLog, deleteErrorLog, getUserProgress, setUserProgress } from './lib/supabaseApi.js'
+import { getErrorLogs, addErrorLog, deleteErrorLog, getUserProgress, setUserProgress } from './lib/supabaseApi.js'
 import {
   plan,
   readingTips,
@@ -136,28 +141,40 @@ const nav = [
   { id: 'reader', labelKey: 'shell.nav.reader', shortKey: 'shell.navShort.reader', icon: BookOpenText , group: 'today' },
   // --- Your Fleet: you, measured ---
   { id: 'twin', labelKey: 'shell.nav.twin', shortKey: 'shell.navShort.twin', icon: Users , group: 'fleet' },
-  { id: 'diagnosis', labelKey: 'shell.nav.diagnosis', icon: Stethoscope , group: 'fleet' },
+  // Diagnosis and the Coach Letter keep their routes but leave the
+  // menu (fleet coherence, Landry 2026-11-08): the checkup is
+  // summoned from My Twin, the letter from Today and the Loop.
+  { id: 'diagnosis', labelKey: 'shell.nav.diagnosis', icon: Stethoscope , group: 'fleet', menu: false },
   { id: 'loop', labelKey: 'shell.nav.loop', shortKey: 'shell.navShort.loop', icon: Repeat , group: 'fleet' },
-  { id: 'coach', labelKey: 'shell.nav.coach', shortKey: 'shell.navShort.coach', icon: Mail , group: 'fleet' },
-  // --- Practice: every training tool, old and new ---
-  { id: 'voice', labelKey: 'shell.nav.voice', icon: Mic , group: 'practice' },
-  { id: 'mine', labelKey: 'shell.nav.mine', icon: Pickaxe , group: 'practice' },
-  { id: 'drills', labelKey: 'shell.nav.drills', icon: Dumbbell , group: 'practice' },
-  { id: 'speed', labelKey: 'shell.nav.speed', icon: Zap , group: 'practice' },
-  { id: 'anki', labelKey: 'shell.nav.anki', icon: Layers , group: 'practice' },
-  { id: 'n2listening', labelKey: 'shell.nav.n2listening', icon: Headphones , group: 'practice' },
-  { id: 'mock', labelKey: 'shell.nav.mock', icon: ClipboardCheck , group: 'practice' },
-  { id: 'bjt', labelKey: 'shell.nav.bjt', icon: Building2 , group: 'practice' },
-  { id: 'ai', labelKey: 'shell.nav.ai', icon: Bot , group: 'practice' },
-  { id: 'errors', labelKey: 'shell.nav.errors', icon: AlertCircle , group: 'practice' },
-  // --- Library: reference ---
-  { id: 'lessons', labelKey: 'shell.nav.lessons', icon: BookOpen , group: 'library' },
-  { id: 'dictionary', labelKey: 'shell.nav.dictionary', icon: Search , group: 'library' },
-  { id: 'reading', labelKey: 'shell.nav.reading', icon: Eye , group: 'library' },
-  { id: 'plan', labelKey: 'shell.nav.plan', icon: Map , group: 'library' },
-  { id: 'resources', labelKey: 'shell.nav.resources', icon: Library , group: 'library' },
-  { id: 'videos', labelKey: 'shell.nav.videos', icon: Play , group: 'library' },
-  { id: 'sources', labelKey: 'shell.nav.sources', shortKey: 'shell.navShort.sources', icon: ScrollText , group: 'library' },
+  { id: 'coach', labelKey: 'shell.nav.coach', shortKey: 'shell.navShort.coach', icon: Mail , group: 'fleet', menu: false },
+  // --- Practice: one hub door, every mode inside (Landry,
+  // 2026-11-08: the menu was long because everything sat separate
+  // and unconnected). The views keep their ids and routes; the
+  // hub is their glanceable map. The AI Tutor leaves the menu —
+  // its floating button is on every screen. The Error Log leaves
+  // the menu — it is reached from What Trips You Up in My Twin,
+  // and its slips live in the one queue now.
+  { id: 'practice', labelKey: 'shell.nav.practiceHub', icon: Dumbbell , group: 'practice' },
+  { id: 'exams', labelKey: 'shell.nav.exams', icon: ClipboardCheck , group: 'practice' },
+  { id: 'voice', labelKey: 'shell.nav.voice', icon: Mic , group: 'practice', menu: false },
+  { id: 'mine', labelKey: 'shell.nav.mine', icon: Pickaxe , group: 'practice', menu: false },
+  { id: 'drills', labelKey: 'shell.nav.drills', icon: Dumbbell , group: 'practice', menu: false },
+  { id: 'speed', labelKey: 'shell.nav.speed', icon: Zap , group: 'practice', menu: false },
+  { id: 'anki', labelKey: 'shell.nav.anki', icon: Layers , group: 'practice', menu: false },
+  { id: 'n2listening', labelKey: 'shell.nav.n2listening', icon: Headphones , group: 'practice', menu: false },
+  { id: 'mock', labelKey: 'shell.nav.mock', icon: ClipboardCheck , group: 'practice', menu: false },
+  { id: 'bjt', labelKey: 'shell.nav.bjt', icon: Building2 , group: 'practice', menu: false },
+  { id: 'ai', labelKey: 'shell.nav.ai', icon: Bot , group: 'practice', menu: false },
+  { id: 'errors', labelKey: 'shell.nav.errors', icon: AlertCircle , group: 'practice', menu: false },
+  // --- Library: one hub door, every shelf inside ---
+  { id: 'library', labelKey: 'shell.nav.libraryHub', icon: Library , group: 'library' },
+  { id: 'lessons', labelKey: 'shell.nav.lessons', icon: BookOpen , group: 'library', menu: false },
+  { id: 'dictionary', labelKey: 'shell.nav.dictionary', icon: Search , group: 'library', menu: false },
+  { id: 'reading', labelKey: 'shell.nav.reading', icon: Eye , group: 'library', menu: false },
+  { id: 'plan', labelKey: 'shell.nav.plan', icon: Map , group: 'library', menu: false },
+  { id: 'resources', labelKey: 'shell.nav.resources', icon: Library , group: 'library', menu: false },
+  { id: 'videos', labelKey: 'shell.nav.videos', icon: Play , group: 'library', menu: false },
+  { id: 'sources', labelKey: 'shell.nav.sources', shortKey: 'shell.navShort.sources', icon: ScrollText , group: 'library', menu: false },
 ]
 
 const navIds = nav.map((n) => n.id)
@@ -468,7 +485,7 @@ function Sidebar({ active, setActive, mobileOpen, setMobileOpen, guest = false, 
           {NAV_GROUPS.map((g) => (
             <div key={g.id} className="pt-3 first:pt-0">
               <p className="px-3.5 pb-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">{t(g.labelKey)}</p>
-              {nav.filter((n) => (n.group || 'library') === g.id).map((n) => {
+              {nav.filter((n) => (n.group || 'library') === g.id && n.menu !== false).map((n) => {
             const Icon = n.icon
             return (
               <button
@@ -672,7 +689,7 @@ function Lessons() {
                 onClick={() => setKanjiBrowse(b)}
                 aria-pressed={kanjiBrowse === b}
                 className={`px-2.5 py-1 rounded-full text-xs font-medium border transition ${
-                  kanjiBrowse === b ? 'bg-[#71368A] text-white border-[#71368A]' : 'bg-bun-800 text-slate-400 border-bun-600/40 hover:text-white'
+                  kanjiBrowse === b ? 'bg-[#FF6B57] text-white border-[#FF6B57]' : 'bg-bun-800 text-slate-400 border-bun-600/40 hover:text-white'
                 }`}
               >
                 {t(labelKey)}
@@ -718,8 +735,8 @@ function Lessons() {
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {list.map((item, i) => (
-            <button key={i} onClick={() => { setActiveItem(item); setShowBack(false) }} className="text-left rounded-2xl glass p-5 card-glow hover:border-[#FF6B57]/30 transition group">
-              <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${item.gradient} flex items-center justify-center text-2xl shadow-lg mb-4 group-hover:scale-105 transition`}>
+            <button key={i} onClick={() => { setActiveItem(item); setShowBack(false) }} className="text-left rounded-2xl bg-[#151129] border border-white/5 p-5 hover:border-[#FF6B57]/30 transition group">
+              <div className="w-14 h-14 rounded-2xl bg-bun-700 border border-bun-600/40 flex items-center justify-center text-2xl shadow-lg mb-4 group-hover:scale-105 transition">
                 {item.emoji || item.image}
               </div>
               <p className="text-2xl font-bold text-white mb-1">{item.char || item.pattern || item.word}</p>
@@ -735,14 +752,23 @@ function Lessons() {
 
 function KanjiDetail({ item, showBack, setShowBack }) {
   const { t } = useLanguage()
+  const { open: openKanji } = useKanjiModal()
+  // Fleet integration (2026-11-08): studying this kanji counts
+  // its example word as genuinely met, and the word (or the
+  // kanji itself) can be kept in the one queue from here.
+  const exampleWord = (item.word || '').split('（')[0].split('(')[0].trim()
+  useEffect(() => {
+    if (exampleWord) { try { recordEncounters([exampleWord]) } catch { /* never blocks */ } }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item])
   return (
-    <div className="rounded-3xl glass p-6 sm:p-10 card-glow">
+    <div className="rounded-3xl bg-[#151129] border border-white/5 p-6 sm:p-10">
       <div className="flex flex-col lg:flex-row gap-8 items-start">
-        <div className={`w-40 h-40 shrink-0 rounded-3xl bg-gradient-to-br ${item.gradient} flex items-center justify-center text-7xl font-bold text-white shadow-2xl`}>{item.char}</div>
+        <div className="w-40 h-40 shrink-0 rounded-3xl bg-[#71368A]/15 border border-[#71368A]/30 flex items-center justify-center text-7xl font-bold text-white shadow-2xl">{item.char}</div>
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-2">
             <h2 className="text-4xl font-bold text-white">{item.char}</h2>
-            <Badge color="cyan">{item.on} · {item.kun}</Badge>
+            <Badge color="plum">{item.on} · {item.kun}</Badge>
           </div>
           <div className="flex flex-wrap items-center gap-2 mb-1">
             <p className="text-xl text-slate-200">{item.meaning}</p>
@@ -750,15 +776,21 @@ function KanjiDetail({ item, showBack, setShowBack }) {
           </div>
           <p className="text-sm text-slate-400 mb-4">{item.word}</p>
 
-          <div className="flex items-center gap-3 mb-6 p-3 rounded-xl bg-bun-700/40 border border-bun-600/20">
-            <span className="text-3xl" aria-label="drawing">{item.doodle}</span>
-            <span className="text-xs text-slate-500">{t('lessons.sceneDrawing')}</span>
+          {/* The old emoji "scene drawing" strip is gone: the
+              Kanji Lens is where this kanji is taken apart now
+              (stroke order, build-up, draw it, sound family) —
+              one quiet door instead of a deprecated doodle. */}
+          <div className="flex flex-wrap items-center gap-2 mb-6">
+            <button onClick={() => openKanji(item)} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium transition">
+              {t('lessons.openLens')}
+            </button>
+            <AddToQueueButton front={exampleWord || item.char} back={item.meaning} reading={item.on && item.kun ? `${item.on} · ${item.kun}` : undefined} source="lessons" />
           </div>
 
           <div className="grid sm:grid-cols-2 gap-4 mb-6">
             {item.radicals.map((r, i) => (
               <div key={i} className="rounded-xl bg-bun-700/50 border border-bun-600/30 p-4 flex items-center gap-3">
-                <span className="text-2xl">{r.icon}</span>
+                <span className="text-2xl font-bold text-white">{r.part}</span>
                 <div><p className="text-sm font-bold text-white">{r.part} · {r.name}</p><p className="text-xs text-slate-400">{t('lessons.component', { n: i + 1 })}</p></div>
               </div>
             ))}
@@ -771,7 +803,7 @@ function KanjiDetail({ item, showBack, setShowBack }) {
 
           {item.storyFr && (
             <div className="rounded-xl bg-bun-700/30 border border-bun-600/20 p-4 mb-6">
-              <h3 className="text-sm font-bold text-cyan-300 mb-2">{t('lessons.storyFrTitle')}</h3>
+              <h3 className="text-sm font-bold text-slate-400 mb-2">{t('lessons.storyFrTitle')}</h3>
               <KanjiTapText text={item.storyFr} className="text-slate-300 text-sm" />
             </div>
           )}
@@ -780,7 +812,7 @@ function KanjiDetail({ item, showBack, setShowBack }) {
             <>
               <button onClick={() => setShowBack((s) => !s)} className="px-5 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-medium transition">{showBack ? t('lessons.hideExample') : t('lessons.showExample')}</button>
               {showBack && (
-                <div className="mt-4 rounded-xl bg-gradient-to-r from-[#71368A]/30 to-[#FF6B57]/20 border border-[#FF6B57]/20 p-4 animate-fade-in">
+                <div className="mt-4 rounded-xl bg-bun-700/40 border border-bun-600/20 p-4 animate-fade-in">
                   <div className="text-slate-100 font-medium text-lg leading-loose mb-2">
                     <Furigana text={item.example} glossary={item.exampleGlossary} />
                   </div>
@@ -809,9 +841,9 @@ function KanjiDetail({ item, showBack, setShowBack }) {
 function GrammarDetail({ item, showBack, setShowBack }) {
   const { t } = useLanguage()
   return (
-    <div className="rounded-3xl glass p-6 sm:p-10 card-glow">
+    <div className="rounded-3xl bg-[#151129] border border-white/5 p-6 sm:p-10">
       <div className="flex flex-col lg:flex-row gap-8 items-start">
-        <div className={`w-32 h-32 shrink-0 rounded-3xl bg-gradient-to-br ${item.gradient} flex items-center justify-center text-5xl shadow-2xl`}>{item.image}</div>
+        <div className="w-32 h-32 shrink-0 rounded-3xl bg-[#71368A]/15 border border-[#71368A]/30 flex items-center justify-center text-5xl shadow-2xl">{item.image}</div>
         <div className="flex-1">
           <h2 className="text-3xl font-bold text-white mb-2">{item.pattern}</h2>
           <Badge color="plum">{item.form}</Badge>
@@ -821,26 +853,24 @@ function GrammarDetail({ item, showBack, setShowBack }) {
           </div>
           <p className="text-sm text-slate-400 mb-6">{item.nuance}</p>
 
-          <div className="flex items-center gap-3 mb-6 p-3 rounded-xl bg-bun-700/40 border border-bun-600/20">
-            <span className="text-3xl" aria-label="drawing">{item.doodle}</span>
-            <span className="text-xs text-slate-500">{t('lessons.sceneDrawing')}</span>
-          </div>
-
           <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-5 mb-4">
-            <h3 className="text-sm font-bold text-cyan-300 mb-2 flex items-center gap-2"><Eye size={16} /> {t('lessons.visualScenario')}</h3>
+            <h3 className="text-sm font-bold text-[#FF8A75] mb-2 flex items-center gap-2"><Eye size={16} /> {t('lessons.visualScenario')}</h3>
             <KanjiTapText text={item.scene} className="text-slate-300" />
           </div>
 
           {item.sceneFr && (
             <div className="rounded-xl bg-bun-700/30 border border-bun-600/20 p-4 mb-6">
-              <h3 className="text-sm font-bold text-cyan-300 mb-2">{t('lessons.sceneFrTitle')}</h3>
+              <h3 className="text-sm font-bold text-slate-400 mb-2">{t('lessons.sceneFrTitle')}</h3>
               <KanjiTapText text={item.sceneFr} className="text-slate-300 text-sm" />
             </div>
           )}
 
-          <button onClick={() => setShowBack((s) => !s)} className="px-5 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-medium transition">{showBack ? t('lessons.hideExample') : t('lessons.showExample')}</button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button onClick={() => setShowBack((s) => !s)} className="px-5 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-medium transition">{showBack ? t('lessons.hideExample') : t('lessons.showExample')}</button>
+            <AddToQueueButton front={item.pattern} back={item.meaning} source="lessons" />
+          </div>
           {showBack && (
-            <div className="mt-4 rounded-xl bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-500/20 p-4 animate-fade-in">
+            <div className="mt-4 rounded-xl bg-bun-700/40 border border-bun-600/20 p-4 animate-fade-in">
               <div className="text-slate-100 font-medium text-lg leading-loose mb-2">
                 <Furigana text={item.example} glossary={item.exampleGlossary} />
               </div>
@@ -855,21 +885,22 @@ function GrammarDetail({ item, showBack, setShowBack }) {
 
 function VocabDetail({ item, showBack, setShowBack }) {
   const { t } = useLanguage()
+  // Fleet integration (2026-11-08): opening this word counts it
+  // as genuinely met; it can be kept in the one queue from here.
+  useEffect(() => {
+    if (item.word) { try { recordEncounters([item.word]) } catch { /* never blocks */ } }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item])
   return (
-    <div className="rounded-3xl glass p-6 sm:p-10 card-glow">
+    <div className="rounded-3xl bg-[#151129] border border-white/5 p-6 sm:p-10">
       <div className="flex flex-col lg:flex-row gap-8 items-start">
-        <div className={`w-32 h-32 shrink-0 rounded-3xl bg-gradient-to-br ${item.gradient} flex items-center justify-center text-5xl shadow-2xl`}>{item.image}</div>
+        <div className="w-32 h-32 shrink-0 rounded-3xl bg-[#71368A]/15 border border-[#71368A]/30 flex items-center justify-center text-5xl shadow-2xl">{item.image}</div>
         <div className="flex-1">
           <h2 className="text-4xl font-bold text-white mb-2">{item.word}</h2>
           <div className="flex flex-wrap items-center gap-2 mb-4">
-            <Badge color="cyan">{item.reading}</Badge>
+            <Badge color="plum">{item.reading}</Badge>
             <Badge color="emerald">{item.meaning}</Badge>
-            {item.meaningFr && <Badge color="sky">{item.meaningFr}</Badge>}
-          </div>
-
-          <div className="flex items-center gap-3 mb-6 p-3 rounded-xl bg-bun-700/40 border border-bun-600/20">
-            <span className="text-3xl" aria-label="drawing">{item.doodle}</span>
-            <span className="text-xs text-slate-500">{t('lessons.sceneDrawing')}</span>
+            {item.meaningFr && <Badge color="plum">{item.meaningFr}</Badge>}
           </div>
 
           <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-5 mb-4">
@@ -879,15 +910,18 @@ function VocabDetail({ item, showBack, setShowBack }) {
 
           {item.storyFr && (
             <div className="rounded-xl bg-bun-700/30 border border-bun-600/20 p-4 mb-6">
-              <h3 className="text-sm font-bold text-cyan-300 mb-2">{t('lessons.memoryFrTitle')}</h3>
+              <h3 className="text-sm font-bold text-slate-400 mb-2">{t('lessons.memoryFrTitle')}</h3>
               <KanjiTapText text={item.storyFr} className="text-slate-300 text-sm" />
             </div>
           )}
 
           <p className="text-sm text-slate-400 mb-2">{t('lessons.collocation')}{' '}<KanjiTapText text={item.collocation} className="text-slate-200" /></p>
-          <button onClick={() => setShowBack((s) => !s)} className="px-5 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-medium transition">{showBack ? t('lessons.hideExample') : t('lessons.showExample')}</button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button onClick={() => setShowBack((s) => !s)} className="px-5 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-medium transition">{showBack ? t('lessons.hideExample') : t('lessons.showExample')}</button>
+            <AddToQueueButton front={item.word} back={item.meaning} reading={item.reading} source="lessons" />
+          </div>
           {showBack && (
-            <div className="mt-4 rounded-xl bg-gradient-to-r from-emerald-900/30 to-teal-900/30 border border-emerald-500/20 p-4 animate-fade-in">
+            <div className="mt-4 rounded-xl bg-bun-700/40 border border-bun-600/20 p-4 animate-fade-in">
               <div className="text-slate-100 font-medium text-lg leading-loose mb-2">
                 <Furigana text={item.example} glossary={item.exampleGlossary} />
               </div>
@@ -986,6 +1020,24 @@ function Drills() {
         logs.unshift({ id: Date.now(), ...entry })
         localStorage.setItem(userKey(user, 'error-log'), JSON.stringify(logs))
       }
+      // Drills joins the system (Landry, 2026-11-08: "Does it
+      // contribute to your level?" — it did not; a miss evaporated
+      // into the legacy error log only). Same mirror as Speed
+      // Cards: the missed item joins the ONE queue (source
+      // 'drills', deduped by addToQueue) and the lapse is
+      // classified into the Twin fingerprint. Recognition is not
+      // recall, so the card's FSRS is not rated here.
+      try {
+        const added = addToQueue([{
+          front: entry.mistake,
+          back: entry.fix,
+          note: `Drill · ${question.type || ''} · you chose: ${question.options[i].label}`,
+          source: 'drills',
+          level: question.level || '',
+        }])
+        const item = added.queue.find((x) => x.front === entry.mistake && x.source === 'drills')
+        if (item) recordQueueRating(item, 1)
+      } catch { /* the queue mirror never blocks the drill */ }
     }
   }
 
@@ -998,6 +1050,10 @@ function Drills() {
     const nextIndex = index + 1
     if (nextIndex >= pool.length + requeued) {
       setFinished(true)
+      // A finished run lands in the metrics ledger like every
+      // other surface's work (mocks, BJT, sessions) — drills used
+      // to leave no trace outside their own score counter.
+      try { recordMetric('drills_completed', { mode, score, total: pool.length }) } catch { /* never blocks */ }
       if (mode === 'daily') setDaily((d) => ({ ...d, completed: true, score, selected: null, answered: false }))
     } else {
       setIndex(nextIndex)
@@ -1190,7 +1246,50 @@ function Resources() {
   )
 }
 
-function ReadingView() {
+// Fleet coherence (Landry, 2026-11-08): a hub is the glanceable
+// map for a whole family of views — one menu door, every mode one
+// tap inside, each card carrying the same label the menu used.
+function HubView({ titleKey, itemIds, setActive }) {
+  const { t } = useLanguage()
+  return (
+    <div className="space-y-5">
+      <h2 className="text-2xl font-bold text-white">{t(titleKey)}</h2>
+      <div className="grid grid-cols-2 gap-3">
+        {itemIds.map((id) => {
+          const item = nav.find((n) => n.id === id)
+          if (!item) return null
+          const Icon = item.icon
+          return (
+            <button key={id} onClick={() => setActive?.(id)} className="text-left rounded-2xl bg-[#151129] border border-white/5 p-4 hover:border-[#FF6B57]/40 transition">
+              <Icon size={20} className="text-[#FF8A75]" />
+              <p className="font-semibold text-white text-sm mt-2.5">{t(item.labelKey)}</p>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// One door from any content surface into the ONE review queue —
+// a looked-up or studied item can always be kept, and the button
+// says so once it is in.
+function AddToQueueButton({ front, back, reading, level, source = 'lessons' }) {
+  const { t } = useLanguage()
+  const [added, setAdded] = useState(() => { try { return loadQueue().some((i) => i.front === front) } catch { return false } })
+  if (!front) return null
+  if (added) return <p className="text-xs text-emerald-300 flex items-center gap-1.5"><CheckCircle2 size={13} /> {t('lessons.inQueue')}</p>
+  return (
+    <button
+      onClick={() => { try { addToQueue([{ front, back, reading, level, source }]); setAdded(true) } catch { /* never blocks */ } }}
+      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bun-700 hover:bg-bun-600 text-slate-200 text-xs font-medium transition"
+    >
+      <Plus size={13} /> {t('lessons.addToQueue')}
+    </button>
+  )
+}
+
+function ReadingView({ setActive: goView }) {
   const { t } = useLanguage()
   const [sub, setSub] = useState('passages')
   const [active, setActive] = useState(0)
@@ -1198,6 +1297,28 @@ function ReadingView() {
   const [query, setQuery] = useState('')
 
   const passage = passages[active]
+
+  // Fleet integration (Landry, 2026-11-08): these essays used to
+  // sit outside everything. Now opening one counts its glossary
+  // as words genuinely met (the Reader's fit can credit them),
+  // finishing its questions lands in the Twin's reading trail,
+  // and every glossary word can be kept in the one queue.
+  useEffect(() => {
+    try { recordEncounters((passage.glossary || []).map((g) => g.word)) } catch { /* never blocks */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active])
+
+  const readingDoneRef = useRef(new Set())
+  useEffect(() => {
+    const ans = answered[active]
+    if (!ans || !passage.questions?.length) return
+    if (!passage.questions.every((_, qi) => ans[qi] !== undefined)) return
+    if (readingDoneRef.current.has(active)) return
+    readingDoneRef.current.add(active)
+    const correct = passage.questions.reduce((a, q, qi) => a + (q.options[ans[qi]]?.correct ? 1 : 0), 0)
+    try { recordReading({ correct: correct === passage.questions.length }) } catch { /* never blocks */ }
+    try { recordMetric('reading_completed', { title: passage.title, correct, total: passage.questions.length }) } catch { /* never blocks */ }
+  }, [answered, active, passage])
 
   const allGlossary = useMemo(() => {
     const flat = passages.flatMap((p) => p.glossary)
@@ -1272,8 +1393,11 @@ function ReadingView() {
             ))}
           </div>
 
-          <div className="rounded-3xl glass p-6 sm:p-8 card-glow">
-            <h3 className="text-xl font-bold text-white mb-2">{passage.title}</h3>
+          <div className="rounded-3xl bg-[#151129] border border-white/5 p-6 sm:p-8">
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="text-xl font-bold text-white mb-2">{passage.title}</h3>
+              <button onClick={() => goView?.('reader')} className="shrink-0 text-xs text-[#FF8A75] hover:text-[#FF6B57] transition">{t('twin.reader.openHere')} →</button>
+            </div>
             <p className="text-xs text-slate-400 mb-6">{t('legacy.reading.targetTime', { level: passage.level, time: passage.time })}</p>
 
             <div className="rounded-2xl bg-bun-700/40 border border-bun-600/20 p-6 mb-8 leading-loose text-lg text-slate-100">
@@ -1293,6 +1417,7 @@ function ReadingView() {
                   </div>
                   <p className="text-sm text-slate-300">{g.meaning}</p>
                   <p className="text-xs text-slate-500 mt-2 line-clamp-2">{g.mnemonic}</p>
+                  <div className="mt-3"><AddToQueueButton front={g.word} back={g.meaning} reading={g.reading} source="reading" /></div>
                 </div>
               ))}
             </div>
@@ -1334,7 +1459,7 @@ function ReadingView() {
         <div className="space-y-6">
           <div className="grid md:grid-cols-3 gap-5">
             {readingTips.map((t, i) => (
-              <div key={i} className="rounded-3xl glass p-6 card-glow">
+              <div key={i} className="rounded-3xl bg-[#151129] border border-white/5 p-6">
                 <div className="w-12 h-12 rounded-2xl bg-bun-700 flex items-center justify-center text-2xl mb-4">{i === 0 ? '🧠' : i === 1 ? '👁️' : '🔄'}</div>
                 <h3 className="text-lg font-bold text-white mb-3">{t.title}</h3>
                 <ul className="space-y-2">
@@ -1345,7 +1470,7 @@ function ReadingView() {
               </div>
             ))}
           </div>
-          <div className="rounded-3xl glass p-6 card-glow">
+          <div className="rounded-3xl bg-[#151129] border border-white/5 p-6">
             <h3 className="text-lg font-bold text-white mb-4">{t('legacy.reading.timingTitle')}</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
@@ -1451,7 +1576,6 @@ function Videos() {
   const { isSupabaseConfigured } = useAuth()
   const [videos, setVideos] = useState([])
   const [loading, setLoading] = useState(!isSupabaseConfigured)
-  const [error, setError] = useState('')
   const [playing, setPlaying] = useState(null)
 
   const byCategory = useMemo(() => {
@@ -1481,8 +1605,8 @@ function Videos() {
         }
         const unique = all.filter((v, i, a) => a.findIndex((x) => x.id === v.id) === i)
         if (!cancelled) setVideos(unique)
-      } catch (err) {
-        if (!cancelled) setError(err.message || t('legacy.videos.loadError'))
+      } catch {
+        // Silent by design: the curated shelf below is the fallback.
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -1503,7 +1627,7 @@ function Videos() {
     <button
       key={v.id}
       onClick={() => setPlaying(v)}
-      className="text-left rounded-2xl glass p-4 card-glow hover:border-[#FF6B57]/40 transition group"
+      className="text-left rounded-2xl bg-[#151129] border border-white/5 p-4 hover:border-[#FF6B57]/40 transition group"
     >
       <div className="aspect-video rounded-xl overflow-hidden border border-bun-600/30 mb-3 relative bg-bun-800">
         {v.thumb ? (
@@ -1531,19 +1655,18 @@ function Videos() {
           <Loader2 size={20} className="animate-spin" /> {t('legacy.videos.loading')}
         </div>
       )}
-      {error && <p className="text-rose-300">{error}</p>}
-      {!loading && !error && videos.length === 0 && (
+      {/* No API talk on screen (fleet coherence, 2026-11-08): if
+          the live search fails or comes back empty, the curated
+          shelf simply shows — the learner never sees plumbing. */}
+      {!loading && videos.length === 0 && (
         <div className="space-y-6">
-          <p className="text-amber-300 text-sm bg-amber-900/20 rounded-xl p-4">
-            {t('legacy.videos.emptyNotice')}
-          </p>
           <h3 className="text-lg font-bold text-white">{t('legacy.videos.featured')}</h3>
           <div className="grid md:grid-cols-2 gap-6">
             {FALLBACK_VIDEOS.map(renderCard)}
           </div>
         </div>
       )}
-      {!loading && !error && videos.length > 0 && (
+      {!loading && videos.length > 0 && (
         <div className="space-y-8">
           {Object.entries(byCategory).map(([cat, list]) => (
             <div key={cat}>
@@ -1593,7 +1716,23 @@ function ErrorLog() {
     return () => { cancelled = true }
   }, [user])
 
-  const srs = [1, 1, 2, 4, 7, 14, 30]
+  // Fleet integration (Landry, 2026-11-08): the log is no longer
+  // a second review queue. Every slip in it also lives in the ONE
+  // FSRS queue — that is where reviewing happens — so any entry
+  // without a queue twin gets one, silently, on load. The server
+  // rows stay: the AI Tutor's review mode reads them.
+  const backfilledRef = useRef(false)
+  useEffect(() => {
+    if (loading || backfilledRef.current) return
+    backfilledRef.current = true
+    try {
+      const fronts = new Set(loadQueue().map((i) => i.front))
+      const missing = logs.filter((l) => l.mistake && !fronts.has(l.mistake))
+      if (missing.length) {
+        addToQueue(missing.map((l) => ({ front: l.mistake, back: l.fix || '', note: l.section || '', source: 'errors' })))
+      }
+    } catch { /* never blocks */ }
+  }, [loading, logs])
 
   const add = async (e) => {
     e.preventDefault()
@@ -1620,22 +1759,10 @@ function ErrorLog() {
     if (!user || !isSupabaseConfigured) {
       localStorage.setItem(userKey(user, 'error-log'), JSON.stringify(next))
     }
+    // A hand-logged slip joins the one queue in the same act.
+    try { addToQueue([{ front: entry.mistake, back: entry.fix || '', note: entry.section, source: 'errors' }]) } catch { /* never blocks */ }
     setMistake(''); setCause(''); setFix('')
     setSaving(false)
-  }
-
-  const markReview = async (l) => {
-    const nextCount = (l.review_count || 0) + 1
-    const days = srs[Math.min(nextCount, srs.length - 1)]
-    const nextDate = new Date()
-    nextDate.setDate(nextDate.getDate() + days)
-    const nextReview = nextDate.toISOString()
-    if (user) await reviewErrorLog(user.id, l.id, l.review_count || 0)
-    const updated = logs.map((x) => (x.id === l.id ? { ...x, review_count: nextCount, next_review: nextReview } : x))
-    setLogs(updated)
-    if (!user || !isSupabaseConfigured) {
-      localStorage.setItem(userKey(user, 'error-log'), JSON.stringify(updated))
-    }
   }
 
   const remove = async (id) => {
@@ -1653,7 +1780,7 @@ function ErrorLog() {
         <h2 className="text-2xl font-bold text-white">{t('legacy.errors.title')}</h2>
         <span className="text-xs text-slate-500">{isSupabaseConfigured ? t('legacy.errors.synced') : t('legacy.errors.local')}</span>
       </div>
-      <form onSubmit={add} className="rounded-3xl glass p-6 card-glow space-y-4">
+      <form onSubmit={add} className="rounded-3xl bg-[#151129] border border-white/5 p-6 space-y-4">
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-1.5">{t('legacy.errors.sectionLabel')}</label>
           <select value={section} onChange={(e) => setSection(e.target.value)} className="w-full rounded-xl bg-bun-900 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 focus:border-[#FF6B57] focus:outline-none">
@@ -1688,29 +1815,23 @@ function ErrorLog() {
         <p className="text-center text-slate-500 py-8">{t('legacy.errors.empty')}</p>
       ) : (
         <div className="space-y-3">
-          <p className="text-xs text-slate-400">{t('legacy.errors.srsNote')}</p>
-          {logs.map((l) => {
-            const isDue = l.next_review && new Date(l.next_review) <= new Date()
-            const days = srs[Math.min((l.review_count || 0) + 1, srs.length - 1)]
-            return (
-              <div key={l.id} className={`rounded-2xl glass p-4 card-glow flex items-start justify-between gap-3 ${isDue ? 'ring-1 ring-rose-500/40' : ''}`}>
+          <p className="text-xs text-slate-400">{t('legacy.errors.queueNote')}</p>
+          {logs.map((l) => (
+              <div key={l.id} className="rounded-2xl bg-[#151129] border border-white/5 p-4 flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2 mb-1.5">
                     <Badge color={l.section === 'Vocabulary' ? 'emerald' : l.section === 'Grammar' ? 'plum' : 'amber'}>{{ Vocabulary: t('legacy.errors.section.vocabulary'), Grammar: t('legacy.errors.section.grammar'), Reading: t('legacy.errors.section.reading'), Listening: t('legacy.errors.section.listening') }[l.section] || l.section}</Badge>
                     <span className="text-xs text-slate-400">{new Date(l.created_at).toLocaleDateString()}</span>
-                    {isDue && <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-600/20 text-rose-300">{t('legacy.errors.due')}</span>}
                   </div>
                   <p className="font-semibold text-slate-100"><KanjiTapText text={l.mistake} className="text-slate-100 font-semibold" /></p>
                   {l.cause && <p className="text-sm text-rose-300 mt-1">{t('legacy.errors.causePrefix')} <KanjiTapText text={l.cause} className="text-rose-300" /></p>}
                   {l.fix && <p className="text-sm text-emerald-300 mt-1">{t('legacy.errors.fixPrefix')} <KanjiTapText text={l.fix} className="text-emerald-300" /></p>}
                 </div>
                 <div className="flex flex-col items-end gap-2 shrink-0">
-                  <button onClick={() => markReview(l)} title={t(days === 1 ? 'legacy.errors.markReviewedTitleOne' : 'legacy.errors.markReviewedTitleMany', { days })} className="text-xs px-2.5 py-1 rounded-lg bg-[#FF6B57]/20 text-[#FF8A75] hover:bg-[#FF6B57]/30 transition">{t('legacy.errors.markReviewed', { days })}</button>
                   <button onClick={() => remove(l.id)} className="text-xs text-slate-500 hover:text-rose-400">{t('legacy.errors.delete')}</button>
                 </div>
               </div>
-            )
-          })}
+          ))}
         </div>
       )}
     </div>
@@ -1857,7 +1978,10 @@ function App() {
     anki: <Anki />,
     speed: <SpeedCards />,
     dictionary: <DictionaryView />,
-    reading: <ReadingView />,
+    reading: <ReadingView setActive={setActive} />,
+    practice: <HubView titleKey="shell.nav.practiceHub" itemIds={['voice', 'mine', 'drills', 'speed', 'anki', 'n2listening']} setActive={setActive} />,
+    exams: <HubView titleKey="shell.nav.exams" itemIds={['mock', 'bjt']} setActive={setActive} />,
+    library: <HubView titleKey="shell.nav.libraryHub" itemIds={['lessons', 'dictionary', 'reading', 'plan', 'resources', 'videos', 'sources']} setActive={setActive} />,
     reader: <Reader setActive={setActive} onSignIn={() => setAuthOverlay(true)} />,
     ai: <AiTutor context={active} />,
     plan: <StudyPlan daysToExam={daysToExam} />,

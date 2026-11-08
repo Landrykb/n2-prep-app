@@ -276,7 +276,7 @@ export default function OneSession({ setActive }) {
         <div className="flex items-center gap-2">
           {(isBusy ? [0] : [0, 1, 2]).map((s) => (
             <div key={s} className="flex-1">
-              <div className={`h-1.5 rounded-full ${state.step >= s ? 'bg-gradient-to-r from-[#71368A] to-cyan-500' : 'bg-bun-700'}`} />
+              <div className={`h-1.5 rounded-full ${state.step >= s ? 'bg-[#FF6B57]' : 'bg-bun-700'}`} />
               <p className={`text-[10px] mt-1.5 text-center ${state.step === s ? 'text-[#FF8A75] font-semibold' : 'text-slate-500'}`}>{s + 1}. {t(STEP_KEYS[s])}</p>
             </div>
           ))}

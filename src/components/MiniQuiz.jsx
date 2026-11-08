@@ -1,8 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { CheckCircle2, XCircle } from 'lucide-react'
 import KanjiTapText from './KanjiTapText.jsx'
 
-export default function MiniQuiz({ questions }) {
+export default function MiniQuiz({ questions, onResult }) {
   const [selected, setSelected] = useState(Array(questions.length).fill(null))
   const [show, setShow] = useState(Array(questions.length).fill(false))
 
@@ -12,6 +12,21 @@ export default function MiniQuiz({ questions }) {
   }
 
   const score = useMemo(() => questions.reduce((acc, q, i) => acc + (selected[i] !== null && q.options[selected[i]].correct ? 1 : 0), 0), [questions, selected])
+
+  // Fleet hook (2026-11-08): when every question has been answered,
+  // the run reports itself ONCE — score + the missed questions — so
+  // the hosting surface (Listening, BJT) can land the result in the
+  // Twin, the one queue and the metrics instead of the score dying
+  // on this screen. Callers key this component per set, so a new
+  // set remounts and the guard resets with it.
+  const firedRef = useRef(false)
+  useEffect(() => {
+    if (!onResult || firedRef.current) return
+    if (!show.length || !show.every(Boolean)) return
+    firedRef.current = true
+    const misses = questions.filter((q, i) => !(selected[i] !== null && q.options[selected[i]]?.correct))
+    onResult({ correct: score, total: questions.length, misses })
+  })
 
   return (
     <div className="space-y-4">

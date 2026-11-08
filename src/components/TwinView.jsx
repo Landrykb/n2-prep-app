@@ -677,6 +677,7 @@ export default function TwinView({ setActive }) {
             ))}
           </ul>
         ) : <p className="text-sm text-slate-300">{t('twin.trips.empty')}</p>}
+        <button onClick={() => setActive?.('errors')} className="text-xs text-slate-500 hover:text-slate-200 transition mt-1">{t('twin.trips.allSlips')} →</button>
       </Section>
 
       <Section title={t('twin.learn.title')} hint={t('twin.learn.hint')}>
