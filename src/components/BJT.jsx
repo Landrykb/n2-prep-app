@@ -46,6 +46,7 @@ import TtsButton from './TtsButton.jsx'
 import KanjiTapText from './KanjiTapText.jsx'
 import MiniQuiz from './MiniQuiz.jsx'
 import BjtTrainer from './BjtTrainer.jsx'
+import { FormPractice } from './BjtExam.jsx'
 
 function colorClass(color) {
   const map = {
@@ -106,7 +107,7 @@ function BjtVideoBox({ query }) {
   )
 }
 
-export default function BJT() {
+export default function BJT({ setActive: goView } = {}) {
   const [active, setActive] = useState('drill')
   const [target, setTarget] = useState('J1')
   const [levelFilter, setLevelFilter] = useState('all')
@@ -158,6 +159,20 @@ export default function BJT() {
           <p className="text-sm text-slate-400">Prepare for BJT or N2.</p>
         </div>
       </div>
+
+      {goView ? (
+        <button type="button" onClick={() => goView('bjtexam')} className="w-full rounded-2xl bg-[#151129] border border-white/5 p-4 text-left">
+          <span className="flex items-center justify-between gap-3">
+            <span>
+              <span className="block text-lg font-bold text-white">BJT Full Exam</span>
+              <span className="block text-sm text-slate-400">The real paper — 80 questions, 3 sittings, listening plays once. Sealed questions you have never practised: passing this is proof.</span>
+            </span>
+            <Award size={22} className="shrink-0 text-[#FF8A75]" />
+          </span>
+        </button>
+      ) : null}
+
+      <FormPractice />
 
       <div className="flex p-1 rounded-xl bg-bun-700/60 border border-bun-600/40 overflow-x-auto">
         {tabs.map((t) => {

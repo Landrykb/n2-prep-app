@@ -99,6 +99,7 @@ const lazyView = (factory) => lazy(() => factory()
 const Anki = lazyView(() => import('./components/Anki.jsx'))
 const AiTutor = lazyView(() => import('./components/AiTutor.jsx'))
 const BJT = lazyView(() => import('./components/BJT.jsx'))
+const BjtExam = lazyView(() => import('./components/BjtExam.jsx'))
 const N2Listening = lazyView(() => import('./components/N2Listening.jsx'))
 const SpeedCards = lazyView(() => import('./components/SpeedCards.jsx'))
 const DictionaryView = lazyView(() => import('./components/DictionaryView.jsx'))
@@ -165,6 +166,7 @@ const nav = [
   { id: 'n2listening', labelKey: 'shell.nav.n2listening', icon: Headphones , group: 'practice', menu: false },
   { id: 'mock', labelKey: 'shell.nav.mock', icon: ClipboardCheck , group: 'practice', menu: false },
   { id: 'bjt', labelKey: 'shell.nav.bjt', icon: Building2 , group: 'practice', menu: false },
+  { id: 'bjtexam', labelKey: 'shell.nav.bjtExam', icon: ClipboardCheck , group: 'practice', menu: false },
   { id: 'ai', labelKey: 'shell.nav.ai', icon: Bot , group: 'practice', menu: false },
   { id: 'errors', labelKey: 'shell.nav.errors', icon: AlertCircle , group: 'practice', menu: false },
   // --- Library: one hub door, every shelf inside ---
@@ -1981,7 +1983,7 @@ function App() {
     dictionary: <DictionaryView />,
     reading: <ReadingView setActive={setActive} />,
     practice: <HubView titleKey="shell.nav.practiceHub" itemIds={['voice', 'mine', 'drills', 'speed', 'anki', 'n2listening']} setActive={setActive} />,
-    exams: <HubView titleKey="shell.nav.exams" itemIds={['mock', 'bjt']} setActive={setActive} />,
+    exams: <HubView titleKey="shell.nav.exams" itemIds={['mock', 'bjt', 'bjtexam']} setActive={setActive} />,
     library: <HubView titleKey="shell.nav.libraryHub" itemIds={['lessons', 'dictionary', 'reading', 'plan', 'resources', 'videos', 'sources']} setActive={setActive} />,
     reader: <Reader setActive={setActive} onSignIn={() => setAuthOverlay(true)} />,
     ai: <AiTutor context={active} />,
@@ -1990,7 +1992,8 @@ function App() {
     sources: <SourcesView />,
     videos: <Videos />,
     n2listening: <N2Listening />,
-    bjt: <BJT />,
+    bjt: <BJT setActive={setActive} />,
+    bjtexam: <BjtExam setActive={setActive} />,
     errors: <ErrorLog />,
   }
 

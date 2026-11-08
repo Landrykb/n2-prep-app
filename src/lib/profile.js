@@ -187,7 +187,10 @@ export function ladderWithStatus(diagnosis, evidence = {}) {
   let bjtProven = null // best full-BJT-exam score { score, at }
   for (const e of metrics) {
     if (e?.type === 'bjt_exam_completed' && typeof e.score === 'number') {
-      if (!bjtProven || e.score > bjtProven.score) bjtProven = { score: e.score, at: e.at || '' }
+      // Proof requires a SEALED paper (Landry, 2026-11-08): questions the
+      // learner has never practised. A mixed/practice paper still counts
+      // as a score estimate for the water below, never as proof.
+      if (e.sealed === true && (!bjtProven || e.score > bjtProven.score)) bjtProven = { score: e.score, at: e.at || '' }
       continue
     }
     if (e?.type !== 'mock_completed' || e.passed !== true || e.length !== 'full') continue
@@ -227,6 +230,10 @@ export function ladderWithStatus(diagnosis, evidence = {}) {
           const secs = [e.scaled.lk, e.scaled.reading, e.scaled.listening].filter((v) => typeof v === 'number')
           if (secs.length) latestMockMinSection = Math.min(...secs)
         }
+      } else if (e.type === 'bjt_exam_completed' && typeof e.score === 'number') {
+        // A full-paper measurement outranks the diagnosis heuristic and the
+        // trainer nudges; the latest one (the loop is chronological) wins.
+        bjt = e.score
       } else if (e.type === 'bjt_completed' && bjt !== null) {
         const c = typeof e.correct === 'number' ? e.correct : null
         const n = typeof e.total === 'number' ? e.total : null
