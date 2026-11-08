@@ -73,6 +73,10 @@ export default function OneSession({ setActive }) {
   const [lastAttempt, setLastAttempt] = useState(null) // { text, score, missing }
   const [flipped, setFlipped] = useState(false)
   const [listening, setListening] = useState(false)
+  // Hick pass (2026-11-08): the scene step has ONE primary action
+  // — speak. The typed path exists but stays folded away until
+  // asked for, like the call's manual fold.
+  const [typeOpen, setTypeOpen] = useState(false)
   const [micError, setMicError] = useState(null)
   const [effort, setEffort] = useState('')
   const [nowTick, setNowTick] = useState(Date.now())
@@ -91,7 +95,11 @@ export default function OneSession({ setActive }) {
     return () => clearInterval(t)
   }, [state.done])
 
-  const elapsedSec = Math.max(0, Math.round((state.elapsedBaseSec || 0) + (state.done ? 0 : (nowTick - new Date(state.segmentStartAt || state.startedAt).getTime()) / 1000)))
+  // Segment honesty: wall time since the segment started, capped
+  // at 15 minutes — a session left open overnight is not an
+  // 11-hour session (his step bar read 692:53 on 2026-11-08).
+  const segmentSec = state.done ? 0 : Math.min(Math.max(0, (nowTick - new Date(state.segmentStartAt || state.startedAt).getTime()) / 1000), 900)
+  const elapsedSec = Math.max(0, Math.round((state.elapsedBaseSec || 0) + segmentSec))
   const minutesSpent = Math.max(1, Math.round(elapsedSec / 60))
 
   const patch = (p) => setState((s) => ({ ...s, ...p }))
@@ -241,7 +249,7 @@ export default function OneSession({ setActive }) {
     : 0
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto">
+    <div className="space-y-6 max-w-3xl mx-auto pb-28">
       <div className="text-center space-y-2 pt-2">
         <p className="flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#FF8A75]"><Sparkles size={14} /> {t('session.eyebrow')}</p>
         {state.done && <div className="mb-3"><Mascot agent="michi" size={64} showName={false} motion="hop" label={t('session.mascotDoneLabel', { name: 'Michi' })} /></div>}
@@ -263,10 +271,9 @@ export default function OneSession({ setActive }) {
           {(isBusy ? [0] : [0, 1, 2]).map((s) => (
             <div key={s} className="flex-1">
               <div className={`h-1.5 rounded-full ${state.step >= s ? 'bg-gradient-to-r from-[#71368A] to-cyan-500' : 'bg-bun-700'}`} />
-              <p className={`text-[10px] mt-1.5 text-center ${state.step === s ? 'text-[#FF8A75] font-semibold' : 'text-slate-500'}`}>{t(STEP_KEYS[s])}</p>
+              <p className={`text-[10px] mt-1.5 text-center ${state.step === s ? 'text-[#FF8A75] font-semibold' : 'text-slate-500'}`}>{s + 1}. {t(STEP_KEYS[s])}</p>
             </div>
           ))}
-          <span className="text-xs text-slate-500 shrink-0 pl-2">{Math.floor(elapsedSec / 60)}:{String(elapsedSec % 60).padStart(2, '0')}</span>
         </div>
       )}
 
@@ -301,16 +308,25 @@ export default function OneSession({ setActive }) {
               ))}
             </p>
           )}
-          <div className="flex gap-2">
-            <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={2} placeholder={t('call.inputPlaceholder')}
-              className="flex-1 rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 focus:border-[#FF6B57] focus:outline-none" />
-            <div className="flex flex-col gap-2">
-              <button onClick={startListening} disabled={!speechSupported || listening} className="px-3 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] disabled:opacity-40 text-white text-xs font-medium flex items-center gap-1.5">
-                {listening ? <MicOff size={14} /> : <Mic size={14} />} {listening ? t('call.listeningBtn') : t('voice.speak')}
+          {speechSupported && !typeOpen ? (
+            <div className="space-y-1.5">
+              <button onClick={startListening} disabled={listening} className="w-full py-3.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] disabled:opacity-40 text-white font-semibold flex items-center justify-center gap-2">
+                {listening ? <MicOff size={17} /> : <Mic size={17} />} {listening ? t('call.listeningBtn') : t('voice.speak')}
               </button>
-              <button onClick={() => checkScene()} disabled={!input.trim()} className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-medium">{t('voice.checkMe')}</button>
+              <button onClick={() => setTypeOpen(true)} className="w-full text-center text-xs text-slate-400 hover:text-slate-200 py-1">{t('call.typeInstead')}</button>
             </div>
-          </div>
+          ) : (
+            <div className="flex gap-2">
+              <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={2} placeholder={t('call.inputPlaceholder')}
+                className="flex-1 rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2.5 text-sm text-slate-100 focus:border-[#FF6B57] focus:outline-none" />
+              <div className="flex flex-col gap-2">
+                <button onClick={() => checkScene()} disabled={!input.trim()} className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-medium">{t('voice.checkMe')}</button>
+                {speechSupported && (
+                  <button onClick={() => setTypeOpen(false)} className="px-3 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-200 text-xs font-medium flex items-center gap-1.5"><Mic size={14} /> {t('voice.speak')}</button>
+                )}
+              </div>
+            </div>
+          )}
           {micError && (
           <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
             <p className="text-sm font-semibold text-amber-200">{micError.titleKey ? t(micError.titleKey) : micError.title}</p>

@@ -244,6 +244,11 @@ await acheck('edgeTts: cancelBrowserSynthesis aborts an in-flight synthesis', as
     assert.ok(os.includes('if (transcript.trim()) checkScene(transcript)'), 'transcript auto-checks')
     assert.ok(os.includes('speakSenseiLine(scene.model,'), 'model line auto-plays below mastery')
     assert.ok(os.includes("setLastAttempt(null); startListening()"), 'Say It Again restarts listening in one tap')
+    // Hick pass (2026-11-08): one primary action per state on the
+    // scene step, an honest clock, numbered steps.
+    assert.ok(os.includes('typeOpen'), 'the typed path is disclosed only on request')
+    assert.ok(os.includes('Math.min(Math.max(0,'), 'elapsed segments are capped — no 692:53 clocks')
+    assert.ok(!os.includes('padStart(2, \'0\')}'), 'the wall-clock readout is gone from the step bar')
   })
 }
 
