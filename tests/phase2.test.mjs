@@ -826,6 +826,19 @@ console.log('integration audit — shared mastery + diagnosis-history sync:')
       assert.match(voice, /scrollIntoView/)
       assert.ok(voice.indexOf('stageRef') < voice.indexOf('voice.library'), 'the stage renders before the library')
     })
+    check('loop stations are an accordion: info unfolds under the tapped agent, outside tap collapses', () => {
+      const loop = readFileSync(new URL('../src/components/GrowthLoop.jsx', import.meta.url), 'utf8')
+      assert.match(loop, /useState\(null\)/, 'the page opens on the simple view — no agent pre-opened')
+      assert.match(loop, /isSel \? null : id/, 'tapping the open station closes it')
+      assert.match(loop, /onClick=\{\(\) => setSelected\(null\)\}/, 'tapping outside collapses to the simple view')
+      assert.match(loop, /loop-unfold/, 'the handoff unfolds under its station')
+      assert.doesNotMatch(loop, /The selected agent's handoff/, 'no separate detail section down the page')
+      assert.match(loop, /loop-sonar/, 'a selected agent pulses sonar rings in its own colour')
+      assert.match(loop, /mascot-bob/, 'a selected agent breathes while open')
+      const css = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8')
+      assert.match(css, /@keyframes loopSonar/)
+      assert.match(css, /@keyframes loopUnfold/)
+    })
   } finally {
     if (prevLS === undefined) delete globalThis.localStorage
     else globalThis.localStorage = prevLS

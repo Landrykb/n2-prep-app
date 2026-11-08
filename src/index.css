@@ -247,3 +247,29 @@ rt {
     animation: none;
   }
 }
+
+/* Loop station selection (Landry, 2026-11-08): a selected agent
+   is ALIVE, not just ringed — the disc breathes with the fleet's
+   own mascotBob, sonar rings in the agent's colour pulse outward
+   and fade, and the handoff panel unfolds under the station. */
+@keyframes loopSonar {
+  0% { transform: scale(1); opacity: 0.5; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+.loop-sonar {
+  animation: loopSonar 1.9s ease-out infinite;
+}
+.loop-sonar-late {
+  animation: loopSonar 1.9s ease-out -0.95s infinite;
+}
+@keyframes loopUnfold {
+  from { opacity: 0; transform: translateY(-6px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.loop-unfold {
+  animation: loopUnfold 0.28s ease-out both;
+  transform-origin: top left;
+}
+@media (prefers-reduced-motion: reduce) {
+  .loop-sonar, .loop-sonar-late, .loop-unfold { animation: none; }
+}
