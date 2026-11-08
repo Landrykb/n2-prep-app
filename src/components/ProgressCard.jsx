@@ -25,7 +25,7 @@ function MiniBar({ label, value, max = 60 }) {
         <span className="text-slate-300 font-semibold">{value}</span>
       </div>
       <div className="h-1.5 rounded-full bg-bun-700 overflow-hidden">
-        <div className={`h-full rounded-full ${value >= 19 ? 'bg-gradient-to-r from-[#71368A] to-cyan-500' : 'bg-rose-500'}`} style={{ width: `${Math.round((value / max) * 100)}%` }} />
+        <div className={`h-full rounded-full ${value >= 19 ? 'bg-emerald-400' : 'bg-rose-500'}`} style={{ width: `${Math.round((value / max) * 100)}%` }} />
       </div>
     </div>
   )
@@ -66,7 +66,7 @@ export default function ProgressCard({ setActive, daysToExam }) {
   })()
 
   return (
-    <section className="rounded-3xl glass p-5 sm:p-6 card-glow">
+    <section className="rounded-3xl bg-[#151129] border border-white/5 p-5 sm:p-6">
       <div className="flex items-center justify-between gap-3 mb-4">
         <h2 className="text-lg font-bold text-white flex items-center gap-2">
           <ClipboardCheck size={18} className="text-[#C39BD3]" /> {t('progress.title')}

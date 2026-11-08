@@ -85,25 +85,62 @@ export function loadDiagnosis() {
 // the catalogs (ladder.*); label/proof/unlocks stay as the English data
 // (and the fallback for anything that renders without a translator).
 export const PROOF_LADDER = [
-  { id: 'foundation', label: 'N5–N4 foundation', proof: 'JLPT N5 80 / N4 90 · every section ≥ 19/60', unlocks: 'Daily life without panic; Specified Skilled Worker floor', jlptOrder: 1 , labelKey: 'ladder.foundation.label', proofKey: 'ladder.foundation.proof', unlocksKey: 'ladder.foundation.unlocks' },
-  { id: 'bridge', label: 'N3 bridge', proof: 'JLPT N3 95/180', unlocks: 'Everyday Japan handled alone — counters, calls, school', jlptOrder: 2 , labelKey: 'ladder.bridge.label', proofKey: 'ladder.bridge.proof', unlocksKey: 'ladder.bridge.unlocks' },
-  { id: 'n2', label: 'N2 — the job filter', proof: 'JLPT N2 90/180', unlocks: 'Passes the résumé filter · HSP +10 pts · B2 evidence for language roles', jlptOrder: 3 , labelKey: 'ladder.n2.label', proofKey: 'ladder.n2.proof', unlocksKey: 'ladder.n2.unlocks' },
-  { id: 'bjt400', label: 'BJT 400', proof: 'BJT ≥ 400 (upper J3)', unlocks: 'Counts as the N2 category for HSP points · B2 evidence', jlptOrder: 3 , labelKey: 'ladder.bjt400.label', proofKey: 'ladder.bjt400.proof', unlocksKey: 'ladder.bjt400.unlocks' },
-  { id: 'bjt480', label: 'BJT 480', proof: 'BJT ≥ 480 (inside J2)', unlocks: 'Counts as the N1 category for HSP points (15 pts)', jlptOrder: 4 , labelKey: 'ladder.bjt480.label', proofKey: 'ladder.bjt480.proof', unlocksKey: 'ladder.bjt480.unlocks' },
-  { id: 'n1', label: 'N1', proof: 'JLPT N1 100/180', unlocks: 'Client-facing, legal/medical, management-track roles · HSP +15 pts', jlptOrder: 4 , labelKey: 'ladder.n1.label', proofKey: 'ladder.n1.proof', unlocksKey: 'ladder.n1.unlocks' },
-  { id: 'j1', label: 'BJT J1 / J1+', proof: 'BJT 530–599 (J1) · 600–800 (J1+)', unlocks: 'Appropriate — then sufficient — communication in any business situation', jlptOrder: 5 , labelKey: 'ladder.j1.label', proofKey: 'ladder.j1.proof', unlocksKey: 'ladder.j1.unlocks' },
+  { id: 'foundation', label: 'N5–N4 foundation', proof: 'JLPT N5 80 / N4 90 · every section ≥ 19/60', unlocks: 'Daily life without panic; Specified Skilled Worker floor', jlptOrder: 1, passMark: 90, labelKey: 'ladder.foundation.label', proofKey: 'ladder.foundation.proof', unlocksKey: 'ladder.foundation.unlocks' },
+  { id: 'bridge', label: 'N3 bridge', proof: 'JLPT N3 95/180', unlocks: 'Everyday Japan handled alone — counters, calls, school', jlptOrder: 2, passMark: 95, labelKey: 'ladder.bridge.label', proofKey: 'ladder.bridge.proof', unlocksKey: 'ladder.bridge.unlocks' },
+  { id: 'n2', label: 'N2 — the job filter', proof: 'JLPT N2 90/180', unlocks: 'Passes the résumé filter · HSP +10 pts · B2 evidence for language roles', jlptOrder: 3, passMark: 90, labelKey: 'ladder.n2.label', proofKey: 'ladder.n2.proof', unlocksKey: 'ladder.n2.unlocks' },
+  { id: 'bjt400', label: 'BJT 400', proof: 'BJT ≥ 400 (upper J3)', unlocks: 'Counts as the N2 category for HSP points · B2 evidence', bjtMin: 400, labelKey: 'ladder.bjt400.label', proofKey: 'ladder.bjt400.proof', unlocksKey: 'ladder.bjt400.unlocks' },
+  { id: 'bjt480', label: 'BJT 480', proof: 'BJT ≥ 480 (inside J2)', unlocks: 'Counts as the N1 category for HSP points (15 pts)', bjtMin: 480, labelKey: 'ladder.bjt480.label', proofKey: 'ladder.bjt480.proof', unlocksKey: 'ladder.bjt480.unlocks' },
+  { id: 'n1', label: 'N1', proof: 'JLPT N1 100/180', unlocks: 'Client-facing, legal/medical, management-track roles · HSP +15 pts', jlptOrder: 4, passMark: 100, labelKey: 'ladder.n1.label', proofKey: 'ladder.n1.proof', unlocksKey: 'ladder.n1.unlocks' },
+  { id: 'j1', label: 'BJT J1 / J1+', proof: 'BJT 530–599 (J1) · 600–800 (J1+)', unlocks: 'Appropriate — then sufficient — communication in any business situation', bjtMin: 530, labelKey: 'ladder.j1.label', proofKey: 'ladder.j1.proof', unlocksKey: 'ladder.j1.unlocks' },
 ]
 
 const JLPT_ORDER = { N5: 0, N4: 1, N3: 2, N2: 3, N1: 4, 'N1+': 5 }
+const SECTION_FLOOR = 19 // every JLPT paper: no section under 19/60 passes
 
+/**
+ * Each rung as a TANK (Landry, 2026-11-08): progress is a fill
+ * level, not a level label that flips. `fill` is the fraction of
+ * the bar PRINTED ON THE RUNG that the learner's own numbers
+ * cover, and a rung is 'reached' only at a full tank:
+ *
+ * - BJT rungs fill on the BJT scale itself (bjtScore / bjtMin).
+ *   The old logic never read the BJT score at all — it borrowed
+ *   the JLPT estimate's order, so BJT 400 showed REACHED at a
+ *   BJT estimate of 348, contradicting the number printed in
+ *   the panel's own header.
+ * - A JLPT rung below the estimated level is full (the estimate
+ *   subsumes it). The rung AT the estimated level fills by the
+ *   real pass rule: total against that level's pass mark, capped
+ *   by the weakest section against the 19/60 floor — a weak
+ *   section visibly holds the water down.
+ * - A JLPT rung above the estimated level stays empty: a score
+ *   earned on easier material is never extrapolated upward
+ *   (the same refusal the promise rule makes).
+ *
+ * 'next' is the first rung whose tank is not full.
+ */
 export function ladderWithStatus(diagnosis) {
   const currentOrder = diagnosis?.jlptEstimate ? (JLPT_ORDER[diagnosis.jlptEstimate] ?? -1) : -1
+  const total = typeof diagnosis?.total === 'number' ? diagnosis.total : null
+  const sections = diagnosis?.sections && typeof diagnosis.sections === 'object' ? Object.values(diagnosis.sections).filter((v) => typeof v === 'number') : []
+  const minSection = sections.length ? Math.min(...sections) : null
+  const bjt = typeof diagnosis?.bjtScore === 'number' ? diagnosis.bjtScore : null
   let nextMarked = false
   return PROOF_LADDER.map((h) => {
+    let fill = 0
+    if (typeof h.bjtMin === 'number') {
+      fill = bjt !== null ? Math.min(bjt / h.bjtMin, 1) : 0
+    } else if (currentOrder >= 0) {
+      if (h.jlptOrder < currentOrder) fill = 1
+      else if (h.jlptOrder === currentOrder && total !== null) {
+        fill = Math.min(total / h.passMark, minSection !== null ? minSection / SECTION_FLOOR : 1, 1)
+      }
+    }
+    fill = Math.max(0, fill)
     let status = 'locked'
-    if (h.jlptOrder <= currentOrder) status = 'reached'
+    if (fill >= 1) status = 'reached'
     else if (!nextMarked) { status = 'next'; nextMarked = true }
-    return { ...h, status }
+    return { ...h, status, fill }
   })
 }
 

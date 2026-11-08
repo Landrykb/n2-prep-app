@@ -129,7 +129,7 @@ export function ProofLadderView({ diagnosis, profile }) {
   const { t } = useLanguage()
   const ladder = ladderWithStatus(diagnosis)
   return (
-    <div className="rounded-2xl glass p-5 card-glow space-y-3">
+    <div className="rounded-2xl bg-[#151129] border border-white/5 p-5 space-y-3">
       <h3 className="text-lg font-bold text-white flex items-center gap-2"><Target size={18} className="text-emerald-300" /> {t('problem.ladderTitle')}</h3>
       <p className="text-xs text-slate-400">
         {diagnosis
@@ -138,16 +138,29 @@ export function ProofLadderView({ diagnosis, profile }) {
         {profile?.proofTarget === 'real-life' && profile?.realLifeGoal ? <>{t('problem.ladderNamedHeightStart')}<span className="text-emerald-300">{profile.realLifeGoal}</span>{t('problem.ladderNamedHeightEnd')}</> : null}
       </p>
       <div className="space-y-2">
-        {ladder.map((h) => (
-          <div key={h.id} className={`flex items-start gap-3 rounded-xl border p-3 ${h.status === 'reached' ? 'bg-emerald-500/10 border-emerald-500/30' : h.status === 'next' ? 'bg-[#FF6B57]/15 border-[#FF6B57]/40' : 'bg-bun-700/30 border-bun-600/20 opacity-75'}`}>
-            <span className="mt-0.5 shrink-0">{h.status === 'reached' ? <CheckCircle2 size={17} className="text-emerald-300" /> : h.status === 'next' ? <HeartPulse size={17} className="text-[#FF8A75]" /> : <Lock size={15} className="text-slate-500" />}</span>
-            <div className="min-w-0">
-              <p className="text-sm font-bold text-white">{h.labelKey ? t(h.labelKey) : h.label} {h.status === 'next' && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-[#FF6B57] text-white align-middle">{t('problem.badgeNext')}</span>}{h.status === 'reached' && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-600/60 text-emerald-100 align-middle">{t('problem.badgeReached')}</span>}</p>
-              <p className="text-xs text-slate-400">{t('problem.ladderProof', { proof: h.proofKey ? t(h.proofKey) : h.proof })}</p>
-              <p className="text-xs text-slate-300">{t('problem.ladderUnlocks', { unlocks: h.unlocksKey ? t(h.unlocksKey) : h.unlocks })}</p>
+        {ladder.map((h) => {
+          // Tank fill (Landry, 2026-11-08): the rung fills like
+          // water to the fraction of its own bar the learner's
+          // numbers cover — progress is a level in a tank, not a
+          // label that flips. Full tank = reached; the first
+          // not-full rung is the next height.
+          const pct = Math.round((h.fill || 0) * 100)
+          const fillBg = h.status === 'reached' ? 'bg-emerald-400/15' : 'bg-sky-400/10'
+          const surface = h.fill > 0 && h.fill < 1 ? 'border-t-2 border-sky-300/40' : ''
+          return (
+          <div key={h.id} className={`relative overflow-hidden rounded-xl border ${h.status === 'reached' ? 'border-emerald-500/30' : h.status === 'next' ? 'border-[#FF6B57]/40' : 'border-bun-600/20 opacity-75'}`}>
+            {h.fill > 0 && <div aria-hidden="true" className={`absolute inset-x-0 bottom-0 ${fillBg} ${surface}`} style={{ height: `${pct}%` }} />}
+            <div className="relative flex items-start gap-3 p-3">
+              <span className="mt-0.5 shrink-0">{h.status === 'reached' ? <CheckCircle2 size={17} className="text-emerald-300" /> : h.status === 'next' ? <HeartPulse size={17} className="text-[#FF8A75]" /> : <Lock size={15} className="text-slate-500" />}</span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-white">{h.labelKey ? t(h.labelKey) : h.label} {h.status === 'next' && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-[#FF6B57] text-white align-middle">{t('problem.badgeNext')}</span>}{h.status === 'reached' && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-600/60 text-emerald-100 align-middle">{t('problem.badgeReached')}</span>}{h.fill > 0 && h.fill < 1 && <span className="float-right text-sm font-bold text-sky-200">{pct}%</span>}</p>
+                <p className="text-xs text-slate-400">{t('problem.ladderProof', { proof: h.proofKey ? t(h.proofKey) : h.proof })}</p>
+                <p className="text-xs text-slate-300">{t('problem.ladderUnlocks', { unlocks: h.unlocksKey ? t(h.unlocksKey) : h.unlocks })}</p>
+              </div>
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
       <p className="text-[11px] text-slate-500">{t('problem.ladderFooter')}</p>
     </div>

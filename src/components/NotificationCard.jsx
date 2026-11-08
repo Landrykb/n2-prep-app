@@ -10,7 +10,7 @@ export default function NotificationCard() {
 
   if (!supported) {
     return (
-      <div className="rounded-2xl glass p-5 card-glow">
+      <div className="rounded-2xl bg-[#151129] border border-white/5 p-5">
         <div className="flex items-center gap-3 text-slate-400">
           <BellOff size={20} />
           <p className="text-sm">{t('notify.unsupported')}</p>
@@ -32,7 +32,7 @@ export default function NotificationCard() {
   const needsPermission = permission === 'denied'
 
   return (
-    <div className="rounded-2xl glass p-5 card-glow space-y-3">
+    <div className="rounded-2xl bg-[#151129] border border-white/5 p-5 space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-[#FF6B57]/20 flex items-center justify-center text-[#FF8A75]">

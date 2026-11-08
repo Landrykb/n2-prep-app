@@ -722,6 +722,53 @@ console.log('integration audit — shared mastery + diagnosis-history sync:')
       const voiceSrc = readFileSync(new URL('../src/components/VoiceLoop.jsx', import.meta.url), 'utf8')
       assert.match(voiceSrc, /yonde:voice-scene/)
     })
+    check('proof ladder tanks: a rung is reached only when the learner numbers meet the bar printed on it', () => {
+      const byId = (ladder) => Object.fromEntries(ladder.map((h) => [h.id, h]))
+      // Landry's real checkup (2026-11-07): N2 est, 97/180, sections
+      // 38/37/22, BJT ~348. The old logic marked BJT 400 REACHED
+      // without ever reading the BJT score.
+      const mine = byId(profileMod.ladderWithStatus({ jlptEstimate: 'N2', total: 97, sections: { language: 38, reading: 37, listening: 22 }, bjtScore: 348 }))
+      assert.equal(mine.foundation.status, 'reached')
+      assert.equal(mine.bridge.status, 'reached')
+      assert.equal(mine.n2.status, 'reached') // 97 ≥ 90 and every section ≥ 19
+      assert.equal(mine.n2.fill, 1)
+      assert.equal(mine.bjt400.status, 'next')
+      assert.ok(Math.abs(mine.bjt400.fill - 348 / 400) < 1e-9, 'BJT 400 fills on the BJT scale itself')
+      assert.equal(mine.bjt480.status, 'locked')
+      assert.ok(Math.abs(mine.bjt480.fill - 348 / 480) < 1e-9)
+      assert.equal(mine.n1.fill, 0) // above the estimate: never extrapolated
+      assert.equal(mine.n1.status, 'locked')
+      assert.ok(Math.abs(mine.j1.fill - 348 / 530) < 1e-9)
+      // A weak section holds the water down even when the total clears the bar.
+      const weak = byId(profileMod.ladderWithStatus({ jlptEstimate: 'N2', total: 96, sections: { language: 40, reading: 44, listening: 12 }, bjtScore: 500 }))
+      assert.ok(Math.abs(weak.n2.fill - 12 / 19) < 1e-9, 'the 19/60 floor caps the fill')
+      assert.equal(weak.n2.status, 'next')
+      assert.equal(weak.bjt400.status, 'reached')
+      assert.equal(weak.bjt480.status, 'reached') // BJT rungs answer to the BJT score alone
+      // No diagnosis: every tank empty, the first rung is next.
+      const none = profileMod.ladderWithStatus(null)
+      assert.ok(none.every((h) => h.fill === 0))
+      assert.equal(none[0].status, 'next')
+    })
+    check('promise panel folds its reasoning behind the Why toggle', () => {
+      const panel = readFileSync(new URL('../src/components/PromisePanel.jsx', import.meta.url), 'utf8')
+      assert.match(panel, /promise\.why/)
+      assert.match(panel, /showWhy &&/)
+    })
+    check('today page: progress bars are one flat tone, panels solid (design constitution)', () => {
+      const progress = readFileSync(new URL('../src/components/ProgressCard.jsx', import.meta.url), 'utf8')
+      assert.doesNotMatch(progress, /to-cyan-500|from-\[#71368A\]/, 'the two-tone plum→cyan bar is gone')
+      assert.match(progress, /bg-emerald-400/)
+      for (const f of ['TodayHome.jsx', 'ProgressCard.jsx', 'NotificationCard.jsx']) {
+        const src = readFileSync(new URL(`../src/components/${f}`, import.meta.url), 'utf8')
+        assert.doesNotMatch(src, /card-glow/, `${f} carries no glow`)
+      }
+      const today = readFileSync(new URL('../src/components/TodayHome.jsx', import.meta.url), 'utf8')
+      assert.doesNotMatch(today, /bg-gradient-to-br from-\[#71368A\]\/20/, 'the plan card wash is solid now')
+      // The ladder container lives in ProblemStart.jsx — solid too.
+      const problem = readFileSync(new URL('../src/components/ProblemStart.jsx', import.meta.url), 'utf8')
+      assert.match(problem, /border-sky-300\/40/, 'the tank water surface line renders')
+    })
   } finally {
     if (prevLS === undefined) delete globalThis.localStorage
     else globalThis.localStorage = prevLS

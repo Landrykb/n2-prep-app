@@ -68,7 +68,7 @@ function FirstWeekCard() {
 
   if (done) {
     return (
-      <section className="rounded-2xl glass p-5 card-glow">
+      <section className="rounded-2xl bg-[#151129] border border-white/5 p-5">
         <p className="text-sm text-slate-200">{done === 'sent' ? t('today.firstWeek.thanks') : t('today.firstWeek.localNote')}</p>
       </section>
     )
@@ -90,7 +90,7 @@ function FirstWeekCard() {
   }
 
   return (
-    <section className="rounded-2xl glass p-5 card-glow space-y-3">
+    <section className="rounded-2xl bg-[#151129] border border-white/5 p-5 space-y-3">
       <div className="flex items-start gap-2.5">
         <span className="mt-0.5"><Mascot agent="michi" size={28} showName={false} /></span>
         <div>
@@ -207,7 +207,7 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
       )}
 
       {modeInfo && (
-        <section className="rounded-2xl glass p-4 card-glow flex items-start gap-3">
+        <section className="rounded-2xl bg-[#151129] border border-white/5 p-4 flex items-start gap-3">
           <Mascot agent="michi" size={38} mood={modeInfo.mode === 'badweek' ? 'resting' : 'happy'} />
           <div>
             <p className="text-sm text-slate-200"><span className="font-semibold text-white">{t('today.michiCoach')}</span> {modeLine(modeInfo.mode, t)}</p>
@@ -219,12 +219,11 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
       {profile && showOnboarding ? (
         <OnboardingFlow initial={profile} setActive={setActive} onDone={(p) => { setProfile(p); setShowOnboarding(false) }} onClose={() => setShowOnboarding(false)} />
       ) : profile ? (
-        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#71368A]/20 to-[#FF6B57]/20 border border-[#FF6B57]/20 p-6 sm:p-8 card-glow">
-          <div className="relative space-y-4">
+        <section className="rounded-3xl bg-[#151129] border border-white/5 p-6 sm:p-8">
+          <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
               <span className="flex items-center gap-1.5 font-medium text-emerald-300"><Calendar size={15} /> {t('today.daysToExam', { days: daysToExam, exam: examLabel, date: dateLabel })}</span>
               <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-bun-800/60 border border-bun-600/40 text-slate-300"><Flame size={12} className="text-orange-300" /> {t('today.thisWeek', { count: weekCount })}</span>
-              <button onClick={() => setShowOnboarding(true)} className="flex items-center gap-1 px-2 py-1 rounded-full bg-bun-800/60 border border-bun-600/40 text-slate-400 hover:text-white transition"><RefreshCw size={11} /> {t('today.problemChanged')}</button>
               {(() => { const m = summariseMetrics(loadMetrics()); return (
                 <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-bun-800/60 border border-bun-600/40 text-slate-300" title={t('today.metricsTitle')}>
                   <Target size={12} className="text-[#FF8A75]" /> {m.minutesPerProofPoint !== null ? t(m.sessions === 1 ? 'today.metricsPaceSingular' : 'today.metricsPacePlural', { minutes: m.minutesPerProofPoint, sessions: m.sessions }) : t('today.metricsEmpty')}
@@ -233,6 +232,10 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
             <h1 className="text-2xl sm:text-3xl font-bold text-white">{t('today.problemPlanTitle')}</h1>
             <p className="max-w-2xl text-slate-200 leading-relaxed text-sm sm:text-base">{plan.line}</p>
             {plan.focusNote && <p className="text-xs text-slate-400">{t('today.builtFrom', { note: plan.focusNote })}</p>}
+            {/* Tier 4 (Doc 06 §10a): the change-problem door is a
+                quiet text link at the card's end — no action hides
+                inside the info pills at the top. */}
+            <button onClick={() => setShowOnboarding(true)} className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-200 transition"><RefreshCw size={11} /> {t('today.problemChanged')}</button>
             {/* The card's action tiles are gone (Hick pass):
                 they were four more doors competing with the one
                 hero above. The card states the plan; the hero
@@ -242,7 +245,7 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
       ) : null}
 
       {tomorrowPlan && (
-        <section className="rounded-2xl glass p-4 card-glow flex items-start gap-3">
+        <section className="rounded-2xl bg-[#151129] border border-white/5 p-4 flex items-start gap-3">
           <Mascot agent="saki" size={38} mood={modeInfo?.mode === 'badweek' ? 'resting' : 'happy'} />
           <div className="flex-1">
             <p className="text-sm text-slate-200"><span className="font-semibold text-white">{t('today.tomorrowBySaki')}</span> {tomorrowPlan.noteKey
@@ -270,7 +273,7 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
         </section>
       )}
 
-      <section className="rounded-2xl glass p-5 card-glow space-y-3">
+      <section className="rounded-2xl bg-[#151129] border border-white/5 p-5 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-bold text-white flex items-center gap-2"><Layers size={18} className="text-[#FF8A75]" /> {t('today.sessionTitle')}</h2>
           <span className="text-xs text-slate-400">{t('today.sessionCounts', { due: session.due.length, dueCap: MAX_DUE_DISPLAY, fresh: session.fresh.length, newCap: MAX_NEW, total: queue.length })}</span>

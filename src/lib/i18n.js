@@ -409,6 +409,7 @@ export const CATALOGS = {
     "promise.eyebrow": "Day-1 Promise",
     "promise.heightTitle": "Your 60-day height: {height}",
     "promise.planTitle": "The plan, in short",
+    "promise.why": "Why this height",
     // queue.*
     "queue.allLevels": "All levels",
     "queue.emptyAll": "You have studied the whole deck in this mode.",
@@ -1664,6 +1665,7 @@ export const CATALOGS = {
     "promise.eyebrow": "Promesse du jour 1",
     "promise.heightTitle": "Votre hauteur à 60 jours : {height}",
     "promise.planTitle": "Le plan, en résumé",
+    "promise.why": "Pourquoi cette hauteur",
     // queue.*
     "queue.allLevels": "Tous les niveaux",
     "queue.emptyAll": "Vous avez étudié tout le paquet dans ce mode.",
@@ -2919,6 +2921,7 @@ export const CATALOGS = {
     "promise.eyebrow": "1日目の約束",
     "promise.heightTitle": "60日後のあなたの高さ： {height}",
     "promise.planTitle": "プラン、短く言うと",
+    "promise.why": "この高さの理由",
     // queue.*
     "queue.allLevels": "すべてのレベル",
     "queue.emptyAll": "このモードではデッキをすべて勉強しました。",
