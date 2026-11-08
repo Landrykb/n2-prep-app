@@ -797,7 +797,17 @@ export default function Reader({ setActive, onSignIn }) {
         </div>
       )}
 
-      {(phase === 'loading' || phase === 'digging') && <p className="text-sm text-slate-400">{t('reader.loading')}</p>}
+      {(phase === 'loading' || phase === 'digging') && (
+        <div className="flex flex-col items-center pt-10 pb-4" role="status">
+          <div className="relative">
+            <div className="hori-search">
+              <Mascot agent="hori" size={96} showName={false} motion="none" />
+            </div>
+            <div aria-hidden="true" className="mx-auto mt-2 h-1.5 w-32 rounded-full bg-white/10" />
+          </div>
+          <p className="text-sm text-slate-400 mt-5">{t('reader.loading')}</p>
+        </div>
+      )}
 
       {phase === 'error' && (
         <div className="rounded-2xl glass p-5 card-glow space-y-3">

@@ -1685,6 +1685,7 @@ check('kanjiReadings: an injected meaning source adds the gloss; without one the
     const page = read('../src/components/Reader.jsx')
     assert.ok(page.includes("functions.invoke('reader-serve'"), 'page invokes the serve function')
     assert.ok(page.includes("phase === 'digging'"), 'a digging state covers the wait')
+    assert.ok(page.includes('hori-search'), 'the wait shows Hori sweeping the shelf with his magnifying glass, not just the words')
     assert.ok(page.includes('tryServe(ctx, excluded)') || page.includes('await tryServe(ctx, excluded)'), 'another-passage uses it too')
   })
 }

@@ -273,3 +273,19 @@ rt {
 @media (prefers-reduced-motion: reduce) {
   .loop-sonar, .loop-sonar-late, .loop-unfold { animation: none; }
 }
+
+/* Hori searching (Landry, 2026-11-08): while the Reader waits
+   on the shelf or on fitted generation, Hori sweeps along the
+   shelf with his magnifying glass — a slow side-to-side scan in
+   his own searching motion. Motion only; reduced-motion users
+   get the still scene and the same words. */
+@keyframes horiSearch {
+  0%, 100% { transform: translateX(-9px) rotate(-3deg); }
+  50% { transform: translateX(9px) rotate(3deg); }
+}
+.hori-search {
+  animation: horiSearch 2.8s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hori-search { animation: none; }
+}
