@@ -3,7 +3,7 @@ import { Phone, PhoneOff, Mic, MicOff, CheckCircle2, RotateCcw, Clock, Bell, Inb
 import { loadProfile } from '../lib/profile.js'
 import { micErrorCopy } from '../lib/speechErrors.js'
 import { primeSpeech, ttsAvailable } from '../lib/tts.js'
-import { speakSenseiLine, stopNeuralSpeech, primeAudioOutput } from '../lib/neuralVoice.js'
+import { speakSenseiLine, stopNeuralSpeech, primeAudioOutput, playAudioFile } from '../lib/neuralVoice.js'
 import { useFurigana } from '../hooks/useFurigana.js'
 import { segmentFurigana, cleanReading } from '../lib/furigana.js'
 import { localDictionary, lookup } from '../lib/dictionary.js'
@@ -227,13 +227,25 @@ export default function SenseiCall() {
   // `tts` function, signed-in users) and falls back to the device
   // voice (speakText) on any failure — its onEnd contract is the
   // same exactly-once one the state machine already relies on.
-  const speakLine = (text, { rate = 0.95, onEnd } = {}) => {
+  const speakLine = (text, { rate = 0.95, onEnd, audioSrc } = {}) => {
     stopRecognition()
     if (senseiMutedRef.current) { if (onEnd) later(onEnd, 450); return }
+    const finish = () => { clearSpotTimers(); setSpotActive(-1); if (onEnd) onEnd() }
+    // Fixed lines (the scene's partner line) play their
+    // pre-rendered file first — the Duolingo shape — and only a
+    // file failure drops to the live synthesis chain.
+    if (audioSrc) {
+      playAudioFile(audioSrc, {
+        onStart: (ms) => runSpotlight(text, ms),
+        onEnd: finish,
+        onError: () => speakSenseiLine(text, { rate, onStart: (ms) => runSpotlight(text, ms), onEnd: finish }),
+      })
+      return
+    }
     speakSenseiLine(text, {
       rate,
       onStart: (ms) => runSpotlight(text, ms),
-      onEnd: () => { clearSpotTimers(); setSpotActive(-1); if (onEnd) onEnd() },
+      onEnd: finish,
     })
   }
 
@@ -581,7 +593,7 @@ export default function SenseiCall() {
     setManualNote('')
     goTurn('sensei')
     if (senseiMutedRef.current) later(() => beginUserTurn(), 900)
-    else speakLine(scene.partner, { onEnd: () => later(() => beginUserTurn(), 900) })
+    else speakLine(scene.partner, { audioSrc: scene.partnerAudio || undefined, onEnd: () => later(() => beginUserTurn(), 900) })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, exIdx, scene])
 
@@ -931,17 +943,27 @@ export default function SenseiCall() {
                  mic is open, the call screen clears everything else
                  away — the prompt, his words as they land, one Done
                  button. No cards, no notes, no second decision. */
-              <div className="flex flex-col items-center text-center pt-12 pb-8 space-y-7">
-                <p className="text-3xl font-bold text-white">{t('call.yourTurnFocus')}</p>
-                <p className="text-lg text-slate-200 max-w-md leading-relaxed">{scene.promptEn}</p>
+              <div className="flex flex-col items-center text-center pt-10 pb-8 space-y-6 w-full">
+                <p className="text-2xl font-bold text-white">{t('call.yourTurnFocus')}</p>
+                {/* The passage stays on screen — it is what he is
+                    answering (Landry, 2026-11-08: "it does not even
+                    show it"). One card, nothing else competes. */}
+                <div className="w-full max-w-md rounded-2xl bg-bun-700/40 border border-bun-600/20 p-4 text-left">
+                  <p className="text-xs text-slate-400 mb-1">{t('call.says', { sensei: callState.settings.senseiName })}</p>
+                  <p className="text-lg text-slate-100 leading-loose"><KanjiTapText text={scene.partner} /></p>
+                </div>
+                <p className="text-base text-slate-200 max-w-md leading-relaxed">{scene.promptEn}</p>
                 <div className="w-20 h-20 rounded-full border-2 border-emerald-400/70 bg-emerald-500/10 flex items-center justify-center animate-pulse">
                   <Mic size={32} className="text-emerald-300" />
                 </div>
                 <p className="text-base text-slate-100 min-h-[1.75rem] max-w-md leading-relaxed">{interim || '…'}</p>
-                <button onClick={() => { if (finishTurnRef.current) finishTurnRef.current() }} className="px-8 py-3.5 rounded-full bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-semibold text-base">{t('call.imDone')}</button>
                 <button onClick={toggleMicMute} aria-pressed={micMuted} className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1.5">
                   {micMuted ? <MicOff size={13} /> : <Mic size={13} />} {micMuted ? t('call.micOff') : t('call.micOn')}
                 </button>
+                {/* Done is the exit: quiet, last, well separated,
+                    and dead until he has actually said something —
+                    a stray tap must not end his turn (Landry). */}
+                <button onClick={() => { if (finishTurnRef.current) finishTurnRef.current() }} disabled={!interim.trim()} className="mt-6 px-5 py-2.5 rounded-full border border-bun-600/40 text-slate-300 text-sm disabled:opacity-40 hover:text-white transition">{t('call.imDone')}</button>
               </div>
             ) : (
               <>
@@ -961,7 +983,7 @@ export default function SenseiCall() {
               <p className="text-xs text-slate-400 mb-1">{t('call.says', { sensei: callState.settings.senseiName })}</p>
               <div className="flex items-start gap-2">
                 <p className="text-slate-100 leading-loose flex-1"><KanjiTapText text={scene.partner} /></p>
-                <TtsButton text={scene.partner} />
+                <TtsButton text={scene.partner} cast={scene.partnerVoice || undefined} audioSrc={scene.partnerAudio || undefined} />
               </div>
             </div>
 

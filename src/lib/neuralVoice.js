@@ -102,6 +102,67 @@ function sharedAudio() {
 
 const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA='
 
+// ---------- WebAudio playback (2026-11-08) ----------
+// Landry's WebKit refuses media-element playback of the neural
+// audio in every shape tried — blob and signed-URL stream, MP3
+// and AAC alike (NotSupportedError, while server probes prove
+// the bytes arrived fine). Decoding the bytes and playing them
+// through WebAudio is a different pipeline entirely — the one
+// web apps rely on to make iOS play sound — so neural lines and
+// fixed files now go: bytes -> decodeAudioData -> buffer
+// source. The element path remains as the fallback when decode
+// is unavailable or fails.
+let actx = null
+let currentSource = null
+function audioCtx() {
+  try {
+    if (!actx) {
+      const AC = window.AudioContext || window.webkitAudioContext
+      if (!AC) return null
+      actx = new AC()
+    }
+    if (actx.state === 'suspended') actx.resume().catch(() => {})
+    return actx
+  } catch { return null }
+}
+async function fetchAudioBytes(source) {
+  if (source instanceof Blob) return source.arrayBuffer()
+  const res = await fetch(source)
+  if (!res.ok) throw new Error(`audio fetch ${res.status}`)
+  return res.arrayBuffer()
+}
+// Play audio (Blob or URL) through WebAudio. Resolves true when
+// playback actually started; onEnded/onStarted mirror the
+// element events the line logic already runs on. shouldContinue
+// is checked after every await, so a line stopped mid-fetch
+// never sounds.
+async function playDecoded(source, { rate = 1, onEnded, onStarted, shouldContinue } = {}) {
+  const ctx = audioCtx()
+  if (!ctx) return false
+  let bytes
+  try { bytes = await fetchAudioBytes(source) } catch { return false }
+  if (shouldContinue && !shouldContinue()) return false
+  let buffer
+  try { buffer = await ctx.decodeAudioData(bytes) } catch { return false }
+  if (shouldContinue && !shouldContinue()) return false
+  const node = ctx.createBufferSource()
+  node.buffer = buffer
+  try { node.playbackRate.value = rate } catch { /* default rate is fine */ }
+  node.connect(ctx.destination)
+  currentSource = node
+  node.onended = () => { if (currentSource === node) currentSource = null; if (onEnded) onEnded() }
+  try { node.start() } catch { return false }
+  if (onStarted) onStarted((buffer.duration * 1000) / (rate > 0 ? rate : 1))
+  return true
+}
+function stopDecoded() {
+  if (currentSource) {
+    const node = currentSource
+    currentSource = null
+    try { node.onended = null; node.stop() } catch { /* already stopped */ }
+  }
+}
+
 /**
  * Unlock audio output for this page. Call SYNCHRONOUSLY inside
  * a tap handler, before any await: plays a silent clip on the
@@ -119,6 +180,7 @@ export function primeAudioOutput() {
     }
   } catch { /* priming is best effort */ }
   try { primeSpeech() } catch { /* best effort */ }
+  try { audioCtx() } catch { /* best effort */ }
 }
 let pendingEnd = null
 let watchdog = null
@@ -136,6 +198,7 @@ function clearWatchdog() {
 
 function teardownAudio() {
   clearWatchdog()
+  stopDecoded()
   // Abort any in-flight browser synthesis: a stopped line must never
   // finish synthesising behind the mic's back (half-duplex). No-op
   // once synthesis has settled — its cancel entry removes itself.
@@ -175,7 +238,7 @@ export function stopNeuralSpeech() {
  * fires when the file cannot play, so the caller can fall back
  * to live synthesis.
  */
-export function playAudioFile(src, { onEnd, onError } = {}) {
+export function playAudioFile(src, { onEnd, onError, onStart } = {}) {
   stopNeuralSpeech()
   if (!src || typeof Audio === 'undefined') { if (onError) onError(); return }
   let endFired = false
@@ -202,15 +265,28 @@ export function playAudioFile(src, { onEnd, onError } = {}) {
     else if (onEnd) onEnd()
   }
   pendingEnd = fireEnd
-  try {
-    const audio = sharedAudio()
-    currentAudio = audio
-    audio.src = src
-    audio.onended = fireEnd
-    audio.onerror = () => fail(null)
-    const played = audio.play()
-    if (played && typeof played.catch === 'function') played.catch((err) => fail(err))
-  } catch (err) { fail(err) }
+  const playOnElement = () => {
+    if (endFired) return
+    try {
+      const audio = sharedAudio()
+      currentAudio = audio
+      audio.src = src
+      audio.onended = fireEnd
+      audio.onerror = () => fail(null)
+      audio.onplaying = () => {
+        const d = audio.duration
+        if (onStart && Number.isFinite(d) && d > 0) onStart(d * 1000)
+      }
+      const played = audio.play()
+      if (played && typeof played.catch === 'function') played.catch((err) => fail(err))
+    } catch (err) { fail(err) }
+  }
+  // WebAudio first (see playDecoded): on Landry's WebKit the
+  // media element refuses these files outright, the decoder
+  // does not. The element is the fallback, not the plan.
+  playDecoded(src, { rate: 1, onEnded: fireEnd, onStarted: (ms) => { if (onStart) onStart(ms) }, shouldContinue: () => !endFired })
+    .then((started) => { if (!endFired && !started) playOnElement() })
+    .catch(() => { if (!endFired) playOnElement() })
 }
 
 /** The signed-in user's access token, or null (guest / signed out). */
@@ -340,9 +416,19 @@ export function speakSenseiLine(text, { rate = 1, onEnd, onStart, onFallback, ca
   }
   const attempt = () => {
     armWatchdog()
-    getNeuralAudio(clean, cast, browserTimeoutMs).then((source) => {
+    getNeuralAudio(clean, cast, browserTimeoutMs).then(async (source) => {
       if (endFired) return
       if (!source) { clearWatchdog(); deviceFallback(); return }
+      // WebAudio first (see playDecoded): the element below is
+      // the fallback — on Landry's WebKit it rejects the stream.
+      const viaWebAudio = await playDecoded(source, {
+        rate: rateOk,
+        onEnded: fireEnd,
+        onStarted: (ms) => fireStart(ms),
+        shouldContinue: () => !endFired,
+      })
+      if (endFired) return
+      if (viaWebAudio) return
       try {
         // An https URL streams natively (the listening-file path);
         // a Blob rides an object URL (the browser Edge route).

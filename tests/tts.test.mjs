@@ -319,6 +319,15 @@ await acheck('edgeTts: cancelBrowserSynthesis aborts an in-flight synthesis', as
     assert.ok(call.includes("turnState === 'listening' ? ("), 'the focus page replaces the stack while he speaks')
     assert.ok(call.includes("t('call.imDone')"), 'an I\'m Done button ends the turn on his tap')
     assert.ok(call.includes("t('call.yourTurnFocus')"), 'the focus page names the turn, on screen only')
+    // Focus v2 + WebAudio (later the same morning): the passage
+    // stays visible on his turn, Done cannot be fat-fingered,
+    // and playback decodes through WebAudio because his WebKit
+    // refuses the media element in every format.
+    assert.ok(call.includes('disabled={!interim.trim()}'), 'Done is dead until he has said something')
+    assert.ok(call.includes('audioSrc: scene.partnerAudio'), 'the call partner line plays its pre-rendered file')
+    const voiceSrc = readFileSync(new URL('../src/lib/neuralVoice.js', import.meta.url), 'utf8')
+    assert.ok(voiceSrc.includes('decodeAudioData'), 'playback decodes through WebAudio')
+    assert.ok(voiceSrc.includes('playDecoded'), 'one decode-first player serves lines and files')
   })
   check('one catch-up ring per day; the name field edits freely', () => {
     assert.ok(call.includes('catchupRung: true'), 'catch-up marked on the day')
