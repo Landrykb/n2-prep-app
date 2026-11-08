@@ -40,9 +40,6 @@ import KanjiTapText from './KanjiTapText.jsx'
 
 const RING_TIMEOUT_MS = 45000
 
-// Spoken once when a turn meets silence, before the call falls back to
-// the typed controls: "Go ahead — it's your turn."
-const REPROMPT_LINE = 'どうぞ、あなたの番です。'
 
 function shortMeaning(raw) {
   if (!raw) return ''
@@ -161,6 +158,11 @@ export default function SenseiCall() {
   const [manualOpen, setManualOpen] = useState(false)
   const [manualNote, setManualNote] = useState('')
   const turnRef = useRef('sensei')
+  // The live auto-turn's finisher, for the focus page's I'm Done
+  // button; and the exchange-finish lock (one finish per exchange,
+  // ever — a stale or doubled advance must not skip a sentence).
+  const finishTurnRef = useRef(null)
+  const finishedExchangeRef = useRef('')
   const micMutedRef = useRef(false)
   const senseiMutedRef = useRef(false)
   const timersRef = useRef([])
@@ -242,7 +244,9 @@ export default function SenseiCall() {
     if (note) setManualNote(note)
   }
 
-  // A turn that heard nothing: one spoken re-prompt, then the typed
+  // A turn that heard nothing: NO spoken re-prompt (Landry,
+  // 2026-11-08: "no need for it to say it's your turn" — the focus
+  // page says it on screen). One silent re-listen, then the typed
   // controls — never a loop.
   const handleSilence = () => {
     if (turnRef.current !== 'listening') return
@@ -251,8 +255,7 @@ export default function SenseiCall() {
       return
     }
     repromptRef.current += 1
-    goTurn('sensei')
-    speakLine(REPROMPT_LINE, { onEnd: () => later(() => { if (turnRef.current === 'sensei') beginUserTurn() }, 700) })
+    beginUserTurn()
   }
 
   const beginUserTurn = () => {
@@ -444,7 +447,16 @@ export default function SenseiCall() {
   // gap ends the turn (Landry, 2026-11-07: the call "feels
   // rushed… I am not done reading and it goes to another
   // sentence").
-  const SILENCE_GAP_MS = 2600
+  // 2026-11-08: 2.6s proved too eager twice over — it ended his
+  // turns while he was still reading a sentence aloud (a learner
+  // pauses to decode), and a turn with no speech at all burned
+  // the same short fuse. Two gaps now: a long leash before he has
+  // said anything, and a full five seconds of continuous silence
+  // after speech before the turn may end — plus the focus page's
+  // I'm Done button ends it on HIS tap, which outranks any timer.
+  const FIRST_SPEECH_GAP_MS = 12000
+  const SPOKEN_SILENCE_MS = 5000
+  const SILENCE_GAP_MS = SPOKEN_SILENCE_MS
   const silenceTimerRef = useRef(null)
   const clearSilenceTimer = () => { if (silenceTimerRef.current) { clearTimeout(silenceTimerRef.current); silenceTimerRef.current = null } }
 
@@ -459,7 +471,7 @@ export default function SenseiCall() {
     // turn has been submitted, and how many times the
     // recogniser has been relaunched inside this one turn
     // (iOS ends sessions on its own; the turn outlives them).
-    const turn = { text: '', submitted: false, restarts: 0 }
+    const turn = { text: '', submitted: false, restarts: 0, heard: false }
 
     const finishAutoTurn = () => {
       if (turn.submitted) return
@@ -482,8 +494,9 @@ export default function SenseiCall() {
         if (listenSessionRef.current !== session) return
         if (turnRef.current !== 'listening') return
         finishAutoTurn()
-      }, SILENCE_GAP_MS)
+      }, turn.heard ? SPOKEN_SILENCE_MS : FIRST_SPEECH_GAP_MS)
     }
+    if (auto) finishTurnRef.current = finishAutoTurn
 
     const launch = () => {
       if (listenSessionRef.current !== session) return
@@ -513,6 +526,7 @@ export default function SenseiCall() {
         // answer by itself. Accumulate and re-arm the gap.
         if (finalText) turn.text += finalText
         if (finalText || interimText) {
+          turn.heard = true
           setInterim(`${turn.text}${interimText}`)
           armSilenceTimer()
         }
@@ -585,6 +599,13 @@ export default function SenseiCall() {
   useEffect(() => () => { stopRecognition(); stopSpeech(); clearTimers(); clearSpotTimers() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const finishExchange = (finalCurrent) => {
+    // One finish per exchange, ever: a doubled or stale advance
+    // (an old timer, a repeated auto-check) must never skip a
+    // sentence (Landry, 2026-11-08: sentence two "just starts and
+    // skips and shows sentence 3").
+    const exchangeKey = `${scene?.id}:${exIdx}`
+    if (finishedExchangeRef.current === exchangeKey) return
+    finishedExchangeRef.current = exchangeKey
     const done = [...results, finalCurrent]
     setResults(done)
     if (exIdx + 1 >= exchangesTotal) finishCall(done)
@@ -695,7 +716,7 @@ export default function SenseiCall() {
   const accept = () => {
     primeSpeech() // inside the tap, so iOS lets Sensei speak when her turn comes
     primeAudioOutput() // same tap: gesture credit for the shared audio element her neural lines play on
-    setPhase('incall'); setExIdx(0); setResults([]); setCurrent(null); setInput(''); setLastAttempt(null)
+    setPhase('incall'); setExIdx(0); setResults([]); setCurrent(null); setInput(''); setLastAttempt(null); finishedExchangeRef.current = ''
   }
 
   // ---------- settings ----------
@@ -905,6 +926,25 @@ export default function SenseiCall() {
             </div>
             <div className="flex gap-1.5">{chain.slice(0, exchangesTotal).map((_, i) => <div key={i} className={`h-1.5 flex-1 rounded-full ${i < results.length ? 'bg-emerald-500' : i === exIdx ? 'bg-[#FF6B57]' : 'bg-bun-700'}`} />)}</div>
 
+            {turnState === 'listening' ? (
+              /* YOUR-TURN FOCUS PAGE (Landry, 2026-11-08): while the
+                 mic is open, the call screen clears everything else
+                 away — the prompt, his words as they land, one Done
+                 button. No cards, no notes, no second decision. */
+              <div className="flex flex-col items-center text-center pt-12 pb-8 space-y-7">
+                <p className="text-3xl font-bold text-white">{t('call.yourTurnFocus')}</p>
+                <p className="text-lg text-slate-200 max-w-md leading-relaxed">{scene.promptEn}</p>
+                <div className="w-20 h-20 rounded-full border-2 border-emerald-400/70 bg-emerald-500/10 flex items-center justify-center animate-pulse">
+                  <Mic size={32} className="text-emerald-300" />
+                </div>
+                <p className="text-base text-slate-100 min-h-[1.75rem] max-w-md leading-relaxed">{interim || '…'}</p>
+                <button onClick={() => { if (finishTurnRef.current) finishTurnRef.current() }} className="px-8 py-3.5 rounded-full bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-semibold text-base">{t('call.imDone')}</button>
+                <button onClick={toggleMicMute} aria-pressed={micMuted} className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1.5">
+                  {micMuted ? <MicOff size={13} /> : <Mic size={13} />} {micMuted ? t('call.micOff') : t('call.micOn')}
+                </button>
+              </div>
+            ) : (
+              <>
             {/* The only controls the call itself needs: two mutes. Turns,
                 scoring and advancing all happen on their own. */}
             <div className="flex flex-wrap items-center gap-2">
@@ -1018,6 +1058,8 @@ export default function SenseiCall() {
               )}
             </div>
             <p className="text-[11px] text-slate-600 text-center pb-4">{t('call.hangupNote')}</p>
+              </>
+            )}
           </div>
         </div>
       )}

@@ -303,10 +303,22 @@ await acheck('edgeTts: cancelBrowserSynthesis aborts an in-flight synthesis', as
   const { readFileSync } = await import('node:fs')
   const call = readFileSync(new URL('../src/components/SenseiCall.jsx', import.meta.url), 'utf8')
   check('the call waits for a real silence gap, not a segment boundary', () => {
-    assert.ok(call.includes('SILENCE_GAP_MS = 2600'), 'silence gap constant')
     assert.ok(call.includes('turn.text += finalText'), 'segments accumulate')
     assert.ok(call.includes('turn.restarts >= 10'), 'recogniser relaunches inside one turn, capped')
     assert.ok(call.includes('beginUserTurn(), 900'), 'a beat before the mic opens')
+  })
+  check('patience + focus: no spoken reprompt, his tap ends the turn, no sentence skips', () => {
+    // 2026-11-08, Landry's live reports: Sensei kept announcing
+    // "your turn" aloud, cut him off mid-reading, and one exchange
+    // skipped straight to the next sentence.
+    assert.ok(!call.includes('REPROMPT_LINE'), 'no spoken your-turn announcement')
+    assert.ok(call.includes('SPOKEN_SILENCE_MS = 5000'), 'five full seconds of silence after speech')
+    assert.ok(call.includes('FIRST_SPEECH_GAP_MS = 12000'), 'a long leash before he has said anything')
+    assert.ok(call.includes('turn.heard ? SPOKEN_SILENCE_MS : FIRST_SPEECH_GAP_MS'), 'the gap follows whether he has started')
+    assert.ok(call.includes('finishedExchangeRef'), 'an exchange can only finish once — no skips')
+    assert.ok(call.includes("turnState === 'listening' ? ("), 'the focus page replaces the stack while he speaks')
+    assert.ok(call.includes("t('call.imDone')"), 'an I\'m Done button ends the turn on his tap')
+    assert.ok(call.includes("t('call.yourTurnFocus')"), 'the focus page names the turn, on screen only')
   })
   check('one catch-up ring per day; the name field edits freely', () => {
     assert.ok(call.includes('catchupRung: true'), 'catch-up marked on the day')

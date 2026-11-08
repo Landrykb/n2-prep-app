@@ -174,6 +174,8 @@ export const CATALOGS = {
     "call.wrapTarget": "Target: {pattern}",
     "call.wrapTitle": "Call kept. よくできました。",
     "call.yourTurnSay": "Your turn — say this, your way:",
+    "call.yourTurnFocus": "Your Turn",
+    "call.imDone": "I'm Done",
     // feedback.*
     "feedback.emailInstead": "Email It Instead",
     "feedback.intro": "What helped, what confused you, what broke — in your own words. It goes to a human (Landry), not a bot queue.",
@@ -1411,6 +1413,8 @@ export const CATALOGS = {
     "call.wrapTarget": "Cible : {pattern}",
     "call.wrapTitle": "Appel tenu. よくできました。",
     "call.yourTurnSay": "À vous — dites ceci, à votre façon :",
+    "call.yourTurnFocus": "À Vous",
+    "call.imDone": "J'ai Fini",
     // feedback.*
     "feedback.emailInstead": "L’envoyer par e-mail à la place",
     "feedback.intro": "Ce qui vous a aidé, ce qui vous a perdu, ce qui a cassé — avec vos mots. Ça arrive à un humain (Landry), pas dans la file d’un robot.",
@@ -2648,6 +2652,8 @@ export const CATALOGS = {
     "call.wrapTarget": "目標：{pattern}",
     "call.wrapTitle": "電話ができました。よくできました。",
     "call.yourTurnSay": "あなたの番 — これを、あなたの言い方で：",
+    "call.yourTurnFocus": "あなたの番",
+    "call.imDone": "言い終わりました",
     // feedback.*
     "feedback.emailInstead": "代わりにメールで送る",
     "feedback.intro": "役に立ったこと、わかりにくかったこと、壊れたこと — 自分の言葉で書いてください。届く先はボットのキューではなく、人間（Landry）です。",
