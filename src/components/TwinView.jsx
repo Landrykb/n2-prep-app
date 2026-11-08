@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Download, Trash2, Mail, ChevronRight, X, Send, BookOpenText, Stethoscope } from 'lucide-react'
+import { Download, Trash2, Mail, ChevronRight, X, Send, BookOpenText, Stethoscope, Play } from 'lucide-react'
 import { brand } from '../lib/brand.js'
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient.js'
 import {
@@ -23,6 +23,7 @@ import { loadMetrics, summariseMetrics } from '../lib/metrics.js'
 import { estimateWorkingLevel } from '../lib/twinEstimate.js'
 import { loadDiagnosis } from '../lib/profile.js'
 import { loadSessionState, todayStr } from '../lib/session.js'
+import { sceneForPattern } from '../lib/planner.js'
 import { deliverTextFile } from '../lib/fileDeliver.js'
 import { collectLearnerState, loadDeclaredLevel, saveDeclaredLevel, STATE_SYNCED_EVENT } from '../lib/learnerState.js'
 import { resolveLevelBasis } from '../lib/levelBasis.js'
@@ -647,7 +648,29 @@ export default function TwinView({ setActive }) {
                 </div>
                 <p className="text-[13px] leading-relaxed text-slate-300 mt-2">{patternById(p.id)?.plain}</p>
                 {p.example && <p className="text-xs text-slate-500 mt-1.5 truncate">{t('twin.trips.yourWords', { example: p.example })}</p>}
-                <div className="flex justify-end mt-2">
+                {/* The card's door (Landry, 2026-11-08): a pattern
+                    you can see but cannot act on is a dead end.
+                    Practice This targets THIS pattern — a listening
+                    pattern opens Listening; a pattern with a matching
+                    scene opens the Voice Loop on that exact scene
+                    (the planner's own pick, via the voice-scene
+                    deep link); anything else opens today's session,
+                    whose plan is built around this list. Remove
+                    stays the quiet, last action. */}
+                <div className="flex items-center justify-between mt-2">
+                  <button
+                    onClick={() => {
+                      if (p.id.startsWith('listening')) { setActive('n2listening'); return }
+                      const scene = sceneForPattern(p.id, todayStr())
+                      if (scene) {
+                        try { sessionStorage.setItem('yonde:voice-scene', scene.id) } catch { /* ignore */ }
+                        setActive('voice')
+                      } else setActive('session')
+                    }}
+                    className="flex items-center gap-1 text-xs font-medium text-[#FF8A75] hover:text-[#FF6B57] transition px-1 py-0.5"
+                  >
+                    <Play size={12} /> {t('twin.trips.practice')}
+                  </button>
                   <button onClick={() => setTwin(removePattern(p.id))} className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-200 transition px-1 py-0.5"><X size={12} /> {t('twin.trips.remove')}</button>
                 </div>
               </li>

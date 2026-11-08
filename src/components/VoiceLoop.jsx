@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Mic, MicOff, Volume2, CheckCircle2, RotateCcw, Save, Ear, MessageSquare, Sparkles } from 'lucide-react'
 import { scenes, SCENE_DOMAINS } from '../data/scenes.js'
 import { addToQueue } from '../lib/queue.js'
@@ -83,6 +83,19 @@ export default function VoiceLoop() {
 
   const filtered = useMemo(() => (domain === 'all' ? ordered : ordered.filter((s) => s.domain === domain)), [ordered, domain])
   const scene = filtered[Math.min(idx, filtered.length - 1)] || ordered[0]
+
+  // Deep link from a Twin fingerprint card ("Practice This" on a
+  // What Trips You Up pattern): open on the exact scene the
+  // planner picked for that pattern, once, then forget the link.
+  useEffect(() => {
+    try {
+      const id = sessionStorage.getItem('yonde:voice-scene')
+      if (!id) return
+      sessionStorage.removeItem('yonde:voice-scene')
+      const i = ordered.findIndex((s) => s.id === id)
+      if (i >= 0) { setDomain('all'); setIdx(i) }
+    } catch { /* ignore */ }
+  }, [ordered])
   const last = attempts[attempts.length - 1]
   const isMastered = mastered.has(scene.id) || (last && last.score >= MASTERY)
   const speechSupported = typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)

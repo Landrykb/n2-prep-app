@@ -84,17 +84,28 @@ function sceneMatchesPattern(scene, patternId) {
   return hint.test(`${scene.targetPattern} ${scene.commonError} ${(scene.keyPhrases || []).join(' ')}`)
 }
 
+/** The scene that exercises one fingerprint pattern, picked
+ *  deterministically for the day — the same choice fingerprintScene
+ *  makes for the plan. Exported for the TwinView trips cards:
+ *  their Practice This door opens the Voice Loop on exactly this
+ *  scene (via the 'yonde:voice-scene' deep link), so the door
+ *  targets the pattern on the card, not practice in general.
+ *  Null when no scene exercises the pattern. */
+export function sceneForPattern(patternId, dateStr) {
+  const candidates = scenes.filter((s) => sceneMatchesPattern(s, patternId))
+  if (!candidates.length) return null
+  let h = 0
+  const key = `${dateStr}|fp|${patternId}`
+  for (let i = 0; i < key.length; i++) h = (Math.imul(31, h) + key.charCodeAt(i)) | 0
+  return candidates[Math.abs(h) % candidates.length]
+}
+
 function fingerprintScene(twin, dateStr) {
   const top = topPatterns(twin, 2)
   for (const p of top) {
     if (p.id.startsWith('listening')) continue // listening patterns steer the bite, not the scene
-    const candidates = scenes.filter((s) => sceneMatchesPattern(s, p.id))
-    if (candidates.length) {
-      let h = 0
-      const key = `${dateStr}|fp|${p.id}`
-      for (let i = 0; i < key.length; i++) h = (Math.imul(31, h) + key.charCodeAt(i)) | 0
-      return { scene: candidates[Math.abs(h) % candidates.length], reasonKey: 'planner.reasonFingerprint', reasonVars: { label: p.label } }
-    }
+    const scene = sceneForPattern(p.id, dateStr)
+    if (scene) return { scene, reasonKey: 'planner.reasonFingerprint', reasonVars: { label: p.label } }
   }
   return null
 }

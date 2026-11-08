@@ -9,6 +9,7 @@
 // 3. Twin merge guard: an older/equal cloud Twin never overwrites local.
 
 import assert from 'node:assert'
+import { readFileSync } from 'node:fs'
 
 const client = await import('../src/lib/calls.js')
 const port = await import('../supabase/functions/call-scheduler/slot.ts')
@@ -687,6 +688,7 @@ console.log('integration audit — shared mastery + diagnosis-history sync:')
     const twin = await import('../src/lib/twin.js')
     const profileMod = await import('../src/lib/profile.js')
     const promiseMod = await import('../src/lib/promise.js')
+    const plannerMod = await import('../src/lib/planner.js')
     const { onLearnerStateSaved } = await import('../src/lib/stateEvents.js')
     check('a voice attempt at mastery records the scene as mastered — from ANY surface (audit #4)', () => {
       twin.recordVoiceAttempt({ scene: { id: 'scene-city-office', model: '住民票を2通お願いします。', for: [], domain: 'City Office' }, text: '住民票を2通お願いします。', score: 92, missing: [] })
@@ -708,6 +710,17 @@ console.log('integration audit — shared mastery + diagnosis-history sync:')
       twin.pushDiagnosisHistory({ at: '2026-11-08T00:00:00Z', jlptEstimate: 'N3', total: 100, sections: { language: 30, reading: 35, listening: 35 }, weakest: 'language' })
       off()
       assert.ok(emissions >= 1, `expected ≥1 emission, got ${emissions}`)
+    })
+    check('trips cards: the Practice This door targets the pattern (sceneForPattern + deep link)', () => {
+      const scene = plannerMod.sceneForPattern('counter-documents', '2026-11-08')
+      assert.ok(scene && scene.id, 'a document-counter pattern has a matching scene')
+      assert.equal(plannerMod.sceneForPattern('counter-documents', '2026-11-08').id, scene.id) // deterministic per day
+      assert.equal(plannerMod.sceneForPattern('no-such-pattern', '2026-11-08'), null)
+      const twinSrc = readFileSync(new URL('../src/components/TwinView.jsx', import.meta.url), 'utf8')
+      assert.match(twinSrc, /twin\.trips\.practice/)
+      assert.match(twinSrc, /yonde:voice-scene/)
+      const voiceSrc = readFileSync(new URL('../src/components/VoiceLoop.jsx', import.meta.url), 'utf8')
+      assert.match(voiceSrc, /yonde:voice-scene/)
     })
   } finally {
     if (prevLS === undefined) delete globalThis.localStorage
