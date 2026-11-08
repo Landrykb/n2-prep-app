@@ -188,11 +188,14 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
             </span>
           </span>
         </button>
-        <button onClick={() => startSession('busy')} className="w-full rounded-2xl bg-bun-800/70 border border-bun-600/40 hover:border-[#FF6B57]/40 p-3.5 text-sm text-slate-200 flex items-center justify-center gap-2 transition">
-          <Coffee size={15} className="text-amber-300" /> {t('today.busyTitle')} <span className="text-slate-400">{t('today.busyHint')}</span>
-        </button>
-        <button onClick={() => setActive('sensei')} className="w-full rounded-2xl bg-emerald-500/10 border border-emerald-500/25 hover:border-emerald-400/40 p-3.5 text-sm text-slate-200 flex items-center justify-center gap-2 transition">
-          <Phone size={15} className="text-emerald-300" /> Yobidashi {(() => { const cs = loadCallState(); return cs.settings.enabled ? <span className="text-slate-400">{t(cs.settings.callsPerDay > 1 ? 'today.yobidashiOnPlural' : 'today.yobidashiOnSingular', { count: cs.settings.callsPerDay })}</span> : <span className="text-slate-400">{t('today.yobidashiOffBefore')}<em>{t('today.yobidashiOffYou')}</em>{t('today.yobidashiOffAfter')}</span> })()}
+        {/* The same decision at a smaller size — a quiet text
+            row, not a competing card (Hick pass, 2026-11-08). The
+            Yobidashi card-button that also sat here moved to the
+            quiet link row at the page bottom: the call has its
+            own bottom-bar tab, it does not compete with today's
+            session on the home screen. */}
+        <button onClick={() => startSession('busy')} className="w-full text-center text-xs text-slate-400 hover:text-slate-200 py-1.5 flex items-center justify-center gap-1.5 transition">
+          <Coffee size={13} className="text-amber-300" /> {t('today.busyTitle')} · {t('today.busyHint')}
         </button>
       </section>
 
@@ -223,14 +226,10 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
             <h1 className="text-2xl sm:text-3xl font-bold text-white">{t('today.problemPlanTitle')}</h1>
             <p className="max-w-2xl text-slate-200 leading-relaxed text-sm sm:text-base">{plan.line}</p>
             {plan.focusNote && <p className="text-xs text-slate-400">{t('today.builtFrom', { note: plan.focusNote })}</p>}
-            <div className="grid gap-3 sm:grid-cols-2">
-              {plan.actions.map((a) => (
-                <button key={`${a.tab}-${a.label}`} onClick={() => setActive(a.tab)} className="text-left rounded-2xl glass p-4 border border-bun-600/30 hover:border-[#FF6B57]/40 transition group">
-                  <p className="font-bold text-white text-sm flex items-center justify-between">{a.label} <ChevronRight size={15} className="text-[#FF8A75] group-hover:translate-x-0.5 transition" /></p>
-                  <p className="text-xs text-slate-400 mt-1">{a.reason}</p>
-                </button>
-              ))}
-            </div>
+            {/* The card's action tiles are gone (Hick pass):
+                they were four more doors competing with the one
+                hero above. The card states the plan; the hero
+                starts it. */}
           </div>
         </section>
       )}
@@ -248,10 +247,6 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
         </section>
       )}
 
-      <button onClick={() => setActive('coach')} className="w-full rounded-2xl bg-bun-800/70 border border-bun-600/40 hover:border-[#FF6B57]/40 p-3.5 text-sm text-slate-200 flex items-center justify-center gap-2 transition">
-        <Mail size={15} className="text-[#FF8A75]" /> {t('today.weeklyLetter')} <span className="text-slate-400">{t('today.weeklyLetterHint')}</span>
-      </button>
-
       <FirstWeekCard />
 
       {isComeback && (
@@ -268,30 +263,13 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
         </section>
       )}
 
-      <section className="rounded-2xl glass p-5 card-glow space-y-4">
+      <section className="rounded-2xl glass p-5 card-glow space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-bold text-white flex items-center gap-2"><Layers size={18} className="text-[#FF8A75]" /> {t('today.sessionTitle')}</h2>
           <span className="text-xs text-slate-400">{t('today.sessionCounts', { due: session.due.length, dueCap: MAX_DUE_DISPLAY, fresh: session.fresh.length, newCap: MAX_NEW, total: queue.length })}</span>
         </div>
         {card ? (
-          <div className="space-y-3">
-            <button onClick={() => setFlipped((f) => !f)} className="w-full text-left rounded-2xl bg-bun-700/40 border border-bun-600/30 p-6 min-h-[130px] hover:border-[#FF6B57]/40 transition">
-              <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-2">{t('today.cardMetaStart', { kind: t(card.fsrs?.reps ? 'today.cardReview' : 'today.cardNew'), source: card.source })}{card.level ? t('today.cardMetaLevel', { level: card.level }) : ''}{t('today.cardTapFlip')}</p>
-              {!flipped ? <p className="text-lg text-white leading-loose">{card.front}</p> : (
-                <span><span className="block text-lg text-emerald-200 leading-loose">{card.back}</span>{card.note && <span className="block text-xs text-slate-400 mt-2">{card.note}</span>}</span>
-              )}
-            </button>
-            {flipped && previews && (
-              <div className="grid grid-cols-4 gap-2">
-                {[1, 2, 3, 4].map((r) => (
-                  <button key={r} onClick={() => rate(r)} className={`px-2 py-2.5 rounded-xl text-xs font-semibold transition ${r === 1 ? 'bg-rose-600/80 hover:bg-rose-500' : r === 2 ? 'bg-amber-600/70 hover:bg-amber-500' : r === 3 ? 'bg-emerald-600/80 hover:bg-emerald-500' : 'bg-cyan-600/80 hover:bg-cyan-500'} text-white`}>
-                    {[t('today.rateAgain'), t('today.rateHard'), t('today.rateGood'), t('today.rateEasy')][r - 1]}<span className="block text-[10px] opacity-80 font-normal">{previews[r].label}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-            <p className="text-xs text-slate-500">{t('today.cardPosition', { current: Math.min(reviewIdx + 1, reviewList.length), total: reviewList.length })}</p>
-          </div>
+          <p className="text-sm text-slate-300">{t('today.cardsInSession')}</p>
         ) : queue.length ? (
           <p className="text-sm text-slate-300">{t('today.sessionDoneStart')}<span className="text-emerald-300 font-semibold">{t('today.sessionDoneEmphasis')}</span>{t('today.sessionDoneEnd')}</p>
         ) : (
@@ -305,25 +283,6 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
         )}
       </section>
 
-      <div className="pt-2">
-        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">{t('today.libraryTitle')}</h2>
-        <p className="text-xs text-slate-500 mt-1">{t('today.libraryHint')}</p>
-      </div>
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          { id: 'voice', label: t('today.shelfVoiceLabel'), desc: t('today.shelfVoiceDesc'), icon: Mic },
-          { id: 'diagnosis', label: t('today.shelfDiagnosisLabel'), desc: diagnosis ? t('today.shelfDiagnosisLast', { level: diagnosis.jlptEstimate, weakest: diagnosis.weakest }) : t('today.shelfDiagnosisDesc'), icon: Stethoscope },
-          { id: 'mine', label: t('today.shelfMineLabel'), desc: t('today.shelfMineDesc'), icon: Pickaxe },
-          { id: 'mock', label: t('today.shelfMockLabel'), desc: t('today.shelfMockDesc'), icon: ClipboardCheck },
-        ].map((a) => { const Icon = a.icon; return (
-          <button key={a.id} onClick={() => setActive(a.id)} className="text-left rounded-2xl glass p-5 card-glow border border-bun-600/20 hover:border-[#FF6B57]/30 transition group">
-            <Icon size={20} className="text-[#FF8A75] mb-2" />
-            <p className="font-bold text-white flex items-center justify-between">{a.label} <ChevronRight size={15} className="text-slate-500 group-hover:translate-x-0.5 transition" /></p>
-            <p className="text-xs text-slate-400 mt-1">{a.desc}</p>
-          </button>
-        ) })}
-      </section>
-
       <ProofLadderView diagnosis={diagnosis} profile={profile} />
 
       <PromisePanel promise={promise} />
@@ -331,6 +290,10 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
       <div className="grid lg:grid-cols-2 gap-6">
         <ProgressCard setActive={setActive} daysToExam={daysToExam} />
         <NotificationCard />
+      </div>
+      <div className="flex justify-center gap-8 text-xs text-slate-400">
+        <button onClick={() => setActive('sensei')} className="flex items-center gap-1.5 hover:text-slate-200 transition"><Phone size={13} className="text-emerald-300" /> Yobidashi</button>
+        <button onClick={() => setActive('coach')} className="flex items-center gap-1.5 hover:text-slate-200 transition"><Mail size={13} className="text-[#FF8A75]" /> {t('today.weeklyLetter')}</button>
       </div>
       <p className="text-[11px] text-slate-600 flex items-center gap-1.5"><Target size={12} /> {t('today.streakFooter', { streak })}</p>
       <FeedbackBox context="today" />
