@@ -15,7 +15,7 @@ import { recordMetric } from '../lib/metrics.js'
 import { getPlanFor, markPlanConsumed, noteSessionForExperiment } from '../lib/planner.js'
 import Mascot from './Mascot.jsx'
 import TtsButton from './TtsButton.jsx'
-import { speakSenseiLine } from '../lib/neuralVoice.js'
+import { speakSenseiLine, resetAudioOutput } from '../lib/neuralVoice.js'
 import { modelCast } from '../lib/voicePreference.js'
 import KanjiTapText from './KanjiTapText.jsx'
 import { useLanguage } from '../hooks/useLanguage.js'
@@ -55,6 +55,7 @@ function freshState(profile, diagnosis, queue, variant) {
     cardIds, ratedIds: [], cardResults: [], startedAt: new Date().toISOString(), elapsedBaseSec: 0,
     segmentStartAt: new Date().toISOString(),
     sceneBest: 0, sceneAttempts: 0, sceneDone: false, listeningPicked: null, done: false,
+    sceneLastText: '', sceneLastScore: 0, sceneLastMissing: [],
     planMode: plan?.mode || null, planNote: plan?.note || null,
     planNoteKey: plan?.noteKey || null, planNoteVars: plan?.noteVars || null,
     planSceneTitle: plan?.sceneTitle || null, planCardBudget: plan?.cardBudget ?? null, planMinutes: plan?.minutes ?? null,
@@ -73,7 +74,16 @@ export default function OneSession({ setActive }) {
     return freshState(loadProfile(), loadDiagnosis(), loadQueue(), loadIntent())
   })
   const [input, setInput] = useState('')
-  const [lastAttempt, setLastAttempt] = useState(null) // { text, score, missing }
+  // The last spoken attempt survives a reload: it is persisted
+  // in the session state (sceneLast*) and restored from it —
+  // before, it lived only in this component and vanished.
+  const [lastAttempt, setLastAttempt] = useState(() => (state.sceneLastText
+    ? { text: state.sceneLastText, score: state.sceneLastScore || 0, missing: state.sceneLastMissing || [] }
+    : null)) // { text, score, missing }
+  const [hearing, setHearing] = useState('')
+  const [noCatch, setNoCatch] = useState(false)
+  const pendingSpokenRef = useRef(null)
+  const heardRef = useRef(false)
   const [flipped, setFlipped] = useState(false)
   const [listening, setListening] = useState(false)
   // Hick pass (2026-11-08): the scene step has ONE primary action
@@ -118,22 +128,67 @@ export default function OneSession({ setActive }) {
   const startListening = () => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SR) return
-    const rec = new SR()
-    recogRef.current = rec
-    rec.lang = 'ja-JP'; rec.interimResults = false; rec.maxAlternatives = 1
-    rec.onresult = (e) => {
-      const transcript = e.results[0][0].transcript || ''
-      setInput(transcript)
-      setListening(false)
-      setMicError(null)
-      // More automatic (Landry, 2026-11-07: "too much taps"): a
-      // spoken attempt checks ITSELF the moment the transcript
-      // lands — no separate Check Me tap after speaking. The
-      // button stays for typed text.
-      if (transcript.trim()) checkScene(transcript)
+    // Voice behaviour (Landry, 2026-11-08): ONE recognizer for
+    // this surface, reused across attempts — a fresh object per
+    // tap re-asks the OS for the microphone every time. It is
+    // dropped only when the OS refuses it, so the next tap
+    // builds a clean one. iOS may still show its own prompt per
+    // start — that residue is OS policy for web speech and only
+    // the native wrap removes it; reuse removes every prompt
+    // the app itself was causing.
+    let rec = recogRef.current
+    if (!rec) {
+      rec = new SR()
+      recogRef.current = rec
     }
-    rec.onerror = (e) => { setListening(false); setMicError(micErrorCopy(e?.error)) }
-    rec.onend = () => setListening(false)
+    rec.lang = 'ja-JP'; rec.interimResults = true; rec.maxAlternatives = 1
+    pendingSpokenRef.current = null
+    heardRef.current = false
+    setNoCatch(false)
+    setHearing('')
+    rec.onresult = (e) => {
+      let live = ''
+      let finalText = ''
+      for (let i = 0; i < e.results.length; i++) {
+        const r = e.results[i]
+        live += r[0].transcript || ''
+        if (r.isFinal) finalText += r[0].transcript || ''
+      }
+      // His words appear AS they are heard (Landry, 2026-11-08:
+      // "this does not show it is getting the words you said").
+      setHearing(live)
+      if (finalText.trim()) {
+        heardRef.current = true
+        pendingSpokenRef.current = finalText
+        setInput(finalText)
+        setMicError(null)
+      }
+    }
+    rec.onerror = (e) => {
+      setListening(false)
+      if (e?.error === 'not-allowed' || e?.error === 'service-not-allowed') recogRef.current = null
+      if (e?.error === 'no-speech') { setNoCatch(true); return }
+      setMicError(micErrorCopy(e?.error))
+    }
+    rec.onend = () => {
+      setListening(false)
+      setHearing('')
+      const spoken = pendingSpokenRef.current
+      pendingSpokenRef.current = null
+      if (spoken && spoken.trim()) {
+        // More automatic (Landry, 2026-11-07: "too much taps"):
+        // a spoken attempt still checks ITSELF — but only once
+        // capture has fully ended, and the output route is
+        // rebuilt first. Playing the model line inside the
+        // capture session is what threw his headphones' sound
+        // onto the phone speaker (2026-11-08).
+        resetAudioOutput()
+        setTimeout(() => { try { checkScene(spoken) } catch { /* best effort */ } }, 700)
+      } else if (!heardRef.current) {
+        // Silence used to leave no trace at all; now it says so.
+        setNoCatch(true)
+      }
+    }
     setListening(true)
     try { rec.start() } catch { setListening(false) }
   }
@@ -153,7 +208,7 @@ export default function OneSession({ setActive }) {
     if (score < MASTERY && scene.model) {
       try { speakSenseiLine(scene.model, { cast: modelCast() }) } catch { /* best effort */ }
     }
-    patch({ sceneAttempts: attempts, sceneBest: best, sceneDone: state.sceneDone || score >= MASTERY })
+    patch({ sceneAttempts: attempts, sceneBest: best, sceneDone: state.sceneDone || score >= MASTERY, sceneLastText: text, sceneLastScore: score, sceneLastMissing: missing })
     if (score >= MASTERY && attempts > 1 && !(state.sceneBest >= MASTERY)) {
       // Mastered after getting it wrong first: the mistake joins the queue.
       addToQueue([{
@@ -340,6 +395,12 @@ export default function OneSession({ setActive }) {
           </div>
             )}
             {!speechSupported && <p className="text-xs text-slate-500">{t('voice.noVoice')}</p>}
+          {listening && hearing && (
+            <p className="text-sm text-slate-200"><span className="text-[#FF8A75] font-semibold">{t('session.hearing')}</span> 「{hearing}」</p>
+          )}
+          {noCatch && !listening && (
+            <p className="text-xs text-amber-200/90">{t('session.noCatch')}</p>
+          )}
 
           {lastAttempt && (
             <div className={`rounded-xl border p-4 space-y-2 ${lastAttempt.score >= MASTERY ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-bun-700/40 border-bun-600/20'}`}>
@@ -364,7 +425,7 @@ export default function OneSession({ setActive }) {
                     </p>
                   )}
                   <p className="text-xs text-slate-400">{scene.commonError}</p>
-                  <button onClick={() => { setInput(''); setLastAttempt(null); startListening() }} className="px-3 py-1.5 rounded-lg bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-xs font-medium flex items-center gap-1"><RotateCcw size={13} /> {t('voice.sayAgain')}</button>
+                  <button onClick={() => { setInput(''); setLastAttempt(null); patch({ sceneLastText: '', sceneLastScore: 0, sceneLastMissing: [] }); startListening() }} className="px-3 py-1.5 rounded-lg bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-xs font-medium flex items-center gap-1"><RotateCcw size={13} /> {t('voice.sayAgain')}</button>
                 </>
               )}
             </div>

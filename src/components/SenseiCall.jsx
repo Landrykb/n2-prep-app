@@ -3,7 +3,7 @@ import { Phone, PhoneOff, Mic, MicOff, CheckCircle2, RotateCcw, Clock, Bell, Inb
 import { loadProfile } from '../lib/profile.js'
 import { micErrorCopy } from '../lib/speechErrors.js'
 import { primeSpeech, ttsAvailable } from '../lib/tts.js'
-import { speakSenseiLine, stopNeuralSpeech, primeAudioOutput, playAudioFile } from '../lib/neuralVoice.js'
+import { speakSenseiLine, stopNeuralSpeech, primeAudioOutput, playAudioFile, resetAudioOutput } from '../lib/neuralVoice.js'
 import { useFurigana } from '../hooks/useFurigana.js'
 import { segmentFurigana, cleanReading } from '../lib/furigana.js'
 import { localDictionary, lookup } from '../lib/dictionary.js'
@@ -491,6 +491,10 @@ export default function SenseiCall({ setActive } = {}) {
       clearSilenceTimer()
       const text = turn.text.trim()
       stopRecognition()
+      // Capture has ended: rebuild the output route before the
+      // model line speaks, or iOS leaves it on the phone speaker
+      // instead of his headphones (Landry, 2026-11-08).
+      resetAudioOutput()
       setInterim('')
       if (text) {
         setInput(text)
@@ -528,6 +532,7 @@ export default function SenseiCall({ setActive } = {}) {
           // Manual: the first final fills the box, as before.
           if (finalText.trim()) {
             stopRecognition()
+            resetAudioOutput()
             setInterim('')
             setInput(finalText.trim())
             setMicError(null)

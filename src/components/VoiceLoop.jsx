@@ -8,6 +8,7 @@ import Mascot from './Mascot.jsx'
 import MicPrompt from './MicPrompt.jsx'
 import { micExplained, markMicExplained } from '../lib/micConsent.js'
 import { micErrorCopy } from '../lib/speechErrors.js'
+import { resetAudioOutput } from '../lib/neuralVoice.js'
 import { useLanguage } from '../hooks/useLanguage.js'
 import TtsButton from './TtsButton.jsx'
 import KanjiTapText from './KanjiTapText.jsx'
@@ -119,12 +120,29 @@ export default function VoiceLoop() {
   const startListening = () => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SR) return
-    const rec = new SR()
-    recogRef.current = rec
-    rec.lang = 'ja-JP'; rec.interimResults = false; rec.maxAlternatives = 1
-    rec.onresult = (e) => { setInput(e.results[0][0].transcript || ''); setListening(false); setMicError(null) }
-    rec.onerror = (e) => { setListening(false); setMicError(micErrorCopy(e?.error)) }
-    rec.onend = () => setListening(false)
+    // Same voice behaviour as One Session (2026-11-08): one
+    // recognizer reused across attempts, interim words visible
+    // in the box AS they are heard, and the output route is
+    // rebuilt when capture ends so the model line returns to
+    // the headphones instead of the phone speaker.
+    let rec = recogRef.current
+    if (!rec) {
+      rec = new SR()
+      recogRef.current = rec
+    }
+    rec.lang = 'ja-JP'; rec.interimResults = true; rec.maxAlternatives = 1
+    rec.onresult = (e) => {
+      let live = ''
+      for (let i = 0; i < e.results.length; i++) live += e.results[i][0].transcript || ''
+      setInput(live)
+      setMicError(null)
+    }
+    rec.onerror = (e) => {
+      setListening(false)
+      if (e?.error === 'not-allowed' || e?.error === 'service-not-allowed') recogRef.current = null
+      setMicError(micErrorCopy(e?.error))
+    }
+    rec.onend = () => { setListening(false); resetAudioOutput() }
     setListening(true)
     try { rec.start() } catch { setListening(false) }
   }

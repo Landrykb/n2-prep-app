@@ -241,9 +241,10 @@ await acheck('edgeTts: cancelBrowserSynthesis aborts an in-flight synthesis', as
   const { readFileSync } = await import('node:fs')
   const os = readFileSync(new URL('../src/components/OneSession.jsx', import.meta.url), 'utf8')
   check('OneSession: spoken attempts auto-check, model auto-plays, retry is one tap', () => {
-    assert.ok(os.includes('if (transcript.trim()) checkScene(transcript)'), 'transcript auto-checks')
+    assert.ok(os.includes('pendingSpokenRef.current = finalText'), 'the final transcript is held for the check')
+    assert.ok(os.includes('checkScene(spoken)'), 'transcript auto-checks once capture ends (2026-11-08: deferred so the model line plays on the rebuilt output route)')
     assert.ok(os.includes('speakSenseiLine(scene.model,'), 'model line auto-plays below mastery')
-    assert.ok(os.includes("setLastAttempt(null); startListening()"), 'Say It Again restarts listening in one tap')
+    assert.ok(os.includes('setLastAttempt(null)') && os.includes('startListening()'), 'Say It Again restarts listening in one tap')
     // Hick pass (2026-11-08): one primary action per state on the
     // scene step, an honest clock, numbered steps.
     assert.ok(os.includes('typeOpen'), 'the typed path is disclosed only on request')
@@ -458,5 +459,26 @@ check('the server route is tts-vm and taps prime the output', async () => {
   const btn = readFileSync(new URL('../src/components/TtsButton.jsx', import.meta.url), 'utf8')
   assert.ok(btn.includes('primeAudioOutput()'), 'the play button primes inside its tap')
 })
+
+{
+  const { readFileSync } = await import('node:fs')
+  check('voice behaviour (2026-11-08): heard words visible, output route rebuilt after capture', () => {
+  const voice = readFileSync(new URL('../src/lib/neuralVoice.js', import.meta.url), 'utf8')
+  assert.ok(voice.includes('export function resetAudioOutput()'), 'the output route can be rebuilt after capture')
+  assert.ok(voice.includes('old.close()'), 'reset closes the shared context so the next prime builds a fresh one')
+  const session = readFileSync(new URL('../src/components/OneSession.jsx', import.meta.url), 'utf8')
+  assert.ok(session.includes('rec.interimResults = true'), 'the scene step hears interim words')
+  assert.ok(session.includes("t('session.hearing')"), 'heard words render live under Speak')
+  assert.ok(session.includes("t('session.noCatch')"), 'a silent attempt leaves a visible note, not silence')
+  assert.ok(session.includes('sceneLastText'), 'the last attempt persists in the session state')
+  assert.ok(session.includes('resetAudioOutput()'), 'the model line waits for the rebuilt route')
+  assert.ok(session.includes('recogRef.current = rec'), 'one recognizer is reused across attempts')
+  const loop = readFileSync(new URL('../src/components/VoiceLoop.jsx', import.meta.url), 'utf8')
+  assert.ok(loop.includes('rec.interimResults = true'), 'Voice Loop hears interim words into its box')
+  assert.ok(loop.includes('resetAudioOutput()'), 'Voice Loop rebuilds the route when capture ends')
+  const call = readFileSync(new URL('../src/components/SenseiCall.jsx', import.meta.url), 'utf8')
+  assert.ok(call.includes('resetAudioOutput()'), 'the call rebuilds the route before the model line')
+  })
+}
 
 console.log(`\ntts: ${passed} checks passed`)

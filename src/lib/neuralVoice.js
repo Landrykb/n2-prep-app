@@ -214,6 +214,27 @@ function teardownAudio() {
 }
 
 /**
+ * Rebuild the output route after microphone capture ends.
+ * Starting capture switches the OS audio session to record
+ * mode; on iOS that drops Bluetooth A2DP and can leave output
+ * on the phone speaker (Landry, 2026-11-08: "I am wearing
+ * headphones but after I allow the microphone, the sound
+ * leaves the headphones"). A context created before or during
+ * capture can stay bound to that route — closing the shared
+ * context makes the next primeAudioOutput() build a fresh one
+ * in the restored playback route. Call when a recognition
+ * round ends, before speaking the model line.
+ */
+export function resetAudioOutput() {
+  teardownAudio()
+  if (actx) {
+    const old = actx
+    actx = null
+    try { void old.close() } catch { /* already closed */ }
+  }
+}
+
+/**
  * Stop the neural voice now (Sensei muted, hang-up, mic opening).
  * Like speechSynthesis.cancel() in the tts.js flow, stopping completes
  * the pending line: its onEnd fires exactly once.
