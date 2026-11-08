@@ -108,6 +108,7 @@ export default function MockExam({ setActive }) {
       level: session.exam.level || 'N2',
       scaled: scored.scaled,
       passed: scored.passed,
+      sealed: session.exam.meta?.sealed === true,
       byType: scored.byType,
       durationSec: Math.round((nowMs() - session.startedAt) / 1000),
       auto,
@@ -117,7 +118,7 @@ export default function MockExam({ setActive }) {
     // a finished mock leaves a trace outside its own local history
     // (integration audit #12): one metric, the same shape the other
     // gate events use.
-    recordMetric('mock_completed', { level: attempt.level, scaled: attempt.scaled, passed: attempt.passed, length: attempt.length })
+    recordMetric('mock_completed', { level: attempt.level, scaled: attempt.scaled, passed: attempt.passed, length: attempt.length, sealed: attempt.sealed })
     logWrongAnswers(scored.wrong)
     setResult({ ...scored, exam: session.exam, answers: session.answers, attempt })
     setSession(null)
@@ -471,7 +472,7 @@ function ResultsView({ result, setActive, askAi, onRetake }) {
           <ScoreBar label="Listening" value={scaled.listening} />
         </div>
         <p className="text-xs text-slate-500 mt-5">
-          {MOCK_LENGTHS[attempt.length]?.label} · {exam.level || 'N2'} paper · {Math.floor(attempt.durationSec / 60)} min {attempt.durationSec % 60}s
+          {MOCK_LENGTHS[attempt.length]?.label} · {exam.level || 'N2'} paper{attempt.sealed ? ' · Sealed paper — texts you had never practised' : ''} · {Math.floor(attempt.durationSec / 60)} min {attempt.durationSec % 60}s
         </p>
         {exam.meta?.estimated?.length > 0 && (
           <p className="text-xs text-amber-200/90 mt-3">Estimated sections in this paper: {exam.meta.estimated.map((e) => `${e.section} (from ${e.from})`).join(' · ')}</p>

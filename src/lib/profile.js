@@ -193,7 +193,11 @@ export function ladderWithStatus(diagnosis, evidence = {}) {
       if (e.sealed === true && (!bjtProven || e.score > bjtProven.score)) bjtProven = { score: e.score, at: e.at || '' }
       continue
     }
-    if (e?.type !== 'mock_completed' || e.passed !== true || e.length !== 'full') continue
+    // JLPT proof also requires a sealed paper (Doc 21 pool law): the
+    // paper's reading/listening texts must be ones the learner has
+    // never practised. A passed full mock on practised texts is a
+    // strong practice result, not proof.
+    if (e?.type !== 'mock_completed' || e.passed !== true || e.length !== 'full' || e.sealed !== true) continue
     const lvl = typeof e.level === 'string' ? e.level : null
     if (!lvl || !(lvl in JLPT_ORDER)) continue
     if (!provenAt[lvl] || (e.at && e.at < provenAt[lvl])) provenAt[lvl] = e.at || ''

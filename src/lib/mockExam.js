@@ -17,6 +17,7 @@
 import { grammarLessons, vocabLessons, passages, questions, commonWords } from '../data.js'
 import { n2Listening } from '../data/n2Listening.js'
 import { listeningPlus } from '../data/listeningPlus.js'
+import { sealedPassages, sealedListening } from '../data/jlptSealed.js'
 import { jlptLevel } from './levels.js'
 import { seededRandom, shuffleWithSeed } from './shuffle.js'
 
@@ -95,9 +96,20 @@ export const MOCK_LENGTHS = {
   full: { label: 'Full mock', desc: 'Full-length paper — every bank item at your level', timeA: 105, timeB: 50 },
 }
 
+// Real sitting times per level (jlpt.jp): section A combines the
+// language-knowledge and reading sittings, as the app models two sittings.
+const LEVEL_TIMES = {
+  N1: { timeA: 110, timeB: 55 },
+  N2: { timeA: 105, timeB: 50 },
+  N3: { timeA: 100, timeB: 40 },
+  N4: { timeA: 80, timeB: 35 },
+  N5: { timeA: 60, timeB: 30 },
+}
+
 export function buildMockExam(length = 'quick', seed = Date.now() % 2147483647, { level = 'N2', dict = null } = {}) {
   const plan = PLANS[length] || PLANS.quick
-  const meta = { estimated: [], thin: [], vocabFrom: 'the built-in study bank' }
+  const sitTimes = length === 'full' ? (LEVEL_TIMES[level] || LEVEL_TIMES.N2) : plan
+  const meta = { estimated: [], thin: [], vocabFrom: 'the built-in study bank', sealed: false }
 
   // --- word pool for this level -------------------------------------------
   // Deck entries at the paper's level first; if that pool cannot build a
@@ -208,7 +220,21 @@ export function buildMockExam(length = 'quick', seed = Date.now() % 2147483647, 
   }))
 
   // --- 問題6 読解: passages --------------------------------------------------
-  const readingGroups = shuffleWithSeed(passages, seed + 7).slice(0, plan.passages).map((p) => ({
+  // Pool split (Doc 21): a FULL paper is a proof paper only when its
+  // fixed-text sections are sealed — texts the learner has never seen in
+  // practice. Quick papers always draw the practice pool.
+  const sealedReadingAtLevel = sealedPassages.filter((p) => p.level === level)
+  const sealedReadingQs = sealedReadingAtLevel.reduce((n, p) => n + p.questions.length, 0)
+  let readingPool = passages
+  let readingSealed = false
+  if (length === 'full' && sealedReadingQs >= 10) {
+    readingPool = sealedReadingAtLevel
+    readingSealed = true
+  } else if (length === 'full' && sealedReadingAtLevel.length) {
+    readingPool = [...sealedReadingAtLevel, ...passages]
+    meta.estimated.push({ section: 'Reading', from: `sealed bank at ${level} is still thin (${sealedReadingQs} questions), so this paper tops up with practice passages and is not a proof paper` })
+  }
+  const readingGroups = shuffleWithSeed(readingPool, seed + 7).slice(0, plan.passages).map((p) => ({
     name: '問題6 読解',
     intro: '次の文章を読んで、後の問いに対する答えとして最もよいものを選びなさい。',
     passage: { title: p.title, text: p.text, glossary: p.glossary },
@@ -219,9 +245,20 @@ export function buildMockExam(length = 'quick', seed = Date.now() % 2147483647, 
   }))
 
   // --- 聴解 ------------------------------------------------------------------
-  const listeningPool = level === 'N2'
+  const practiceListeningPool = level === 'N2'
     ? [...n2Listening, ...listeningPlus.filter((l) => l.level === 'N2')]
     : listeningPlus.filter((l) => l.level === level)
+  const sealedListeningAtLevel = sealedListening.filter((l) => l.level === level)
+  let listeningPool = practiceListeningPool
+  let listeningSealed = false
+  if (length === 'full' && sealedListeningAtLevel.length >= 6) {
+    listeningPool = sealedListeningAtLevel
+    listeningSealed = true
+  } else if (length === 'full' && sealedListeningAtLevel.length) {
+    listeningPool = [...sealedListeningAtLevel, ...practiceListeningPool]
+    meta.estimated.push({ section: 'Listening', from: `sealed bank at ${level} is still thin (${sealedListeningAtLevel.length} dialogues), so this paper tops up with practice dialogues and is not a proof paper` })
+  }
+  meta.sealed = length === 'full' && readingSealed && listeningSealed
   if (listeningPool.length < Math.min(plan.listening === Infinity ? 2 : plan.listening, 2)) {
     meta.thin.push(`Listening has only ${listeningPool.length} dialogue${listeningPool.length === 1 ? '' : 's'} at ${level}, so this paper's listening section is shorter than the real exam.`)
   }
@@ -244,7 +281,7 @@ export function buildMockExam(length = 'quick', seed = Date.now() % 2147483647, 
       {
         id: 'A',
         name: '言語知識（文字・語彙・文法）・読解',
-        timeMin: plan.timeA,
+        timeMin: sitTimes.timeA,
         groups: [
           { name: '問題1 漢字読み', intro: '＿＿＿の言葉の読み方として最もよいものを、1・2・3・4から一つ選びなさい。', questions: kanjiQs },
           { name: '問題2 表記', intro: '＿＿＿の言葉を漢字で書くとき、最もよいものを選びなさい。', questions: orthoQs },
@@ -257,7 +294,7 @@ export function buildMockExam(length = 'quick', seed = Date.now() % 2147483647, 
       {
         id: 'B',
         name: '聴解',
-        timeMin: plan.timeB,
+        timeMin: sitTimes.timeB,
         groups: listeningGroups,
       },
     ],

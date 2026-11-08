@@ -801,7 +801,7 @@ console.log('integration audit — shared mastery + diagnosis-history sync:')
       // proves nothing.
       const ev = (events) => ({ metrics: events, now: new Date('2026-11-08T12:00:00') })
       const proven = byId(profileMod.ladderWithStatus(dx, ev([
-        { type: 'mock_completed', at: '2026-11-08T09:00:00', level: 'N2', length: 'full', passed: true, scaled: { lk: 40, reading: 38, listening: 30, total: 108 } },
+        { type: 'mock_completed', at: '2026-11-08T09:00:00', level: 'N2', length: 'full', passed: true, sealed: true, scaled: { lk: 40, reading: 38, listening: 30, total: 108 } },
       ])))
       assert.equal(proven.foundation.status, 'reached')
       assert.equal(proven.bridge.status, 'reached')

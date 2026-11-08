@@ -157,6 +157,33 @@ export function scorePaper(paper, answers = {}) {
 
 export { itemKey }
 
+// ─── The BJT clock: bookable any week (Landry, 2026-11-08) ──────────────
+// The JLPT counts down to a fixed date; the BJT is CBT — you book it
+// whenever you're ready. Readiness evidence = your best SEALED paper,
+// discounted by a safety margin (never book on a borderline mock): the
+// band you can claim is the band of (best sealed score − margin).
+export const BJT_BOOKING_MARGIN = 30
+
+export function bjtBookable(metrics = []) {
+  let bestSealed = null
+  for (const e of metrics || []) {
+    if (e?.type === 'bjt_exam_completed' && e.sealed === true && typeof e.score === 'number') {
+      if (bestSealed === null || e.score > bestSealed) bestSealed = e.score
+    }
+  }
+  if (bestSealed === null) return { bestSealed: null, claimable: null, nextBand: 'J4', nextBar: 200, pointsToNext: null }
+  const claimable = bandForScore(Math.max(0, bestSealed - BJT_BOOKING_MARGIN))
+  const idx = BJT_BANDS.findIndex((b) => b.band === claimable)
+  const next = idx > 0 ? BJT_BANDS[idx - 1] : null
+  return {
+    bestSealed,
+    claimable,
+    nextBand: next ? next.band : null,
+    nextBar: next ? next.min : null,
+    pointsToNext: next ? Math.max(0, next.min - bestSealed) : 0,
+  }
+}
+
 // ─── Form practice: variants of the exam's forms, for daily exposure ────
 // Practice draws ONLY from the practice pool and the generators below.
 // Sealed items are never practised and never templated — that separation

@@ -10,6 +10,7 @@ import {
 } from '../lib/day30.js'
 import { saveFeedback } from '../lib/feedback.js'
 import { loadMetrics, summariseMetrics } from '../lib/metrics.js'
+import { bjtBookable } from '../lib/bjtExam.js'
 import FeedbackBox from './FeedbackBox.jsx'
 import Mascot from './Mascot.jsx'
 import { loadProfile, loadDiagnosis, derivePlan, daysSinceLastVisit, markVisit } from '../lib/profile.js'
@@ -223,6 +224,11 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
               <span className="flex items-center gap-1.5 font-medium text-emerald-300"><Calendar size={15} /> {t('today.daysToExam', { days: daysToExam, exam: examLabel, date: dateLabel })}</span>
+              {(() => { const b = bjtBookable(loadMetrics()); return b.bestSealed === null ? (
+                <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-bun-800/60 border border-bun-600/40 text-slate-300"><Target size={12} className="text-[#FF8A75]" /> {t('today.bjtNoPaper')}</span>
+              ) : (
+                <a href="https://www.kanken.or.jp/bjt/" target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-[#FF6B57]/15 border border-[#FF6B57]/40 text-[#FFB4A6] font-medium"><Target size={12} /> {t('today.bjtReady', { band: b.claimable, points: b.pointsToNext, next: b.nextBand || '' })}</a>
+              ) })()}
               <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-bun-800/60 border border-bun-600/40 text-slate-300"><Flame size={12} className="text-orange-300" /> {t('today.thisWeek', { count: weekCount })}</span>
               {(() => { const m = summariseMetrics(loadMetrics()); return (
                 <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-bun-800/60 border border-bun-600/40 text-slate-300" title={t('today.metricsTitle')}>
