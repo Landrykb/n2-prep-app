@@ -421,6 +421,13 @@ check('the server route is tts-vm and taps prime the output', async () => {
   // her): the line recovers once, then falls back audibly.
   assert.ok(voice.includes('stream-recovered'), 'mid-line stream errors are recovered, not treated as line ends')
   assert.ok(voice.includes('audio.onerror = () => recover'), 'the error handler recovers instead of firing the end')
+  // The call's keyword spotlight runs on the audio clock: it
+  // starts when playback starts (onStart with the real duration)
+  // and lights each word at its position in the line.
+  assert.ok(voice.includes('audio.onplaying'), 'line start is reported from real playback')
+  const call = readFileSync(new URL('../src/components/SenseiCall.jsx', import.meta.url), 'utf8')
+  assert.ok(call.includes('onStart: (ms) => runSpotlight(text, ms)'), 'the spotlight starts with the sound')
+  assert.ok(call.includes('h.at / Math.max(1, text.length)'), 'cards light at their word position, not on an even spread')
   assert.ok(voice.includes('sharedAudio()'), 'playback uses one shared audio element')
   const btn = readFileSync(new URL('../src/components/TtsButton.jsx', import.meta.url), 'utf8')
   assert.ok(btn.includes('primeAudioOutput()'), 'the play button primes inside its tap')

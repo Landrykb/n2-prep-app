@@ -198,20 +198,23 @@ export default function SenseiCall() {
     setListening(false)
   }
 
-  // Light the spotlight cards in the order their words occur in the
-  // spoken line, spreading the utterance's estimated duration across
-  // them (same estimate as the TTS safety timer — an approximation,
-  // not phoneme timing).
-  const runSpotlight = (text) => {
+  // Light the spotlight cards as their words are spoken. The run
+  // starts when the sound actually starts (speakSenseiLine's
+  // onStart, with the real audio duration) and each card lights at
+  // its word's position in the line — until 2026-11-08 the timers
+  // started at the tap (seconds before the fetched voice began)
+  // and spread evenly, so the glow drifted off the voice both
+  // ways (Landry's report). Position-proportional is still an
+  // approximation, not phoneme timing.
+  const runSpotlight = (text, durationMs) => {
     clearSpotTimers()
     setSpotActive(-1)
     if (!text || !spotlight.length) return
     const hits = spotlight.map((c, i) => ({ i, at: text.indexOf(c.word) })).filter((h) => h.at >= 0).sort((a, b) => a.at - b.at)
     if (!hits.length) return
-    const estMs = 1200 + 90 * text.length
-    const per = estMs / hits.length
-    hits.forEach((h, k) => { spotTimersRef.current.push(setTimeout(() => setSpotActive(h.i), Math.round(k * per))) })
-    spotTimersRef.current.push(setTimeout(() => setSpotActive(-1), estMs + 250))
+    const total = Number.isFinite(durationMs) && durationMs > 0 ? durationMs : 1200 + 90 * text.length
+    hits.forEach((h) => { spotTimersRef.current.push(setTimeout(() => setSpotActive(h.i), Math.round((h.at / Math.max(1, text.length)) * total))) })
+    spotTimersRef.current.push(setTimeout(() => setSpotActive(-1), total + 250))
   }
 
   // Every Sensei utterance in the call goes through here: mic closed
@@ -225,9 +228,9 @@ export default function SenseiCall() {
   const speakLine = (text, { rate = 0.95, onEnd } = {}) => {
     stopRecognition()
     if (senseiMutedRef.current) { if (onEnd) later(onEnd, 450); return }
-    runSpotlight(text)
     speakSenseiLine(text, {
       rate,
+      onStart: (ms) => runSpotlight(text, ms),
       onEnd: () => { clearSpotTimers(); setSpotActive(-1); if (onEnd) onEnd() },
     })
   }

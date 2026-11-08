@@ -141,7 +141,7 @@ function teardownAudio() {
   // once synthesis has settled — its cancel entry removes itself.
   cancelBrowserSynthesis()
   if (currentAudio) {
-    try { currentAudio.onended = null; currentAudio.onerror = null; currentAudio.pause() } catch { /* already stopped */ }
+    try { currentAudio.onended = null; currentAudio.onerror = null; currentAudio.onplaying = null; currentAudio.pause() } catch { /* already stopped */ }
     currentAudio = null
   }
   if (currentUrl) {
@@ -286,7 +286,7 @@ async function fetchNeuralAudio(text, cast = 'female') {
  * the caller's point of view — the fetch starts immediately and the
  * fallback decision happens inside.
  */
-export function speakSenseiLine(text, { rate = 1, onEnd, onFallback, cast = 'female', browserTimeoutMs = null } = {}) {
+export function speakSenseiLine(text, { rate = 1, onEnd, onStart, onFallback, cast = 'female', browserTimeoutMs = null } = {}) {
   stopNeuralSpeech()
   let endFired = false
   const fireEnd = () => {
@@ -296,9 +296,16 @@ export function speakSenseiLine(text, { rate = 1, onEnd, onFallback, cast = 'fem
     if (pendingEnd === fireEnd) pendingEnd = null
     if (onEnd) onEnd()
   }
+  let startFired = false
+  const fireStart = (ms) => {
+    if (startFired || endFired) return
+    startFired = true
+    if (onStart) onStart(ms)
+  }
   const deviceFallback = () => {
     if (endFired) return
     logVoice('device-fallback', {}, { sticky: false })
+    fireStart(estimateSpeechMs(clean, rate))
     // onFallback (optional): told WHICH device result served, so a
     // caller like TtsButton can keep its honest no-Japanese-voice
     // label when the device voice had to read Japanese without one.
@@ -328,6 +335,7 @@ export function speakSenseiLine(text, { rate = 1, onEnd, onFallback, cast = 'fem
     logVoice('stream-recovered', { name: err?.name || 'unknown', retried })
     clearWatchdog()
     teardownAudio()
+    startFired = false // the retry restarts the line; listeners resync
     if (!retried) { retried = true; attempt() } else { deviceFallback() }
   }
   const attempt = () => {
@@ -345,6 +353,17 @@ export function speakSenseiLine(text, { rate = 1, onEnd, onFallback, cast = 'fem
         try { audio.playbackRate = rateOk } catch { /* default rate is fine */ }
         audio.onended = fireEnd
         audio.onerror = () => recover(new Error('stream-error'))
+        // The spotlight (and any listener) starts from the moment
+        // sound actually begins, with the real duration — never
+        // from the tap, which the fetch can precede by seconds.
+        audio.onplaying = () => {
+          const d = audio.duration
+          if (Number.isFinite(d) && d > 0) { fireStart((d * 1000) / rateOk); return }
+          setTimeout(() => {
+            const d2 = audio.duration
+            fireStart(Number.isFinite(d2) && d2 > 0 ? (d2 * 1000) / rateOk : (clean.length / 6.5) * 1000 / rateOk)
+          }, 350)
+        }
         const played = audio.play()
         if (played && typeof played.catch === 'function') {
           played.catch((err) => { logVoice('blob-play-rejected', { name: err?.name || 'unknown' }); recover(err) })
