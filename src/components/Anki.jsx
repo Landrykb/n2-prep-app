@@ -9,7 +9,8 @@ import { userKey } from '../lib/userKey.js'
 import { mergeAnkiProgress } from '../lib/stateMerge.js'
 import { recordEncounters, ankiEncounterWords } from '../lib/encounters.js'
 import KanjiTapText from './KanjiTapText.jsx'
-import { Download, ExternalLink, Loader2, RotateCcw, Search, Settings, Shuffle, CheckCircle2, XCircle } from 'lucide-react'
+import { Download, ExternalLink, RotateCcw, Search, Settings, Shuffle, CheckCircle2, XCircle } from 'lucide-react'
+import { CardSkeleton } from './Skeleton.jsx'
 
 const SRS = [1, 3, 7, 14, 30, 90, 180]
 // P1-4: progress used to live under one global key ('n2:anki-progress'),
@@ -374,12 +375,7 @@ export default function Anki() {
   }
 
   if (loading) {
-    return (
-      <div className="max-w-2xl mx-auto text-center py-20 text-slate-400">
-        <Loader2 size={24} className="animate-spin mx-auto mb-4" />
-        <p>{t('queue.loadingDeck', { count: '8,334' })}</p>
-      </div>
-    )
+    return <CardSkeleton caption={t('queue.loadingDeck', { count: '8,334' })} />
   }
 
   if (error) {

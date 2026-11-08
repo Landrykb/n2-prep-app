@@ -1,4 +1,4 @@
-const CACHE_NAME = 'yonde-v9'
+const CACHE_NAME = 'yonde-v10'
 const PRECACHE = ['/', '/index.html', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png']
 
 self.addEventListener('install', (event) => {
@@ -54,7 +54,7 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.open(CACHE_NAME).then((cache) => {
       if (isHtml || isManifest) return networkFirst(event.request, cache)
-      if (isIcon || url.pathname.startsWith('/assets/') || url.pathname.startsWith('/data/')) return cacheFirst(event.request, cache)
+      if (isIcon || url.pathname.startsWith('/assets/') || url.pathname.startsWith('/data/') || url.pathname.startsWith('/fleet/')) return cacheFirst(event.request, cache)
       return networkFirst(event.request, cache)
     })
   )

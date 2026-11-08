@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search, Loader2, BookOpen, X, Plus, Check } from 'lucide-react'
+import { Search, BookOpen, X, Plus, Check } from 'lucide-react'
+import { RowsSkeleton } from './Skeleton.jsx'
 import { localDictionary, loadDictionary, search, LEVELS } from '../lib/dictionary.js'
 import { addToQueue, loadQueue } from '../lib/queue.js'
 import { recordEncounters } from '../lib/encounters.js'
@@ -102,9 +103,7 @@ export default function DictionaryView() {
         </div>
       </div>
 
-      {loading && !query && (
-        <p className="text-sm text-slate-400 flex items-center gap-2"><Loader2 size={15} className="animate-spin" /> Loading the full word list…</p>
-      )}
+      {loading && !query && <RowsSkeleton rows={6} />}
 
       {query && results.length === 0 && !loading && (
         <p className="text-sm text-slate-400">

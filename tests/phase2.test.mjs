@@ -813,7 +813,9 @@ console.log('integration audit — shared mastery + diagnosis-history sync:')
       assert.doesNotMatch(today, /bg-gradient-to-br from-\[#71368A\]\/20/, 'the plan card wash is solid now')
       // The ladder container lives in ProblemStart.jsx — solid too.
       const problem = readFileSync(new URL('../src/components/ProblemStart.jsx', import.meta.url), 'utf8')
-      assert.match(problem, /border-sky-300\/40/, 'the tank water surface line renders')
+      assert.match(problem, /tank-wave-a/, 'the tank water surface undulates — two drifting wave layers')
+      assert.match(problem, /tank-wave-b/)
+      assert.doesNotMatch(problem, /border-sky-300\/40/, 'the flat surface line is gone')
     })
     check('loop page is a route of stations, not a ring; voice loop stage comes before its library', () => {
       const loop = readFileSync(new URL('../src/components/GrowthLoop.jsx', import.meta.url), 'utf8')
@@ -838,6 +840,27 @@ console.log('integration audit — shared mastery + diagnosis-history sync:')
       const css = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8')
       assert.match(css, /@keyframes loopSonar/)
       assert.match(css, /@keyframes loopUnfold/)
+    })
+    check('skeleton loading everywhere; the service worker caches the fleet art too', () => {
+      const skel = readFileSync(new URL('../src/components/Skeleton.jsx', import.meta.url), 'utf8')
+      assert.match(skel, /export default function Skeleton/, 'the original Skeleton block survives — App.jsx imports it')
+      assert.match(skel, /export function SkeletonText/, 'SkeletonText survives — App.jsx imports it')
+      for (const name of ['PageSkeleton', 'RowsSkeleton', 'CardSkeleton', 'PassageSkeleton']) {
+        assert.match(skel, new RegExp(`export function ${name}`), `${name} exists in the shared kit`)
+      }
+      const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+      assert.match(app, /fallback=\{<PageSkeleton/, 'every lazy view falls back to a page skeleton, not a spinner')
+      const dict = readFileSync(new URL('../src/components/DictionaryView.jsx', import.meta.url), 'utf8')
+      assert.match(dict, /RowsSkeleton/)
+      assert.doesNotMatch(dict, /Loading the full word list/)
+      const anki = readFileSync(new URL('../src/components/Anki.jsx', import.meta.url), 'utf8')
+      assert.match(anki, /CardSkeleton/)
+      const readerPage = readFileSync(new URL('../src/components/Reader.jsx', import.meta.url), 'utf8')
+      assert.match(readerPage, /PassageSkeleton/)
+      const sw = readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8')
+      assert.match(sw, /yonde-v10/)
+      assert.match(sw, /startsWith\('\/fleet\/'\)/, 'fleet art is cache-first like the data shards')
+      assert.match(sw, /startsWith\('\/data\/'\)/, 'the data shards stay cache-first')
     })
   } finally {
     if (prevLS === undefined) delete globalThis.localStorage

@@ -21,6 +21,7 @@ import KanjiTapText from './KanjiTapText.jsx'
 import KanjiChips from './KanjiChips.jsx'
 import TtsButton from './TtsButton.jsx'
 import Mascot from './Mascot.jsx'
+import { PassageSkeleton } from './Skeleton.jsx'
 
 // THE READER (Doc 16 §2/§7 R1) — the web surface of Hori's Reader, the
 // same shelf the Telegram bot serves from. Fitting happens HERE, in
@@ -797,7 +798,9 @@ export default function Reader({ setActive, onSignIn }) {
         </div>
       )}
 
-      {(phase === 'loading' || phase === 'digging') && (
+      {phase === 'loading' && <PassageSkeleton />}
+
+      {phase === 'digging' && (
         <div className="flex flex-col items-center pt-10 pb-4" role="status">
           <div className="relative">
             <div className="hori-search">

@@ -289,3 +289,17 @@ rt {
 @media (prefers-reduced-motion: reduce) {
   .hori-search { animation: none; }
 }
+
+/* Tank water (Landry, 2026-11-08): the Proof Ladder fills are
+   water, and water moves — two wave layers drift against each
+   other across the surface of every non-empty tank. Reduced
+   motion stills the surface; the level stays readable. */
+@keyframes tankWave {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.tank-wave-a { animation: tankWave 5s linear infinite; }
+.tank-wave-b { animation: tankWave 9s linear infinite reverse; }
+@media (prefers-reduced-motion: reduce) {
+  .tank-wave-a, .tank-wave-b { animation: none; }
+}

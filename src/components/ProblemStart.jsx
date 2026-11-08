@@ -146,10 +146,20 @@ export function ProofLadderView({ diagnosis, profile }) {
           // not-full rung is the next height.
           const pct = Math.round((h.fill || 0) * 100)
           const fillBg = h.status === 'reached' ? 'bg-emerald-400/15' : 'bg-sky-400/10'
-          const surface = h.fill > 0 && h.fill < 1 ? 'border-t-2 border-sky-300/40' : ''
+          // The surface is water, and water moves (Landry,
+          // 2026-11-08): two wave layers drift against each
+          // other along the top of the fill.
+          const waveFront = h.status === 'reached' ? 'rgba(110,231,183,0.45)' : 'rgba(125,211,252,0.45)'
+          const waveBack = h.status === 'reached' ? 'rgba(110,231,183,0.22)' : 'rgba(125,211,252,0.22)'
+          const wavePath = 'M0 7 Q15 1 30 7 T60 7 T90 7 T120 7 V12 H0 Z'
           return (
           <div key={h.id} className={`relative overflow-hidden rounded-xl border ${h.status === 'reached' ? 'border-emerald-500/30' : h.status === 'next' ? 'border-[#FF6B57]/40' : 'border-bun-600/20 opacity-75'}`}>
-            {h.fill > 0 && <div aria-hidden="true" className={`absolute inset-x-0 bottom-0 ${fillBg} ${surface}`} style={{ height: `${pct}%` }} />}
+            {h.fill > 0 && (
+              <div aria-hidden="true" className={`absolute inset-x-0 bottom-0 ${fillBg}`} style={{ height: `${pct}%` }}>
+                <svg className="tank-wave-b absolute -top-[7px] left-0 block h-[8px] w-[200%]" viewBox="0 0 120 12" preserveAspectRatio="none"><path d={wavePath} fill={waveBack} /></svg>
+                <svg className="tank-wave-a absolute -top-[5px] left-0 block h-[8px] w-[200%]" viewBox="0 0 120 12" preserveAspectRatio="none"><path d={wavePath} fill={waveFront} /></svg>
+              </div>
+            )}
             <div className="relative flex items-start gap-3 p-3">
               <span className="mt-0.5 shrink-0">{h.status === 'reached' ? <CheckCircle2 size={17} className="text-emerald-300" /> : h.status === 'next' ? <HeartPulse size={17} className="text-[#FF8A75]" /> : <Lock size={15} className="text-slate-500" />}</span>
               <div className="min-w-0 flex-1">

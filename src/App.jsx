@@ -49,6 +49,7 @@ import { cleanReading } from './lib/furigana.js'
 import { supabase } from './lib/supabaseClient.js'
 import { findStudyItem } from './lib/findStudyItem.js'
 import { localDictionary, loadDictionary, lookup } from './lib/dictionary.js'
+import { PageSkeleton } from './components/Skeleton.jsx'
 import { loadDiagnosis } from './lib/profile.js'
 import { loadPromise } from './lib/promise.js'
 import { addToQueue, loadQueue } from './lib/queue.js'
@@ -2041,13 +2042,7 @@ function App() {
         </div>
         <div className="flex-1 page-gutter py-5 sm:py-6 lg:py-8 overflow-y-auto swipe-area pb-28 lg:pb-8">
           <div className="max-w-6xl mx-auto animate-fade-in">
-            <Suspense
-              fallback={
-                <div className="p-8 text-slate-400 flex items-center gap-2">
-                  <Loader2 size={20} className="animate-spin" /> {t('shell.loading')}
-                </div>
-              }
-            >
+            <Suspense fallback={<PageSkeleton label={t('shell.loading')} />}>
               {content[active]}
             </Suspense>
           </div>
