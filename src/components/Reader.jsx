@@ -4,7 +4,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabaseClient.js'
 import { useAuth } from '../hooks/useAuth.js'
 import { useLanguage } from '../hooks/useLanguage.js'
 import { useFurigana } from '../hooks/useFurigana.js'
-import { collectLearnerState } from '../lib/learnerState.js'
+import { collectLearnerState, saveDeclaredLevel } from '../lib/learnerState.js'
 import { addToQueue, loadQueue, queueItemId } from '../lib/queue.js'
 import { loadDictionary } from '../lib/dictionary.js'
 import { recordMetric } from '../lib/metrics.js'
@@ -19,6 +19,7 @@ import {
 } from '../lib/readAloud.js'
 import KanjiTapText from './KanjiTapText.jsx'
 import KanjiChips from './KanjiChips.jsx'
+import TtsButton from './TtsButton.jsx'
 import Mascot from './Mascot.jsx'
 
 // THE READER (Doc 16 §2/§7 R1) — the web surface of Hori's Reader, the
@@ -167,7 +168,7 @@ function PassageText({ text, newWords, highlightWord }) {
   )
 }
 
-export default function Reader() {
+export default function Reader({ setActive, onSignIn }) {
   const { t } = useLanguage()
   const { user } = useAuth()
   const [phase, setPhase] = useState('loading') // loading | digging | guest | error | empty | ready
@@ -179,6 +180,8 @@ export default function Reader() {
   const [mineNote, setMineNote] = useState('')
   const [finished, setFinished] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0) // error retry / level tap re-runs load
+  const [canFit, setCanFit] = useState(false) // fit verdicts persist only on a linked row (for now)
 
   // The fitting context, computed once per sign-in and kept in refs so
   // Another Passage re-picks without re-reading the world. knownRef is
@@ -289,7 +292,13 @@ export default function Reader() {
       const { data, error } = await supabase.functions.invoke('reader-serve', {
         body: { excludeIds: (excluded || []).map(String) },
       })
-      if (error || !data || data.status !== 'picked' || !data.passage) return null
+      if (error || !data) return null
+      // The server's need_level verdict is INFORMATION, not a miss
+      // (audit P1-1): it means "ask the one-tap level question",
+      // exactly as the bot does. Surface it instead of collapsing
+      // into the generic empty state.
+      if (data.status === 'nofit' && data.reason === 'need_level') return { needLevel: true }
+      if (data.status !== 'picked' || !data.passage) return null
       return shapeServed(ctx, data.passage, data.ratio, data.coldStart === true)
     } catch { return null }
   }
@@ -336,17 +345,19 @@ export default function Reader() {
         // surface aims the same way. Any read failure degrades to no
         // declaration and no step — never to a block.
         let declaredBand = null
+        let declaredAt = null
         let fitStep = 0
         let fitState = { fit_step: 0, last_good_step: 0, comfy_streak: 0 }
         let hasLink = false
         const linkRes = await supabase
           .from('telegram_links')
-          .select('declared_band, fit_step, last_good_step, comfy_streak')
+          .select('declared_band, declared_at, fit_step, last_good_step, comfy_streak')
           .eq('user_id', user.id)
           .maybeSingle()
         if (!linkRes.error && linkRes.data) {
           hasLink = true
           declaredBand = linkRes.data.declared_band ?? null
+          declaredAt = linkRes.data.declared_at ?? null
           fitStep = Number(linkRes.data.fit_step ?? 0) || 0
           fitState = {
             fit_step: fitStep,
@@ -385,7 +396,15 @@ export default function Reader() {
         // Twin's vocab is derived stats, so it contributes nothing
         // today, here as there) + below-band deck credit when a basis
         // exists. Diagnosis outranks the declared tap (resolveBand).
-        const { band: resolvedBand, source } = resolveBand({ diagnosisBand, declaredBand })
+        // BOTH declaration stores count (integration audit #2): a
+        // level declared inside the app lives in the state document —
+        // this surface used to read only the Telegram row, so an
+        // in-app declaration was invisible here while the bot and
+        // reader-serve both honoured it. All five inputs, freshest
+        // declaration wins, exactly as reader-serve resolves it.
+        const stateDeclaredBand = typeof state.declaredLevel?.band === 'string' ? state.declaredLevel.band : null
+        const stateDeclaredAt = typeof state.declaredLevel?.at === 'string' ? state.declaredLevel.at : null
+        const { band: resolvedBand, source } = resolveBand({ diagnosisBand, declaredBand, declaredAt, stateDeclaredBand, stateDeclaredAt })
         const hasDiagnosis = source === 'diagnosis'
         const band = resolvedBand ?? 'N4' // gentle default; the footer says so
         const credit = resolvedBand ? deckCreditSet(deckLevels, resolvedBand) : null
@@ -439,6 +458,7 @@ export default function Reader() {
         excludedRef.current = []
         setBandSource(source)
         setDisplayBand(band)
+        setCanFit(hasLink)
         const first = doPick(ctx, [])
         if (first) { present(first); return }
         // Bank miss: before declaring the shelf empty, ask the
@@ -448,7 +468,9 @@ export default function Reader() {
           setPhase('digging')
           const served = await tryServe(ctx, [])
           if (cancelled) return
-          if (served) { present(served); return }
+          if (served && !served.needLevel) { present(served); return }
+          // need_level: the empty state below renders the one-tap
+          // level question (bandSource is 'none' in that world).
         }
         setEmptyKind(bank.length === 0 || cold ? 'shelf' : 'nofit')
         setPhase('empty')
@@ -458,7 +480,7 @@ export default function Reader() {
     }
     load()
     return () => { cancelled = true }
-  }, [user]) // eslint-disable-line react-hooks/exhaustive-deps -- load reads the signed-in learner's world once per user
+  }, [user, reloadKey]) // eslint-disable-line react-hooks/exhaustive-deps -- load reads the signed-in learner's world once per user (+ explicit retries)
 
   const another = async () => {
     const ctx = ctxRef.current
@@ -471,6 +493,7 @@ export default function Reader() {
       // server pipeline may still fit or generate one.
       setNote(t('reader.loading'))
       next = await tryServe(ctx, excluded)
+      if (next?.needLevel) next = null // a level question mid-book helps nobody; the note below stands
     }
     if (!next || String(next.passage.id) === String(pick.passage.id)) {
       setNote(t('reader.nothingElse'))
@@ -544,24 +567,42 @@ export default function Reader() {
   const finish = () => {
     if (!pick || finished) return
     logCompleted(pick.passage)
+    // Finishing a read IS a comfortable read (audit P2-7): it earns
+    // the same fit transition a passed read-aloud earns — the web
+    // surface used to log the completion and move nothing.
+    void applyFitFeedback(pick.passage, 'read', 'webfinish')
   }
 
-  // A passed web read-aloud earns exactly what a plausible Telegram
-  // voice note earns (Doc 16 §5 amendments #4/#5): the comfy 'read'
-  // transition on the fit step, once per passage, through the same
+  // Fit feedback, one door for every kind (Doc 16 §5 amendment #4):
+  // a passed web read-aloud, the Finished Reading tap, and the
+  // Push Me / Too Hard verdict buttons all run the same
   // applyFeedback the bot runs — persisted to the learner's own
-  // telegram_links row (owner RLS allows the write). Any failure
-  // degrades quietly: the passage_completed metric already landed,
-  // and the step simply moves next time on the surface that can.
-  const applyComfyRead = async (passage) => {
+  // telegram_links row (owner RLS allows the write). 'read' credits
+  // once per passage across every door (creditedRef); verdicts
+  // dedupe per passage too (verdictRef) — one tap per passage,
+  // the bot's own rule. Any failure degrades quietly: the
+  // passage_completed metric already landed, and the step simply
+  // moves next time on the surface that can. (Fit state still lives
+  // on the Telegram row — audit P2-9; unlinked learners' verdicts
+  // have nowhere to persist yet, so the buttons render only when a
+  // link row exists.)
+  const verdictRef = useRef(new Set())
+  const applyFitFeedback = async (passage, kind, via) => {
     const id = String(passage.id)
-    if (creditedRef.current.has(id)) return
-    creditedRef.current.add(id)
+    if (kind === 'read') {
+      if (creditedRef.current.has(id)) return
+      creditedRef.current.add(id)
+    } else {
+      if (verdictRef.current.has(id)) return
+      verdictRef.current.add(id)
+    }
     const ctx = ctxRef.current
     if (!ctx?.hasLink || !ctx.fitState) return
-    const next = applyFeedback(ctx.fitState, 'read')
+    const next = applyFeedback(ctx.fitState, kind)
     ctx.fitState = { fit_step: next.fit_step, last_good_step: next.last_good_step, comfy_streak: next.comfy_streak }
-    recordMetric('reading_feedback', { passageId: id, kind: 'read', via: 'webspeech', fitStepAfter: next.fit_step })
+    ctx.fitStep = next.fit_step
+    ctx.serveBand = serveBandFor(ctx.resolvedBand, next.fit_step) ?? ctx.serveBand
+    recordMetric('reading_feedback', { passageId: id, kind, via, fitStepAfter: next.fit_step })
     if (isSupabaseConfigured && supabase && user) {
       try {
         await supabase
@@ -570,6 +611,25 @@ export default function Reader() {
           .eq('user_id', user.id)
       } catch { /* best effort — the metric above is this session's record */ }
     }
+  }
+  const applyComfyRead = (passage) => applyFitFeedback(passage, 'read', 'webspeech')
+
+  // Push Me / Too Hard (the bot's verdict pair, now on the web too):
+  // the step moves, then the next passage is served AT the new step —
+  // the lesson continues, exactly as the bot continues it.
+  const verdict = async (kind) => {
+    if (!pick || busy) return
+    await applyFitFeedback(pick.passage, kind, 'webbuttons')
+    await another()
+  }
+
+  // The one-tap level question, the bot's ask on this surface too:
+  // a tap stores the declaration in the state document (the same
+  // store TwinView's Your Level card writes) and the Reader reloads
+  // against the new basis at once.
+  const declareLevel = (band) => {
+    saveDeclaredLevel(band)
+    setReloadKey((k) => k + 1)
   }
 
   const scoreTranscript = (target, transcript) => {
@@ -724,28 +784,71 @@ export default function Reader() {
       </div>
 
       {phase === 'guest' && (
-        <div className="rounded-2xl glass p-5 card-glow flex items-start gap-3">
-          <span className="mt-0.5"><Mascot agent="hori" size={30} showName={false} /></span>
-          <p className="text-sm text-slate-300">{t('reader.guestBefore')}<span className="text-slate-100 font-medium">{t('reader.guestYour')}</span>{t('reader.guestAfter')}</p>
+        <div className="rounded-2xl glass p-5 card-glow space-y-3">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5"><Mascot agent="hori" size={30} showName={false} /></span>
+            <p className="text-sm text-slate-300">{t('reader.guestBefore')}<span className="text-slate-100 font-medium">{t('reader.guestYour')}</span>{t('reader.guestAfter')}</p>
+          </div>
+          {onSignIn && (
+            <button onClick={onSignIn} className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold">
+              {t('auth.signIn')}
+            </button>
+          )}
         </div>
       )}
 
       {(phase === 'loading' || phase === 'digging') && <p className="text-sm text-slate-400">{t('reader.loading')}</p>}
 
       {phase === 'error' && (
-        <div className="rounded-2xl glass p-5 card-glow">
+        <div className="rounded-2xl glass p-5 card-glow space-y-3">
           <p className="text-sm text-slate-300">{t('reader.errorShelf')}</p>
+          <button onClick={() => setReloadKey((k) => k + 1)} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium">
+            {t('reader.tryAgain')}
+          </button>
         </div>
       )}
 
       {phase === 'empty' && (
-        <div className="rounded-2xl glass p-5 card-glow space-y-2">
+        <div className="rounded-2xl glass p-5 card-glow space-y-3">
           {emptyKind === 'shelf' ? (
-            <p className="text-sm text-slate-300">{t('reader.emptyShelf')}</p>
+            <>
+              <p className="text-sm text-slate-300">{t('reader.emptyShelf')}</p>
+              <button onClick={() => setReloadKey((k) => k + 1)} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium">
+                {t('reader.tryAgain')}
+              </button>
+            </>
           ) : (
             <>
               <p className="text-sm text-slate-300">{t('reader.emptyNofit')}</p>
-              {bandSource === 'none' && <p className="text-sm text-slate-300">{t('reader.checkupSwitch')}</p>}
+              {bandSource === 'none' ? (
+                <>
+                  <p className="text-sm text-slate-300">{t('reader.checkupSwitch')}</p>
+                  {/* The one-tap level question (the bot's ask): no
+                      basis → declare once, here, and fitting turns
+                      on. Not Sure leads to the checkup, the measured
+                      answer. */}
+                  <p className="text-sm font-medium text-slate-200">{t('reader.levelAsk')}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {[...BANDS, 'N7'].map((b) => (
+                      <button key={b} onClick={() => declareLevel(b)} className="px-3 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-semibold">
+                        {b === 'N7' ? 'N7+' : b}
+                      </button>
+                    ))}
+                    <button onClick={() => setActive?.('diagnosis')} className="px-3 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold">
+                      {t('twin.level.takeCheckup')}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={() => setActive?.('session')} className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold">
+                    {t('reader.goSession')}
+                  </button>
+                  <button onClick={() => setReloadKey((k) => k + 1)} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium">
+                    {t('reader.tryAgain')}
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -756,6 +859,13 @@ export default function Reader() {
           <section className="rounded-3xl glass p-6 sm:p-8 card-glow space-y-5">
             <p className="text-sm text-slate-400">{t('reader.dugUp', { topic: pick.passage.topic || t('reader.defaultTopic'), band: pick.passage.band })}</p>
             <PassageText text={pick.passage.text} newWords={pick.newWords} highlightWord={pulseWord} />
+            {/* The listen step (audit P2-6): the bot sends a voice
+                note with every passage; the web surface had no way
+                to hear the passage at all. Same order as the bot:
+                listen first, then read it back. */}
+            <div>
+              <TtsButton text={pick.passage.text} className="px-4 py-2 text-sm font-medium" />
+            </div>
             <KanjiChips key={String(pick.passage.id)} chips={chips} activeWord={pulseWord} onHighlight={setPulseWord} onMineWord={mineCandidates} />
             {pick.newWords.length > 0 && (
               <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4">
@@ -789,6 +899,20 @@ export default function Reader() {
               <button onClick={finish} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1.5">
                 <CheckCircle2 size={15} /> {t('reader.finishedReading')}
               </button>
+            )}
+            {/* The fit verdict pair (the bot's Push Me / Too Hard):
+                one tap moves the step and the next passage arrives
+                at the new step. Only when a link row can persist the
+                fit state (audit P2-9). */}
+            {canFit && (
+              <>
+                <button onClick={() => verdict('up')} disabled={busy} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 disabled:opacity-40 text-slate-100 text-sm font-medium">
+                  {t('reader.pushMe')}
+                </button>
+                <button onClick={() => verdict('hard')} disabled={busy} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 disabled:opacity-40 text-slate-100 text-sm font-medium">
+                  {t('reader.tooHard')}
+                </button>
+              </>
             )}
           </div>
           {mineNote && <p className="text-sm text-emerald-300 flex items-center gap-2"><CheckCircle2 size={15} /> {mineNote}</p>}

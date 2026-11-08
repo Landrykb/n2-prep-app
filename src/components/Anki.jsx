@@ -3,7 +3,8 @@ import { useAuth } from '../hooks/useAuth.js'
 import { useLanguage } from '../hooks/useLanguage.js'
 import { getUserProgress, setUserProgress } from '../lib/supabaseApi.js'
 import { deliverTextFile } from '../lib/fileDeliver.js'
-import { addToQueue, loadQueue, saveQueue, queueItemId } from '../lib/queue.js'
+import { addToQueue, loadQueue, saveQueue, queueItemId, rateQueueItem } from '../lib/queue.js'
+import { recordQueueRating } from '../lib/twin.js'
 import { userKey } from '../lib/userKey.js'
 import { mergeAnkiProgress } from '../lib/stateMerge.js'
 import { recordEncounters, ankiEncounterWords } from '../lib/encounters.js'
@@ -332,6 +333,25 @@ export default function Anki() {
     // The rated card was met, whatever the rating — an encounter
     // (Fit v2): it joins the proven set the Reader fits against.
     recordEncounters([current.front])
+    // One queue (integration audit #6): this tab's private ladder
+    // used to be a parallel SRS universe — a rating here changed
+    // nothing in Today, the plan, or the Twin. The rating now ALSO
+    // lands in the ONE queue (source 'anki', the MigrationCard's
+    // door, live): the card joins the queue if it is not there,
+    // and the FSRS state advances by the same rating (Anki quality
+    // 0–3 maps onto the queue's 1–4). The tab's own progress above
+    // still drives this tab's deck order; nothing here is removed.
+    try {
+      const qid = queueItemId('anki', current.front)
+      if (!loadQueue().some((i) => i.id === qid)) {
+        addToQueue([{ front: current.front, back: current.back, level: current.level, source: 'anki' }])
+      }
+      const qItem = loadQueue().find((i) => i.id === qid)
+      if (qItem) {
+        recordQueueRating(qItem, quality + 1)
+        rateQueueItem(qid, quality + 1)
+      }
+    } catch { /* the mirror never blocks the tab */ }
     if (user) setUserProgress(user.id, { anki: next })
     setFlipped(false)
 

@@ -3,19 +3,36 @@
 // Every prompt keeps a small record of how often it was missed vs answered
 // correctly. Items you keep missing are drawn far more often than items you
 // already know, so a session automatically concentrates on your weak spots.
+//
+// Scoping (integration audit #14): the store used to live under one
+// global key, so two accounts on one browser shared each other's
+// weak spots. It is user-scoped now (userKey, the Anki pattern);
+// the legacy global copy is adopted once into the first scope that
+// finds it empty — adopted, not copied-and-kept, so the leak stops.
 
-const KEY = 'n2:speed:stats'
+import { userKey } from './userKey.js'
+
+const LEGACY_KEY = 'n2:speed:stats'
 const MAX_ENTRIES = 4000
+const statsKeyFor = (user) => userKey(user, 'speed:stats')
 
-export function loadStats() {
+export function loadStats(user = null) {
   try {
-    return JSON.parse(localStorage.getItem(KEY)) || {}
+    const scoped = localStorage.getItem(statsKeyFor(user))
+    if (scoped !== null) return JSON.parse(scoped) || {}
+    const legacy = localStorage.getItem(LEGACY_KEY)
+    if (legacy !== null) {
+      localStorage.setItem(statsKeyFor(user), legacy)
+      localStorage.removeItem(LEGACY_KEY)
+      return JSON.parse(legacy) || {}
+    }
+    return {}
   } catch {
     return {}
   }
 }
 
-export function saveStats(stats) {
+export function saveStats(stats, user = null) {
   try {
     // Keep the store bounded: drop mastered entries first if it grows too large.
     const keys = Object.keys(stats)
@@ -26,7 +43,7 @@ export function saveStats(stats) {
         .slice(0, MAX_ENTRIES)
       stats = Object.fromEntries(trimmed)
     }
-    localStorage.setItem(KEY, JSON.stringify(stats))
+    localStorage.setItem(statsKeyFor(user), JSON.stringify(stats))
   } catch {
     /* storage full or unavailable — weighting simply resets next session */
   }

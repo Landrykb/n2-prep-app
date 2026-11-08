@@ -21,6 +21,9 @@ import { getStateSyncState, subscribeStateSync } from '../lib/stateSync.js'
 import { validateExport, planRestore } from '../lib/restore.js'
 import { loadMetrics, summariseMetrics } from '../lib/metrics.js'
 import { estimateWorkingLevel } from '../lib/twinEstimate.js'
+import { loadDiagnosis } from '../lib/profile.js'
+import { loadSessionState, todayStr } from '../lib/session.js'
+import { deliverTextFile } from '../lib/fileDeliver.js'
 import { collectLearnerState, loadDeclaredLevel, saveDeclaredLevel, STATE_SYNCED_EVENT } from '../lib/learnerState.js'
 import { resolveLevelBasis } from '../lib/levelBasis.js'
 import FeedbackBox from './FeedbackBox.jsx'
@@ -458,19 +461,27 @@ export default function TwinView({ setActive }) {
   const patterns = topPatterns(twin, 8)
   const rows = learningStyleRows(twin)
   const deltas = diagnosisDeltas()
+  // The one next door (audit P1-3): this page is a catalogue of what
+  // the fleet knows — its top must still answer "what do I do now?"
+  // with the same spine as everywhere else: no checkup yet → the
+  // checkup; session open → today's session; session done → Today
+  // (where tomorrow's plan waits).
+  const nextDoor = (() => {
+    if (!loadDiagnosis()) return { view: 'diagnosis', label: t('twin.level.takeCheckup') }
+    const s = loadSessionState()
+    if (s && s.date === todayStr() && s.done) return { view: 'dashboard', label: t('twin.nextDone') }
+    return { view: 'session', label: t('twin.nextSession') }
+  })()
   const persona = PERSONAS.find((p) => p.id === twin.life?.persona)
   const target = PROOF_TARGETS.find((t) => t.id === twin.life?.proofTarget)
   const kept = twin.rhythm.callsKept || 0
   const missed = twin.rhythm.callsMissed || 0
 
   const exportTwin = () => {
-    const blob = new Blob([JSON.stringify(loadTwin(), null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'my-learner-twin.json'
-    a.click()
-    URL.revokeObjectURL(url)
+    // Mini App-safe delivery (fileDeliver.js): the raw anchor
+    // download this used to do is exactly what silently fails
+    // inside the Telegram webview (audit P2).
+    void deliverTextFile({ filename: 'my-learner-twin.json', text: JSON.stringify(loadTwin(), null, 2), mime: 'application/json' })
   }
 
   // Backup restore (P0-1): the export used to be a dead end. Restoring
@@ -540,6 +551,15 @@ export default function TwinView({ setActive }) {
               ? t('twin.header.syncSyncing')
               : t('twin.header.syncRetry')}</p>
       </div>
+
+      {/* The one next door — the guided spine, stated at the top of
+          the catalogue (audit P1-3). */}
+      <button
+        onClick={() => setActive?.(nextDoor.view)}
+        className="w-full px-5 py-3.5 rounded-2xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-semibold text-sm flex items-center justify-center gap-2 transition"
+      >
+        {nextDoor.label} <ChevronRight size={16} />
+      </button>
 
       {/* The Loop entry (Doc 05 §11): the fleet-togetherness view. The
           line-up below says WHO the fleet is; the Loop shows them
@@ -661,7 +681,7 @@ export default function TwinView({ setActive }) {
             <li><span className="text-slate-500">{t('twin.life.whatHurts')}</span> {(twin.life?.pains || []).map((id) => PAINS.find((p) => p.id === id)).filter(Boolean).map((p) => t(p.labelKey)).join(' · ') || t('twin.life.notSet')}</li>
             <li><span className="text-slate-500">{t('twin.life.climbing')}</span> {target ? t(target.labelKey) : t('twin.life.notSet')}</li>
           </ul>
-          <button onClick={() => setActive?.('dashboard')} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1">{t('twin.life.changeProblem')} <ChevronRight size={14} /></button>
+          <button onClick={() => { try { sessionStorage.setItem('yonde:open-problem', '1') } catch { /* ignore */ } setActive?.('dashboard') }} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1">{t('twin.life.changeProblem')} <ChevronRight size={14} /></button>
         </Section>
 
         <Section title={t('twin.rhythm.title')} hint={t('twin.rhythm.hint')}>

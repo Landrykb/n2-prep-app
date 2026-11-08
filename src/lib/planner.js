@@ -23,6 +23,7 @@ import { loadTwin, saveTwin, refreshTwin, topPatterns } from './twin.js'
 import { detectMode } from './modes.js'
 import { todayStr, pickSceneForProfile, pickListeningForDiagnosis, buildSessionCards } from './session.js'
 import { shadowPlan } from './plannerShadow.js'
+import { emitLearnerStateSaved } from './stateEvents.js'
 import { t as translate } from './i18n.js'
 
 // Plan lines live in the language catalogs (Doc 20, first-run slice
@@ -38,7 +39,11 @@ export const PLAN_KEY = 'jpn:plan:v1'
 const MAX_CARDS = 5
 
 // -------------------------------------------------------------- storage
-function loadPlanState() {
+// The plan state is a learner-state slice (integration audit #7): it
+// rides the synced state document so Saki's "one guided day" is the
+// same on every device — a plan consumed on the phone is not offered
+// fresh on the desktop.
+export function loadPlanState() {
   try {
     const parsed = JSON.parse(localStorage.getItem(PLAN_KEY) || 'null')
     if (parsed && typeof parsed === 'object') return { plans: {}, experiment: null, experimentLog: [], ...parsed }
@@ -46,7 +51,7 @@ function loadPlanState() {
   return { plans: {}, experiment: null, experimentLog: [] }
 }
 function savePlanState(state) {
-  try { localStorage.setItem(PLAN_KEY, JSON.stringify(state)) } catch { /* ignore */ }
+  try { localStorage.setItem(PLAN_KEY, JSON.stringify(state)); emitLearnerStateSaved() } catch { /* ignore */ }
   return state
 }
 export function loadPlans() { return loadPlanState() }

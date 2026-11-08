@@ -2,8 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Timer, Award, FileText, CheckCircle2, XCircle } from 'lucide-react'
 import { bjtTrainerItems } from '../data/bjtTrainer.js'
 import { estimateBjtScore, bjtBandForScore } from '../lib/levels.js'
+import { recordMetric } from '../lib/metrics.js'
 import TtsButton from './TtsButton.jsx'
 import KanjiTapText from './KanjiTapText.jsx'
+
+export const BJT_ATTEMPTS_KEY = 'jpn:bjt:attempts'
 
 const TIME_PER_ITEM = 120 // seconds — BJT pace: ~80 questions in ~2h ≈ 90s/q; combined items get a little more
 
@@ -62,6 +65,31 @@ export default function BjtTrainer() {
 
   const estScore = finishedAll ? estimateBjtScore(scored.correct / totalQuestions) : null
   const band = estScore !== null ? bjtBandForScore(estScore) : null
+
+  // A finished run is recorded (integration audit #15): this
+  // trainer used to keep answers in component state only, so BJT
+  // practice could never move anything — no metric, no history.
+  // Now a completion persists an attempt (local history, capped)
+  // and logs bjt_attempt. The Twin's register estimate stays
+  // diagnosis-owned on purpose: a short Part-II trainer sample is
+  // an estimate for the learner, not a register measurement.
+  const recordedRef = useRef(false)
+  useEffect(() => {
+    if (!finishedAll) { recordedRef.current = false; return }
+    if (recordedRef.current || estScore === null || !band) return
+    recordedRef.current = true
+    const attempt = {
+      at: new Date().toISOString(),
+      correct: scored.correct, answered: scored.answered, total: totalQuestions,
+      estScore, band: band.id,
+    }
+    try {
+      const prev = JSON.parse(localStorage.getItem(BJT_ATTEMPTS_KEY) || '[]')
+      const list = Array.isArray(prev) ? prev : []
+      localStorage.setItem(BJT_ATTEMPTS_KEY, JSON.stringify([...list, attempt].slice(-20)))
+    } catch { /* ignore */ }
+    recordMetric('bjt_attempt', { correct: scored.correct, answered: scored.answered, total: totalQuestions, estScore, band: band.id })
+  }, [finishedAll, estScore, band, scored, totalQuestions])
   const itemPicks = item ? (answers[item.id] || Array(item.questions.length).fill(null)) : []
   const itemAnswered = itemPicks.filter((p) => p !== null && p !== undefined).length
 

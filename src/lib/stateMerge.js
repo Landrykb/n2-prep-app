@@ -134,15 +134,88 @@ export function mergeEncounters(localWords, otherWords) {
 }
 
 /**
+ * Saki's plan state (integration audit #7): { plans: {date: plan},
+ * experiment, experimentLog }. Plans merge PER DATE: a consumed copy
+ * beats an unconsumed copy of the same day (work already done from a
+ * plan is never un-done by a merge), otherwise the later-created plan
+ * wins; dates present on only one side are kept. The running
+ * experiment: the only copy wins; same id → the copy that has seen
+ * more sessions (then more proof) wins; different ids → the later
+ * start wins. The experiment log unions by experiment id.
+ */
+export function mergePlanStates(localState, otherState) {
+  const L = localState && typeof localState === 'object' ? localState : null
+  const O = otherState && typeof otherState === 'object' ? otherState : null
+  if (!L) return O
+  if (!O) return L
+  const plans = { ...(L.plans || {}) }
+  for (const [date, plan] of Object.entries(O.plans || {})) {
+    const mine = plans[date]
+    if (!mine) { plans[date] = plan; continue }
+    if (!!plan?.consumed !== !!mine?.consumed) { if (plan?.consumed) plans[date] = plan; continue }
+    if (ts(plan?.createdAt) > ts(mine?.createdAt)) plans[date] = plan
+  }
+  let experiment = L.experiment || null
+  const otherExp = O.experiment || null
+  if (otherExp && !experiment) experiment = otherExp
+  else if (otherExp && experiment) {
+    if (otherExp.id === experiment.id) {
+      const a = [experiment.sessionsSeen || 0, experiment.proofSum || 0]
+      const b = [otherExp.sessionsSeen || 0, otherExp.proofSum || 0]
+      if (b[0] > a[0] || (b[0] === a[0] && b[1] > a[1])) experiment = otherExp
+    } else if (ts(otherExp.startedAt) > ts(experiment.startedAt)) experiment = otherExp
+  }
+  const logById = new Map()
+  for (const e of [...(Array.isArray(L.experimentLog) ? L.experimentLog : []), ...(Array.isArray(O.experimentLog) ? O.experimentLog : [])]) {
+    if (e?.id && !logById.has(e.id)) logById.set(e.id, e)
+  }
+  return { plans, experiment, experimentLog: [...logById.values()] }
+}
+
+/**
+ * The in-progress One Session (integration audit #9): one document
+ * per learner, keyed by its `date`. A later date wins whole (a new
+ * day is a new session). Same date → the MORE-PROGRESSED copy wins:
+ * done/recorded beats not (a finished session is never resurrected
+ * as unfinished, and its `recorded` guard travels with it), then the
+ * higher step, then more rated cards, then the better scene result,
+ * then the later start.
+ */
+export function mergeSessionStates(localState, otherState) {
+  const L = localState && typeof localState === 'object' ? localState : null
+  const O = otherState && typeof otherState === 'object' ? otherState : null
+  if (!L) return O
+  if (!O) return L
+  if ((O.date || '') !== (L.date || '')) return (O.date || '') > (L.date || '') ? O : L
+  const progress = (s) => [
+    s.done || s.recorded ? 1 : 0,
+    s.step || 0,
+    Array.isArray(s.ratedIds) ? s.ratedIds.length : 0,
+    s.sceneBest || 0,
+    s.sceneAttempts || 0,
+    ts(s.segmentStartAt) || ts(s.startedAt),
+  ]
+  const a = progress(L)
+  const b = progress(O)
+  for (let i = 0; i < a.length; i++) {
+    if (b[i] > a[i]) return O
+    if (a[i] > b[i]) return L
+  }
+  return L
+}
+
+/**
  * Merge two learner-state documents ({ queue, profile, diagnosis,
  * diagnosisHistory, promise, declaredLevel, encounters, language,
- * modeSpells }).
+ * modeSpells, plan, session }).
  * Returns a new document; inputs untouched. declaredLevel and
  * language are single documents like the others — the newer one
  * (its `at`) wins whole.
  * Encounters union (above): met words are never un-met by a merge.
  * Mode spells union by startedAt (above): a spell, once recorded,
  * is never un-recorded by a merge.
+ * Plan merges per date with consumed-wins (above); the session
+ * merges by date then by progress (above).
  */
 export function mergeLearnerState(local, other) {
   const L = local || {}
@@ -158,6 +231,8 @@ export function mergeLearnerState(local, other) {
     voiceCast: pickDoc(L.voiceCast, O.voiceCast, (d) => d.at),
     encounters: mergeEncounters(L.encounters, O.encounters),
     modeSpells: mergeModeSpells(L.modeSpells, O.modeSpells),
+    plan: mergePlanStates(L.plan, O.plan),
+    session: mergeSessionStates(L.session, O.session),
   }
 }
 

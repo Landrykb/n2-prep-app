@@ -71,15 +71,16 @@ Deno.serve(async (req) => {
       { command: 'level', description: 'Tell Hori your level (one tap)' },
     ],
   })
-  // The chat Menu button opens Yonde itself (Doc 16 §5 amendment
-  // #7): set WITHOUT a chat_id, it is the default for every private
-  // chat — the app becomes one tap from the chat's own chrome, not
-  // only from buttons inside messages.
+  // The chat Menu button is this bot's exact door (integration
+  // audit): the Reader bot's own chrome opens the Reader surface
+  // (/reader), not the app root — the whole app stays one tap
+  // further, from the Reader itself. Set WITHOUT a chat_id, it is
+  // the default for every private chat.
   const setChatMenuButton = await tg('setChatMenuButton', {
     menu_button: {
       type: 'web_app',
       text: 'Open Yonde',
-      web_app: { url: 'https://jpn2easy.vercel.app/?tg=4' },
+      web_app: { url: 'https://jpn2easy.vercel.app/reader?tg=4' },
     },
   })
   const getMe = await tg('getMe', {})

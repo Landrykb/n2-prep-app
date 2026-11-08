@@ -42,7 +42,33 @@ function setStatus(next) {
 async function pushStateNow() {
   if (!supabase || !activeUserId) return
   setStatus('syncing')
-  const state = collectLearnerState()
+  // Pull-merge-push (integration audit #1): the cloud document is
+  // shared with the Telegram bot, which writes mined words and level
+  // declarations into the SAME row. A blind whole-document upsert
+  // would erase anything the bot (or another device) wrote since this
+  // device last pulled — so every push first re-reads the row, merges
+  // it with the local document (union/never-lose rules in
+  // stateMerge.js), applies the merged result locally, and only then
+  // upserts. If the re-read fails, the push is skipped entirely:
+  // overwriting sight-unseen is exactly the failure this prevents.
+  let cloudState = null
+  try {
+    const { data, error } = await supabase
+      .from('learner_state')
+      .select('state, updated_at')
+      .eq('user_id', activeUserId)
+      .maybeSingle()
+    if (error) throw error
+    cloudState = data?.state || null
+  } catch (err) {
+    console.error('stateSync pre-push pull error:', err)
+    setStatus('error')
+    return
+  }
+  const state = cloudState
+    ? mergeLearnerState(collectLearnerState(), cloudState)
+    : collectLearnerState()
+  if (cloudState) applyLearnerState(state)
   const { error } = await supabase
     .from('learner_state')
     .upsert(

@@ -46,7 +46,10 @@ function freshState(profile, diagnosis, queue, variant) {
   const listening = pickListeningForDiagnosis(diagnosis, date)
   const planCards = (plan?.cardIds || []).filter((id) => queue.some((c) => c.id === id))
   const cardIds = planCards.length ? planCards : buildSessionCards(queue).map((c) => c.id)
-  if (plan) markPlanConsumed(date)
+  // The plan is NOT consumed here (integration audit #7): building a
+  // session is not doing the work. Consumption is marked at the first
+  // recorded piece of work (a scene attempt, a card rating, a
+  // listening answer) and at finish — never at creation.
   return {
     date, variant, step: 0, sceneId: scene.id, listeningTitle: plan?.listeningTitle || listening.title,
     cardIds, ratedIds: [], cardResults: [], startedAt: new Date().toISOString(), elapsedBaseSec: 0,
@@ -142,6 +145,7 @@ export default function OneSession({ setActive }) {
     const attempts = (state.sceneAttempts || 0) + 1
     const best = Math.max(state.sceneBest || 0, score)
     recordVoiceAttempt({ scene, text, score, missing })
+    try { markPlanConsumed(state.date) } catch { /* plan bookkeeping never blocks learning */ }
     setLastAttempt({ text, score, missing })
     // And the fix speaks itself: below mastery, Nao's model line
     // plays on its own (the neural chain; a refused autoplay just
@@ -173,6 +177,7 @@ export default function OneSession({ setActive }) {
   const rateCard = (rating) => {
     if (!card) return
     recordQueueRating(card, rating)
+    try { markPlanConsumed(state.date) } catch { /* plan bookkeeping never blocks learning */ }
     setQueue(rateQueueItem(card.id, rating))
     setFlipped(false)
     patch({
@@ -212,6 +217,7 @@ export default function OneSession({ setActive }) {
         listeningScript: bite.script,
       })
       recordMetric('session_completed', { minutes: minutesSpent, proof }) // gate metric (Doc 11)
+      try { markPlanConsumed(state.date) } catch { /* ignore */ }
       if (state.planExperiment) noteSessionForExperiment({ experiment: state.planExperiment }, { proof })
     }
     patch({ step: 3, done: true, recorded: true, elapsedBaseSec: elapsedSec, segmentStartAt: new Date().toISOString() })
@@ -429,7 +435,7 @@ export default function OneSession({ setActive }) {
               const picked = state.listeningPicked
               const chosen = picked === i
               return (
-                <button key={i} onClick={() => { if (picked === null || picked === undefined) patch({ listeningPicked: i }) }}
+                <button key={i} onClick={() => { if (picked === null || picked === undefined) { try { markPlanConsumed(state.date) } catch { /* ignore */ } patch({ listeningPicked: i }) } }}
                   className={`text-left px-4 py-3 rounded-xl border transition ${picked !== null && picked !== undefined && opt.correct ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-200' : chosen ? 'bg-rose-500/15 border-rose-500/50 text-rose-200' : 'bg-bun-700/40 border-bun-600/30 text-slate-200 hover:bg-bun-700/60'}`}>
                   {opt.label}
                 </button>

@@ -11,6 +11,7 @@
 //     banks are labelled, never silently faked.
 
 import assert from 'node:assert'
+import { readFileSync } from 'node:fs'
 
 const { pickQueueWinner, mergeQueues, mergeLearnerState, mergeDiagnosisHistory, mergeAnkiProgress } = await import('../src/lib/stateMerge.js')
 const { validateExport, planRestore } = await import('../src/lib/restore.js')
@@ -77,6 +78,39 @@ check('history unions by timestamp', () => {
   const merged = mergeDiagnosisHistory([{ at: '2026-11-01' }, { at: '2026-11-03' }], [{ at: '2026-11-02' }, { at: '2026-11-03' }])
   assert.equal(merged.length, 3)
   assert.equal(merged[1].at, '2026-11-02')
+})
+check('plan slice merges per date — consumed wins, one-sided dates survive, experiment keeps the further-along copy', () => {
+  const merged = mergeLearnerState(
+    { plan: { plans: { '2026-11-08': { forDate: '2026-11-08', createdAt: '2026-11-07T20:00:00Z', consumed: false } }, experiment: { id: 'exp-1', startedAt: '2026-11-07T00:00:00Z', sessionsSeen: 1, proofSum: 2 }, experimentLog: [] } },
+    { plan: { plans: { '2026-11-08': { forDate: '2026-11-08', createdAt: '2026-11-07T19:00:00Z', consumed: true }, '2026-11-09': { forDate: '2026-11-09', createdAt: '2026-11-08T20:00:00Z', consumed: false } }, experiment: { id: 'exp-1', startedAt: '2026-11-07T00:00:00Z', sessionsSeen: 3, proofSum: 5 }, experimentLog: [{ id: 'exp-0' }] } },
+  )
+  assert.equal(merged.plan.plans['2026-11-08'].consumed, true) // work done is never un-done
+  assert.ok(merged.plan.plans['2026-11-09']) // the other device's tomorrow survives
+  assert.equal(merged.plan.experiment.sessionsSeen, 3)
+  assert.equal(merged.plan.experimentLog.length, 1)
+  assert.equal(mergeLearnerState({}, {}).plan, null)
+})
+check('session slice merges by date then progress — a recorded finish is never resurrected as unfinished', () => {
+  const merged = mergeLearnerState(
+    { session: { date: '2026-11-08', step: 1, ratedIds: ['a'], recorded: false, done: false } },
+    { session: { date: '2026-11-08', step: 3, ratedIds: ['a', 'b'], recorded: true, done: true } },
+  )
+  assert.equal(merged.session.recorded, true)
+  assert.equal(merged.session.done, true)
+  const nextDay = mergeLearnerState(
+    { session: { date: '2026-11-08', step: 3, recorded: true, done: true } },
+    { session: { date: '2026-11-09', step: 0, recorded: false, done: false } },
+  )
+  assert.equal(nextDay.session.date, '2026-11-09') // a new day is a new session
+  assert.equal(mergeLearnerState({}, {}).session, null)
+})
+check('stateSync pushes pull-merge-push — a blind upsert would erase bot writes (audit #1)', () => {
+  const src = readFileSync(new URL('../src/lib/stateSync.js', import.meta.url), 'utf8')
+  const push = src.slice(src.indexOf('async function pushStateNow'))
+  const selectAt = push.indexOf(".select('state, updated_at')")
+  const mergeAt = push.indexOf('mergeLearnerState(collectLearnerState(), cloudState)')
+  const upsertAt = push.indexOf('.upsert(')
+  assert.ok(selectAt > -1 && mergeAt > selectAt && upsertAt > mergeAt, 'push must re-read, merge, then upsert')
 })
 
 console.log('anki progress merge (per card, never overwrite):')

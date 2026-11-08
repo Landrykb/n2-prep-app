@@ -15,6 +15,7 @@ export type BotLang = 'en' | 'fr' | 'ja'
 export const BOT_LANGS: BotLang[] = ['en', 'fr', 'ja']
 
 const en: Record<string, string> = {
+  'app.openSession': 'Open Today\'s Session',
   'app.openYonde': 'Open Yonde',
   'app.openReader': '📖 Open in Yonde — tap the words',
   'app.reply': 'Your whole Yonde is one tap away — sessions, the checkup, Koe\'s calls, and your queue live in the app. This chat stays your reading shelf.',
@@ -56,8 +57,9 @@ const en: Record<string, string> = {
   'level.n7Toast': 'N7+ 😂 — noted',
   'level.noneToast': 'No problem — we start easy.',
   'level.notSure': 'Not sure',
-  'link.explainer': '🔍 Hori here — I run Yonde Reader. This chat is not linked yet.\nOpen Yonde → <b>Fleet</b> → <b>Yonde Reader on Telegram</b> → <b>Connect Telegram</b>, then tap the link there. It takes ten seconds, and then /read works here.',
-  'link.expired': 'That link has expired or was already used. In Yonde → Fleet → Yonde Reader on Telegram, tap Connect Telegram for a fresh one.',
+  'chat.contextReply': '🔍 I don\'t chat — I dig up passages fitted to your words. Your next one is one tap below. Everything else lives in Yonde itself, and /help lists what I do here.',
+  'link.explainer': '🔍 Hori here — I run Yonde Reader. This chat is not linked yet.\nOpen Yonde → <b>My Twin</b> → <b>Yonde Reader on Telegram</b> → <b>Connect Telegram</b>, then tap the link there. It takes ten seconds, and then /read works here.',
+  'link.expired': 'That link has expired or was already used. In Yonde → My Twin → Yonde Reader on Telegram, tap Connect Telegram for a fresh one.',
   'link.failed': 'Linking failed on my side — try the fresh link from the app once more.',
   'mine.addedMany': '⛏ {count} words joined your review queue — they will surface in your sessions, with this passage\'s sentence on the card.',
   'mine.addedOne': '⛏ {count} word joined your review queue — they will surface in your sessions, with this passage\'s sentence on the card.',
@@ -80,6 +82,7 @@ const en: Record<string, string> = {
   'nofit.recent': 'One passage does fit your words — 「{topic}」 — but you read it in the last two weeks, and I hold recent reads back so /read stays fresh.\nIt is yours again whenever you want it: tap below. And a study session in Yonde grows your words, so fresh fits follow.',
   'passage.defaultTopic': 'Reading',
   'passage.header': '🔍 Hori dug this up for you — {topic} · {band}',
+  'passage.howTo': '① Listen to the voice note  ② Read it out loud  ③ Tap how it felt below',
   'passage.mineButton': 'Mine the New Words',
   'passage.pushMe': 'Push Me 🔥',
   'passage.readIt': 'Read It ✓',
@@ -112,6 +115,7 @@ const en: Record<string, string> = {
 }
 
 const fr: Record<string, string> = {
+  'app.openSession': 'Ouvrir la séance du jour',
   'app.openYonde': 'Ouvrir Yonde',
   'app.openReader': '📖 Ouvrir dans Yonde — toucher les mots',
   'app.reply': 'Tout ton Yonde est à un toucher — les séances, le bilan, les appels de Koe et ta file vivent dans l\'app. Ce chat reste ton étagère de lecture.',
@@ -153,8 +157,9 @@ const fr: Record<string, string> = {
   'level.n7Toast': 'N7+ 😂 — noté',
   'level.noneToast': 'Pas de problème — on commence facile.',
   'level.notSure': 'Je ne sais pas',
-  'link.explainer': '🔍 C\'est Hori — je m\'occupe de Yonde Reader. Ce chat n\'est pas encore relié.\nOuvre Yonde → <b>Fleet</b> → <b>Yonde Reader on Telegram</b> → <b>Connect Telegram</b>, puis touche le lien affiché là. Ça prend dix secondes, et ensuite /read fonctionne ici.',
-  'link.expired': 'Ce lien a expiré ou a déjà été utilisé. Dans Yonde → Fleet → Yonde Reader on Telegram, touche Connect Telegram pour en obtenir un nouveau.',
+  'chat.contextReply': '🔍 Je ne discute pas — je déniche des textes ajustés à tes mots. Le prochain est à un toucher ci-dessous. Tout le reste vit dans Yonde même, et /help liste ce que je fais ici.',
+  'link.explainer': '🔍 C\'est Hori — je m\'occupe de Yonde Reader. Ce chat n\'est pas encore relié.\nOuvre Yonde → <b>Mon jumeau</b> → <b>Le Lecteur Yonde Sur Telegram</b> → <b>Connecter Telegram</b>, puis touche le lien affiché là. Ça prend dix secondes, et ensuite /read fonctionne ici.',
+  'link.expired': 'Ce lien a expiré ou a déjà été utilisé. Dans Yonde → Mon jumeau → Le Lecteur Yonde Sur Telegram, touche Connecter Telegram pour en obtenir un nouveau.',
   'link.failed': 'La liaison a échoué de mon côté — réessaie avec le lien frais depuis l\'app.',
   'mine.addedMany': '⛏ {count} mots ont rejoint ta file de révision — ils apparaîtront dans tes séances, avec la phrase de ce texte sur la carte.',
   'mine.addedOne': '⛏ {count} mot a rejoint ta file de révision — il apparaîtra dans tes séances, avec la phrase de ce texte sur la carte.',
@@ -177,6 +182,7 @@ const fr: Record<string, string> = {
   'nofit.recent': 'Un texte correspond bien à tes mots — 「{topic}」 — mais tu l\'as lu au cours des deux dernières semaines, et je retiens les lectures récentes pour que /read reste frais.\nIl est de nouveau à toi quand tu le veux : touche ci-dessous. Et une séance d\'étude dans Yonde enrichit tes mots, alors de nouveaux ajustements suivront.',
   'passage.defaultTopic': 'Lecture',
   'passage.header': '🔍 Hori a déniché ceci pour toi — {topic} · {band}',
+  'passage.howTo': '① Écoute la note vocale  ② Lis-le à voix haute  ③ Touche ci-dessous comment c\'était',
   'passage.mineButton': 'Miner Les Mots Nouveaux',
   'passage.pushMe': 'Pousse-moi 🔥',
   'passage.readIt': 'Lu ✓',
@@ -209,6 +215,7 @@ const fr: Record<string, string> = {
 }
 
 const ja: Record<string, string> = {
+  'app.openSession': '今日のセッションを開く',
   'app.openYonde': 'Yondeを開く',
   'app.openReader': '📖 Yondeで開く — 単語をタップ',
   'app.reply': 'Yonde全体はタップ1つ先にあります — セッション、チェックアップ、Koeの電話、キューはアプリの中にあります。このチャットは、あなたの読書棚のままです。',
@@ -250,8 +257,9 @@ const ja: Record<string, string> = {
   'level.n7Toast': 'N7+ 😂 — メモしました',
   'level.noneToast': '大丈夫です — やさしく始めましょう。',
   'level.notSure': 'わからない',
-  'link.explainer': '🔍 Horiです。Yonde Readerを担当しています。このチャットはまだ連携されていません。\nYondeを開いて、<b>Fleet</b> → <b>Yonde Reader on Telegram</b> → <b>Connect Telegram</b> の順に進み、そこにあるリンクをタップしてください。10秒で終わります。そのあと、ここで /read が使えます。',
-  'link.expired': 'そのリンクは期限切れか、使用済みです。Yonde → Fleet → Yonde Reader on Telegram で Connect Telegram をタップし、新しいリンクを取得してください。',
+  'chat.contextReply': '🔍 私はおしゃべりはしません — あなたの単語に合わせたテキストを掘ってきます。次は下のタップ1つです。他のことはすべてYonde本体の中にあり、ここでできることは /help にあります。',
+  'link.explainer': '🔍 Horiです。Yonde Readerを担当しています。このチャットはまだ連携されていません。\nYondeを開いて、<b>わたしのツイン</b> → <b>Telegramの Yonde リーダー</b> → <b>Telegramをつなぐ</b> の順に進み、そこにあるリンクをタップしてください。10秒で終わります。そのあと、ここで /read が使えます。',
+  'link.expired': 'そのリンクは期限切れか、使用済みです。Yonde → わたしのツイン → Telegramの Yonde リーダー で Telegramをつなぐ をタップし、新しいリンクを取得してください。',
   'link.failed': '私の側で連携に失敗しました — アプリからの新しいリンクでもう一度試してください。',
   'mine.addedMany': '⛏ {count}つの単語が復習キューに入りました — セッションで出てきて、カードにはこのテキストの文が載ります。',
   'mine.addedOne': '⛏ {count}つの単語が復習キューに入りました — セッションで出てきて、カードにはこのテキストの文が載ります。',
@@ -274,6 +282,7 @@ const ja: Record<string, string> = {
   'nofit.recent': 'あなたの単語に合うテキストが1つあります — 「{topic}」 — ただし、この2週間以内に読んだものです。/read を新しく保つため、最近の読みは控えています。\nほしいときはいつでも、またあなたのものです。下をタップしてください。そして、Yondeで学習セッションをすると単語が増え、新しく合うものが続きます。',
   'passage.defaultTopic': '読書',
   'passage.header': '🔍 Horiが見つけてきました — {topic} · {band}',
+  'passage.howTo': '① 音声メモを聞く  ② 声に出して読む  ③ 下で感触をタップ',
   'passage.mineButton': '新しい単語を取り込む',
   'passage.pushMe': 'もっと難しく 🔥',
   'passage.readIt': '読んだ ✓',

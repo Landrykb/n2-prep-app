@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { localDictionary, loadDictionary, quizPool, LEVELS } from '../lib/dictionary.js'
 import { loadStats, saveStats, recordResult, weightedSample, weakCount } from '../lib/speedStats.js'
+import { useAuth } from '../hooks/useAuth.js'
+import { addToQueue } from '../lib/queue.js'
+import { recordQueueRating } from '../lib/twin.js'
 import { Zap, Clock, Flame, Play, RotateCcw, Trophy, Target, Loader2 } from 'lucide-react'
 
 const TIMES = [3, 5, 8, 12]
@@ -49,6 +52,7 @@ function buildQuestion(entry, pool) {
 }
 
 export default function SpeedCards() {
+  const { user } = useAuth()
   const [dict, setDict] = useState(localDictionary)
   const [loading, setLoading] = useState(true)
   const [levels, setLevels] = useState(['N2'])
@@ -67,8 +71,9 @@ export default function SpeedCards() {
   const [correct, setCorrect] = useState(0)
   const [missed, setMissed] = useState([])
 
-  const initialStats = useMemo(() => loadStats(), [])
+  const initialStats = useMemo(() => loadStats(user), [user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const statsRef = useRef(initialStats)
+  useEffect(() => { statsRef.current = initialStats }, [initialStats])
   const [weak, setWeak] = useState(() => weakCount(initialStats))
   const [highScore, setHighScore] = useState(() => Number(localStorage.getItem('n2:speed-high') || 0))
 
@@ -119,7 +124,7 @@ export default function SpeedCards() {
   const score = correct * 10 + Math.max(0, best - 2) * 5
 
   const finish = useCallback((finalCorrect, finalBest) => {
-    saveStats(statsRef.current)
+    saveStats(statsRef.current, user)
     setWeak(weakCount(statsRef.current))
     const final = finalCorrect * 10 + Math.max(0, finalBest - 2) * 5
     setHighScore((hs) => {
@@ -130,7 +135,7 @@ export default function SpeedCards() {
       return hs
     })
     setPhase('done')
-  }, [])
+  }, [user])
 
   const advance = useCallback((nextCards, nextIndex, finalCorrect, finalBest) => {
     if (nextIndex >= nextCards.length) {
@@ -162,6 +167,24 @@ export default function SpeedCards() {
     let nextCards = cards
     if (!isCorrect) {
       setMissed((m) => (m.some((x) => x.key === current.key) ? m : [...m, current]))
+      // Misses join the ONE queue (integration audit #14): a speed
+      // miss used to evaporate into this tab's private stats. The
+      // word now becomes a queue card (source 'speed', deduped by
+      // addToQueue) and the lapse is classified into the Twin
+      // fingerprint like every other lapse source. Recognition is
+      // not recall, so the queue card's FSRS is NOT rated here —
+      // it simply waits in the queue like any new card.
+      try {
+        const added = addToQueue([{
+          front: current.prompt,
+          back: firstSense(current.entry?.meaning) || current.answer || '',
+          reading: current.entry?.reading || '',
+          source: 'speed',
+          level: current.level || '',
+        }])
+        const item = added.queue.find((i) => i.front === current.prompt && i.source === 'speed')
+        if (item) recordQueueRating(item, 1)
+      } catch { /* the queue mirror never blocks the round */ }
       // Requeue the missed card a few positions later so it is retried in-round.
       const at = Math.min(index + 3, cards.length)
       nextCards = [...cards.slice(0, at), current, ...cards.slice(at)]

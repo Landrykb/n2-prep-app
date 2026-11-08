@@ -3,6 +3,7 @@
 // profile — the app starts from the person's problem, not from features.
 
 import { emitLearnerStateSaved } from './stateEvents.js'
+import { computeSixtyDayPromise, savePromise } from './promise.js'
 import { t as translate } from './i18n.js'
 
 // Onboarding option copy lives in the language catalogs (Doc 20,
@@ -48,7 +49,23 @@ export function loadProfile() {
 }
 
 export function saveProfile(profile) {
-  try { localStorage.setItem(PROFILE_KEY, JSON.stringify({ ...profile, updatedAt: new Date().toISOString() })); emitLearnerStateSaved() } catch { /* ignore */ }
+  try {
+    const stamped = { ...profile, updatedAt: new Date().toISOString() }
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(stamped))
+    emitLearnerStateSaved()
+    // The promise must not go stale when the problem changes
+    // (integration audit #19): the planner already plans from the
+    // new profile immediately, so PromisePanel/Today would quote a
+    // promise computed from the old one until the next diagnosis.
+    // When a diagnosis exists, recompute + re-save the promise from
+    // the new profile in the same act. No diagnosis → no promise
+    // (the promise rule itself), exactly as before.
+    try {
+      const diagnosis = loadDiagnosis()
+      const promise = diagnosis ? computeSixtyDayPromise(diagnosis, stamped) : null
+      if (promise) savePromise(promise)
+    } catch { /* a promise refresh never blocks saving the profile */ }
+  } catch { /* ignore */ }
 }
 
 export function saveDiagnosis(diagnosis) {

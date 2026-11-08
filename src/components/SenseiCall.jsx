@@ -86,7 +86,7 @@ function freshRingChain(profile, slotIdx) {
   return pickCallScenes(profile, todayStr(), slotIdx || 0, 3)
 }
 
-export default function SenseiCall() {
+export default function SenseiCall({ setActive } = {}) {
   const profile = useMemo(loadProfile, [])
   const { user } = useAuth()
   const { t } = useLanguage()
@@ -416,7 +416,7 @@ export default function SenseiCall() {
     if (source === 'test' || source === 'mini') { setRing(null); setPhase('idle'); return }
     recordCallOutcome({ kept: false })
     let s = loadCallState()
-    s = recordHistory(s, { kind: 'call', scene: chain[0]?.title || t('call.practiceCallFallback'), status: 'missed', bestScore: null, how })
+    s = recordHistory(s, { kind: 'call', scene: chain[0]?.title || t('call.practiceCallFallback'), status: 'missed', bestScore: null, how, source })
     const { state: next, outcome } = registerMiss(s, { slotIdx, wasCallback: source === 'callback', sceneTitle: chain[0]?.title })
     updateState(next)
     setInbox(loadInbox())
@@ -703,7 +703,12 @@ export default function SenseiCall() {
     if (ring && ring.source !== 'test') recordCallOutcome({ kept: true, bestScore: bestScoreVal, partial: done.length < chain.length })
     const weakest = [...done].sort((a, b) => a.best - b.best)[0]
     let s = loadCallState()
-    s = recordHistory(s, { kind: 'call', scene: chain[0]?.title || t('call.practiceCallFallback'), status: 'completed', bestScore: bestScoreVal, exchanges: done.length })
+    // The history entry carries its ring source (audit #5): it is
+    // the ONE source refreshTwin derives the Twin's call counters
+    // from, and a test ring must be excludable there exactly as it
+    // is excluded from the metric above. No ring = a self-started
+    // practice call, which counts.
+    s = recordHistory(s, { kind: 'call', scene: chain[0]?.title || t('call.practiceCallFallback'), status: 'completed', bestScore: bestScoreVal, exchanges: done.length, source: ring?.source || 'practice' })
     if (ring && (ring.source === 'slot' || ring.source === 'callback' || ring.source === 'catchup')) {
       const date = todayStr()
       const d = s.days[date]
@@ -820,6 +825,12 @@ export default function SenseiCall() {
             <span className={`block w-5 h-5 rounded-full bg-white shadow transition-transform ${settings.enabled ? 'translate-x-6' : 'translate-x-1'}`} />
           </button>
         </label>
+        {/* Progressive disclosure (audit P1-4): while calls are off,
+            the form's details stay folded behind the toggle — the
+            page's sequence is enable → try a call → then, only if
+            wanted, the details. Save stays visible in both states:
+            the toggle itself is a setting that must be saveable. */}
+        {settings.enabled && (<>
         <div className="grid sm:grid-cols-3 gap-3">
           <label className="text-xs text-slate-400 space-y-1.5">{t('call.senseiNameLabel')}
             <input value={settings.senseiName} onChange={(e) => setSettings((st) => ({ ...st, senseiName: e.target.value }))} className="w-full rounded-xl bg-bun-800 border border-bun-600/40 px-3 py-2 text-sm text-slate-100 focus:border-[#FF6B57] focus:outline-none" />
@@ -849,6 +860,7 @@ export default function SenseiCall() {
           ))}
           {settings.windows.length < 3 && <button onClick={addWindow} className="text-xs text-[#FF8A75] hover:text-[#FFA08D]">{t('call.addWindow')}</button>}
         </div>
+        </>)}
         <div className="flex items-center gap-3">
           <button onClick={saveSettings} className="px-4 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold">{t('call.saveSettings')}</button>
           {savedNote && <span className="text-xs text-emerald-300">{savedNote}</span>}
@@ -1105,6 +1117,14 @@ export default function SenseiCall() {
               </div>
             )}
             <button onClick={() => { setPhase('idle'); setRing(null) }} className="px-6 py-3 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-semibold">{t('call.wrapDone')}</button>
+            {/* The wrap-up names queue items the call just created —
+                give them a door (audit P1-4): they surface in today's
+                session, so that is where the door leads. */}
+            {wrap.queued > 0 && setActive && (
+              <div>
+                <button onClick={() => { setPhase('idle'); setRing(null); setActive('session') }} className="text-sm text-slate-300 hover:text-white underline underline-offset-4 transition">{t('call.wrapSeeSession')}</button>
+              </div>
+            )}
             <p className="text-[11px] text-slate-600">{t('call.wrapFooter')}</p>
           </div>
         </div>

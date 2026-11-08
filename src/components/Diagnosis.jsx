@@ -203,14 +203,18 @@ export default function Diagnosis({ setActive }) {
   const prescription = (res) => {
     const lines = []
     const weakestLabel = t(`diag.section.${res.weakest}`)
+    // The FIRST door is the spine (audit P0-3): today's session,
+    // which Saki builds from exactly this result. The tool rows
+    // below are the supporting habits, demoted under it.
+    lines.push({ tab: 'session', text: t('diag.rx.session'), primary: true })
     lines.push({ tab: res.weakest === 'listening' ? 'n2listening' : res.weakest === 'reading' ? 'reading' : 'lessons', text: t('diag.rx.weakest', { section: weakestLabel, score: res.sections[res.weakest] }) })
-    lines.push({ tab: 'voice', text: t('diag.rx.voice') })
+    // The voice habit lives inside the guided session's scene step
+    // now — one door, not the VoiceLoop's separate entrance, and
+    // the old commute line that duplicated this same tab is gone.
+    lines.push({ tab: 'session', text: t('diag.rx.voice') })
     lines.push({ tab: 'anki', text: t('diag.rx.anki') })
     if ((profile?.pains || []).includes('keigo') || (profile?.pains || []).includes('blocked-job') || profile?.proofTarget === 'bjt' || profile?.proofTarget === 'hsp') {
       lines.push({ tab: 'bjt', text: t('diag.rx.bjt') })
-    }
-    if ((profile?.pains || []).includes('listening') || res.weakest === 'listening') {
-      lines.push({ tab: 'voice', text: t('diag.rx.commute') })
     }
     lines.push({ tab: 'mock', text: t('diag.rx.mock', { level: res.jlptEstimate, target: (res.passMark || 90) + 15 }) })
     lines.push({ tab: 'diagnosis', text: t('diag.rx.rerun') })
@@ -350,8 +354,10 @@ export default function Diagnosis({ setActive }) {
               </div>
             </div>
             {prescription(result).map((line, i) => (
-              <button key={i} onClick={() => setActive?.(line.tab)} className="w-full text-left flex items-start gap-2 rounded-xl bg-bun-700/40 border border-bun-600/30 p-3 hover:border-[#FF6B57]/40 transition">
-                <ChevronRight size={15} className="text-[#FF8A75] mt-0.5 shrink-0" /><span className="text-sm text-slate-200">{line.text}</span>
+              <button key={i} onClick={() => setActive?.(line.tab)} className={line.primary
+                ? "w-full text-left flex items-start gap-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] p-3.5 transition"
+                : "w-full text-left flex items-start gap-2 rounded-xl bg-bun-700/40 border border-bun-600/30 p-3 hover:border-[#FF6B57]/40 transition"}>
+                <ChevronRight size={15} className={`${line.primary ? 'text-white' : 'text-[#FF8A75]'} mt-0.5 shrink-0`} /><span className={`text-sm ${line.primary ? 'text-white font-semibold' : 'text-slate-200'}`}>{line.text}</span>
               </button>
             ))}
             <button onClick={() => setPhase('intro')} className="px-4 py-2 rounded-lg bg-bun-700 hover:bg-bun-600 text-slate-200 text-xs font-medium flex items-center gap-1.5"><RotateCcw size={13} /> {t('diag.backLater')}</button>

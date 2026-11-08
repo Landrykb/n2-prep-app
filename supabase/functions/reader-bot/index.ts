@@ -140,13 +140,33 @@ const MINI_APP_READER_URL = 'https://jpn2easy.vercel.app/reader?tg=4'
 // (registered by reader-admin via setChatMenuButton), and /app is
 // the typed route to it.
 const MINI_APP_URL = 'https://jpn2easy.vercel.app/?tg=4'
-const appButton = (lang: BotLang) => ({
-  text: bt(lang, 'app.openYonde'),
-  web_app: { url: MINI_APP_URL },
+const MINI_APP_SESSION_URL = 'https://jpn2easy.vercel.app/session?tg=4'
+// Exact doors (integration audit): a button lands on the surface
+// its copy names, never just the app root. 'app' is the whole-app
+// door; 'reader' and 'session' land on those views directly (the
+// client routes the literal /reader and /session paths).
+const APP_DOORS = {
+  app: { key: 'app.openYonde', url: MINI_APP_URL },
+  reader: { key: 'app.openReader', url: MINI_APP_READER_URL },
+  session: { key: 'app.openSession', url: MINI_APP_SESSION_URL },
+} as const
+type AppDoor = keyof typeof APP_DOORS
+const appButton = (lang: BotLang, dest: AppDoor = 'app') => ({
+  text: bt(lang, APP_DOORS[dest].key),
+  web_app: { url: APP_DOORS[dest].url },
 })
-const appKeyboard = (lang: BotLang = 'en', rows: Record<string, unknown>[][] = []) => ({
-  inline_keyboard: [...rows, [appButton(lang)]],
+const appKeyboard = (lang: BotLang = 'en', rows: Record<string, unknown>[][] = [], dest: AppDoor = 'app') => ({
+  inline_keyboard: [...rows, [appButton(lang, dest)]],
 })
+// The one continuation (integration audit): every terminal reply
+// — a confirmation, a notice, a dead end — ends with the same two
+// fixed slots, in the same order: the guided next step first
+// ([Send Me a Passage], the door:read serve), the whole-app door
+// last. A learner never has to guess what happens next.
+const continuationKeyboard = (lang: BotLang = 'en') =>
+  appKeyboard(lang, [
+    [{ text: bt(lang, 'start.sendPassage'), callback_data: 'door:read' }],
+  ])
 
 // The morning greeting (Doc 16 R1/§9) is copy key
 // 'morning.greeting' in i18n.ts: the one line that precedes a
@@ -555,6 +575,20 @@ serve(async (req: Request) => {
       link: { user_id?: string | null } | null | undefined,
     ): Promise<BotLang> => (link?.user_id ? await langForUser(link.user_id) : 'en')
 
+    // Pre-link language (integration audit): an unlinked chat has
+    // no state slice to resolve from, so its explainer speaks the
+    // language Telegram itself reports for the sender
+    // (language_code on the update's from) — fr/ja when Telegram
+    // says so, English otherwise. Linked chats never use this:
+    // their app choice stays the single source.
+    const telegramLang = (): BotLang => {
+      const u = update as Record<string, unknown> | null
+      const msgFrom = ((u?.message ?? {}) as Record<string, unknown>).from as Record<string, unknown> | undefined
+      const cbFrom = ((u?.callback_query ?? {}) as Record<string, unknown>).from as Record<string, unknown> | undefined
+      const code = (msgFrom?.language_code ?? cbFrom?.language_code) as unknown
+      return code === 'fr' || code === 'ja' ? code : 'en'
+    }
+
     // The calibrated known set (Doc 16 §5 amendment): queue fronts +
     // Twin personal vocab + below-band deck credit. The credit follows
     // the resolved band basis (resolveBand, amendment #3): it exists
@@ -725,11 +759,15 @@ serve(async (req: Request) => {
     // ANY failure along the way is a console line, never a
     // user-facing error: voice enhances the passage; the text is
     // the passage.
-    const enqueueVoiceJob = async (chatId: number, passage: Record<string, unknown>) => {
+    // Returns true when a worker job now covers this passage (one
+    // already live, or a fresh insert) — the caller can then skip
+    // every other synthesis route (integration audit: the worker
+    // is the route that works from a reachable egress).
+    const enqueueVoiceJob = async (chatId: number, passage: Record<string, unknown>): Promise<boolean> => {
       try {
         const passageId = String(passage.id ?? '')
         const text = String(passage.text ?? '')
-        if (!passageId || !text) return
+        if (!passageId || !text) return false
         // One live job per passage is enough: a pending/claimed job
         // will produce the audio, and a done one is awaiting (or
         // retrying) delivery through the dispatch sweep. A failed
@@ -741,13 +779,18 @@ serve(async (req: Request) => {
           .eq('passage_id', passageId)
           .in('status', ['pending', 'claimed', 'done'])
           .limit(1)
-        if (live && live.length > 0) return
+        if (live && live.length > 0) return true
         const { error } = await supabaseAdmin
           .from('voice_jobs')
           .insert({ passage_id: passageId, chat_id: chatId, text })
-        if (error) console.error('reader-bot: voice job enqueue failed')
+        if (error) {
+          console.error('reader-bot: voice job enqueue failed')
+          return false
+        }
+        return true
       } catch (err) {
         console.error('reader-bot: voice job enqueue failed', err)
+        return false
       }
     }
 
@@ -758,6 +801,13 @@ serve(async (req: Request) => {
           await tg(botToken, 'sendVoice', { chat_id: chatId, voice: cached })
           return
         }
+        // Worker first (integration audit): direct Edge synthesis
+        // from this function's egress is a known dead route — it
+        // burned time on every uncached passage before falling
+        // through to the worker anyway. Enqueue first; the direct
+        // attempt below survives only as the last resort when no
+        // job could be queued.
+        if (await enqueueVoiceJob(chatId, passage)) return
         const bytes = await synthesizeSpeechOgg(String(passage.text ?? ''))
         if (bytes) {
           const form = new FormData()
@@ -780,9 +830,9 @@ serve(async (req: Request) => {
           }
           console.error(`reader-bot: sendVoice upload failed status=${res.status}`)
         }
-        // No voice from this egress — hand the passage to the VM
-        // Voice Worker. Its delivery arrives as its own message
-        // through the ?voicejob route (or the dispatch sweep).
+        // The direct attempt was already the fallback (the worker
+        // enqueue above failed) — one last enqueue try, then voice
+        // simply waits for the next send of this passage.
         await enqueueVoiceJob(chatId, passage)
       } catch (err) {
         console.error('reader-bot: passage voice send failed', err)
@@ -803,14 +853,20 @@ serve(async (req: Request) => {
     // .againPassageId (amendment #7): re-serve THIS passage — the
     // learner tapped Read It Again on the no-fit reply; the gate
     // re-verifies it below before anything is sent.
+    // Returns an outcome word (integration audit): 'sent' when a
+    // passage went out, otherwise the reason it did not —
+    // 'not_linked' | 'need_level' | 'shelf_empty' | 'nofit_recent'
+    // | 'nofit_no_words' | 'nofit_gate'. The morning dispatch logs
+    // it per due learner (dispatch_outcome), so a {due:1, sent:0}
+    // morning is diagnosable from metrics alone instead of silent.
     const handleRead = async (
       chatId: number,
       opts: { declaredBand?: string | null; declaredAt?: string | null; fromLevelTap?: boolean; forceStarter?: boolean; kind?: string; againPassageId?: string; lang?: BotLang } = {},
-    ) => {
+    ): Promise<string> => {
       const link = await linkByChat(chatId)
       if (!link) {
-        await sendMessage(botToken, chatId, bt('en', 'link.explainer'))
-        return
+        await sendMessage(botToken, chatId, bt(telegramLang(), 'link.explainer'))
+        return 'not_linked'
       }
       const declaredBand = opts.declaredBand !== undefined ? opts.declaredBand : (link.declared_band ?? null)
       const declaredAt = opts.declaredAt !== undefined ? opts.declaredAt : (link.declared_at ?? null)
@@ -859,7 +915,7 @@ serve(async (req: Request) => {
       // stops the moment a basis exists.
       if (!opts.fromLevelTap && shouldAskLevel({ ...link, declared_band: declaredBand }, bandSource)) {
         await sendMessage(botToken, chatId, bt(lang, 'level.ask'), { reply_markup: levelKeyboard(bt(lang, 'level.notSure')) })
-        return
+        return 'need_level'
       }
 
       // Cold start (Doc 16 §5 amendment #2): no band basis of any
@@ -887,8 +943,8 @@ serve(async (req: Request) => {
         .select('id, band, topic, text, tokens, new_word_candidates, source, voice_file_id')
       if (bankError || !bank) {
         console.error('reader-bot: passage bank fetch failed')
-        await sendMessage(botToken, chatId, bt(lang, 'shelf.empty'))
-        return
+        await sendMessage(botToken, chatId, bt(lang, 'shelf.empty'), { reply_markup: continuationKeyboard(lang) })
+        return 'shelf_empty'
       }
 
       let picked: { passage: Record<string, unknown>; ratio: number } | null = null
@@ -990,19 +1046,19 @@ serve(async (req: Request) => {
             {
               reply_markup: appKeyboard(lang, [
                 [{ text: bt(lang, 'nofit.readAgainButton'), callback_data: `again:${String(againPassage.id)}` }],
-              ]),
+              ], 'session'),
             },
           )
-          return
+          return 'nofit_recent'
         }
         if (queue.length === 0) {
           await sendMessage(
             botToken,
             chatId,
             bt(lang, 'nofit.noSyncedWords'),
-            { reply_markup: appKeyboard(lang) },
+            { reply_markup: appKeyboard(lang, [], 'session') },
           )
-          return
+          return 'nofit_no_words'
         }
         // Case two: the bank genuinely runs ahead of this learner's
         // words at their band. Say exactly that, own the generation
@@ -1019,8 +1075,10 @@ serve(async (req: Request) => {
         }
         noFit += bt(lang, 'nofit.forward')
         if (!cold && bandSource === 'none') noFit += bt(lang, 'checkup.switch')
-        await sendMessage(botToken, chatId, noFit, { reply_markup: appKeyboard(lang) })
-        return
+        // Exact door: the copy names a study session as the way
+        // forward, so the button lands on the session itself.
+        await sendMessage(botToken, chatId, noFit, { reply_markup: appKeyboard(lang, [], 'session') })
+        return 'nofit_gate'
       }
 
       const passage = picked.passage as Record<string, unknown>
@@ -1122,11 +1180,18 @@ serve(async (req: Request) => {
           readings.map((r) => `${esc(r.word)} （${esc(r.reading)}）${r.meaning ? ` — ${esc(r.meaning)}` : ''}`).join('\n') +
           '</blockquote>'
         : null
+      // Step order (integration audit, hierarchy standard in text
+      // form): the header names what arrived, ONE line says what
+      // to do in order (① listen → ② read it aloud → ③ tap how it
+      // felt), then the passage itself is the body, then the
+      // detail (readings, footer) and the detailed voice
+      // instruction last.
       const lines = [
         bt(lang, 'passage.header', {
           topic: esc(String(passage.topic || bt(lang, 'passage.defaultTopic'))),
           band: esc(String(passage.band)),
         }),
+        bt(lang, 'passage.howTo'),
         '',
         renderPassage(String(passage.text), newWords),
         ...(readingsBlock ? ['', readingsBlock] : []),
@@ -1135,24 +1200,28 @@ serve(async (req: Request) => {
         '',
         bt(lang, 'voice.instruction'),
       ]
-      // Every passage send carries the adaptive-fit feedback row
-      // (amendment #4) under Mine: [Read It ✓] [Push Me 🔥]
-      // [Too Hard]. The payloads carry the passage id (fitCallback)
-      // so the handler can dedupe — one tap per passage counts —
-      // and so Too Hard can explain THAT passage. Read It ✓ is
-      // self-report, honestly: a tap cannot verify a read — the
-      // voice-note read-aloud (handleVoiceNote) is the performed
-      // proof, and both paths share this dedupe so a passage is
-      // proven once, by voice or by tap.
+      // Keyboard hierarchy (integration audit): the ONE primary
+      // action first and alone — [Read It ✓], the completion tap;
+      // the fit verdicts next ([Push Me 🔥] [Too Hard]); Mine
+      // after them; the app door last, as the exit. The payloads
+      // carry the passage id (fitCallback) so the handler can
+      // dedupe — one tap per passage counts — and so Too Hard can
+      // explain THAT passage. Read It ✓ is self-report, honestly:
+      // a tap cannot verify a read — the voice-note read-aloud
+      // (handleVoiceNote) is the performed proof, and both paths
+      // share this dedupe so a passage is proven once, by voice
+      // or by tap.
       const keyboardRows: Record<string, string>[][] = []
-      if (newWords.length > 0) {
-        keyboardRows.push([{ text: bt(lang, 'passage.mineButton'), callback_data: `mine:${String(passage.id)}` }])
-      }
       keyboardRows.push([
         { text: bt(lang, 'passage.readIt'), callback_data: fitCallback('read', String(passage.id)) },
+      ])
+      keyboardRows.push([
         { text: bt(lang, 'passage.pushMe'), callback_data: fitCallback('up', String(passage.id)) },
         { text: bt(lang, 'passage.tooHard'), callback_data: fitCallback('hard', String(passage.id)) },
       ])
+      if (newWords.length > 0) {
+        keyboardRows.push([{ text: bt(lang, 'passage.mineButton'), callback_data: `mine:${String(passage.id)}` }])
+      }
       // The Mini App row (R1): tap-a-word lives on the PWA /reader
       // page — chat text cannot do per-word taps — so every passage
       // keyboard ends with the door to it. The chat message stays
@@ -1194,6 +1263,7 @@ serve(async (req: Request) => {
         // the learning loop turning, not just passages moving.
         ...(coldStart ? {} : { newKanji: newKanji.length, recycledBatch }),
       })
+      return 'sent'
     }
 
     // ---------- read-again + door callbacks (amendment #7) ----------
@@ -1373,8 +1443,10 @@ serve(async (req: Request) => {
       const row = await loadState(link.user_id)
       if (!row?.state) {
         // Conservative by design: never fabricate a learner document.
+        // The copy names the one action (open Yonde signed in), so
+        // the reply carries that exact door (integration audit).
         await answer(bt(lang, 'mine.nothingSyncedToast'))
-        await sendMessage(botToken, chatId, bt(lang, 'mine.nothingSynced'))
+        await sendMessage(botToken, chatId, bt(lang, 'mine.nothingSynced'), { reply_markup: appKeyboard(lang) })
         return
       }
       const state = row.state as Record<string, unknown>
@@ -1451,12 +1523,15 @@ serve(async (req: Request) => {
           ? bt(lang, added === 1 ? 'mine.toastOne' : 'mine.toastMany', { count: added })
           : bt(lang, 'mine.toastNone'),
       )
+      // The confirmation is a terminal reply: it ends with the
+      // one continuation (next passage first, app door last).
       await sendMessage(
         botToken,
         chatId,
         added > 0
           ? bt(lang, added === 1 ? 'mine.addedOne' : 'mine.addedMany', { count: added })
           : bt(lang, 'mine.nothingNew'),
+        { reply_markup: continuationKeyboard(lang) },
       )
     }
 
@@ -1647,7 +1722,7 @@ serve(async (req: Request) => {
           // silent difficulty jump would read as the bot drifting,
           // and the way back is named in the same breath. The count
           // word follows the pace that was actually applied.
-          await sendMessage(botToken, chatId, botTrialUpCopy(lang, comfyTarget))
+          await sendMessage(botToken, chatId, botTrialUpCopy(lang, comfyTarget), { reply_markup: continuationKeyboard(lang) })
         }
       } else if (kind === 'up') {
         await answer(after.effect === 'max' ? bt(lang, 'feedback.pushMax') : bt(lang, 'feedback.pushing'))
@@ -1922,7 +1997,7 @@ serve(async (req: Request) => {
       // in the linked private chat, from the person who owns it.
       const link = Number.isFinite(chatId) ? await linkByChat(chatId) : null
       if (!link || Number(vFrom.id) !== chatId) {
-        if (Number.isFinite(chatId)) await sendMessage(botToken, chatId, bt('en', 'link.explainer'))
+        if (Number.isFinite(chatId)) await sendMessage(botToken, chatId, bt(telegramLang(), 'link.explainer'))
         return
       }
       const lang = await langForUser(link.user_id)
@@ -1941,7 +2016,7 @@ serve(async (req: Request) => {
         .limit(1)
       const currentId = (sentRows?.[0]?.payload as Record<string, unknown> | undefined)?.passageId
       if (typeof currentId !== 'string' || !currentId) {
-        await sendMessage(botToken, chatId, bt(lang, 'voice.noPassage'))
+        await sendMessage(botToken, chatId, bt(lang, 'voice.noPassage'), { reply_markup: continuationKeyboard(lang) })
         return
       }
       const { data: passage } = await supabaseAdmin
@@ -1950,7 +2025,7 @@ serve(async (req: Request) => {
         .eq('id', currentId)
         .maybeSingle()
       if (!passage) {
-        await sendMessage(botToken, chatId, bt(lang, 'voice.passageGone'))
+        await sendMessage(botToken, chatId, bt(lang, 'voice.passageGone'), { reply_markup: continuationKeyboard(lang) })
         return
       }
 
@@ -1993,7 +2068,7 @@ serve(async (req: Request) => {
             { reply_markup: voiceResultKeyboard(lang, currentId) },
           )
           if (voiceEffect.trialUp) {
-            await sendMessage(botToken, chatId, botTrialUpCopy(lang, voiceEffect.target))
+            await sendMessage(botToken, chatId, botTrialUpCopy(lang, voiceEffect.target), { reply_markup: continuationKeyboard(lang) })
           }
         } else {
           await sendMessage(
@@ -2039,7 +2114,7 @@ serve(async (req: Request) => {
         { reply_markup: voiceResultKeyboard(lang, currentId) },
       )
       if (voiceEffect.trialUp) {
-        await sendMessage(botToken, chatId, botTrialUpCopy(lang, voiceEffect.target))
+        await sendMessage(botToken, chatId, botTrialUpCopy(lang, voiceEffect.target), { reply_markup: continuationKeyboard(lang) })
       }
     }
 
@@ -2201,10 +2276,15 @@ serve(async (req: Request) => {
           if (!isDispatchDue({ morningMinutes, nowMinutes, sentMorningToday: !!morningRows && morningRows.length > 0 })) continue
 
           due++
-          // Served == a morning-tagged passage_sent exists now that
-          // did not before (handleRead's failure paths send honest
-          // copy instead of a passage, and must not count).
-          await handleRead(chatId, { kind: 'morning' })
+          // The serve reports its own outcome (integration audit):
+          // log it per due learner, so a morning that sent nothing
+          // names its reason in metrics (dispatch_outcome) instead
+          // of collapsing into a silent {due:1, sent:0}. Served
+          // still means a morning-tagged passage_sent exists now
+          // that did not before — the outcome and the event agree
+          // by construction, and the event stays the count's proof.
+          const outcome = await handleRead(chatId, { kind: 'morning' })
+          await logEvent(link.user_id, 'dispatch_outcome', { outcome })
           const { data: checkRows } = await supabaseAdmin
             .from('metrics_events')
             .select('id')
@@ -2289,7 +2369,7 @@ serve(async (req: Request) => {
           // gets the explainer.
           const link = await linkByChat(chatId)
           if (!link) {
-            await sendMessage(botToken, chatId, bt('en', 'link.explainer'))
+            await sendMessage(botToken, chatId, bt(telegramLang(), 'link.explainer'))
           } else {
             const row = await loadState(link.user_id)
             const state = (row?.state ?? {}) as Record<string, unknown>
@@ -2325,7 +2405,7 @@ serve(async (req: Request) => {
             .maybeSingle()
           const unexpired = pending && (!pending.link_expires_at || new Date(pending.link_expires_at as string) > new Date())
           if (!unexpired) {
-            await sendMessage(botToken, chatId, bt('en', 'link.expired'))
+            await sendMessage(botToken, chatId, bt(telegramLang(), 'link.expired'))
           } else {
             const { error } = await supabaseAdmin
               .from('telegram_links')
@@ -2347,7 +2427,7 @@ serve(async (req: Request) => {
               .is('chat_id', null)
             if (error) {
               console.error('reader-bot: link claim failed')
-              await sendMessage(botToken, chatId, bt('en', 'link.failed'))
+              await sendMessage(botToken, chatId, bt(telegramLang(), 'link.failed'))
             } else {
               // Post-claim language (amendment #11): the claimed
               // user's state row may already carry a language
@@ -2355,7 +2435,10 @@ serve(async (req: Request) => {
               // app has not synced a choice yet hears English
               // until it does. No slice is ever written here.
               const claimLang = await langForUser(pending.user_id as string)
-              await sendMessage(botToken, chatId, bt(claimLang, 'welcome'), { reply_markup: appKeyboard(claimLang) })
+              // The welcome is the first guided step, not a dead
+              // end: it carries the one continuation (a first
+              // passage first, the app door last).
+              await sendMessage(botToken, chatId, bt(claimLang, 'welcome'), { reply_markup: continuationKeyboard(claimLang) })
             }
           }
         }
@@ -2380,7 +2463,7 @@ serve(async (req: Request) => {
         // there is no row to declare onto.
         const link = await linkByChat(chatId)
         if (!link) {
-          await sendMessage(botToken, chatId, bt('en', 'link.explainer'))
+          await sendMessage(botToken, chatId, bt(telegramLang(), 'link.explainer'))
         } else {
           const row = await loadState(link.user_id)
           const state = (row?.state ?? {}) as Record<string, unknown>
@@ -2411,10 +2494,25 @@ serve(async (req: Request) => {
             ? bt(unlinkLang, 'unlink.done')
             : bt('en', 'unlink.notLinked'),
         )
-      } else {
+      } else if (cmd === '/help') {
         const helpLink = await linkByChat(chatId)
         const helpLang = await langForLink(helpLink)
         await sendMessage(botToken, chatId, bt(helpLang, 'help'), { reply_markup: appKeyboard(helpLang) })
+      } else {
+        // Free text (integration audit): any other words from a
+        // linked chat are not a command, and dumping the command
+        // catalogue on them was a dead end dressed as help. The
+        // reply stays in context — Hori's one job, the next
+        // passage one tap away — and the catalogue lives behind
+        // /help, where it was asked for. An unlinked chat gets
+        // the explainer, in Telegram's own reported language.
+        const freeLink = await linkByChat(chatId)
+        if (!freeLink) {
+          await sendMessage(botToken, chatId, bt(telegramLang(), 'link.explainer'))
+        } else {
+          const freeLang = await langForUser(freeLink.user_id)
+          await sendMessage(botToken, chatId, bt(freeLang, 'chat.contextReply'), { reply_markup: continuationKeyboard(freeLang) })
+        }
       }
     } catch (err) {
       console.error('reader-bot: message handling failed', err)

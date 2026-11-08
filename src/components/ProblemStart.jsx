@@ -1,16 +1,24 @@
 import { useState } from 'react'
 import { X, CheckCircle2, Circle, Lock, Compass, Target, HeartPulse } from 'lucide-react'
 import { PERSONAS, PAINS, PROOF_TARGETS, saveProfile, ladderWithStatus, PROOF_LADDER } from '../lib/profile.js'
+import { saveDeclaredLevel } from '../lib/learnerState.js'
+import { BANDS } from '../lib/readerFit.js'
 import { useLanguage } from '../hooks/useLanguage.js'
 
 // "Start with your problem" onboarding — three questions, saved to
 // localStorage (jpn:profile:v1), dismissible, re-openable from Today.
-export function OnboardingFlow({ initial, onDone, onClose }) {
+// First run does not end at the save (audit P0-2): the form hands off
+// to the ONE next step — the checkup — with the level declaration as
+// the skip path, so a new learner is never left standing on Today
+// wondering where the plan went. Editing an existing problem keeps
+// the old behaviour: save and close.
+export function OnboardingFlow({ initial, onDone, onClose, setActive }) {
   const { t } = useLanguage()
   const [persona, setPersona] = useState(initial?.persona || '')
   const [pains, setPains] = useState(initial?.pains || [])
   const [proofTarget, setProofTarget] = useState(initial?.proofTarget || '')
   const [realLifeGoal, setRealLifeGoal] = useState(initial?.realLifeGoal || '')
+  const [savedProfile, setSavedProfile] = useState(null) // first-run handoff panel
 
   const togglePain = (id) => setPains((cur) => (cur.includes(id) ? cur.filter((p) => p !== id) : [...cur, id]))
   const complete = persona && pains.length && proofTarget
@@ -18,7 +26,40 @@ export function OnboardingFlow({ initial, onDone, onClose }) {
   const finish = () => {
     const profile = { persona, pains, proofTarget, realLifeGoal }
     saveProfile(profile)
-    onDone?.(profile)
+    if (initial) { onDone?.(profile); return } // editing: save + close, as before
+    setSavedProfile(profile) // first run: hand off, don't just close
+  }
+
+  const handoff = (view) => {
+    onDone?.(savedProfile)
+    setActive?.(view)
+  }
+
+  if (savedProfile) {
+    return (
+      <div className="rounded-3xl glass p-6 sm:p-8 card-glow space-y-5 border border-[#FF6B57]/25">
+        <div>
+          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#FF8A75] mb-1"><Compass size={14} /> {t('problem.eyebrow')}</p>
+          <h2 className="text-2xl font-bold text-white">{t('problem.nextTitle')}</h2>
+        </div>
+        <button onClick={() => handoff('diagnosis')} className="w-full px-6 py-3.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white font-semibold text-sm transition">
+          {t('twin.level.takeCheckup')}
+        </button>
+        <div className="space-y-2">
+          <p className="text-sm text-slate-300">{t('problem.nextLevelLine')}</p>
+          <div className="flex flex-wrap gap-2">
+            {[...BANDS, 'N7'].map((b) => (
+              <button key={b} onClick={() => { saveDeclaredLevel(b); handoff('session') }} className="px-3 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-semibold">
+                {b === 'N7' ? 'N7+' : b}
+              </button>
+            ))}
+          </div>
+        </div>
+        <button onClick={() => handoff('session')} className="text-xs text-slate-400 hover:text-slate-200 transition">
+          {t('problem.nextSkip')}
+        </button>
+      </div>
+    )
   }
 
   return (

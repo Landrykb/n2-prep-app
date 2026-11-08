@@ -12,6 +12,7 @@ const MOCK_LEVELS = ['N5', 'N4', 'N3', 'N2', 'N1']
 import { loadMockHistory, saveMockAttempt } from '../lib/mockStore.js'
 import { setAiPrefill } from '../lib/aiPrefill.js'
 import { addErrorLog } from '../lib/supabaseApi.js'
+import { recordMetric } from '../lib/metrics.js'
 import { userKey } from '../lib/userKey.js'
 import KanjiTapText from './KanjiTapText.jsx'
 import TtsButton from './TtsButton.jsx'
@@ -110,6 +111,11 @@ export default function MockExam({ setActive }) {
       auto,
     }
     saveMockAttempt(user, attempt).then(setHistory)
+    // The promise's Day-30/Day-55 mock gates can only be checked if
+    // a finished mock leaves a trace outside its own local history
+    // (integration audit #12): one metric, the same shape the other
+    // gate events use.
+    recordMetric('mock_completed', { level: attempt.level, scaled: attempt.scaled, passed: attempt.passed, length: attempt.length })
     logWrongAnswers(scored.wrong)
     setResult({ ...scored, exam: session.exam, answers: session.answers, attempt })
     setSession(null)
@@ -534,7 +540,12 @@ function ResultsView({ result, setActive, askAi, onRetake }) {
           <RotateCcw size={16} /> New mock
         </button>
         <button onClick={() => setActive('dashboard')} className="px-6 py-2.5 rounded-xl bg-bun-700 hover:bg-bun-600 border border-bun-600/40 text-slate-200 font-medium transition">
-          Dashboard
+          Today
+        </button>
+        {/* The wrong answers just landed in the Error Log — the
+            results page says so and gives it a door (audit P1-6). */}
+        <button onClick={() => setActive('errors')} className="px-6 py-2.5 rounded-xl text-slate-400 hover:text-slate-200 font-medium transition">
+          Review in Error Log
         </button>
       </div>
     </div>

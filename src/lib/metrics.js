@@ -41,6 +41,68 @@ async function pushMetric(event) {
   } catch { /* best effort — local copy is the fallback truth */ }
 }
 
+/** Stable dedupe key for one event: type + timestamp + payload. */
+export function metricEventKey(event) {
+  if (!event || typeof event !== 'object') return ''
+  const { type, at, ...rest } = event
+  const keys = Object.keys(rest).sort()
+  const body = keys.map((k) => `${k}=${JSON.stringify(rest[k])}`).join('&')
+  return `${type || ''}|${at || ''}|${body}`
+}
+
+/**
+ * Merge server rows (metrics_events shape: { type, payload,
+ * created_at }) into the local list. The app reads only its own
+ * device's local copy, while the Reader bot writes events only to
+ * the server — split-brain (integration audit #8): a Telegram-only
+ * learner looked inactive in the app, and the Day-30 churn math
+ * could judge them churned. Rows whose key already exists locally
+ * (this device's own mirrored events) are skipped; bot-only events
+ * land. Returns how many were added.
+ */
+export function mergeRemoteMetrics(rows) {
+  const remote = (Array.isArray(rows) ? rows : [])
+    .filter((r) => r && typeof r.type === 'string')
+    .map((r) => ({ type: r.type, at: r.created_at, ...(r.payload && typeof r.payload === 'object' ? r.payload : {}) }))
+  if (!remote.length) return 0
+  try {
+    const list = loadMetrics()
+    const seen = new Set(list.map(metricEventKey))
+    let added = 0
+    for (const e of remote) {
+      const key = metricEventKey(e)
+      if (!key || seen.has(key)) continue
+      seen.add(key)
+      list.push(e)
+      added++
+    }
+    if (added) {
+      list.sort((a, b) => String(a.at || '').localeCompare(String(b.at || '')))
+      localStorage.setItem(METRICS_KEY, JSON.stringify(list.slice(-CAP)))
+    }
+    return added
+  } catch { return 0 }
+}
+
+/** Pull this user's server events once (sign-in) and merge them in. */
+export async function pullRemoteMetrics() {
+  try {
+    const { supabase, isSupabaseConfigured } = await import('./supabaseClient.js')
+    if (!isSupabaseConfigured || !supabase) return 0
+    const { data: sessionData } = await supabase.auth.getSession()
+    const user = sessionData?.session?.user
+    if (!user) return 0
+    const { data, error } = await supabase
+      .from('metrics_events')
+      .select('type, payload, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: true })
+      .limit(500)
+    if (error || !data) return 0
+    return mergeRemoteMetrics(data)
+  } catch { return 0 }
+}
+
 export function recordMetric(type, payload = {}) {
   const event = { type, at: new Date().toISOString(), ...payload }
   try {

@@ -3,11 +3,12 @@
 // cloud sync (stateSync.js) in the same shape the merge logic
 // (stateMerge.js) consumes:
 //
-//   { queue, profile, diagnosis, diagnosisHistory, promise, declaredLevel, encounters, language, modeSpells }
+//   { queue, profile, diagnosis, diagnosisHistory, promise, declaredLevel, encounters, language, modeSpells, plan, session }
 //
 // Local storage stays the offline source of truth; this module only
 // reads/writes the existing keys. Diagnosis history writes go through
-// profile.js's saveDiagnosisHistory so the save-event bus stays honest.
+// twin.js's pushDiagnosisHistory, which emits on the save-event bus
+// itself so the history slice stays honest.
 
 import { QUEUE_KEY, loadQueue } from './queue.js'
 import { PROFILE_KEY, DIAGNOSIS_KEY, loadProfile, loadDiagnosis } from './profile.js'
@@ -16,6 +17,8 @@ import { emitLearnerStateSaved } from './stateEvents.js'
 import { ENCOUNTERS_KEY, collectEncounterWords } from './encounters.js'
 import { MODE_SPELLS_KEY, loadModeSpells } from './day30.js'
 import { VOICE_CAST_KEY, loadVoiceCast } from './voicePreference.js'
+import { PLAN_KEY, loadPlanState } from './planner.js'
+import { SESSION_KEY, loadSessionState } from './session.js'
 
 export const DIAGNOSIS_HISTORY_KEY = 'jpn:diagnosisHistory:v1'
 export const DECLARED_LEVEL_KEY = 'jpn:declaredLevel:v1'
@@ -97,6 +100,11 @@ export function collectLearnerState() {
     // union-merged by startedAt so the mode history (and the
     // bad-week gate measurement) survives across devices.
     modeSpells: loadModeSpells(),
+    // Integration audit #7/#9: Saki's plan state and the in-progress
+    // session ride the document too — one guided day, one session,
+    // the same on every device (merge rules in stateMerge.js).
+    plan: loadPlanState(),
+    session: loadSessionState(),
   }
 }
 
@@ -111,6 +119,8 @@ const SLICE_KEYS = [
   ['language', LANGUAGE_KEY],
   ['voiceCast', VOICE_CAST_KEY],
   ['modeSpells', MODE_SPELLS_KEY],
+  ['plan', PLAN_KEY],
+  ['session', SESSION_KEY],
 ]
 
 /** Write a (merged) state document back to the local keys, verbatim —

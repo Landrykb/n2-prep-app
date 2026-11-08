@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Calendar, Target, Layers, Mic, Stethoscope, Pickaxe, ClipboardCheck, ChevronRight, RefreshCw, Flame, CheckCircle2, Play, Coffee, Phone, Mail } from 'lucide-react'
+import { Calendar, Target, Layers, Mic, Stethoscope, Pickaxe, RefreshCw, Flame, CheckCircle2, Play, Coffee, Phone, Mail } from 'lucide-react'
 import { brand } from '../lib/brand.js'
-import { loadCallState } from '../lib/calls.js'
 import { detectMode, modeLabel, modeLine } from '../lib/modes.js'
 import { getPlanFor, tomorrowStr } from '../lib/planner.js'
-import { recordQueueRating, loadDiagnosisHistory } from '../lib/twin.js'
+import { loadDiagnosisHistory } from '../lib/twin.js'
 import {
   loadFirstWeekFeedbackStamp, saveFirstWeekFeedbackStamp, firstWeekFeedbackStatus,
   recordFirstWeekAnswer, recordFirstWeekDismissal,
@@ -14,11 +13,10 @@ import { loadMetrics, summariseMetrics } from '../lib/metrics.js'
 import FeedbackBox from './FeedbackBox.jsx'
 import Mascot from './Mascot.jsx'
 import { loadProfile, loadDiagnosis, derivePlan, daysSinceLastVisit, markVisit } from '../lib/profile.js'
-import { loadQueue, todaySession, rateQueueItem } from '../lib/queue.js'
+import { loadQueue, todaySession } from '../lib/queue.js'
 import { estimateSessionMinutes, loadSessionState, setIntent, todayStr } from '../lib/session.js'
 import { loadPromise } from '../lib/promise.js'
 import PromisePanel from './PromisePanel.jsx'
-import { previewIntervals } from '../lib/fsrs.js'
 import { OnboardingFlow, ProofLadderView } from './ProblemStart.jsx'
 import ProgressCard from './ProgressCard.jsx'
 import { useLanguage } from '../hooks/useLanguage.js'
@@ -136,15 +134,22 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
   const [profile, setProfile] = useState(loadProfile)
   const [showOnboarding, setShowOnboarding] = useState(() => !loadProfile())
   const [diagnosis] = useState(loadDiagnosis)
-  const [queue, setQueue] = useState(loadQueue)
+  const [queue] = useState(loadQueue)
   const [weekDays, setWeekDays] = useState(loadWeek)
   const [gapDays] = useState(() => daysSinceLastVisit())
-  const [reviewIdx, setReviewIdx] = useState(0)
-  const [flipped, setFlipped] = useState(false)
 
   useEffect(() => {
     setWeekDays(recordToday())
     markVisit()
+    // TwinView's "my problem changed" door lands here with a flag
+    // (audit P1-3): open the problem form on arrival instead of
+    // dropping the learner on Today to hunt for the pill.
+    try {
+      if (sessionStorage.getItem('yonde:open-problem') === '1') {
+        sessionStorage.removeItem('yonde:open-problem')
+        setShowOnboarding(true)
+      }
+    } catch { /* storage unavailable — the pill below still works */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -154,37 +159,38 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
   const modeInfo = useMemo(() => { try { return detectMode() } catch { return null } }, [])
   const tomorrowPlan = useMemo(() => { try { return getPlanFor(tomorrowStr()) } catch { return null } }, [])
   const session = useMemo(() => todaySession(queue, { maxNew: MAX_NEW, maxDue: MAX_DUE_DISPLAY }), [queue])
-  const reviewList = useMemo(() => [...session.due, ...session.fresh], [session])
-  const card = reviewList[Math.min(reviewIdx, Math.max(0, reviewList.length - 1))]
-  const previews = useMemo(() => (card ? previewIntervals(card.fsrs) : null), [card])
+  // The old in-page flashcard flow is gone (Hick pass): this card is
+  // only the status line's existence check — reviews live in the
+  // session, step 2.
+  const card = [...session.due, ...session.fresh][0] || null
   const weekCount = weekDays.filter((d) => (Date.now() - new Date(d).getTime()) < 7 * 86400000).length
   const isComeback = gapDays !== null && gapDays > 2
   // One Session is the primary action: the whole day, auto-sequenced.
   const sessionMins = estimateSessionMinutes(queue)
   const savedSession = loadSessionState()
   const sessionInProgress = savedSession && savedSession.date === todayStr() && !savedSession.done
+  const sessionDoneToday = savedSession && savedSession.date === todayStr() && savedSession.done
   const promise = loadPromise()
   const startSession = (variant) => { setIntent(variant); setActive('session') }
-
-  const rate = (rating) => {
-    if (!card) return
-    recordQueueRating(card, rating)
-    setQueue(rateQueueItem(card.id, rating))
-    setFlipped(false)
-    setReviewIdx((i) => i + 1)
-  }
 
   const dateLabel = nextExam?.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 
   return (
     <div className="space-y-8">
+      {/* First run (audit P0-2): with no profile there is no plan and
+          no fitted session yet, so the problem form IS the top of the
+          page — the hero waits until there is something to start. */}
+      {!profile && showOnboarding && (
+        <OnboardingFlow initial={profile} setActive={setActive} onDone={(p) => { setProfile(p); setShowOnboarding(false) }} />
+      )}
+      {profile && (
       <section className="space-y-2.5">
         <button onClick={() => startSession('full')} className="w-full relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#71368A] to-[#FF6B57] p-6 sm:p-8 text-left shadow-xl hover:from-[#71368A] hover:to-[#FF7F6E] transition group">
           <span className="flex items-center gap-4">
-            <span className="w-14 h-14 shrink-0 rounded-2xl bg-white/20 flex items-center justify-center group-hover:scale-105 transition"><Play size={28} className="text-white ml-0.5" /></span>
+            <span className="w-14 h-14 shrink-0 rounded-2xl bg-white/20 flex items-center justify-center group-hover:scale-105 transition">{sessionDoneToday ? <CheckCircle2 size={28} className="text-white" /> : <Play size={28} className="text-white ml-0.5" />}</span>
             <span>
-              <span className="block text-2xl sm:text-3xl font-bold text-white">{t('today.heroTitle', { mins: sessionMins })}</span>
-              <span className="block text-sm text-white mt-1">{sessionInProgress ? t('today.heroInProgress') : t('today.heroSubtitle')}</span>
+              <span className="block text-2xl sm:text-3xl font-bold text-white">{sessionDoneToday ? t('today.doneTitle') : t('today.heroTitle', { mins: sessionMins })}</span>
+              <span className="block text-sm text-white mt-1">{sessionDoneToday ? t('today.doneSubtitle') : sessionInProgress ? t('today.heroInProgress') : t('today.heroSubtitle')}</span>
             </span>
           </span>
         </button>
@@ -198,6 +204,7 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
           <Coffee size={13} className="text-amber-300" /> {t('today.busyTitle')} · {t('today.busyHint')}
         </button>
       </section>
+      )}
 
       {modeInfo && (
         <section className="rounded-2xl glass p-4 card-glow flex items-start gap-3">
@@ -209,9 +216,9 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
         </section>
       )}
 
-      {showOnboarding ? (
-        <OnboardingFlow initial={profile} onDone={(p) => { setProfile(p); setShowOnboarding(false) }} onClose={profile ? () => setShowOnboarding(false) : undefined} />
-      ) : (
+      {profile && showOnboarding ? (
+        <OnboardingFlow initial={profile} setActive={setActive} onDone={(p) => { setProfile(p); setShowOnboarding(false) }} onClose={() => setShowOnboarding(false)} />
+      ) : profile ? (
         <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#71368A]/20 to-[#FF6B57]/20 border border-[#FF6B57]/20 p-6 sm:p-8 card-glow">
           <div className="relative space-y-4">
             <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
@@ -232,7 +239,7 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
                 starts it. */}
           </div>
         </section>
-      )}
+      ) : null}
 
       {tomorrowPlan && (
         <section className="rounded-2xl glass p-4 card-glow flex items-start gap-3">

@@ -674,4 +674,112 @@ console.log('i18n round 2 — promise mirrors, loop stats, diagnosis draft:')
   }
 }
 
+console.log('integration audit — shared mastery + diagnosis-history sync:')
+{
+  const store = new Map()
+  const prevLS = globalThis.localStorage
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  }
+  try {
+    const twin = await import('../src/lib/twin.js')
+    const profileMod = await import('../src/lib/profile.js')
+    const promiseMod = await import('../src/lib/promise.js')
+    const { onLearnerStateSaved } = await import('../src/lib/stateEvents.js')
+    check('a voice attempt at mastery records the scene as mastered — from ANY surface (audit #4)', () => {
+      twin.recordVoiceAttempt({ scene: { id: 'scene-city-office', model: '住民票を2通お願いします。', for: [], domain: 'City Office' }, text: '住民票を2通お願いします。', score: 92, missing: [] })
+      assert.deepEqual(JSON.parse(store.get(twin.MASTERED_KEY) || '[]'), ['scene-city-office'])
+      twin.recordVoiceAttempt({ scene: { id: 'scene-city-office', model: 'x', for: [], domain: 'City Office' }, text: 'x', score: 40, missing: [] })
+      assert.deepEqual(JSON.parse(store.get(twin.MASTERED_KEY) || '[]'), ['scene-city-office']) // a later miss never un-masters
+      assert.deepEqual(twin.recordSceneMastered('scene-city-office'), ['scene-city-office']) // idempotent
+    })
+    check('changing the problem recomputes the promise from the existing diagnosis (audit #19)', () => {
+      store.set(profileMod.DIAGNOSIS_KEY, JSON.stringify({ at: '2026-11-08T00:00:00Z', jlptEstimate: 'N3', total: 60, sections: { language: 20, reading: 20, listening: 20 }, weakest: 'language' }))
+      profileMod.saveProfile({ persona: 'resident', pains: ['speaking'], proofTarget: 'jlpt', realLifeGoal: '' })
+      assert.match(promiseMod.loadPromise()?.height || '', /unscripted conversation/)
+      profileMod.saveProfile({ persona: 'parent', pains: ['life-admin'], proofTarget: 'jlpt', realLifeGoal: '' })
+      assert.match(promiseMod.loadPromise()?.height || '', /city-office/)
+    })
+    check('pushDiagnosisHistory emits on the save-event bus by itself (audit #18)', () => {
+      let emissions = 0
+      const off = onLearnerStateSaved(() => { emissions += 1 })
+      twin.pushDiagnosisHistory({ at: '2026-11-08T00:00:00Z', jlptEstimate: 'N3', total: 100, sections: { language: 30, reading: 35, listening: 35 }, weakest: 'language' })
+      off()
+      assert.ok(emissions >= 1, `expected ≥1 emission, got ${emissions}`)
+    })
+  } finally {
+    if (prevLS === undefined) delete globalThis.localStorage
+    else globalThis.localStorage = prevLS
+  }
+}
+
+console.log('integration audit — Twin collection merge + metrics pull-merge:')
+{
+  const store = new Map()
+  const prevLS = globalThis.localStorage
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  }
+  try {
+    const { mergeTwins } = await import('../src/lib/twinMerge.js')
+    const metrics = await import('../src/lib/metrics.js')
+    check('mergeTwins: neither device loses fingerprint, session log or counters (audit #3)', () => {
+      const local = {
+        updatedAt: '2026-11-08T02:00:00Z', createdAt: '2026-11-01T00:00:00Z', version: 1,
+        fingerprint: { 'particle-ha-ga': { count: 3, recentWeight: 0.5, lastSeenAt: '2026-11-08T01:00:00Z', example: 'a' } },
+        rhythm: { sessionLog: [{ date: '2026-11-07', minutes: 10, accuracy01: 0.8, lapseRate: 0.1, proof: 1 }], callsKept: 2, callsMissed: 1, lastSessionAt: '2026-11-07T10:00:00Z', feltEffortRecent: [] },
+        speaking: { attempts: 10, scoreSum: 800, avgBest: 80, masteredEvents: 4, masteredScenes: 2 },
+        accuracyRecent: [{ at: '2026-11-07T10:00:00Z', kind: 'voice', score01: 0.9 }],
+        learningStyle: { methods: { voice: { sessions: 3, minutes: 30, proof: 2 } } },
+        sections: {}, register: {}, mode: 'cruise', modeSince: '2026-11-01T00:00:00Z', userCorrections: [],
+      }
+      const cloud = {
+        updatedAt: '2026-11-08T03:00:00Z', createdAt: '2026-11-01T00:00:00Z', version: 1,
+        fingerprint: { 'keigo-direction': { count: 1, recentWeight: 0.34, lastSeenAt: '2026-11-08T02:30:00Z', example: 'b' }, 'particle-ha-ga': { count: 5, recentWeight: 0.4, lastSeenAt: '2026-11-06T01:00:00Z', example: 'c' } },
+        rhythm: { sessionLog: [{ date: '2026-11-08', minutes: 12, accuracy01: 0.9, lapseRate: 0, proof: 2 }], callsKept: 4, callsMissed: 1, lastSessionAt: '2026-11-08T09:00:00Z', feltEffortRecent: ['fine'] },
+        speaking: { attempts: 6, scoreSum: 500, avgBest: 83, masteredEvents: 7, masteredScenes: 5 },
+        accuracyRecent: [{ at: '2026-11-08T09:00:00Z', kind: 'voice', score01: 0.7 }],
+        learningStyle: { methods: { voice: { sessions: 5, minutes: 20, proof: 4 }, reading: { sessions: 1, minutes: 5, proof: 1 } } },
+        sections: {}, register: {}, mode: 'surge', modeSince: '2026-11-05T00:00:00Z', userCorrections: [],
+      }
+      const m = mergeTwins(local, cloud)
+      assert.equal(m.fingerprint['particle-ha-ga'].count, 5) // stronger copy wins
+      assert.ok(m.fingerprint['keigo-direction']) // cloud-only pattern survives
+      assert.equal(m.rhythm.sessionLog.length, 2) // both days kept
+      assert.equal(m.rhythm.callsKept, 4) // counters take the max
+      assert.equal(m.speaking.attempts, 10) // the pair stays with the higher-attempts copy
+      assert.equal(m.speaking.scoreSum, 800)
+      assert.equal(m.speaking.masteredEvents, 7) // monotonic max across copies
+      assert.equal(m.accuracyRecent.length, 2)
+      assert.equal(m.learningStyle.methods.voice.sessions, 5)
+      assert.equal(m.learningStyle.methods.voice.minutes, 30)
+      assert.equal(m.learningStyle.methods.reading.proof, 1)
+      assert.equal(m.mode, 'surge') // later modeSince wins
+      assert.equal(mergeTwins(null, cloud), cloud)
+      assert.equal(mergeTwins(local, null), local)
+    })
+    check('mergeRemoteMetrics: bot-only events land, mirrored events dedupe (audit #8)', () => {
+      metrics.recordMetric('session_completed', { minutes: 10, proof: 1 })
+      const localList = metrics.loadMetrics()
+      const mirrored = localList[localList.length - 1]
+      const rows = [
+        { type: 'session_completed', payload: { minutes: 10, proof: 1 }, created_at: mirrored.at }, // this device's own mirror
+        { type: 'passage_sent', payload: { passageId: 'p1', band: 'N2' }, created_at: '2026-11-08T01:00:00.000Z' }, // bot-only
+        { type: 'word_mined', payload: { passageId: 'p1', count: 3 }, created_at: '2026-11-08T01:01:00.000Z' }, // bot-only
+      ]
+      assert.equal(metrics.mergeRemoteMetrics(rows), 2)
+      assert.equal(metrics.mergeRemoteMetrics(rows), 0) // idempotent
+      const types = metrics.loadMetrics().map((e) => e.type)
+      assert.ok(types.includes('passage_sent') && types.includes('word_mined'))
+    })
+  } finally {
+    if (prevLS === undefined) delete globalThis.localStorage
+    else globalThis.localStorage = prevLS
+  }
+}
+
 console.log(`\nphase2: ${passed} checks passed (incl. scheduler-auth)`)

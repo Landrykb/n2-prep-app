@@ -3,6 +3,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabaseClient.js'
 import { AuthContext } from '../lib/authContext.js'
 import { initTwinSync, stopTwinSync } from '../lib/twinSync.js'
 import { initStateSync, stopStateSync } from '../lib/stateSync.js'
+import { pullRemoteMetrics } from '../lib/metrics.js'
 import { adoptAnonKeys } from '../lib/anonMerge.js'
 import { syncCallWindows } from '../lib/callSync.js'
 import { bridgeTelegramSession, getTelegramInitData } from '../lib/telegramAuth.js'
@@ -92,6 +93,10 @@ export const AuthProvider = ({ children }) => {
       adoptAnonKeys(userId)
       initTwinSync(session.user).catch(() => {})
       initStateSync(session.user).catch(() => {})
+      // Bot-written events (passage_sent, word_mined, …) live only
+      // on the server; pull them into the local metrics list so the
+      // app's summaries see the learner's whole activity (audit #8).
+      pullRemoteMetrics().catch(() => {})
       syncCallWindows().catch(() => {})
     } else {
       stopTwinSync()

@@ -11,6 +11,7 @@ import { listeningPlus } from '../data/listeningPlus.js'
 import { n2Listening } from '../data/n2Listening.js'
 import { todaySession } from './queue.js'
 import { recordMetric } from './metrics.js'
+import { emitLearnerStateSaved } from './stateEvents.js'
 
 export const SESSION_KEY = 'jpn:session:v1'
 export const EFFORT_KEY = 'jpn:effort:v1'
@@ -85,7 +86,11 @@ export function loadSessionState() {
 }
 
 export function saveSessionState(state) {
-  try { localStorage.setItem(SESSION_KEY, JSON.stringify(state)) } catch { /* ignore */ }
+  // The in-progress session is a learner-state slice (integration
+  // audit #9): it rides the synced state document, so a session
+  // finished on one device carries its `recorded` guard to every
+  // other device and can never be recorded twice.
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify(state)); emitLearnerStateSaved() } catch { /* ignore */ }
   return state
 }
 

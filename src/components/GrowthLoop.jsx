@@ -37,7 +37,10 @@ const HANDOFFS = {
     getsKey: 'loop.saki.gets',
     handsKey: 'loop.saki.hands',
     next: 'Koe',
-    door: { view: 'plan', labelKey: 'loop.saki.door' },
+    // Saki's plan IS Today's plan — the door lands on Today, where the
+    // plan line and tomorrow's plan actually live, not on the legacy
+    // countdown view that used to share the name (audit P1-2).
+    door: { view: 'dashboard', labelKey: 'loop.saki.door' },
   },
   koe: {
     getsKey: 'loop.koe.gets',
@@ -49,7 +52,10 @@ const HANDOFFS = {
     getsKey: 'loop.nao.gets',
     handsKey: 'loop.nao.hands',
     nextKey: 'loop.next.yourQueue',
-    door: { view: 'anki', labelKey: 'loop.nao.door' },
+    // "Open Your Queue" opens the ONE queue where it is actually
+    // reviewed — step 2 of today's session — not the legacy Anki deck
+    // that merely borrowed the queue's name (audit P1-1/P1-2).
+    door: { view: 'session', labelKey: 'loop.nao.door' },
   },
   hori: {
     getsKey: 'loop.hori.gets',

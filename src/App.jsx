@@ -1720,7 +1720,10 @@ function ErrorLog() {
 function App() {
   const { t } = useLanguage()
   const { user, loading, isSupabaseConfigured, signOut, guest } = useAuth()
-  const [active, setActive] = useHashRoute('dashboard', navIds)
+  // Privacy/Terms are real routes (TwinView + the legal pages link to
+  // them) but not menu items — the router's valid list must still
+  // know them, or #/privacy silently falls back to Today (audit P0-1).
+  const [active, setActive] = useHashRoute('dashboard', [...navIds, 'privacy', 'terms'])
   const [mobileOpen, setMobileOpen] = useState(false)
   // Guest → account door (Doc 12 audit #1): the AuthModal as a
   // dismissible overlay, opened deliberately (sidebar Create Your
@@ -1734,9 +1737,14 @@ function App() {
   // The literal /reader path (Doc 16 §2): the Telegram "Open in
   // Reader" button points at https://jpn2easy.vercel.app/reader, and
   // vercel.json's SPA fallback serves this app there — open on the
-  // Reader view when we land on that path.
+  // Reader view when we land on that path. /session is the same
+  // door for the bot's no-fit replies: their copy names a study
+  // session as the way forward, so the button lands on the session
+  // itself, not the app root (integration audit, exact doors).
   useEffect(() => {
-    if (window.location.pathname.replace(/\/+$/, '') === '/reader') setActive('reader')
+    const path = window.location.pathname.replace(/\/+$/, '')
+    if (path === '/reader') setActive('reader')
+    else if (path === '/session') setActive('session')
   }, [setActive])
 
   // P1-5: the ~1 MB deck used to download on every cold start for the
@@ -1803,12 +1811,15 @@ function App() {
     return () => navigator.serviceWorker.removeEventListener('message', onMessage)
   }, [setActive])
 
-  // Swipe left/right (touch) and Alt+Arrow (desktop) move between sections, so
-  // the installed PWA is navigable without any browser chrome.
+  // Swipe left/right (touch) and Alt+Arrow (desktop) move between the
+  // bottom-bar sections ONLY (audit P1-5): cycling all 25 menu views
+  // in menu order contradicted the map the learner can see — a swipe
+  // from Today landed on screens they had never heard of. The four
+  // quickNav views are the swipe world; everything else is the menu.
   const step = useCallback((delta) => {
-    const i = navIds.indexOf(active)
+    const i = quickNav.indexOf(active)
     if (i === -1) return
-    const next = navIds[(i + delta + navIds.length) % navIds.length]
+    const next = quickNav[(i + delta + quickNav.length) % quickNav.length]
     setActive(next)
   }, [active, setActive])
 
@@ -1832,7 +1843,7 @@ function App() {
     session: <OneSession setActive={setActive} />,
     dashboard: <TodayHome streak={streak} daysToExam={daysToExam} nextExam={nextExam} examLabel={examLabel} setActive={setActive} />,
     voice: <VoiceLoop />,
-    sensei: <SenseiCall />,
+    sensei: <SenseiCall setActive={setActive} />,
     diagnosis: <Diagnosis setActive={setActive} />,
     twin: <TwinView setActive={setActive} />,
     loop: <GrowthLoop setActive={setActive} />,
@@ -1847,7 +1858,7 @@ function App() {
     speed: <SpeedCards />,
     dictionary: <DictionaryView />,
     reading: <ReadingView />,
-    reader: <Reader />,
+    reader: <Reader setActive={setActive} onSignIn={() => setAuthOverlay(true)} />,
     ai: <AiTutor context={active} />,
     plan: <StudyPlan daysToExam={daysToExam} />,
     resources: <Resources />,

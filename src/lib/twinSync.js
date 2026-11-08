@@ -3,18 +3,19 @@
 // The Twin lives locally first (jpn:twin:v1 is the offline source of
 // truth). When the learner is signed in, this module mirrors it to the
 // `learner_twin` table:
-//   - On sign-in: pull the cloud row and reconcile with pickNewerTwin()
-//     (twinMerge.js) — strictly-newer cloud data is adopted locally; in
-//     every other case local wins and is pushed up. An older cloud copy
-//     NEVER overwrites a newer local Twin.
-//   - On every local save (twin.js onTwinSaved): debounced push.
+//   - On sign-in: pull the cloud row and MERGE it with local by
+//     collection (twinMerge.js mergeTwins) — neither device's
+//     fingerprint, session log or counters are ever discarded.
+//   - On every local save (twin.js onTwinSaved): debounced
+//     pull-merge-push, the same contract as stateSync — a push never
+//     overwrites cloud work this device has not seen.
 // Signed-out: this module does nothing at all — local only, zero behaviour
 // change. Sync state is surfaced quietly in TwinView via getTwinSyncState()
 // / subscribeTwinSync().
 
 import { supabase, isSupabaseConfigured } from './supabaseClient.js'
 import { TWIN_KEY, loadTwin, onTwinSaved } from './twin.js'
-import { pickNewerTwin } from './twinMerge.js'
+import { mergeTwins } from './twinMerge.js'
 
 export const TWIN_SYNC_EVENT = 'jpn:twin-synced'
 
@@ -40,8 +41,33 @@ function setStatus(next) {
 
 async function pushTwinNow() {
   if (!supabase || !activeUserId) return
-  const twin = loadTwin()
   setStatus('syncing')
+  // Pull-merge-push (integration audit #3): re-read the cloud Twin
+  // and merge by collection before writing, so a push from this
+  // device can never erase work another device (or the bot's
+  // surfaces) recorded since this device last pulled. On a failed
+  // pull, do NOT push — overwriting blind is the bug being fixed.
+  let twin = loadTwin()
+  try {
+    const { data, error } = await supabase
+      .from('learner_twin')
+      .select('twin, updated_at')
+      .eq('user_id', activeUserId)
+      .maybeSingle()
+    if (error) throw error
+    const cloudTwin = data?.twin || null
+    if (cloudTwin) {
+      const merged = mergeTwins(twin, cloudTwin)
+      if (merged && JSON.stringify(merged) !== JSON.stringify(twin)) {
+        adoptCloudTwin(merged)
+        twin = merged
+      }
+    }
+  } catch (err) {
+    console.error('twinSync pre-push pull error:', err)
+    setStatus('error')
+    return
+  }
   const { error } = await supabase
     .from('learner_twin')
     .upsert(
@@ -74,7 +100,8 @@ export async function initTwinSync(user) {
   activeUserId = user.id
   setStatus('syncing')
 
-  // Pull-on-login with the merge guard.
+  // Pull-on-login with the collection merge: adopt the merged
+  // Twin locally, then push it up so the cloud holds the union too.
   try {
     const { data, error } = await supabase
       .from('learner_twin')
@@ -84,14 +111,11 @@ export async function initTwinSync(user) {
     if (error) throw error
     const cloudTwin = data?.twin || null
     const localTwin = loadTwin()
-    if (pickNewerTwin(localTwin, cloudTwin) === 'cloud') {
-      adoptCloudTwin(cloudTwin)
-      setStatus('synced')
-    } else {
-      // Local wins (newer, equal, or the only copy): push it up so the
-      // cloud reflects the device that's actually current.
-      await pushTwinNow()
+    if (cloudTwin) {
+      const merged = mergeTwins(localTwin, cloudTwin)
+      if (merged && JSON.stringify(merged) !== JSON.stringify(localTwin)) adoptCloudTwin(merged)
     }
+    await pushTwinNow()
   } catch (err) {
     console.error('twinSync pull error:', err)
     setStatus('error')

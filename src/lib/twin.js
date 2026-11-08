@@ -26,6 +26,7 @@ import { loadCallState } from './calls.js'
 import { todayStr } from './session.js'
 import { recordMetric } from './metrics.js'
 import { appendDiagnosisHistory } from './day30.js'
+import { emitLearnerStateSaved } from './stateEvents.js'
 import { shadowClassify } from './correctorShadow.js'
 
 export const TWIN_KEY = 'jpn:twin:v1'
@@ -164,7 +165,11 @@ export function pushDiagnosisHistory(result) {
   // the history while PINNING the first diagnosis — the Day-30 delta
   // is anchored on it and must stay computable forever.
   const next = appendDiagnosisHistory(history, entry)
-  try { localStorage.setItem(DIAGNOSIS_HISTORY_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+  // The history is a learner-state slice: emit on the save-event bus
+  // HERE (integration audit #18) so any caller of this function —
+  // not just Diagnosis.finish via its saveDiagnosis side effect —
+  // gets the Day-30 anchor synced.
+  try { localStorage.setItem(DIAGNOSIS_HISTORY_KEY, JSON.stringify(next)); emitLearnerStateSaved() } catch { /* ignore */ }
   return next
 }
 
@@ -301,6 +306,10 @@ export function recordVoiceAttempt({ scene, text, score, missing = [] }) {
   if (score >= 85) {
     twin.speaking.masteredEvents += 1
     bumpMethod(twin, 'voice', { proof: 1 })
+    // Every surface that attempts a scene funnels through here, so
+    // mastery is recorded once, centrally (audit #4) — the session
+    // and the call now mark scenes mastered exactly like VoiceLoop.
+    if (scene?.id) recordSceneMastered(scene.id)
   } else {
     const patterns = classifyVoiceError({ scene, text, missing, score })
     recordPatterns(twin, patterns, text)
@@ -349,8 +358,14 @@ export function recordSessionSummary({ minutes = 0, accuracy01 = null, lapseRate
 /** Sensei Call outcomes. */
 export function recordCallOutcome({ kept, bestScore = null, partial = false }) {
   let twin = loadTwin()
-  if (kept) twin.rhythm.callsKept += 1
-  else twin.rhythm.callsMissed += 1
+  // ONE counting source (integration audit #5): the Twin's
+  // callsKept/callsMissed are DERIVED from the call history by
+  // refreshTwin — this recorder used to increment them too, and
+  // the two systems disagreed (a self-started practice call was
+  // invisible here, then counted after the next refresh). This
+  // function now owns only the accuracy trail and the gate metric;
+  // the counters move when refreshTwin next derives them from the
+  // history entry SenseiCall writes for the same call.
   if (kept && bestScore !== null) pushAccuracy(twin, 'voice', Math.min(1, bestScore / 100))
   // Gate metric (Doc 11): kept | missed | partial (ended warmly early).
   recordMetric('call_outcome', { outcome: partial ? 'partial' : kept ? 'kept' : 'missed' })
@@ -404,9 +419,27 @@ function loadMasteredScenes() {
 }
 
 /**
+ * The ONE mastery writer (integration audit #4): scene mastery has
+ * three surfaces — VoiceLoop, the One Session scene step, and the
+ * Sensei call — but only VoiceLoop used to record it, so a scene
+ * mastered inside today's session still showed unmastered in the
+ * Voice Loop and Saki could re-pick it as "fresh" comeback material.
+ * recordVoiceAttempt (below, called by all three surfaces) records
+ * mastery here whenever an attempt clears the MASTERY bar.
+ */
+export function recordSceneMastered(sceneId) {
+  const mastered = loadMasteredScenes()
+  if (!sceneId || !Array.isArray(mastered) || mastered.includes(sceneId)) return mastered
+  const next = [...mastered, sceneId]
+  try { localStorage.setItem(MASTERED_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+  return next
+}
+
+/**
  * Recompute the derived parts of the Twin from their source stores:
  * vocab stats from the ONE queue, life context from the profile, speaking
- * mastered count from VoiceLoop's store, felt effort from its key. Cheap
+ * mastered count from the shared mastered-scene store, felt effort from
+ * its key. Cheap
  * and idempotent — call it before reading the Twin for display/planning.
  */
 export function refreshTwin() {
@@ -447,9 +480,24 @@ export function refreshTwin() {
 
   const calls = loadCallState()
   if (Array.isArray(calls.history) && calls.history.length) {
-    twin.rhythm.callsKept = calls.history.filter((h) => h.status === 'completed').length
-    twin.rhythm.callsMissed = calls.history.filter((h) => h.status === 'missed').length
+    // The one counting source (audit #5): history entries carry
+    // their ring source (SenseiCall); test rings never count, and
+    // a missed Mini App ring never counted as a miss (it early-
+    // returns before recording) — completed Mini App calls do
+    // count, exactly as recordCallOutcome's gate always treated
+    // them. Legacy entries without a source count both ways.
+    twin.rhythm.callsKept = calls.history.filter((h) => h.status === 'completed' && h.source !== 'test').length
+    twin.rhythm.callsMissed = calls.history.filter((h) => h.status === 'missed' && h.source !== 'test' && h.source !== 'mini').length
   }
+  // No restamp on a no-op refresh (audit #3): refreshTwin runs on
+  // DISPLAY paths (TwinView, GrowthLoop, CoachLetter) and inside
+  // the planner — if nothing derived actually changed, saving
+  // would bump updatedAt and push, and two devices would
+  // alternately overwrite each other for the crime of being
+  // looked at. Save only on a real change.
+  const before = loadTwin()
+  const stripStamp = (t) => { const copy = { ...(t || {}) }; delete copy.updatedAt; return JSON.stringify(copy) }
+  if (stripStamp(before) === stripStamp(twin)) return before
   return saveTwin(twin)
 }
 

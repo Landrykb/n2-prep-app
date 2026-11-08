@@ -1542,6 +1542,37 @@ const botI18n = await import('../supabase/functions/reader-bot/i18n.ts')
     assert.equal(ja.inline_keyboard[0][1].callback_data, 'again:x1')
   })
 
+  check('integration audit: link path names My Twin (never the retired Fleet), in all three languages', () => {
+    for (const lang of ['en', 'fr', 'ja']) {
+      assert.ok(!bt(lang, 'link.explainer').includes('Fleet'), `${lang} explainer`)
+      assert.ok(!bt(lang, 'link.expired').includes('Fleet'), `${lang} expired`)
+    }
+    assert.ok(bt('en', 'link.explainer').includes('My Twin'))
+    assert.ok(bt('fr', 'link.explainer').includes('Mon jumeau'))
+    assert.ok(bt('ja', 'link.explainer').includes('わたしのツイン'))
+    // The new guided-flow keys exist and are non-empty everywhere
+    // (catalog parity above already proves the key SETS match).
+    for (const key of ['app.openSession', 'passage.howTo', 'chat.contextReply']) {
+      for (const lang of ['en', 'fr', 'ja']) assert.ok(bt(lang, key).length > 0, `${lang}:${key}`)
+    }
+  })
+
+  check('integration audit: bot source carries the continuation, exact doors and dispatch outcome', () => {
+    const src = readFileSync(new URL('../supabase/functions/reader-bot/index.ts', import.meta.url), 'utf8')
+    assert.ok(src.includes('continuationKeyboard'), 'one shared continuation builder')
+    assert.ok(src.includes("callback_data: 'door:read'"), 'continuation primary is the door serve')
+    assert.ok(src.includes('MINI_APP_SESSION_URL'), 'a session door exists')
+    assert.ok(src.includes("'session'"), 'no-fit doors land on the session')
+    assert.ok(src.includes('dispatch_outcome'), 'dispatch logs its outcome per due learner')
+    assert.ok(src.includes("return 'sent'"), 'handleRead reports the sent outcome')
+    assert.ok(src.includes('telegramLang()'), 'pre-link replies resolve Telegram language')
+    assert.ok(src.includes("bt(lang, 'passage.howTo')"), 'the passage message carries its numbered steps')
+    const admin = readFileSync(new URL('../supabase/functions/reader-admin/index.ts', import.meta.url), 'utf8')
+    assert.ok(admin.includes('/reader?tg=4'), 'the chat menu button opens the Reader surface')
+    const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+    assert.ok(app.includes("path === '/session'"), 'the client routes the literal /session path')
+  })
+
   check('bot i18n: bt interpolates, falls back to EN, then to the key', () => {
     assert.equal(bt('fr', 'level.bandToast', { band: 'N3' }), 'N3 — compris.')
     assert.equal(bt('xx', 'level.notSure'), 'Not sure', 'unknown lang falls back to EN')
