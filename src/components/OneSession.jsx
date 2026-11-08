@@ -11,7 +11,7 @@ import {
 import { bestScore, missingPhrases } from './VoiceLoop.jsx'
 import { scenes as allScenes } from '../data/scenes.js'
 import { recordVoiceAttempt, recordQueueRating, recordSessionSummary } from '../lib/twin.js'
-import { recordMetric } from '../lib/metrics.js'
+import { recordMetric, loadMetrics } from '../lib/metrics.js'
 import { getPlanFor, markPlanConsumed, noteSessionForExperiment } from '../lib/planner.js'
 import Mascot from './Mascot.jsx'
 import TtsButton from './TtsButton.jsx'
@@ -246,7 +246,7 @@ export default function OneSession({ setActive }) {
   const biteQuestion = bite.questions[0]
 
   // --- End ---
-  const ladder = useMemo(() => ladderWithStatus(diagnosis), [diagnosis])
+  const ladder = useMemo(() => ladderWithStatus(diagnosis, { metrics: loadMetrics() }), [diagnosis])
   const nextRung = ladder.find((h) => h.status === 'next')
   const reachedRung = [...ladder].reverse().find((h) => h.status === 'reached')
   const finish = () => {

@@ -85,12 +85,12 @@ export function loadDiagnosis() {
 // the catalogs (ladder.*); label/proof/unlocks stay as the English data
 // (and the fallback for anything that renders without a translator).
 export const PROOF_LADDER = [
-  { id: 'foundation', label: 'N5–N4 foundation', proof: 'JLPT N5 80 / N4 90 · every section ≥ 19/60', unlocks: 'Daily life without panic; Specified Skilled Worker floor', jlptOrder: 1, passMark: 90, labelKey: 'ladder.foundation.label', proofKey: 'ladder.foundation.proof', unlocksKey: 'ladder.foundation.unlocks' },
-  { id: 'bridge', label: 'N3 bridge', proof: 'JLPT N3 95/180', unlocks: 'Everyday Japan handled alone — counters, calls, school', jlptOrder: 2, passMark: 95, labelKey: 'ladder.bridge.label', proofKey: 'ladder.bridge.proof', unlocksKey: 'ladder.bridge.unlocks' },
-  { id: 'n2', label: 'N2 — the job filter', proof: 'JLPT N2 90/180', unlocks: 'Passes the résumé filter · HSP +10 pts · B2 evidence for language roles', jlptOrder: 3, passMark: 90, labelKey: 'ladder.n2.label', proofKey: 'ladder.n2.proof', unlocksKey: 'ladder.n2.unlocks' },
+  { id: 'foundation', label: 'N5–N4 foundation', proof: 'JLPT N5 80 / N4 90 · every section ≥ 19/60', unlocks: 'Daily life without panic; Specified Skilled Worker floor', jlptOrder: 1, passMark: 90, proofLevel: 'N4', labelKey: 'ladder.foundation.label', proofKey: 'ladder.foundation.proof', unlocksKey: 'ladder.foundation.unlocks' },
+  { id: 'bridge', label: 'N3 bridge', proof: 'JLPT N3 95/180', unlocks: 'Everyday Japan handled alone — counters, calls, school', jlptOrder: 2, passMark: 95, proofLevel: 'N3', labelKey: 'ladder.bridge.label', proofKey: 'ladder.bridge.proof', unlocksKey: 'ladder.bridge.unlocks' },
+  { id: 'n2', label: 'N2 — the job filter', proof: 'JLPT N2 90/180', unlocks: 'Passes the résumé filter · HSP +10 pts · B2 evidence for language roles', jlptOrder: 3, passMark: 90, proofLevel: 'N2', labelKey: 'ladder.n2.label', proofKey: 'ladder.n2.proof', unlocksKey: 'ladder.n2.unlocks' },
   { id: 'bjt400', label: 'BJT 400', proof: 'BJT ≥ 400 (upper J3)', unlocks: 'Counts as the N2 category for HSP points · B2 evidence', bjtMin: 400, labelKey: 'ladder.bjt400.label', proofKey: 'ladder.bjt400.proof', unlocksKey: 'ladder.bjt400.unlocks' },
   { id: 'bjt480', label: 'BJT 480', proof: 'BJT ≥ 480 (inside J2)', unlocks: 'Counts as the N1 category for HSP points (15 pts)', bjtMin: 480, labelKey: 'ladder.bjt480.label', proofKey: 'ladder.bjt480.proof', unlocksKey: 'ladder.bjt480.unlocks' },
-  { id: 'n1', label: 'N1', proof: 'JLPT N1 100/180', unlocks: 'Client-facing, legal/medical, management-track roles · HSP +15 pts', jlptOrder: 4, passMark: 100, labelKey: 'ladder.n1.label', proofKey: 'ladder.n1.proof', unlocksKey: 'ladder.n1.unlocks' },
+  { id: 'n1', label: 'N1', proof: 'JLPT N1 100/180', unlocks: 'Client-facing, legal/medical, management-track roles · HSP +15 pts', jlptOrder: 4, passMark: 100, proofLevel: 'N1', labelKey: 'ladder.n1.label', proofKey: 'ladder.n1.proof', unlocksKey: 'ladder.n1.unlocks' },
   { id: 'j1', label: 'BJT J1 / J1+', proof: 'BJT 530–599 (J1) · 600–800 (J1+)', unlocks: 'Appropriate — then sufficient — communication in any business situation', bjtMin: 530, labelKey: 'ladder.j1.label', proofKey: 'ladder.j1.proof', unlocksKey: 'ladder.j1.unlocks' },
 ]
 
@@ -98,35 +98,149 @@ const JLPT_ORDER = { N5: 0, N4: 1, N3: 2, N2: 3, N1: 4, 'N1+': 5 }
 const SECTION_FLOOR = 19 // every JLPT paper: no section under 19/60 passes
 
 /**
- * Each rung as a TANK (Landry, 2026-11-08): progress is a fill
- * level, not a level label that flips. `fill` is the fraction of
- * the bar PRINTED ON THE RUNG that the learner's own numbers
- * cover, and a rung is 'reached' only at a full tank:
+ * The ladder's water system (Landry, 2026-11-08: "the progress
+ * it shows must be real and well measured... If someone sees
+ * green in the N2 level it must mean they can go sit for N2 and
+ * pass" + "this should not just be design fluke"). Three layers,
+ * each fed by a real measurement:
  *
- * - BJT rungs fill on the BJT scale itself (bjtScore / bjtMin).
- *   The old logic never read the BJT score at all — it borrowed
- *   the JLPT estimate's order, so BJT 400 showed REACHED at a
- *   BJT estimate of 348, contradicting the number printed in
- *   the panel's own header.
- * - A JLPT rung below the estimated level is full (the estimate
- *   subsumes it). The rung AT the estimated level fills by the
- *   real pass rule: total against that level's pass mark, capped
- *   by the weakest section against the 19/60 floor — a weak
- *   section visibly holds the water down.
- * - A JLPT rung above the estimated level stays empty: a score
- *   earned on easier material is never extrapolated upward
- *   (the same refusal the promise rule makes).
+ * 1. THE PROVEN LINE — never recedes, the only green. A rung is
+ *    'reached' ONLY when a FULL mock at its proof level (or a
+ *    higher one) was passed under the real pass rule — scoreExam
+ *    already enforces the level's pass mark AND every section
+ *    ≥ 19/60. The diagnosis estimate can NEVER paint green.
+ *    BJT rungs have no in-app exam-grade proof (the trainer runs
+ *    short sets), so they honestly stay unproven for now.
+ * 2. THE WATER — current readiness, per rung, on the rung's own
+ *    scale (BJT rungs on the BJT score; the JLPT rung at the
+ *    estimated level by total vs its pass mark, capped by the
+ *    weakest section against the 19/60 floor; rungs below the
+ *    estimate full; rungs above it empty — never extrapolated).
+ *    The water MOVES after the diagnosis: real mock scores pull
+ *    the estimate toward themselves (EMA), every practice day
+ *    adds a small inflow ("a few days and you solve a few
+ *    questions and done" counts), BJT trainer accuracy nudges
+ *    the BJT estimate.
+ * 3. EVAPORATION — dry days recede the water on both scales
+ *    (EVAP_PER_DRY_DAY per full dry day since the last practice
+ *    day). Physics, not punishment: the proven line never
+ *    evaporates, and any practice day refills.
  *
- * 'next' is the first rung whose tank is not full.
+ * Practice days come from timestamped metric events — sessions,
+ * kept/partial calls, listening, reading, drills, BJT sets,
+ * passages, mocks. A missed call is not practice.
  */
-export function ladderWithStatus(diagnosis) {
+export const EVAP_PER_DRY_DAY = 0.004
+export const PRACTICE_DAY_INFLOW = 0.0015
+const INFLOW_TYPES = new Set([
+  'session_completed', 'listening_completed', 'reading_completed',
+  'drills_completed', 'bjt_completed', 'mock_completed', 'passage_completed',
+])
+
+function dayKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function isInflow(event) {
+  if (!event || typeof event.type !== 'string') return false
+  if (event.type === 'call_outcome') return event.outcome === 'kept' || event.outcome === 'partial'
+  return INFLOW_TYPES.has(event.type)
+}
+
+/** Local days (YYYY-MM-DD) with at least one real practice event. */
+export function practiceDaysOf(metrics) {
+  const days = new Set()
+  for (const e of Array.isArray(metrics) ? metrics : []) {
+    if (!isInflow(e) || !e.at) continue
+    const d = new Date(e.at)
+    if (!Number.isNaN(d.getTime())) days.add(dayKey(d))
+  }
+  return days
+}
+
+/** Full dry days in the trailing spell: yesterday, the day
+ *  before, … until the last practice day. Practising today or
+ *  yesterday means 0. */
+export function drySpellDays(metrics, now = new Date()) {
+  const days = practiceDaysOf(metrics)
+  if (!days.size) return 0
+  const last = [...days].sort().at(-1)
+  const today = dayKey(now)
+  if (last >= today) return 0
+  const ms = new Date(`${today}T12:00:00`) - new Date(`${last}T12:00:00`)
+  return Math.max(0, Math.round(ms / 86400000) - 1)
+}
+
+export function ladderWithStatus(diagnosis, evidence = {}) {
+  const metrics = Array.isArray(evidence.metrics) ? evidence.metrics : []
+  const now = evidence.now instanceof Date ? evidence.now : new Date()
   const currentOrder = diagnosis?.jlptEstimate ? (JLPT_ORDER[diagnosis.jlptEstimate] ?? -1) : -1
-  const total = typeof diagnosis?.total === 'number' ? diagnosis.total : null
+  let total = typeof diagnosis?.total === 'number' ? diagnosis.total : null
+  let bjt = typeof diagnosis?.bjtScore === 'number' ? diagnosis.bjtScore : null
   const sections = diagnosis?.sections && typeof diagnosis.sections === 'object' ? Object.values(diagnosis.sections).filter((v) => typeof v === 'number') : []
-  const minSection = sections.length ? Math.min(...sections) : null
-  const bjt = typeof diagnosis?.bjtScore === 'number' ? diagnosis.bjtScore : null
+  let minSection = sections.length ? Math.min(...sections) : null
+
+  // ——— 1 · the proven line ———
+  const provenAt = {} // proofLevel -> earliest proving date (ISO)
+  for (const e of metrics) {
+    if (e?.type !== 'mock_completed' || e.passed !== true || e.length !== 'full') continue
+    const lvl = typeof e.level === 'string' ? e.level : null
+    if (!lvl || !(lvl in JLPT_ORDER)) continue
+    if (!provenAt[lvl] || (e.at && e.at < provenAt[lvl])) provenAt[lvl] = e.at || ''
+  }
+  const provenOrders = Object.keys(provenAt).map((l) => JLPT_ORDER[l])
+  const isProven = (h) => typeof h.proofLevel === 'string'
+    && provenOrders.some((o) => o >= JLPT_ORDER[h.proofLevel])
+
+  // ——— 2 · the water moves with real work since the diagnosis ———
+  const t0 = metrics
+    .filter((e) => e?.type === 'diagnosis_completed' && e.at)
+    .map((e) => e.at)
+    .sort()
+    .at(-1) || null
+  if (diagnosis && t0) {
+    const after = metrics
+      .filter((e) => e?.at && e.at > t0)
+      .sort((a, b) => (a.at < b.at ? -1 : 1))
+    let latestMockMinSection = null
+    for (const e of after) {
+      if (e.type === 'mock_completed') {
+        const scaledTotal = typeof e.scaled === 'number' ? e.scaled
+          : (e.scaled && typeof e.scaled.total === 'number' ? e.scaled.total : null)
+        if (total !== null && scaledTotal !== null) {
+          const w = e.length === 'full' ? 0.5 : 0.3
+          total = total * (1 - w) + scaledTotal * w
+        }
+        if (e.scaled && typeof e.scaled === 'object') {
+          const secs = [e.scaled.lk, e.scaled.reading, e.scaled.listening].filter((v) => typeof v === 'number')
+          if (secs.length) latestMockMinSection = Math.min(...secs)
+        }
+      } else if (e.type === 'bjt_completed' && bjt !== null) {
+        const c = typeof e.correct === 'number' ? e.correct : null
+        const n = typeof e.total === 'number' ? e.total : null
+        if (c !== null && n) bjt = Math.max(0, Math.min(800, bjt + (c / n - 0.5) * 8))
+      }
+    }
+    if (latestMockMinSection !== null) minSection = latestMockMinSection
+    const t0Day = dayKey(new Date(t0))
+    const inflowDays = [...practiceDaysOf(after)].filter((d) => d > t0Day).length
+    if (inflowDays > 0) {
+      const f = Math.pow(1 + PRACTICE_DAY_INFLOW, inflowDays)
+      if (total !== null) total *= f
+      if (bjt !== null) bjt *= f
+    }
+  }
+
+  // ——— 3 · evaporation ———
+  const dry = drySpellDays(metrics, now)
+  if (dry > 0) {
+    const f = Math.pow(1 - EVAP_PER_DRY_DAY, dry)
+    if (total !== null) total *= f
+    if (bjt !== null) bjt *= f
+  }
+
   let nextMarked = false
-  return PROOF_LADDER.map((h) => {
+  const rungs = PROOF_LADDER.map((h) => {
     let fill = 0
     if (typeof h.bjtMin === 'number') {
       fill = bjt !== null ? Math.min(bjt / h.bjtMin, 1) : 0
@@ -137,11 +251,19 @@ export function ladderWithStatus(diagnosis) {
       }
     }
     fill = Math.max(0, fill)
+    const proven = isProven(h)
+    if (proven) fill = 1
     let status = 'locked'
-    if (fill >= 1) status = 'reached'
-    else if (!nextMarked) { status = 'next'; nextMarked = true }
-    return { ...h, status, fill }
+    if (proven) status = 'reached'
+    else if (fill >= 1) status = 'covered'
+    else if (fill > 0 && !nextMarked) { status = 'next'; nextMarked = true }
+    return { ...h, status, fill, provenAt: proven ? (provenAt[h.proofLevel] || Object.values(provenAt)[0] || null) : null }
   })
+  if (!nextMarked) {
+    const first = rungs.find((h) => h.status === 'covered' || h.status === 'locked')
+    if (first) first.status = 'next'
+  }
+  return rungs
 }
 
 const TAB_KEYS = {

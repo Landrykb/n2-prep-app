@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { X, CheckCircle2, Circle, Lock, Compass, Target, HeartPulse } from 'lucide-react'
-import { PERSONAS, PAINS, PROOF_TARGETS, saveProfile, ladderWithStatus, PROOF_LADDER } from '../lib/profile.js'
+import { PERSONAS, PAINS, PROOF_TARGETS, saveProfile, ladderWithStatus, drySpellDays, PROOF_LADDER } from '../lib/profile.js'
+import { loadMetrics } from '../lib/metrics.js'
 import { saveDeclaredLevel } from '../lib/learnerState.js'
 import { BANDS } from '../lib/readerFit.js'
 import { useLanguage } from '../hooks/useLanguage.js'
@@ -127,7 +128,9 @@ export function OnboardingFlow({ initial, onDone, onClose, setActive }) {
 // The Proof Ladder — where you are, the next height, what each height unlocks.
 export function ProofLadderView({ diagnosis, profile }) {
   const { t } = useLanguage()
-  const ladder = ladderWithStatus(diagnosis)
+  const [metrics] = useState(() => loadMetrics())
+  const ladder = ladderWithStatus(diagnosis, { metrics, now: new Date() })
+  const dryDays = drySpellDays(metrics, new Date())
   return (
     <div className="rounded-2xl bg-[#151129] border border-white/5 p-5 space-y-3">
       <h3 className="text-lg font-bold text-white flex items-center gap-2"><Target size={18} className="text-emerald-300" /> {t('problem.ladderTitle')}</h3>
@@ -153,7 +156,7 @@ export function ProofLadderView({ diagnosis, profile }) {
           const waveBack = h.status === 'reached' ? 'rgba(110,231,183,0.22)' : 'rgba(125,211,252,0.22)'
           const wavePath = 'M0 7 Q15 1 30 7 T60 7 T90 7 T120 7 V12 H0 Z'
           return (
-          <div key={h.id} className={`relative overflow-hidden rounded-xl border ${h.status === 'reached' ? 'border-emerald-500/30' : h.status === 'next' ? 'border-[#FF6B57]/40' : 'border-bun-600/20 opacity-75'}`}>
+          <div key={h.id} className={`relative overflow-hidden rounded-xl border ${h.status === 'reached' ? 'border-emerald-500/30' : h.status === 'next' ? 'border-[#FF6B57]/40' : h.status === 'covered' ? 'border-sky-300/25' : 'border-bun-600/20 opacity-75'}`}>
             {h.fill > 0 && (
               <div aria-hidden="true" className={`absolute inset-x-0 bottom-0 ${fillBg}`} style={{ height: `${pct}%` }}>
                 <svg className="tank-wave-b absolute -top-[7px] left-0 block h-[8px] w-[200%]" viewBox="0 0 120 12" preserveAspectRatio="none"><path d={wavePath} fill={waveBack} /></svg>
@@ -161,9 +164,9 @@ export function ProofLadderView({ diagnosis, profile }) {
               </div>
             )}
             <div className="relative flex items-start gap-3 p-3">
-              <span className="mt-0.5 shrink-0">{h.status === 'reached' ? <CheckCircle2 size={17} className="text-emerald-300" /> : h.status === 'next' ? <HeartPulse size={17} className="text-[#FF8A75]" /> : <Lock size={15} className="text-slate-500" />}</span>
+              <span className="mt-0.5 shrink-0">{h.status === 'reached' ? <CheckCircle2 size={17} className="text-emerald-300" /> : h.status === 'covered' ? <CheckCircle2 size={17} className="text-sky-300" /> : h.status === 'next' ? <HeartPulse size={17} className="text-[#FF8A75]" /> : <Lock size={15} className="text-slate-500" />}</span>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-bold text-white">{h.labelKey ? t(h.labelKey) : h.label} {h.status === 'next' && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-[#FF6B57] text-white align-middle">{t('problem.badgeNext')}</span>}{h.status === 'reached' && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-600/60 text-emerald-100 align-middle">{t('problem.badgeReached')}</span>}{h.fill > 0 && h.fill < 1 && <span className="float-right text-sm font-bold text-sky-200">{pct}%</span>}</p>
+                <p className="text-sm font-bold text-white">{h.labelKey ? t(h.labelKey) : h.label} {h.status === 'next' && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-[#FF6B57] text-white align-middle">{t('problem.badgeNext')}</span>}{h.status === 'reached' && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-600/60 text-emerald-100 align-middle">{t('problem.badgeProven')}</span>}{h.status !== 'reached' && h.fill >= 1 && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300 align-middle">{t('problem.badgeUnproven')}</span>}{h.fill > 0 && h.fill < 1 && <span className="float-right text-sm font-bold text-sky-200">{pct}%</span>}</p>
                 <p className="text-xs text-slate-400">{t('problem.ladderProof', { proof: h.proofKey ? t(h.proofKey) : h.proof })}</p>
                 <p className="text-xs text-slate-300">{t('problem.ladderUnlocks', { unlocks: h.unlocksKey ? t(h.unlocksKey) : h.unlocks })}</p>
               </div>
@@ -172,6 +175,9 @@ export function ProofLadderView({ diagnosis, profile }) {
           )
         })}
       </div>
+      {dryDays >= 2 && (
+        <p className="text-[11px] text-amber-200/80">{t('problem.ladderDry', { days: dryDays })}</p>
+      )}
       <p className="text-[11px] text-slate-500">{t('problem.ladderFooter')}</p>
     </div>
   )

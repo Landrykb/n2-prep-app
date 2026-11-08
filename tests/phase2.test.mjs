@@ -768,33 +768,79 @@ console.log('integration audit — shared mastery + diagnosis-history sync:')
       const voiceSrc = readFileSync(new URL('../src/components/VoiceLoop.jsx', import.meta.url), 'utf8')
       assert.match(voiceSrc, /yonde:voice-scene/)
     })
-    check('proof ladder tanks: a rung is reached only when the learner numbers meet the bar printed on it', () => {
+    check('proof ladder water system: green is proven by a full mock only; the water lives and dries', () => {
       const byId = (ladder) => Object.fromEntries(ladder.map((h) => [h.id, h]))
-      // Landry's real checkup (2026-11-07): N2 est, 97/180, sections
-      // 38/37/22, BJT ~348. The old logic marked BJT 400 REACHED
-      // without ever reading the BJT score.
-      const mine = byId(profileMod.ladderWithStatus({ jlptEstimate: 'N2', total: 97, sections: { language: 38, reading: 37, listening: 22 }, bjtScore: 348 }))
-      assert.equal(mine.foundation.status, 'reached')
-      assert.equal(mine.bridge.status, 'reached')
-      assert.equal(mine.n2.status, 'reached') // 97 ≥ 90 and every section ≥ 19
+      const dx = { jlptEstimate: 'N2', total: 97, sections: { language: 38, reading: 37, listening: 22 }, bjtScore: 348 }
+      // Diagnosis alone (Landry's real checkup, 2026-11-07): the
+      // water is high — foundation/bridge/N2 covered, BJT 400 at
+      // 87% — but NOTHING is green. An estimate is not proof.
+      const mine = byId(profileMod.ladderWithStatus(dx))
+      assert.equal(mine.foundation.status, 'covered')
+      assert.equal(mine.bridge.status, 'covered')
+      assert.equal(mine.n2.status, 'covered')
       assert.equal(mine.n2.fill, 1)
+      assert.ok(mine.foundation.status !== 'reached' && mine.n2.status !== 'reached', 'no green without proof')
       assert.equal(mine.bjt400.status, 'next')
       assert.ok(Math.abs(mine.bjt400.fill - 348 / 400) < 1e-9, 'BJT 400 fills on the BJT scale itself')
       assert.equal(mine.bjt480.status, 'locked')
       assert.ok(Math.abs(mine.bjt480.fill - 348 / 480) < 1e-9)
       assert.equal(mine.n1.fill, 0) // above the estimate: never extrapolated
-      assert.equal(mine.n1.status, 'locked')
       assert.ok(Math.abs(mine.j1.fill - 348 / 530) < 1e-9)
       // A weak section holds the water down even when the total clears the bar.
       const weak = byId(profileMod.ladderWithStatus({ jlptEstimate: 'N2', total: 96, sections: { language: 40, reading: 44, listening: 12 }, bjtScore: 500 }))
       assert.ok(Math.abs(weak.n2.fill - 12 / 19) < 1e-9, 'the 19/60 floor caps the fill')
       assert.equal(weak.n2.status, 'next')
-      assert.equal(weak.bjt400.status, 'reached')
-      assert.equal(weak.bjt480.status, 'reached') // BJT rungs answer to the BJT score alone
+      assert.equal(weak.bjt400.status, 'covered') // full BJT water, still not proof
+      assert.equal(weak.bjt480.status, 'covered')
       // No diagnosis: every tank empty, the first rung is next.
       const none = profileMod.ladderWithStatus(null)
       assert.ok(none.every((h) => h.fill === 0))
       assert.equal(none[0].status, 'next')
+      // PROOF: a passed FULL mock at N2 proves N2 and everything
+      // below it. A quick mock proves nothing. A failed full mock
+      // proves nothing.
+      const ev = (events) => ({ metrics: events, now: new Date('2026-11-08T12:00:00') })
+      const proven = byId(profileMod.ladderWithStatus(dx, ev([
+        { type: 'mock_completed', at: '2026-11-08T09:00:00', level: 'N2', length: 'full', passed: true, scaled: { lk: 40, reading: 38, listening: 30, total: 108 } },
+      ])))
+      assert.equal(proven.foundation.status, 'reached')
+      assert.equal(proven.bridge.status, 'reached')
+      assert.equal(proven.n2.status, 'reached')
+      assert.equal(proven.bjt400.status, 'next') // a JLPT proof never proves a BJT rung
+      const quickOnly = byId(profileMod.ladderWithStatus(dx, ev([
+        { type: 'mock_completed', at: '2026-11-08T09:00:00', level: 'N2', length: 'quick', passed: true, scaled: { total: 150 } },
+      ])))
+      assert.equal(quickOnly.n2.status, 'covered', 'a quick mock is practice, not proof')
+      const failedFull = byId(profileMod.ladderWithStatus(dx, ev([
+        { type: 'mock_completed', at: '2026-11-08T09:00:00', level: 'N2', length: 'full', passed: false, scaled: { total: 70 } },
+      ])))
+      assert.equal(failedFull.n2.status, 'covered')
+      // EVAPORATION: diagnosis Nov 1, last practice Nov 1, today
+      // Nov 11 → 9 dry days recede both scales; the covered rungs
+      // stay covered (their fill is order-based) but the partial
+      // BJT water visibly drops.
+      const dried = byId(profileMod.ladderWithStatus(dx, { now: new Date('2026-11-11T12:00:00'), metrics: [
+        { type: 'diagnosis_completed', at: '2026-11-01T09:00:00', total: 97 },
+        { type: 'session_completed', at: '2026-11-01T10:00:00', minutes: 5 },
+      ] }))
+      assert.ok(dried.bjt400.fill < 348 / 400 - 0.02, `dry days recede the water (got ${dried.bjt400.fill})`)
+      assert.ok(dried.bjt400.fill > 0.80, 'evaporation is gradual, not a cliff')
+      assert.equal(profileMod.drySpellDays([
+        { type: 'session_completed', at: '2026-11-01T10:00:00' },
+      ], new Date('2026-11-11T12:00:00')), 9)
+      assert.equal(profileMod.drySpellDays([
+        { type: 'call_outcome', at: '2026-11-10T10:00:00', outcome: 'missed' },
+        { type: 'session_completed', at: '2026-11-01T10:00:00' },
+      ], new Date('2026-11-11T12:00:00')), 9, 'a missed call is not practice')
+      // INFLOW: practice days after the diagnosis lift the water.
+      const watered = byId(profileMod.ladderWithStatus(dx, { now: new Date('2026-11-08T12:00:00'), metrics: [
+        { type: 'diagnosis_completed', at: '2026-11-01T09:00:00', total: 97 },
+        { type: 'session_completed', at: '2026-11-03T10:00:00', minutes: 5 },
+        { type: 'listening_completed', at: '2026-11-05T10:00:00', correct: 4, total: 5 },
+        { type: 'drills_completed', at: '2026-11-07T10:00:00' },
+        { type: 'session_completed', at: '2026-11-08T09:00:00', minutes: 5 },
+      ] }))
+      assert.ok(watered.bjt400.fill > 348 / 400, 'a few practice days add real water')
     })
     check('promise panel folds its reasoning behind the Why toggle', () => {
       const panel = readFileSync(new URL('../src/components/PromisePanel.jsx', import.meta.url), 'utf8')
