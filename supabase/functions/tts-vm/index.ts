@@ -58,13 +58,13 @@ async function urlResponse(
 ): Promise<Response | null> {
   const { data } = await admin.storage.from(BUCKET).createSignedUrl(path, 3600).catch(() => ({ data: null }))
   if (!data?.signedUrl) return null
-  return json({ url: data.signedUrl, contentType: 'audio/mpeg' })
+  return json({ url: data.signedUrl, contentType: 'audio/mp4' })
 }
 
 const audioResponse = (bytes: Uint8Array) =>
   new Response(bytes, {
     status: 200,
-    headers: { ...corsHeaders, 'Content-Type': 'audio/mpeg', 'Cache-Control': 'private, max-age=86400' },
+    headers: { ...corsHeaders, 'Content-Type': 'audio/mp4', 'Cache-Control': 'private, max-age=86400' },
   })
 
 serve(async (req: Request) => {
@@ -127,7 +127,7 @@ serve(async (req: Request) => {
   const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
 
   // Cache first: the same line in the same cast never synthesizes twice.
-  const cachePath = `tts-cache/${await hashOf(`${cast}\n${text}`)}.mp3`
+  const cachePath = `tts-cache/${await hashOf(`${cast}\n${text}`)}.m4a`
   // storage-js download() resolves { data, error } — the Blob
   // is .data. Reading .arrayBuffer() off the result object
   // itself threw and 500'd every cache miss (2026-11-08: the

@@ -104,23 +104,39 @@ async def synthesize_mp3_cast(text, out_path, voice, pitch):
     await communicate.save(out_path)
 
 
-def synthesize_tts_mp3(text, job_id, cast):
+def synthesize_tts_audio(text, job_id, cast):
+    """One button line in its cast, returned as AAC in an MP4
+    container (.m4a). The MP3 edge-tts produces is valid, but
+    Landry's WebKit refused to play it in every delivery shape
+    (blob AND https URL — NotSupportedError, 2026-11-08), while
+    AAC/m4a is Apple's own format. The transcode mirrors the
+    passage lane's ffmpeg step: AAC-LC, 44.1 kHz, mono, 48k."""
     voice, pitch = CASTS.get(cast, CASTS["female"])
     mp3_path = os.path.join(TMP_DIR, "tts-" + job_id + ".mp3")
+    m4a_path = os.path.join(TMP_DIR, "tts-" + job_id + ".m4a")
     asyncio.run(synthesize_mp3_cast(text, mp3_path, voice, pitch))
-    with open(mp3_path, "rb") as f:
-        data = f.read()
     try:
-        os.unlink(mp3_path)
-    except OSError:
-        pass
+        subprocess.run(
+            ["ffmpeg", "-y", "-v", "error", "-i", mp3_path,
+             "-c:a", "aac", "-b:a", "48k", "-ar", "44100", "-ac", "1",
+             m4a_path],
+            check=True, timeout=60,
+        )
+        with open(m4a_path, "rb") as f:
+            data = f.read()
+    finally:
+        for path in (mp3_path, m4a_path):
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
     if not data:
         raise RuntimeError("empty audio from synthesis")
     return data
 
 
 def tts_loop(cfg):
-    """Fast lane: claim kind='tts' jobs and hand MP3 bytes back.
+    """Fast lane: claim kind='tts' jobs and hand AAC/m4a bytes back.
 
     Runs in a daemon thread beside the passage loop; shares the
     one worker secret and door. A failure here never touches the
@@ -141,7 +157,7 @@ def tts_loop(cfg):
             cast = str(job.get("cast", "female"))
             t0 = time.time()
             try:
-                audio = synthesize_tts_mp3(text, job_id, cast)
+                audio = synthesize_tts_audio(text, job_id, cast)
                 post_json(
                     url, secret,
                     {

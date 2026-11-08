@@ -230,7 +230,7 @@ serve(async (req: Request) => {
       return json({ job: null })
     }
 
-    // ---------- tts-complete: MP3 bytes back, no Telegram poke ---
+    // ---------- tts-complete: AAC/m4a bytes back, no Telegram poke ---
     if (action === 'tts-complete') {
       const jobId = typeof body?.jobId === 'string' ? body.jobId : ''
       const audioBase64 = typeof body?.audioBase64 === 'string' ? body.audioBase64 : ''
@@ -248,10 +248,10 @@ serve(async (req: Request) => {
       if (bytes.length === 0 || bytes.length > MAX_AUDIO_BYTES) {
         return json({ error: 'Audio size out of bounds' }, 400)
       }
-      const storagePath = `${jobId}.mp3`
+      const storagePath = `${jobId}.m4a`
       const { error: uploadError } = await supabaseAdmin.storage
         .from(BUCKET)
-        .upload(storagePath, bytes, { contentType: 'audio/mpeg', upsert: true })
+        .upload(storagePath, bytes, { contentType: 'audio/mp4', upsert: true })
       if (uploadError) {
         console.error(`voice-queue: tts storage upload failed job=${jobId}`)
         return json({ error: 'Storage upload failed' }, 500)
