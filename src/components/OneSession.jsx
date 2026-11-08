@@ -290,7 +290,7 @@ export default function OneSession({ setActive }) {
             <p className="text-xs text-slate-400 mb-1">{t('voice.partnerSays')}</p>
             <div className="flex items-start gap-2">
               <p className="text-slate-100 leading-loose flex-1"><KanjiTapText text={scene.partner} /></p>
-              <TtsButton text={scene.partner} cast={scene.partnerVoice || undefined} />
+              <TtsButton text={scene.partner} cast={scene.partnerVoice || undefined} audioSrc={scene.partnerAudio || undefined} />
             </div>
           </div>
           <p className="text-sm text-slate-200"><span className="text-[#FF8A75] font-semibold">{t('voice.yourTurn')}</span> {scene.promptEn}</p>

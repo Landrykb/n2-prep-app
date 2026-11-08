@@ -372,7 +372,25 @@ check('every listening item carries its pre-rendered audio URL', async () => {
     // The files live in the public listening-audio Storage
     // bucket (the push route is UTF-8 text — binaries cannot
     // ride it); the URL names the manifest slug, nothing else.
-    assert.ok(item.audio && item.audio.endsWith(`/listening-audio/${slug}.ogg`), `${item.title}'s audio URL names its slug`)
+    // m4a (AAC), not ogg: WebKit refuses ogg/opus outright
+    // (MEDIA_ERR_SRC_NOT_SUPPORTED on Landry's iPhone,
+    // 2026-11-08) — every fixed file is Apple's format now.
+    assert.ok(item.audio && item.audio.endsWith(`/listening-audio/${slug}.m4a`), `${item.title}'s audio URL names its slug`)
+  }
+})
+check('every scene partner line carries its pre-rendered m4a', async () => {
+  const { scenes } = await import('../src/data/scenes.js')
+  assert.equal(scenes.length, 22)
+  for (const scene of scenes) {
+    assert.ok(
+      scene.partnerAudio && scene.partnerAudio.endsWith(`/listening-audio/scene-${scene.id}.m4a`),
+      `${scene.id}'s partner audio names its scene`,
+    )
+  }
+  const { readFileSync } = await import('node:fs')
+  for (const rel of ['../src/components/VoiceLoop.jsx', '../src/components/OneSession.jsx']) {
+    const src = readFileSync(new URL(rel, import.meta.url), 'utf8')
+    assert.ok(src.includes('audioSrc={scene.partnerAudio'), `${rel} plays the partner file first`)
   }
 })
 check('the file route is wired: player, button, and the three surfaces', async () => {

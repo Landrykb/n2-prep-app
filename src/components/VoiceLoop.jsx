@@ -193,7 +193,7 @@ export default function VoiceLoop() {
           <p className="text-xs text-slate-400 mb-1">{t('voice.partnerSays')}</p>
           <div className="flex items-start gap-2">
             <p className="text-slate-100 leading-loose flex-1"><KanjiTapText text={scene.partner} /></p>
-            <TtsButton text={scene.partner} />
+            <TtsButton text={scene.partner} cast={scene.partnerVoice || undefined} audioSrc={scene.partnerAudio || undefined} />
           </div>
         </div>
 
