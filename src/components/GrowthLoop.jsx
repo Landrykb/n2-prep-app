@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { ArrowRight, ChevronRight } from 'lucide-react'
+import { useState } from 'react'
+import { ArrowRight, ChevronDown, ChevronRight, Layers, RotateCcw } from 'lucide-react'
 import { brand, mascotById } from '../lib/brand.js'
 import { refreshTwin, topPatterns } from '../lib/twin.js'
 import { loadQueue } from '../lib/queue.js'
@@ -71,13 +71,6 @@ const HANDOFFS = {
   },
 }
 
-const RING_R = 32 // % of the square — node centres and the SVG ring agree
-
-function nodePos(i) {
-  const rad = ((-90 + i * 60) * Math.PI) / 180
-  return { x: 50 + RING_R * Math.cos(rad), y: 50 + RING_R * Math.sin(rad) }
-}
-
 function AgentDisc({ m, size, selected }) {
   const [imgOk, setImgOk] = useState(true)
   return (
@@ -112,15 +105,6 @@ export default function GrowthLoop({ setActive }) {
   const { user } = useAuth()
   const { t } = useLanguage()
   const [selected, setSelected] = useState('michi')
-  const [reducedMotion, setReducedMotion] = useState(
-    () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
-  )
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const fn = () => setReducedMotion(mq.matches)
-    mq.addEventListener?.('change', fn)
-    return () => mq.removeEventListener?.('change', fn)
-  }, [])
 
   const [twin] = useState(() => refreshTwin())
   const [metrics] = useState(() => loadMetrics())
@@ -169,65 +153,44 @@ export default function GrowthLoop({ setActive }) {
         </section>
       )}
 
-      {/* ——— The diagram ——— */}
-      <section className="rounded-3xl bg-[#151129] border border-white/5 px-4 pt-7 pb-5 sm:px-6">
-        <div className="relative mx-auto w-full max-w-[540px] aspect-square select-none mb-7">
-          <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" aria-hidden="true">
-            <defs>
-              <linearGradient id="loopGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#71368A" />
-                <stop offset="100%" stopColor="#FF6B57" />
-              </linearGradient>
-            </defs>
-            <circle cx="50" cy="50" r={RING_R} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="2.2" />
-            <circle cx="50" cy="50" r={RING_R} fill="none" stroke="url(#loopGrad)" strokeWidth="0.55" opacity="0.6" />
-            {LOOP_ORDER.map((id, i) => {
-              const mid = nodePos(i + 0.5)
-              const angle = -90 + 30 + i * 60
-              return (
-                <g key={id} transform={`translate(${mid.x} ${mid.y}) rotate(${angle + 90})`} opacity="0.9">
-                  <polygon points="0,-1.7 1.1,1.1 -1.1,1.1" fill="#FF6B57" />
-                </g>
-              )
-            })}
-            {!reducedMotion && (
-              <>
-                <path id="loopPulsePath" d="M 50 18 A 32 32 0 1 1 49.99 18" fill="none" stroke="none" />
-                <circle r="2.9" fill="#FF6B57" opacity="0.22">
-                  <animateMotion dur="18s" repeatCount="indefinite">
-                    <mpath href="#loopPulsePath" />
-                  </animateMotion>
-                </circle>
-                <circle r="1.4" fill="#FF8A75">
-                  <animateMotion dur="18s" repeatCount="indefinite">
-                    <mpath href="#loopPulsePath" />
-                  </animateMotion>
-                </circle>
-              </>
-            )}
-          </svg>
-
-          {/* The Twin at the centre — the queue is the flywheel. */}
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[42%] text-center pointer-events-none">
+      {/* ——— The route ———
+          The loop is a ROUTE, not a ring (Landry, 2026-11-08: the
+          circle "does not display well" — on a phone the ring
+          crushed six nodes, their stat pills and the centre stack
+          into each other). Drawn like a line map: your Twin is the
+          home station at the top, the six agents are stations down
+          the line in cycle order, and the return strip at the
+          bottom closes the loop. Normal flow only — nothing can
+          overlap at any width. */}
+      <section className="rounded-3xl bg-[#151129] border border-white/5 px-4 py-5 sm:px-6">
+        {/* Home station — your Twin, the flywheel. */}
+        <div className="flex items-center gap-3.5">
+          <span aria-hidden="true" className="w-14 h-14 rounded-full flex items-center justify-center shrink-0" style={{ border: '3px solid #71368A', background: 'rgba(113,54,138,0.12)' }}>
+            <Layers size={22} className="text-[#C39BD3]" />
+          </span>
+          <div className="flex-1 min-w-0">
             <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">{t('loop.centre.twin')}</p>
-            <p className="text-[44px] leading-none font-bold text-white mt-2">{centre.queueTotal}</p>
-            <p className="text-xs text-slate-300">{t('loop.centre.words')}</p>
+            <p className="text-[13px] text-slate-300 mt-0.5">{t('loop.centre.words')}</p>
             {centre.queueTotal > 0 && (
-              <p className="text-[11px] text-slate-400 mt-1">
-                {t('loop.centre.breakdown', { graduated: centre.graduated, fresh: centre.fresh })}
-              </p>
+              <p className="text-[11px] text-slate-400">{t('loop.centre.breakdown', { graduated: centre.graduated, fresh: centre.fresh })}</p>
             )}
             {est.band && (
-              <p className="text-[11px] mt-1.5">
+              <p className="text-[11px]">
                 <span className="text-[#FF8A75] font-medium">{t('loop.centre.workingLevel', { band: est.band })}</span>
                 <span className="text-slate-500"> {t('loop.centre.estimate')}</span>
               </p>
             )}
           </div>
+          <p className="text-[40px] leading-none font-bold text-white shrink-0">{centre.queueTotal}</p>
+        </div>
 
-          {LOOP_ORDER.map((id, i) => {
+        <div className="w-14 flex justify-center py-1" aria-hidden="true"><ChevronDown size={14} className="text-slate-600" /></div>
+
+        {/* The stations, in cycle order, on one spine. */}
+        <div className="relative">
+          <div aria-hidden="true" className="absolute left-[27px] top-7 bottom-7 w-[2px] bg-white/[0.08]" />
+          {LOOP_ORDER.map((id) => {
             const m = mascotById(id)
-            const pos = nodePos(i)
             const st = stats[id]
             const isSel = selected === id
             return (
@@ -235,27 +198,32 @@ export default function GrowthLoop({ setActive }) {
                 key={id}
                 onClick={() => setSelected(id)}
                 aria-pressed={isSel}
-                className="absolute w-[132px] -translate-x-1/2 flex flex-col items-center gap-1 rounded-2xl px-1 focus:outline-none"
-                style={{ left: `${pos.x}%`, top: `calc(${pos.y}% - 32px)` }}
+                className="relative w-full flex items-center gap-3.5 py-2.5 px-2 -mx-2 rounded-2xl text-left focus:outline-none"
+                style={isSel ? { background: `${m.color}0d` } : undefined}
               >
-                <AgentDisc m={m} size={64} selected={isSel} />
-                <span className="text-[13px] font-semibold text-white leading-tight mt-0.5">
-                  {m.name} <span style={{ color: m.color }}>{m.kanji}</span>
+                <span className="relative z-10 rounded-full bg-[#151129] shrink-0">
+                  <AgentDisc m={m} size={56} selected={isSel} />
                 </span>
-                <span className="text-[11px] text-slate-400 leading-none">{m.roleKey ? t(m.roleKey) : m.role}</span>
-                {st.stat && (
-                  <span
-                    className="text-[11px] font-medium whitespace-nowrap rounded-full px-2 py-[3px] mt-1"
-                    style={{ color: m.color, border: `1px solid ${m.color}55`, background: `${m.color}12` }}
-                  >
-                    {st.stat}
+                <span className="flex-1 min-w-0">
+                  <span className="block text-[15px] font-semibold text-white leading-tight">
+                    {m.name} <span style={{ color: m.color }}>{m.kanji}</span>
+                    <span className="text-xs font-medium text-slate-400"> · {m.roleKey ? t(m.roleKey) : m.role}</span>
                   </span>
-                )}
+                  {st.stat
+                    ? <span className="block text-[13px] font-medium mt-0.5" style={{ color: m.color }}>{st.stat}</span>
+                    : <span className="block text-[13px] text-slate-400 mt-0.5">{m.jobKey ? t(m.jobKey) : m.job}</span>}
+                </span>
               </button>
             )
           })}
         </div>
-        <p className="text-center text-xs text-slate-500 mt-5">{t('loop.diagram.tap')}</p>
+
+        {/* The return leg — the loop closes. */}
+        <div className="mt-3 flex items-center gap-2.5 rounded-2xl bg-white/[0.04] px-4 py-3">
+          <RotateCcw size={15} className="text-[#FF8A75] shrink-0" />
+          <p className="text-xs text-slate-300">{t('loop.route.return')}</p>
+        </div>
+        <p className="text-center text-xs text-slate-500 mt-4">{t('loop.diagram.tap')}</p>
       </section>
 
       {/* ——— The selected agent's handoff ——— */}

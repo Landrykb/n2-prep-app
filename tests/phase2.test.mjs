@@ -769,6 +769,17 @@ console.log('integration audit — shared mastery + diagnosis-history sync:')
       const problem = readFileSync(new URL('../src/components/ProblemStart.jsx', import.meta.url), 'utf8')
       assert.match(problem, /border-sky-300\/40/, 'the tank water surface line renders')
     })
+    check('loop page is a route of stations, not a ring; voice loop stage comes before its library', () => {
+      const loop = readFileSync(new URL('../src/components/GrowthLoop.jsx', import.meta.url), 'utf8')
+      assert.doesNotMatch(loop, /aspect-square|animateMotion|nodePos/, 'the ring and its pulse are gone')
+      assert.match(loop, /loop\.route\.return/)
+      assert.match(loop, /loop\.centre\.twin/)
+      const voice = readFileSync(new URL('../src/components/VoiceLoop.jsx', import.meta.url), 'utf8')
+      assert.doesNotMatch(voice, /card-glow/)
+      assert.match(voice, /voice\.library/)
+      assert.match(voice, /scrollIntoView/)
+      assert.ok(voice.indexOf('stageRef') < voice.indexOf('voice.library'), 'the stage renders before the library')
+    })
   } finally {
     if (prevLS === undefined) delete globalThis.localStorage
     else globalThis.localStorage = prevLS

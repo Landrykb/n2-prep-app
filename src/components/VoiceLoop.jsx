@@ -100,7 +100,13 @@ export default function VoiceLoop() {
   const isMastered = mastered.has(scene.id) || (last && last.score >= MASTERY)
   const speechSupported = typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)
 
-  const pickScene = (i) => { setIdx(i); setAttempts([]); setInput(''); setSavedNote(''); setShadowChecks({ heard: false, matched: false, meaning: false }) }
+  const stageRef = useRef(null)
+  const pickScene = (i) => {
+    setIdx(i); setAttempts([]); setInput(''); setSavedNote(''); setShadowChecks({ heard: false, matched: false, meaning: false })
+    // The stage lives at the top now: picking a scene in the
+    // library below brings the learner back up to the work.
+    try { stageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) } catch { /* ignore */ }
+  }
 
   // First mic use on this device shows the plain-language explanation
   // BEFORE the browser prompt (Doc 15 — Apple 2.5.14 / Play disclosure).
@@ -179,21 +185,14 @@ export default function VoiceLoop() {
           <button onClick={() => setMode('roleplay')} className={`px-3 py-1.5 rounded-lg text-xs font-medium ${mode === 'roleplay' ? 'bg-[#FF6B57] text-white' : 'text-slate-400'}`}>{t('voice.modeRoleplay')}</button>
           <button onClick={() => setMode('shadow')} className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 ${mode === 'shadow' ? 'bg-[#FF6B57] text-white' : 'text-slate-400'}`}><Ear size={13} /> {t('voice.modeShadow')}</button>
         </div>
-        <select value={domain} onChange={(e) => { setDomain(e.target.value); setIdx(0) }} className="bg-bun-900 border border-bun-600/40 rounded-lg px-2 py-2 text-sm text-slate-200 focus:outline-none focus:border-[#FF6B57]">
-          <option value="all">{t('voice.allDomains')}</option>
-          {SCENE_DOMAINS.map((d) => <option key={d} value={d}>{d}</option>)}
-        </select>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {filtered.map((s, i) => (
-          <button key={s.id} onClick={() => pickScene(i)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${scene.id === s.id ? 'bg-[#FF6B57] text-white' : 'bg-bun-700 text-slate-300 hover:bg-bun-600'}`}>
-            {mastered.has(s.id) ? '✓ ' : ''}{s.title} <span className="text-slate-400">· {s.level}</span>
-          </button>
-        ))}
-      </div>
-
-      <div className="rounded-2xl glass p-5 card-glow space-y-4">
+      {/* The stage FIRST (Landry, 2026-11-08): the scene you are
+          working on is the page's one job — it used to sit under a
+          wall of 22 scene pills. The picker is a quiet library
+          below the stage; the domain filter moved down with it,
+          where it belongs. */}
+      <div ref={stageRef} className="rounded-3xl bg-[#151129] border border-white/5 p-5 space-y-4 scroll-mt-24">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="text-lg font-bold text-white">{scene.title}</h3>
@@ -295,6 +294,26 @@ export default function VoiceLoop() {
             )}
           </div>
         )}
+      </div>
+
+      {/* The scene library — quiet rows under the stage, problem-
+          matched scenes first (the existing ordering), the domain
+          filter at its head. Picking a row returns to the stage. */}
+      <div className="rounded-3xl bg-[#151129] border border-white/5 p-3 space-y-1">
+        <div className="flex items-center justify-between gap-2 px-2 pt-1 pb-1.5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{t('voice.library')}</p>
+          <select value={domain} onChange={(e) => { setDomain(e.target.value); setIdx(0) }} className="bg-bun-900 border border-bun-600/40 rounded-lg px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-[#FF6B57]">
+            <option value="all">{t('voice.allDomains')}</option>
+            {SCENE_DOMAINS.map((d) => <option key={d} value={d}>{d}</option>)}
+          </select>
+        </div>
+        {filtered.map((s, i) => (
+          <button key={s.id} onClick={() => pickScene(i)} aria-pressed={scene.id === s.id} className={`w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm transition ${scene.id === s.id ? 'bg-[#FF6B57]/15 text-white' : 'text-slate-300 hover:bg-white/[0.04]'}`}>
+            <span className="flex-1 min-w-0 truncate">{s.title}</span>
+            {mastered.has(s.id) && <CheckCircle2 size={14} className="text-emerald-300 shrink-0" />}
+            <span className="text-[11px] text-slate-500 shrink-0">{s.level}</span>
+          </button>
+        ))}
       </div>
     </div>
   )
