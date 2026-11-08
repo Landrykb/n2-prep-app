@@ -141,36 +141,58 @@ export function ProofLadderView({ diagnosis, profile }) {
         {profile?.proofTarget === 'real-life' && profile?.realLifeGoal ? <>{t('problem.ladderNamedHeightStart')}<span className="text-emerald-300">{profile.realLifeGoal}</span>{t('problem.ladderNamedHeightEnd')}</> : null}
       </p>
       <div className="space-y-2">
-        {ladder.map((h) => {
+        {ladder.map((h, idx) => {
           // Tank fill (Landry, 2026-11-08): the rung fills like
           // water to the fraction of its own bar the learner's
           // numbers cover — progress is a level in a tank, not a
           // label that flips. Full tank = reached; the first
           // not-full rung is the next height.
           const pct = Math.round((h.fill || 0) * 100)
-          const fillBg = h.status === 'reached' ? 'bg-emerald-400/15' : 'bg-sky-400/10'
-          // The surface is water, and water moves (Landry,
-          // 2026-11-08): two wave layers drift against each
-          // other along the top of the fill.
-          const waveFront = h.status === 'reached' ? 'rgba(110,231,183,0.45)' : 'rgba(125,211,252,0.45)'
-          const waveBack = h.status === 'reached' ? 'rgba(110,231,183,0.22)' : 'rgba(125,211,252,0.22)'
+          const full = (h.fill || 0) >= 1
+          // The water must READ as water (Landry, 2026-11-08:
+          // "make it more visible", "like it is full and start
+          // spilling into other tanks"): a strong body of colour,
+          // a bright waterline, taller waves — and a full tank
+          // pours over its rim into the next tank below it.
+          const fillBg = h.status === 'reached' ? 'bg-emerald-400/35' : 'bg-sky-400/30'
+          const lineBg = h.status === 'reached' ? 'bg-emerald-200/80' : 'bg-sky-200/80'
+          const waveFront = h.status === 'reached' ? 'rgba(110,231,183,0.85)' : 'rgba(125,211,252,0.85)'
+          const waveBack = h.status === 'reached' ? 'rgba(110,231,183,0.45)' : 'rgba(125,211,252,0.45)'
           const wavePath = 'M0 7 Q15 1 30 7 T60 7 T90 7 T120 7 V12 H0 Z'
+          const receives = idx > 0 && (ladder[idx - 1].fill || 0) >= 1
+          const spillSolid = h.status === 'reached' ? 'bg-emerald-200' : 'bg-sky-200'
+          const spillBody = h.status === 'reached' ? 'bg-emerald-300/50' : 'bg-sky-300/50'
           return (
-          <div key={h.id} className={`relative overflow-hidden rounded-xl border ${h.status === 'reached' ? 'border-emerald-500/30' : h.status === 'next' ? 'border-[#FF6B57]/40' : h.status === 'covered' ? 'border-sky-300/25' : 'border-bun-600/20 opacity-75'}`}>
+          <div key={h.id} className="relative">
+          <div className={`relative overflow-hidden rounded-xl border min-h-[84px] ${h.status === 'reached' ? 'border-emerald-500/40' : h.status === 'next' ? 'border-[#FF6B57]/40' : h.status === 'covered' ? 'border-sky-300/35' : 'border-bun-600/20 opacity-75'}`}>
             {h.fill > 0 && (
               <div aria-hidden="true" className={`absolute inset-x-0 bottom-0 ${fillBg}`} style={{ height: `${pct}%` }}>
-                <svg className="tank-wave-b absolute -top-[7px] left-0 block h-[8px] w-[200%]" viewBox="0 0 120 12" preserveAspectRatio="none"><path d={wavePath} fill={waveBack} /></svg>
-                <svg className="tank-wave-a absolute -top-[5px] left-0 block h-[8px] w-[200%]" viewBox="0 0 120 12" preserveAspectRatio="none"><path d={wavePath} fill={waveFront} /></svg>
+                <div className={`absolute inset-x-0 ${full ? 'top-[10px]' : 'top-0'} h-[2px] ${lineBg}`} />
+                <svg className={`tank-wave-b absolute ${full ? 'top-[3px]' : '-top-[8px]'} left-0 block h-[12px] w-[200%]`} viewBox="0 0 120 12" preserveAspectRatio="none"><path d={wavePath} fill={waveBack} /></svg>
+                <svg className={`tank-wave-a absolute ${full ? 'top-[1px]' : '-top-[6px]'} left-0 block h-[12px] w-[200%]`} viewBox="0 0 120 12" preserveAspectRatio="none"><path d={wavePath} fill={waveFront} /></svg>
               </div>
+            )}
+            {receives && !full && (
+              <span aria-hidden="true" className={`absolute left-[24px] top-[3px] block h-[6px] w-[14px] rounded-[50%] border-2 ${h.status === 'reached' ? 'border-emerald-200/70' : 'border-sky-200/70'} motion-safe:animate-ping`} />
             )}
             <div className="relative flex items-start gap-3 p-3">
               <span className="mt-0.5 shrink-0">{h.status === 'reached' ? <CheckCircle2 size={17} className="text-emerald-300" /> : h.status === 'covered' ? <CheckCircle2 size={17} className="text-sky-300" /> : h.status === 'next' ? <HeartPulse size={17} className="text-[#FF8A75]" /> : <Lock size={15} className="text-slate-500" />}</span>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-bold text-white">{h.labelKey ? t(h.labelKey) : h.label} {h.status === 'next' && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-[#FF6B57] text-white align-middle">{t('problem.badgeNext')}</span>}{h.status === 'reached' && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-600/60 text-emerald-100 align-middle">{t(typeof h.bjtMin === 'number' ? 'problem.badgeProvenBjt' : 'problem.badgeProven')}</span>}{h.status !== 'reached' && h.fill >= 1 && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300 align-middle">{t('problem.badgeUnproven')}</span>}{h.fill > 0 && h.fill < 1 && <span className="float-right text-sm font-bold text-sky-200">{pct}%</span>}</p>
+                <p className="text-sm font-bold text-white">{h.labelKey ? t(h.labelKey) : h.label} {h.status === 'next' && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-[#FF6B57] text-white align-middle">{t('problem.badgeNext')}</span>}{h.status === 'reached' && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-600/60 text-emerald-100 align-middle">{t(typeof h.bjtMin === 'number' ? 'problem.badgeProvenBjt' : 'problem.badgeProven')}</span>}{h.status !== 'reached' && h.fill >= 1 && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300 align-middle">{t('problem.badgeUnproven')}</span>}{h.fill > 0 && <span className={`float-right text-base font-extrabold ${h.status === 'reached' ? 'text-emerald-100' : 'text-sky-100'}`}>{pct}%</span>}</p>
                 <p className="text-xs text-slate-400">{t('problem.ladderProof', { proof: h.proofKey ? t(h.proofKey) : h.proof })}</p>
                 <p className="text-xs text-slate-300">{t('problem.ladderUnlocks', { unlocks: h.unlocksKey ? t(h.unlocksKey) : h.unlocks })}</p>
               </div>
             </div>
+          </div>
+          {full && idx < ladder.length - 1 && (
+            <div aria-hidden="true" className="absolute left-[25px] -bottom-[11px] z-20">
+              <div className={`relative h-[11px] w-[8px] rounded-full ${spillBody}`}>
+                <span className={`tank-spill-dot absolute left-1/2 top-0 -ml-[2px] block h-[4px] w-[4px] rounded-full ${spillSolid}`} />
+                <span className={`tank-spill-dot d2 absolute left-1/2 top-0 -ml-[2px] block h-[4px] w-[4px] rounded-full ${spillSolid}`} />
+                <span className={`tank-spill-dot d3 absolute left-1/2 top-0 -ml-[2px] block h-[4px] w-[4px] rounded-full ${spillSolid}`} />
+              </div>
+            </div>
+          )}
           </div>
           )
         })}
