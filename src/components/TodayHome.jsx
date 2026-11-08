@@ -10,7 +10,66 @@ import {
 } from '../lib/day30.js'
 import { saveFeedback } from '../lib/feedback.js'
 import { loadMetrics, summariseMetrics } from '../lib/metrics.js'
-import { bjtBookable } from '../lib/bjtExam.js'
+import { bjtBookable, bandForScore } from '../lib/bjtExam.js'
+
+// The BJT clock, designed (Landry, 2026-11-08): not a sentence in the
+// pill row — a band gauge. Six segments at their real widths on the
+// 0–800 scale; the fill is the learner's best evidence (emerald when it
+// is a sealed score, sky while it is only the diagnosis estimate), and
+// the one action on the right is the next honest step: take the sealed
+// paper, or book the real thing on the official site.
+const BJT_SEGMENTS = [
+  { band: 'J5', min: 0, max: 200 }, { band: 'J4', min: 200, max: 320 },
+  { band: 'J3', min: 320, max: 420 }, { band: 'J2', min: 420, max: 530 },
+  { band: 'J1', min: 530, max: 600 }, { band: 'J1+', min: 600, max: 800 },
+]
+
+function BjtClockRow({ t, setActive }) {
+  const b = bjtBookable(loadMetrics())
+  let estimate = null
+  try { estimate = loadDiagnosis()?.bjtScore ?? null } catch { estimate = null }
+  const sealed = b.bestSealed !== null
+  const pos = sealed ? b.bestSealed : estimate
+  const title = sealed
+    ? t('today.bjtWithinReach', { band: b.claimable })
+    : pos !== null
+      ? t('today.bjtEstRange', { band: bandForScore(pos) })
+      : 'BJT'
+  const sub = sealed
+    ? (b.nextBand ? t('today.bjtToNext', { points: b.pointsToNext, next: b.nextBand }) : t('today.bjtTopBand'))
+    : t('today.bjtSealedHint')
+  return (
+    <div className="w-full rounded-xl bg-white/[0.03] border border-white/5 px-3 py-2.5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-baseline gap-2 min-w-0">
+          <span className="rounded-md bg-[#FF6B57]/15 border border-[#FF6B57]/30 px-1.5 py-0.5 text-[11px] font-bold text-[#FFB4A6]">BJT</span>
+          <span className="text-sm font-semibold text-white whitespace-nowrap">{title}</span>
+          <span className="text-[11px] text-slate-400 truncate">{sub}</span>
+        </div>
+        {sealed ? (
+          <a href="https://www.kanken.or.jp/bjt/" target="_blank" rel="noreferrer" className="shrink-0 rounded-lg bg-[#FF6B57] px-2.5 py-1.5 text-xs font-semibold text-white">{t('today.bjtBook')}</a>
+        ) : (
+          <button type="button" onClick={() => setActive && setActive('bjtexam')} className="shrink-0 rounded-lg bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-slate-100">{t('today.bjtTakePaper')}</button>
+        )}
+      </div>
+      <div className="mt-2 flex gap-[3px]" aria-hidden="true">
+        {BJT_SEGMENTS.map((s) => {
+          const frac = pos === null ? 0 : Math.max(0, Math.min(1, (pos - s.min) / (s.max - s.min)))
+          return (
+            <div key={s.band} className="h-1.5 rounded-full bg-white/10 overflow-hidden" style={{ flexGrow: s.max - s.min }}>
+              <div className={`h-full rounded-full ${sealed ? 'bg-emerald-400' : 'bg-sky-400'}`} style={{ width: `${Math.round(frac * 100)}%` }} />
+            </div>
+          )
+        })}
+      </div>
+      <div className="mt-1 flex gap-[3px]" aria-hidden="true">
+        {BJT_SEGMENTS.map((s) => (
+          <div key={s.band} className="text-center text-[9px] font-medium text-slate-500" style={{ flexGrow: s.max - s.min }}>{s.band}</div>
+        ))}
+      </div>
+    </div>
+  )
+}
 import FeedbackBox from './FeedbackBox.jsx'
 import Mascot from './Mascot.jsx'
 import { loadProfile, loadDiagnosis, derivePlan, daysSinceLastVisit, markVisit } from '../lib/profile.js'
@@ -224,17 +283,13 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
               <span className="flex items-center gap-1.5 font-medium text-emerald-300"><Calendar size={15} /> {t('today.daysToExam', { days: daysToExam, exam: examLabel, date: dateLabel })}</span>
-              {(() => { const b = bjtBookable(loadMetrics()); return b.bestSealed === null ? (
-                <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-bun-800/60 border border-bun-600/40 text-slate-300"><Target size={12} className="text-[#FF8A75]" /> {t('today.bjtNoPaper')}</span>
-              ) : (
-                <a href="https://www.kanken.or.jp/bjt/" target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-[#FF6B57]/15 border border-[#FF6B57]/40 text-[#FFB4A6] font-medium"><Target size={12} /> {t('today.bjtReady', { band: b.claimable, points: b.pointsToNext, next: b.nextBand || '' })}</a>
-              ) })()}
               <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-bun-800/60 border border-bun-600/40 text-slate-300"><Flame size={12} className="text-orange-300" /> {t('today.thisWeek', { count: weekCount })}</span>
               {(() => { const m = summariseMetrics(loadMetrics()); return (
                 <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-bun-800/60 border border-bun-600/40 text-slate-300" title={t('today.metricsTitle')}>
                   <Target size={12} className="text-[#FF8A75]" /> {m.minutesPerProofPoint !== null ? t(m.sessions === 1 ? 'today.metricsPaceSingular' : 'today.metricsPacePlural', { minutes: m.minutesPerProofPoint, sessions: m.sessions }) : t('today.metricsEmpty')}
                 </span>) })()}
             </div>
+            <BjtClockRow t={t} setActive={setActive} />
             <h1 className="text-2xl sm:text-3xl font-bold text-white">{t('today.problemPlanTitle')}</h1>
             <p className="max-w-2xl text-slate-200 leading-relaxed text-sm sm:text-base">{plan.line}</p>
             {plan.focusNote && <p className="text-xs text-slate-400">{t('today.builtFrom', { note: plan.focusNote })}</p>}
