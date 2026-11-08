@@ -811,6 +811,19 @@ console.log('integration audit — shared mastery + diagnosis-history sync:')
         { type: 'mock_completed', at: '2026-11-08T09:00:00', level: 'N2', length: 'quick', passed: true, scaled: { total: 150 } },
       ])))
       assert.equal(quickOnly.n2.status, 'covered', 'a quick mock is practice, not proof')
+      // BJT PROOF: a full BJT exam score proves every BJT rung at
+      // or below it — and no JLPT rung.
+      const bjtProven = byId(profileMod.ladderWithStatus(dx, ev([
+        { type: 'bjt_exam_completed', at: '2026-11-08T09:00:00', score: 512, band: 'J2' },
+      ])))
+      assert.equal(bjtProven.bjt400.status, 'reached')
+      assert.equal(bjtProven.bjt480.status, 'reached')
+      assert.equal(bjtProven.j1.status, 'next') // 512 < 530: J1 stays the next height
+      assert.equal(bjtProven.n2.status, 'covered', 'a BJT score never proves a JLPT rung')
+      const bjtLow = byId(profileMod.ladderWithStatus(dx, ev([
+        { type: 'bjt_exam_completed', at: '2026-11-08T09:00:00', score: 385, band: 'J3' },
+      ])))
+      assert.equal(bjtLow.bjt400.status, 'next', 'a real score below the bar proves nothing')
       const failedFull = byId(profileMod.ladderWithStatus(dx, ev([
         { type: 'mock_completed', at: '2026-11-08T09:00:00', level: 'N2', length: 'full', passed: false, scaled: { total: 70 } },
       ])))

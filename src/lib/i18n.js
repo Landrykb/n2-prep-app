@@ -372,6 +372,7 @@ export const CATALOGS = {
     // problem.*
     "problem.badgeNext": "NEXT HEIGHT",
     "problem.badgeProven": "PROVEN · FULL MOCK",
+    "problem.badgeProvenBjt": "PROVEN · FULL BJT",
     "problem.badgeUnproven": "NOT PROVEN",
     "problem.buildCta": "Build my plan from my problem",
     "problem.nextLevelLine": "Or tell us your level — one tap, and today's session aims at it:",
@@ -1642,6 +1643,7 @@ export const CATALOGS = {
     // problem.*
     "problem.badgeNext": "PROCHAINE HAUTEUR",
     "problem.badgeProven": "PROUVÉ · EXAMEN COMPLET",
+    "problem.badgeProvenBjt": "PROUVÉ · BJT COMPLET",
     "problem.badgeUnproven": "NON PROUVÉ",
     "problem.buildCta": "Construire mon plan à partir de mon problème",
     "problem.nextLevelLine": "Ou dis-nous ton niveau — un toucher, et la session du jour le visera :",
@@ -2912,6 +2914,7 @@ export const CATALOGS = {
     // problem.*
     "problem.badgeNext": "次の高さ",
     "problem.badgeProven": "実証済み・フル模試",
+    "problem.badgeProvenBjt": "実証済み・BJTフル",
     "problem.badgeUnproven": "未実証",
     "problem.buildCta": "困りごとからプランを作る",
     "problem.nextLevelLine": "またはレベルを教えてください — ワンタップで、今日のセッションが合わせます：",

@@ -109,8 +109,10 @@ const SECTION_FLOOR = 19 // every JLPT paper: no section under 19/60 passes
  *    higher one) was passed under the real pass rule — scoreExam
  *    already enforces the level's pass mark AND every section
  *    ≥ 19/60. The diagnosis estimate can NEVER paint green.
- *    BJT rungs have no in-app exam-grade proof (the trainer runs
- *    short sets), so they honestly stay unproven for now.
+ *    BJT rungs are proven the same way, by a full BJT exam
+ *    (bjt_exam_completed: the real 80-question, three-part
+ *    structure, scored 0–800) at or above the rung's bar.
+ *    Short trainer sets are practice, never proof.
  * 2. THE WATER — current readiness, per rung, on the rung's own
  *    scale (BJT rungs on the BJT score; the JLPT rung at the
  *    estimated level by total vs its pass mark, capped by the
@@ -182,15 +184,25 @@ export function ladderWithStatus(diagnosis, evidence = {}) {
 
   // ——— 1 · the proven line ———
   const provenAt = {} // proofLevel -> earliest proving date (ISO)
+  let bjtProven = null // best full-BJT-exam score { score, at }
   for (const e of metrics) {
+    if (e?.type === 'bjt_exam_completed' && typeof e.score === 'number') {
+      if (!bjtProven || e.score > bjtProven.score) bjtProven = { score: e.score, at: e.at || '' }
+      continue
+    }
     if (e?.type !== 'mock_completed' || e.passed !== true || e.length !== 'full') continue
     const lvl = typeof e.level === 'string' ? e.level : null
     if (!lvl || !(lvl in JLPT_ORDER)) continue
     if (!provenAt[lvl] || (e.at && e.at < provenAt[lvl])) provenAt[lvl] = e.at || ''
   }
   const provenOrders = Object.keys(provenAt).map((l) => JLPT_ORDER[l])
-  const isProven = (h) => typeof h.proofLevel === 'string'
-    && provenOrders.some((o) => o >= JLPT_ORDER[h.proofLevel])
+  const isProven = (h) => {
+    // A BJT rung is proven by a full BJT exam (real structure:
+    // 80 questions, three parts) scored at or above its bar.
+    if (typeof h.bjtMin === 'number') return bjtProven !== null && bjtProven.score >= h.bjtMin
+    return typeof h.proofLevel === 'string'
+      && provenOrders.some((o) => o >= JLPT_ORDER[h.proofLevel])
+  }
 
   // ——— 2 · the water moves with real work since the diagnosis ———
   const t0 = metrics
@@ -257,7 +269,7 @@ export function ladderWithStatus(diagnosis, evidence = {}) {
     if (proven) status = 'reached'
     else if (fill >= 1) status = 'covered'
     else if (fill > 0 && !nextMarked) { status = 'next'; nextMarked = true }
-    return { ...h, status, fill, provenAt: proven ? (provenAt[h.proofLevel] || Object.values(provenAt)[0] || null) : null }
+    return { ...h, status, fill, provenAt: proven ? (typeof h.bjtMin === 'number' ? (bjtProven?.at || null) : (provenAt[h.proofLevel] || Object.values(provenAt)[0] || null)) : null }
   })
   if (!nextMarked) {
     const first = rungs.find((h) => h.status === 'covered' || h.status === 'locked')
