@@ -13,7 +13,11 @@ import { useLanguage } from '../hooks/useLanguage.js'
 // the live Heard Today strip (Doc 22 A5) takes these spots
 // once the learner has heard words of their own.
 const HEARD_PITCH_KEY = 'jpn:heard-pitch:v1'
-const BOT_URL = 'https://t.me/YondeReaderBot'
+// The deep link carries the intent: Telegram delivers
+// ?start=listen to the bot as "/start listen", and the bot
+// opens the session on that tap (reader-bot, Doc 22) — the
+// button starts listening; nobody types a command.
+const BOT_URL = 'https://t.me/YondeReaderBot?start=listen'
 
 export default function HeardPitch({ variant = 'full' }) {
   const { t } = useLanguage()

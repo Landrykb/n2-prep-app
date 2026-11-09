@@ -802,14 +802,19 @@ export default function Reader({ setActive, onSignIn }) {
       {phase === 'loading' && <PassageSkeleton />}
 
       {phase === 'digging' && (
-        <div className="flex flex-col items-center pt-10 pb-4" role="status">
-          <div className="relative">
-            <div className="hori-search">
-              <Mascot agent="hori" size={96} showName={false} motion="none" />
-            </div>
-            <div aria-hidden="true" className="mx-auto mt-2 h-1.5 w-32 rounded-full bg-white/10" />
+        // Compact wait row (2026-11-09): the digging scene used to
+        // be a 96px hero that filled the Mini App's first screen
+        // and pushed every action out of sight. The search motion
+        // stays; the size now matches what it is — a wait, not a
+        // destination.
+        <div className="flex items-center gap-3 py-2" role="status">
+          <div className="hori-search shrink-0">
+            <Mascot agent="hori" size={44} showName={false} motion="none" />
           </div>
-          <p className="text-sm text-slate-400 mt-5">{t('reader.loading')}</p>
+          <div className="min-w-0">
+            <p className="text-sm text-slate-300">{t('reader.loading')}</p>
+            <div aria-hidden="true" className="mt-2 h-1.5 w-32 rounded-full bg-white/10" />
+          </div>
         </div>
       )}
 
@@ -883,6 +888,46 @@ export default function Reader({ setActive, onSignIn }) {
             <div>
               <TtsButton text={pick.passage.text} className="px-4 py-2 text-sm font-medium" />
             </div>
+            {/* Actions sit directly under the passage (hierarchy:
+                the passage is the job, these are its one tier of
+                actions) — never below the detail blocks, so acting
+                never needs a scroll (2026-11-09, the first user:
+                "the website should be easy to see actions"). The
+                chips, the word list and the footer are tier-3
+                detail and follow below. */}
+            <div className="flex flex-wrap items-center gap-2">
+              {pick.newWords.length > 0 && (
+                <button onClick={mine} className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold flex items-center gap-1.5">
+                  <Pickaxe size={15} /> {t('reader.mineNewWords')}
+                </button>
+              )}
+              <button onClick={another} disabled={busy} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 disabled:opacity-40 text-slate-100 text-sm font-medium flex items-center gap-1.5">
+                <RefreshCw size={15} /> {t('reader.anotherPassage')}
+              </button>
+              {finished ? (
+                <span className="text-sm text-emerald-300 flex items-center gap-1.5"><CheckCircle2 size={15} /> {t('reader.finishedLogged')}</span>
+              ) : (
+                <button onClick={finish} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1.5">
+                  <CheckCircle2 size={15} /> {t('reader.finishedReading')}
+                </button>
+              )}
+              {/* The fit verdict pair (the bot's Push Me / Too Hard):
+                  one tap moves the step and the next passage arrives
+                  at the new step. Only when a link row can persist the
+                  fit state (audit P2-9). */}
+              {canFit && (
+                <>
+                  <button onClick={() => verdict('up')} disabled={busy} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 disabled:opacity-40 text-slate-100 text-sm font-medium">
+                    {t('reader.pushMe')}
+                  </button>
+                  <button onClick={() => verdict('hard')} disabled={busy} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 disabled:opacity-40 text-slate-100 text-sm font-medium">
+                    {t('reader.tooHard')}
+                  </button>
+                </>
+              )}
+            </div>
+            {mineNote && <p className="text-sm text-emerald-300 flex items-center gap-2"><CheckCircle2 size={15} /> {mineNote}</p>}
+            {note && <p className="text-sm text-slate-400">{note}</p>}
             <KanjiChips key={String(pick.passage.id)} chips={chips} activeWord={pulseWord} onHighlight={setPulseWord} onMineWord={mineCandidates} />
             {pick.newWords.length > 0 && (
               <div className="rounded-xl bg-white/5 p-4">
@@ -900,40 +945,6 @@ export default function Reader({ setActive, onSignIn }) {
             )}
             <p className="text-sm text-slate-400 whitespace-pre-line">{footerFor(pick)}</p>
           </section>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {pick.newWords.length > 0 && (
-              <button onClick={mine} className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold flex items-center gap-1.5">
-                <Pickaxe size={15} /> {t('reader.mineNewWords')}
-              </button>
-            )}
-            <button onClick={another} disabled={busy} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 disabled:opacity-40 text-slate-100 text-sm font-medium flex items-center gap-1.5">
-              <RefreshCw size={15} /> {t('reader.anotherPassage')}
-            </button>
-            {finished ? (
-              <span className="text-sm text-emerald-300 flex items-center gap-1.5"><CheckCircle2 size={15} /> {t('reader.finishedLogged')}</span>
-            ) : (
-              <button onClick={finish} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1.5">
-                <CheckCircle2 size={15} /> {t('reader.finishedReading')}
-              </button>
-            )}
-            {/* The fit verdict pair (the bot's Push Me / Too Hard):
-                one tap moves the step and the next passage arrives
-                at the new step. Only when a link row can persist the
-                fit state (audit P2-9). */}
-            {canFit && (
-              <>
-                <button onClick={() => verdict('up')} disabled={busy} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 disabled:opacity-40 text-slate-100 text-sm font-medium">
-                  {t('reader.pushMe')}
-                </button>
-                <button onClick={() => verdict('hard')} disabled={busy} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 disabled:opacity-40 text-slate-100 text-sm font-medium">
-                  {t('reader.tooHard')}
-                </button>
-              </>
-            )}
-          </div>
-          {mineNote && <p className="text-sm text-emerald-300 flex items-center gap-2"><CheckCircle2 size={15} /> {mineNote}</p>}
-          {note && <p className="text-sm text-slate-400">{note}</p>}
 
           <section className="rounded-3xl bg-[#151129] p-6 space-y-3">
             <h3 className="text-base font-bold text-white">{t('reader.readAloudTitle')}</h3>

@@ -2674,10 +2674,49 @@ serve(async (req: Request) => {
     const [rawCmd, ...rest] = text.split(/\s+/)
     const cmd = rawCmd.split('@')[0].toLowerCase()
 
+    // Heard Words session opening, shared by /listen and the
+    // /start listen deep link (the app pitch's one-tap door —
+    // Telegram delivers ?start=listen as "/start listen").
+    const openListenSession = async (
+      link: { user_id: string; declared_band?: string | null; declared_at?: string | null },
+      via?: string,
+    ) => {
+      const lang = await langForLink(link)
+      const existing = await ambientSessionByChat(chatId)
+      const day = ambientDay()
+      if (existing && existing.day === day && existing.card_message_id) {
+        await sendMessage(botToken, chatId, bt(lang, 'ambient.alreadyOpen'))
+        return
+      }
+      await supabaseAdmin
+        .from('ambient_sessions')
+        .upsert(
+          { chat_id: chatId, user_id: link.user_id, card_message_id: null, day, opened_at: new Date().toISOString() },
+          { onConflict: 'chat_id' },
+        )
+      const fresh = await ambientSessionByChat(chatId)
+      if (fresh) await refreshAmbientCard(chatId, fresh, link, lang)
+      await logEvent(link.user_id, 'ambient_session_opened', via ? { day, via } : { day })
+    }
+
     try {
       if (cmd === '/start') {
         const code = (rest[0] ?? '').trim()
-        if (!code) {
+        if (code === 'listen') {
+          // The app's Heard Words door (Doc 22, 2026-11-09): the
+          // pitch's button carries ?start=listen, so one tap in
+          // the app opens the session here — no command to type,
+          // which the first user rightly questioned. 'listen' can
+          // never be a link code (codes are 10 characters), so
+          // this check runs before the claim flow. An unlinked
+          // chat gets the explainer, as any stranger does.
+          const link = await linkByChat(chatId)
+          if (!link) {
+            await sendMessage(botToken, chatId, bt(telegramLang(), 'link.explainer'))
+          } else {
+            await openListenSession(link, 'deeplink')
+          }
+        } else if (!code) {
           // Amendment #7 (Bug 1): /start used to send the link
           // explainer to EVERY plain /start — including chats that
           // were already linked, which read as "you lost the
@@ -2823,22 +2862,7 @@ serve(async (req: Request) => {
         if (!link) {
           await sendMessage(botToken, chatId, bt(telegramLang(), 'ambient.needLink'))
         } else {
-          const lang = await langForLink(link)
-          const existing = await ambientSessionByChat(chatId)
-          const day = ambientDay()
-          if (existing && existing.day === day && existing.card_message_id) {
-            await sendMessage(botToken, chatId, bt(lang, 'ambient.alreadyOpen'))
-          } else {
-            await supabaseAdmin
-              .from('ambient_sessions')
-              .upsert(
-                { chat_id: chatId, user_id: link.user_id, card_message_id: null, day, opened_at: new Date().toISOString() },
-                { onConflict: 'chat_id' },
-              )
-            const fresh = await ambientSessionByChat(chatId)
-            if (fresh) await refreshAmbientCard(chatId, fresh, link, lang)
-            await logEvent(link.user_id, 'ambient_session_opened', { day })
-          }
+          await openListenSession(link)
         }
       } else if (cmd === '/stop') {
         const session = await ambientSessionByChat(chatId)
