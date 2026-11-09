@@ -1,4 +1,5 @@
-// Build the Heard Words wide wordbook (public/data/wordbook.json).
+// Build the Heard Words wide wordbook (public/data/wordbook/,
+// sharded JSON + manifest).
 //
 // Why: the Heard Words matcher (Doc 22) began with the bot's
 // curated glossaries — the JLPT deck + its gloss + the JMdict
@@ -34,7 +35,7 @@ import { fileURLToPath } from 'node:url'
 const here = dirname(fileURLToPath(import.meta.url))
 const repo = resolve(here, '..')
 const cachePath = resolve(here, '../../../wordsdb-cache/jmdict-eng-3.6.2.json')
-const outPath = resolve(repo, 'public/data/wordbook.json')
+const outPath = resolve(repo, 'public/data/wordbook')
 
 const MAX_SURFACE_CHARS = 16 // longer entries are phrases, not words
 
@@ -87,8 +88,31 @@ for (const entry of entries) {
   }
 }
 
-mkdirSync(dirname(outPath), { recursive: true })
-writeFileSync(outPath, JSON.stringify({ heads, readings, forms }))
+// Sharded output: the whole book is ~14 MB, and the GitHub
+// write route rejects request bodies near that size once the
+// content is encoded — so the book ships as N shards plus a
+// manifest, the same pattern as the app's WordsDB. Shards are
+// contiguous headword ranges; forms keep GLOBAL head indexes,
+// so the loader just concatenates heads/readings in shard
+// order and merges the forms maps.
+const SHARDS = 4
+mkdirSync(outPath, { recursive: true })
+const per = Math.ceil(heads.length / SHARDS)
+const shardNames = []
+for (let s = 0; s < SHARDS; s++) {
+  const from = s * per
+  const sliceHeads = heads.slice(from, from + per)
+  if (sliceHeads.length === 0) continue
+  const sliceReadings = readings.slice(from, from + per)
+  const sliceForms = {}
+  for (const [surface, idx] of Object.entries(forms)) {
+    if (idx >= from && idx < from + per) sliceForms[surface] = idx
+  }
+  const name = `wordbook-${s}.json`
+  writeFileSync(resolve(outPath, name), JSON.stringify({ heads: sliceHeads, readings: sliceReadings, forms: sliceForms }))
+  shardNames.push(name)
+}
+writeFileSync(resolve(outPath, 'manifest.json'), JSON.stringify({ shards: shardNames }))
 console.log(`entries: ${entries.length}, headwords: ${heads.length}, variant forms: ${formCount}, mapped forms: ${Object.keys(forms).length}`)
 for (const probe of ['納期', '検収', '稟議', '見積書']) {
   const idx = headIndex.get(probe)

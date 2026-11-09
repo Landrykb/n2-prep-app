@@ -143,8 +143,8 @@ export function buildHeardDict(wordbook?: { heads?: string[]; readings?: string[
   }
 }
 
-/** The wordbook ships as data with the app; the bot fetches it once per process. */
-export const WORDBOOK_URL = 'https://jpn2easy.vercel.app/data/wordbook.json'
+/** The wordbook ships as data with the app (sharded + manifest); the bot fetches it once per process. */
+export const WORDBOOK_URL = 'https://jpn2easy.vercel.app/data/wordbook/manifest.json'
 
 let dictCache: { at: number; dict: ReturnType<typeof buildHeardDict>; wide: boolean } | null = null
 
@@ -158,13 +158,26 @@ let dictCache: { at: number; dict: ReturnType<typeof buildHeardDict>; wide: bool
 export async function loadHeardDict(fetchFn: typeof fetch = fetch) {
   const now = Date.now()
   if (dictCache && (dictCache.wide || now - dictCache.at < 5 * 60 * 1000)) return dictCache.dict
-  let wordbook: { heads?: string[]; readings?: string[]; forms?: Record<string, number> } | null = null
+  let wordbook: { heads: string[]; readings: string[]; forms: Record<string, number> } | null = null
   let wide = false
   try {
-    const res = await fetchFn(WORDBOOK_URL)
-    if (res.ok) {
-      const parsed = await res.json() as { heads?: string[] }
-      if (Array.isArray(parsed?.heads) && parsed.heads.length > 0) { wordbook = parsed; wide = true }
+    const base = WORDBOOK_URL.slice(0, WORDBOOK_URL.lastIndexOf('/') + 1)
+    const manifestRes = await fetchFn(WORDBOOK_URL)
+    const manifest = manifestRes.ok ? await manifestRes.json() as { shards?: string[] } : null
+    const shardNames = Array.isArray(manifest?.shards) ? manifest.shards : []
+    if (shardNames.length > 0) {
+      const merged = { heads: [] as string[], readings: [] as string[], forms: {} as Record<string, number> }
+      let ok = true
+      for (const name of shardNames) {
+        const res = await fetchFn(base + name)
+        if (!res.ok) { ok = false; break }
+        const shard = await res.json() as { heads?: string[]; readings?: string[]; forms?: Record<string, number> }
+        if (!Array.isArray(shard?.heads)) { ok = false; break }
+        merged.heads.push(...shard.heads)
+        merged.readings.push(...(shard.readings ?? []))
+        Object.assign(merged.forms, shard.forms ?? {})
+      }
+      if (ok && merged.heads.length > 0) { wordbook = merged; wide = true }
     }
   } catch { wordbook = null }
   const dict = buildHeardDict(wordbook)

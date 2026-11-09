@@ -20,7 +20,15 @@ const { matchHeardWords, summariseHeard, buildHeardDict, heardReading, EXPRESSIO
 let passed = 0
 const check = (name, fn) => { fn(); passed++; console.log(`  ok ${name}`) }
 
-const wordbook = JSON.parse(readFileSync(new URL('../public/data/wordbook.json', import.meta.url), 'utf8'))
+const wbDir = new URL('../public/data/wordbook/', import.meta.url)
+const wbManifest = JSON.parse(readFileSync(new URL('manifest.json', wbDir), 'utf8'))
+const wordbook = { heads: [], readings: [], forms: {} }
+for (const name of wbManifest.shards) {
+  const shard = JSON.parse(readFileSync(new URL(name, wbDir), 'utf8'))
+  wordbook.heads.push(...shard.heads)
+  wordbook.readings.push(...shard.readings)
+  Object.assign(wordbook.forms, shard.forms)
+}
 const t0 = Date.now()
 const dict = buildHeardDict(wordbook)
 console.log(`  (wide dictionary built: ${dict.surfaces.size} surfaces in ${Date.now() - t0}ms)`)
