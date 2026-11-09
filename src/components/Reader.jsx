@@ -880,17 +880,20 @@ export default function Reader({ setActive, onSignIn }) {
         <p className="text-sm text-slate-400">{t('reader.intro')}</p>
       </div>
 
-      {/* Reading and listening, side by side (his layout call,
-          2026-11-09: "less needing to scroll in the mini app —
-          the start listening button among the first things —
-          have them side by side, the reading part and the
-          listening part"). The phase column and Hori's panel
-          share a two-column grid at EVERY width: on a phone
-          each column is narrow, and both doors sit at the top
-          of the first screen instead of one buried under the
-          other's scroll. */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-6 items-start">
-        <div className="space-y-6 min-w-0">
+      {/* Reading and listening, together (his layout call,
+          2026-11-09, refined 2026-11-10 after his verdict on
+          the first attempt — "Not well designed. Study and
+          find a better way"): two content columns at phone
+          width crushed both sides below readability — the
+          passage starved to a sliver, the words wrapped into
+          a tower. The studied answer: side by side only where
+          the width earns it (≥720px: passage left, Hori's
+          panel right at 340px). On a phone the pair STACKS,
+          Hori's strip first — a slim bar carrying the Start
+          door in the first screen — and every content block
+          keeps the full width it needs to be read. */}
+      <div className="flex flex-col gap-6 min-[720px]:grid min-[720px]:grid-cols-[minmax(0,1fr)_340px] min-[720px]:items-start">
+        <div className="order-2 min-[720px]:order-1 space-y-6 min-w-0">
       {phase === 'guest' && (
         <div className="rounded-2xl glass p-5 card-glow space-y-3">
           <div className="flex items-start gap-3">
@@ -1110,9 +1113,9 @@ export default function Reader({ setActive, onSignIn }) {
         </div>
 
         {/* Heard Words (Doc 22): Hori's other ear — the right
-            column of the pair, beside the reading at every
-            width (see the grid note above). */}
-        <div className="min-w-0">
+            column on wide screens, the strip at the top on
+            phones (see the layout note above). */}
+        <div className="order-1 min-[720px]:order-2 min-w-0">
           <HeardPitch variant="compact" />
         </div>
       </div>

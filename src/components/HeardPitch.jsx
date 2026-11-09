@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Ear, MonitorPlay, BookOpen, ShieldCheck, ChevronDown } from 'lucide-react'
+import { Ear, MonitorPlay, BookOpen, ShieldCheck, ChevronDown, ChevronUp } from 'lucide-react'
 import Mascot from './Mascot.jsx'
 import { useLanguage } from '../hooks/useLanguage.js'
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient.js'
@@ -216,6 +216,13 @@ export default function HeardPitch({ variant = 'full', onReadPassage }) {
   const [showOnce, setShowOnce] = useState(false)
   const onceWordItems = merged.filter((r) => r.kind === 'word' && r.count < HEARD_FLOOR)
   const onceExprItems = merged.filter((r) => r.kind === 'expr' && r.count < HEARD_FLOOR)
+  // Compact accordion (2026-11-10 redesign): on the Reader
+  // page the panel rests as a slim strip — Hori, the count,
+  // the Start door — and opens in place when tapped, when
+  // listening starts, or while a cook runs. His accordion
+  // pattern, applied to the panel itself; the two crushed
+  // columns it replaces failed his own squint test.
+  const [expanded, setExpanded] = useState(false)
   const hasAny = merged.length > 0
   const totalHearings = merged.reduce((n, r) => n + r.count, 0)
   const readingFor = (item) => auto.readingsOf?.get(item) ?? readings[item] ?? null
@@ -445,8 +452,42 @@ export default function HeardPitch({ variant = 'full', onReadPassage }) {
   )
   const doorSlot = auto.supported ? autoDoor : browserDoor
 
+  // The resting strip (compact variant, idle states): one
+  // row, ~60px tall, carrying the door that matters. The
+  // full panel is one tap away and nothing is hidden that
+  // the strip does not name (title + today's count).
+  const strip = (
+    <section className="rounded-3xl bg-[#151129] border border-white/5 px-4 py-3">
+      <div className="flex items-center gap-3">
+        <HoriEats size={30} eating={false} gulp={false} />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold text-white truncate">{hasAny ? t('today.heardPitchTodayTitle') : t('today.heardPitchTitle')}</p>
+          {hasAny && <p className="text-xs text-slate-400 truncate">{t('today.heardPitchCaught', { n: totalHearings })}</p>}
+        </div>
+        {auto.supported ? (
+          <button onClick={() => { setExpanded(true); auto.start() }} className="inline-flex items-center gap-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] transition px-3.5 py-2 text-sm font-semibold text-white shrink-0">
+            {t('today.heardPitchAutoCta')}
+          </button>
+        ) : browserDoor}
+        <button onClick={() => setExpanded(true)} aria-label={t('today.heardPitchTitle')} className="p-1.5 text-slate-400 hover:text-slate-200 transition shrink-0">
+          <ChevronDown size={18} />
+        </button>
+      </div>
+    </section>
+  )
+  const collapseBtn = (
+    <div className="flex justify-end">
+      <button onClick={() => setExpanded(false)} className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition">
+        <ChevronUp size={14} /> {t('today.heardPitchCollapse')}
+      </button>
+    </div>
+  )
+
   // ---------- BOT-LIVE state: the Heard Today strip ----------
   if (live && (live.listening || hasAny)) {
+    // The compact strip rests here: words exist but nothing
+    // is live — the panel is a bar until opened (2026-11-10).
+    if (variant === 'compact' && !live.listening && !expanded && !cookBusy) return strip
     return (
       <section className="rounded-3xl bg-[#151129] border border-white/5 p-4 sm:p-6 space-y-4">
         {header(
@@ -459,6 +500,7 @@ export default function HeardPitch({ variant = 'full', onReadPassage }) {
           ) : null,
           live.listening,
         )}
+        {variant === 'compact' && !live.listening && collapseBtn}
         {wordBlock(live.listening ? t('today.heardPitchNoWords') : t('today.heardPitchNoneYet'))}
         {cookBlock}
         {privacy}
@@ -542,8 +584,11 @@ export default function HeardPitch({ variant = 'full', onReadPassage }) {
   )
 
   if (variant === 'compact') {
+    // The strip rests here too — nothing heard yet today.
+    if (!expanded && !cookBusy) return strip
     return (
       <section className="rounded-3xl bg-[#151129] border border-white/5 p-4 sm:p-6 space-y-4">
+        {collapseBtn}
         <div className="flex items-start gap-3">
           <Mascot agent="hori" size={38} mood="happy" showName={false} />
           <div className="min-w-0">
