@@ -97,6 +97,17 @@ function HeardPitch() {
   const [hidden, setHidden] = useState(() => { try { return localStorage.getItem(HEARD_PITCH_KEY) === '1' } catch { return false } })
   if (hidden) return null
   const hide = () => { try { localStorage.setItem(HEARD_PITCH_KEY, '1') } catch { /* ignore */ } setHidden(true) }
+  // Inside the Telegram Mini App, a plain _blank link can bounce
+  // out to a browser; Telegram's own link opener keeps the jump
+  // inside Telegram, straight into the bot chat. Outside Telegram
+  // (or on webviews that never expose the bridge) the plain link
+  // below is the behaviour.
+  const openBot = (e) => {
+    try {
+      const wa = window.Telegram?.WebApp
+      if (wa?.openTelegramLink) { e.preventDefault(); wa.openTelegramLink('https://t.me/YondeReaderBot') }
+    } catch { /* fall through to the href */ }
+  }
   const beats = [
     { icon: Ear, text: t('today.heardPitchBeat1') },
     { icon: MonitorPlay, text: t('today.heardPitchBeat2') },
@@ -124,7 +135,7 @@ function HeardPitch() {
         <span>{t('today.heardPitchPrivacy')}</span>
       </p>
       <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <a href="https://t.me/YondeReaderBot" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] transition px-4 py-2.5 text-sm font-semibold text-white">
+        <a href="https://t.me/YondeReaderBot" target="_blank" rel="noreferrer" onClick={openBot} className="inline-flex items-center gap-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] transition px-4 py-2.5 text-sm font-semibold text-white">
           {t('today.heardPitchCta')}
         </a>
         <span className="text-xs text-slate-500">{t('today.heardPitchHow')}</span>
