@@ -42,7 +42,13 @@ const RECENT_DAYS = 14
 
 // --- R0.5 fitted generation — copied from reader-bot (the draft
 // loop is a twin; fit.ts/segment.ts are byte-identical files). ---
-const GEN_MAX_ATTEMPTS = 4
+// Six attempts over a four-model chain (2026-11-10): at four,
+// every model got exactly one shot, and the first user's whole
+// evening of serves died on single 429s and single overlong
+// drafts — five generation_failed events, zero passages. Six
+// lets the strong models shoot twice, after the 429 backoff
+// breath, before the sequence gives up.
+const GEN_MAX_ATTEMPTS = 6
 const GEN_COOLDOWN_MS = 10 * 60 * 1000
 const GEN_LENGTH_BY_BAND: Record<string, number> = { N5: 120, N4: 180, N3: 230, N2: 300, N1: 350 }
 
@@ -79,8 +85,15 @@ function trimDraftToFit(text: string, max = 1200): string | null {
   if (text.length <= max) return text
   const cut = text.slice(0, max)
   const boundary = Math.max(cut.lastIndexOf('。'), cut.lastIndexOf('！'), cut.lastIndexOf('？'))
-  if (boundary < 400) return null
-  return cut.slice(0, boundary + 1)
+  if (boundary >= 400) return cut.slice(0, boundary + 1)
+  // Salvage (2026-11-10): a long draft whose sentences run
+  // past the cap still holds a good passage — end it at the
+  // last clause comma and close the sentence. Only a true
+  // run-on (no boundary of either kind past 400 chars) is
+  // refused as too_long; the fit gate still judges the result.
+  const comma = Math.max(cut.lastIndexOf('、'), cut.lastIndexOf('，'))
+  if (comma >= 400) return cut.slice(0, comma) + '。'
+  return null
 }
 
 
@@ -164,6 +177,7 @@ async function generateDraft(band: string, topic: string, chars: number, forbidd
     : ''
   const user =
     `Write a passage of about ${chars} Japanese characters at JLPT ${band} level about: ${topic}. ` +
+    `Never write more than ${chars + 80} characters in total. End every sentence with 。 ` +
     `You may use at most about 8 words that a ${band} learner would not know yet.${forbiddenLine}${targetLine}`
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), 20000)
@@ -184,7 +198,11 @@ async function generateDraft(band: string, topic: string, chars: number, forbidd
           { role: 'user', content: user },
         ],
         temperature: 0.7,
-        max_tokens: 800,
+        // Token budget scaled to the ask (2026-11-10): a flat
+        // 800 invited essays for a 300-character passage, and
+        // the essays came back 'too_long'. ~1.9 tokens per
+        // character is generous headroom without essay room.
+        max_tokens: Math.min(800, Math.max(320, Math.round(chars * 1.9))),
       }),
     })
     if (!res.ok) {
@@ -370,6 +388,10 @@ serve(async (req: Request) => {
 
   let generationAttempted = false
   let genReason: string | null = null
+  // The heard words this serve actually cooked into the
+  // passage (2026-11-10): returned with the pick so the app
+  // can name them — on the panel and in the DM mirror.
+  let seededWords: string[] = []
   if (!picked && !cold) {
     // R0.5 fitted generation, the bot's tryGenerate sequence with
     // the same cooldown read from the generation events.
@@ -378,7 +400,12 @@ serve(async (req: Request) => {
       .from('metrics_events')
       .select('id')
       .eq('user_id', userId)
-      .in('type', ['passage_generated', 'generation_failed'])
+      // Successes only (2026-11-10): the cooldown is cost
+      // discipline for generated passages, but counting
+      // FAILURES locked the learner out for ten minutes
+      // after every failed serve — the retry could never
+      // succeed, and nothing on screen said why.
+      .in('type', ['passage_generated'])
       .gte('created_at', cdSince)
       .limit(1)
     if (!shouldGenerate(null, !recentGen || recentGen.length === 0)) {
@@ -391,10 +418,15 @@ serve(async (req: Request) => {
       let forbidden: string[] = []
       let calls = 0
       const models = genModels()
+      // Rotate the starting model per serve (2026-11-10):
+      // when one provider's free pool is in a 429 storm, the
+      // next serve knocks on a different door first instead
+      // of burning its best attempts in the same storm.
+      const modelOffset = Math.floor(Math.random() * models.length)
       let lastModel = ''
       let lastReason: string | null = null
       for (let attempt = 1; attempt <= GEN_MAX_ATTEMPTS; attempt++) {
-        lastModel = models[(attempt - 1) % models.length]
+        lastModel = models[(attempt - 1 + modelOffset) % models.length]
         const { text: draft, reason } = await generateDraft(serveBand, topic, chars, forbidden, lastModel, targets)
         if (draft === null) {
           lastReason = reason
@@ -439,6 +471,7 @@ serve(async (req: Request) => {
             passageId, band: serveBand, topic, attempts: attempt, ratio: Math.round(verdict.ratio * 1000) / 1000, model: lastModel, surface: 'web',
             seeded: verdict.unknowns.filter((u) => targets.includes(u)).length, seededTargets: targets.length,
           })
+          seededWords = verdict.unknowns.filter((u) => targets.includes(u))
           picked = { passage, ratio: verdict.ratio }
           generated = true
           break
@@ -460,6 +493,7 @@ serve(async (req: Request) => {
       ratio: picked.ratio,
       coldStart,
       generated,
+      seededWords,
     })
   }
 

@@ -301,7 +301,10 @@ export default function Reader({ setActive, onSignIn }) {
       // into the generic empty state.
       if (data.status === 'nofit' && data.reason === 'need_level') return { needLevel: true }
       if (data.status !== 'picked' || !data.passage) return null
-      return shapeServed(ctx, data.passage, data.ratio, data.coldStart === true)
+      const shaped = shapeServed(ctx, data.passage, data.ratio, data.coldStart === true)
+      shaped.generated = data.generated === true
+      shaped.seededWords = Array.isArray(data.seededWords) ? data.seededWords : []
+      return shaped
     } catch { return null }
   }
 
@@ -482,13 +485,17 @@ export default function Reader({ setActive, onSignIn }) {
           setPhase('digging')
           const served = await tryServe(ctx, [])
           if (cancelled) return
-          if (served && !served.needLevel) { present(served); return }
+          if (served && !served.needLevel) {
+            if (cook) { dispatchCookResult(true); if (served.generated) sendCookedToDm(served) }
+            present(served); return
+          }
           // need_level: the empty state below renders the one-tap
           // level question (bandSource is 'none' in that world).
         }
         if (cook) {
           const first = doPick(ctx, [])
-          if (first) { present(first); return }
+          if (first) { dispatchCookResult(true); present(first); return }
+          dispatchCookResult(false)
         }
         setEmptyKind(bank.length === 0 || cold ? 'shelf' : 'nofit')
         setPhase('empty')
@@ -527,21 +534,63 @@ export default function Reader({ setActive, onSignIn }) {
   // fires 'yonde:cook' — serve generation-first, because the
   // server's generation is the one seeded with heard words;
   // the local shelf is the fallback, not the lead.
+  // The DM mirror (2026-11-10, his words: the two sides work
+  // together — the words pass into the reading panel AND the
+  // passage is sent to the DM chat too). After a GENERATED
+  // cook serve, the passage is posted to reader-bot's ?dm=1
+  // route, which delivers it to the linked Telegram chat.
+  // Fire-and-forget: the panel is the primary surface, and a
+  // failed mirror never breaks the serve (the outcome is
+  // logged server-side as passage_dm either way).
+  const sendCookedToDm = async (servedPick) => {
+    try {
+      if (!supabase) return
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) return
+      await fetch(`${supabase.supabaseUrl}/functions/v1/reader-bot?dm=1`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          text: String(servedPick.passage.text || ''),
+          seeded: Array.isArray(servedPick.seededWords) ? servedPick.seededWords : [],
+        }),
+      })
+    } catch { /* the mirror is a courtesy copy, never a blocker */ }
+  }
+  const dispatchCookResult = (ok) => {
+    try { window.dispatchEvent(new CustomEvent('yonde:cook-result', { detail: { ok } })) } catch { /* odd surfaces */ }
+  }
+
   const cookServe = async () => {
     const ctx = ctxRef.current
     if (!ctx || busy) return
+    const prevPick = pick
     setBusy(true)
+    // The tap must be VISIBLE (2026-11-10: "the button does
+    // not do anything or does not show it is doing anything"):
+    // the reading column switches to the digging state for the
+    // whole attempt, and the outcome is announced to the panel
+    // that holds the door ('yonde:cook-result'), success or
+    // failure alike. The old path set a note that renders only
+    // in the ready phase — in the empty state, a forty-second
+    // failed serve looked exactly like a dead button.
+    setPhase('digging')
     const excluded = [...excludedRef.current, ...(pick ? [String(pick.passage.id)] : [])]
     setNote(t('reader.loading'))
     let next = !ctx.cold ? await tryServe(ctx, excluded) : null
     if (next?.needLevel) next = null
     if (!next) next = doPick(ctx, excluded)
-    if (!next || (pick && String(next.passage.id) === String(pick.passage.id))) {
+    if (!next || (prevPick && String(next.passage.id) === String(prevPick.passage.id))) {
       setNote(t('reader.nothingElse'))
+      if (prevPick) { setPick(prevPick); setPhase('ready') } else { setPhase('empty') }
+      dispatchCookResult(false)
     } else {
       excludedRef.current = excluded
       setNote('')
       present(next)
+      dispatchCookResult(true)
+      if (next.generated) sendCookedToDm(next)
     }
     setBusy(false)
   }
@@ -927,6 +976,12 @@ export default function Reader({ setActive, onSignIn }) {
               )}
             </>
           )}
+          {/* Serve notes render in the empty state too
+              (2026-11-10): a failed serve's only trace was a
+              note bound to the ready phase, so from the empty
+              state a long failed attempt was indistinguishable
+              from a dead button. */}
+          {note && <p className="text-sm text-slate-400">{note}</p>}
         </div>
       )}
 

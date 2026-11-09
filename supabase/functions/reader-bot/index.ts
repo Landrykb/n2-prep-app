@@ -184,7 +184,13 @@ const continuationKeyboard = (lang: BotLang = 'en') =>
 // cached into reading_passages (source 'foundry') so the bank grows
 // toward the learners it actually serves.
 
-const GEN_MAX_ATTEMPTS = 4
+// Six attempts over a four-model chain (2026-11-10): at four,
+// every model got exactly one shot, and the first user's whole
+// evening of serves died on single 429s and single overlong
+// drafts — five generation_failed events, zero passages. Six
+// lets the strong models shoot twice, after the 429 backoff
+// breath, before the sequence gives up.
+const GEN_MAX_ATTEMPTS = 6
 const GEN_COOLDOWN_MS = 10 * 60 * 1000
 const GEN_LENGTH_BY_BAND: Record<string, number> = { N5: 120, N4: 180, N3: 230, N2: 300, N1: 350 }
 
@@ -230,8 +236,15 @@ function trimDraftToFit(text: string, max = 1200): string | null {
   if (text.length <= max) return text
   const cut = text.slice(0, max)
   const boundary = Math.max(cut.lastIndexOf('。'), cut.lastIndexOf('！'), cut.lastIndexOf('？'))
-  if (boundary < 400) return null
-  return cut.slice(0, boundary + 1)
+  if (boundary >= 400) return cut.slice(0, boundary + 1)
+  // Salvage (2026-11-10): a long draft whose sentences run
+  // past the cap still holds a good passage — end it at the
+  // last clause comma and close the sentence. Only a true
+  // run-on (no boundary of either kind past 400 chars) is
+  // refused as too_long; the fit gate still judges the result.
+  const comma = Math.max(cut.lastIndexOf('、'), cut.lastIndexOf('，'))
+  if (comma >= 400) return cut.slice(0, comma) + '。'
+  return null
 }
 
 // One OpenRouter draft (the chat function's call shape: same base,
@@ -324,6 +337,7 @@ async function generateDraft(band: string, topic: string, chars: number, forbidd
     : ''
   const user =
     `Write a passage of about ${chars} Japanese characters at JLPT ${band} level about: ${topic}. ` +
+    `Never write more than ${chars + 80} characters in total. End every sentence with 。 ` +
     `You may use at most about 8 words that a ${band} learner would not know yet.${forbiddenLine}${targetLine}`
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), 20000)
@@ -344,7 +358,11 @@ async function generateDraft(band: string, topic: string, chars: number, forbidd
           { role: 'user', content: user },
         ],
         temperature: 0.7,
-        max_tokens: 800,
+        // Token budget scaled to the ask (2026-11-10): a flat
+        // 800 invited essays for a 300-character passage, and
+        // the essays came back 'too_long'. ~1.9 tokens per
+        // character is generous headroom without essay room.
+        max_tokens: Math.min(800, Math.max(320, Math.round(chars * 1.9))),
       }),
     })
     if (!res.ok) {
@@ -527,8 +545,32 @@ serve(async (req: Request) => {
     // no service.
     let webChunk: { userId: string; audio: ArrayBuffer; mime: string } | null = null
     let webProbe: { userId: string; payload: Record<string, unknown> } | null = null
+    let webDm: { userId: string; text: string; seeded: string[] } | null = null
     const supabaseAdmin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
-    if (routeParams.get('webchunk') === '1') {
+    // ---------- cooked-passage DM mirror (2026-11-10) ----------
+    // The two sides work together (his words): the words pass
+    // into the reading panel AND the cooked passage is sent to
+    // the DM chat too. The app posts the passage it just
+    // served (?dm=1, the learner's own JWT, JSON body) and the
+    // bot delivers it to the linked chat in the passage
+    // format. Fail closed: no token, no user, no text, no send.
+    if (routeParams.get('dm') === '1') {
+      const token = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '').trim()
+      if (!token) return json({ error: 'Unauthorized' }, 401)
+      const { data: userData } = await supabaseAdmin.auth.getUser(token)
+      const userId = userData?.user?.id
+      if (!userId) return json({ error: 'Unauthorized' }, 401)
+      const body = await req.json().catch(() => null) as Record<string, unknown> | null
+      const text = typeof body?.text === 'string' ? body.text.slice(0, 2000) : ''
+      if (!text) return json({ error: 'text required' }, 400)
+      webDm = {
+        userId,
+        text,
+        seeded: Array.isArray(body?.seeded)
+          ? body.seeded.filter((w): w is string => typeof w === 'string').slice(0, 8)
+          : [],
+      }
+    } else if (routeParams.get('webchunk') === '1') {
       const token = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '').trim()
       if (!token) return json({ error: 'Unauthorized' }, 401)
       const { data: userData } = await supabaseAdmin.auth.getUser(token)
@@ -587,8 +629,8 @@ serve(async (req: Request) => {
       }
     }
 
-    const update = (dispatchMode || voiceJobId || webChunk || webProbe) ? null : await req.json().catch(() => null)
-    if (!dispatchMode && !voiceJobId && !webChunk && !webProbe && !update) return json({ ok: true })
+    const update = (dispatchMode || voiceJobId || webChunk || webProbe || webDm) ? null : await req.json().catch(() => null)
+    if (!dispatchMode && !voiceJobId && !webChunk && !webProbe && !webDm && !update) return json({ ok: true })
 
     const logEvent = async (userId: string, type: string, payload: Record<string, unknown>) => {
       const { error } = await supabaseAdmin.from('metrics_events').insert({ user_id: userId, type, payload })
@@ -749,7 +791,12 @@ serve(async (req: Request) => {
         .from('metrics_events')
         .select('id')
         .eq('user_id', link.user_id)
-        .in('type', ['passage_generated', 'generation_failed'])
+        // Successes only (2026-11-10): the cooldown is cost
+        // discipline for generated passages, but counting
+        // FAILURES locked the learner out for ten minutes
+        // after every failed serve — the retry could never
+        // succeed, and nothing on screen said why.
+        .in('type', ['passage_generated'])
         .gte('created_at', since)
         .limit(1)
       if (!shouldGenerate(null, !recentGen || recentGen.length === 0)) {
@@ -760,12 +807,17 @@ serve(async (req: Request) => {
       const targets = await heardTargets(link.user_id, known)
       const chars = GEN_LENGTH_BY_BAND[band] ?? 200
       const models = genModels()
+      // Rotate the starting model per serve (2026-11-10):
+      // when one provider's free pool is in a 429 storm, the
+      // next serve knocks on a different door first instead
+      // of burning its best attempts in the same storm.
+      const modelOffset = Math.floor(Math.random() * models.length)
       let forbidden: string[] = []
       let calls = 0
       let lastReason: string | null = null
       let lastModel = ''
       for (let attempt = 1; attempt <= GEN_MAX_ATTEMPTS; attempt++) {
-        lastModel = models[(attempt - 1) % models.length]
+        lastModel = models[(attempt - 1 + modelOffset) % models.length]
         const { text: draft, reason } = await generateDraft(band, topic, chars, forbidden, lastModel, targets)
         if (draft === null) {
           // Amendment #7: a failed draft CONSUMES the attempt and
@@ -2361,6 +2413,34 @@ serve(async (req: Request) => {
       }
     }
 
+    // The DM mirror (?dm=1, JWT already validated at routing):
+    // deliver the passage the app just cooked to the learner's
+    // bot DM, in the passage format (Doc 16 display law: the
+    // framing line bold, the passage in a blockquote). The
+    // outcome is logged either way (passage_dm, migration
+    // 00024) — a mirror that fails silently would repeat the
+    // exact sin this night started with.
+    const handleDmPassage = async (dm: { userId: string; text: string; seeded: string[] }) => {
+      const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      const { data: link } = await supabaseAdmin
+        .from('telegram_links')
+        .select('chat_id')
+        .eq('user_id', dm.userId)
+        .maybeSingle()
+      if (!link?.chat_id) {
+        await logEvent(dm.userId, 'passage_dm', { sent: false, reason: 'not-linked' })
+        return json({ ok: true, sent: false })
+      }
+      const head = dm.seeded.length > 0
+        ? `<b>Cooked from your heard words: ${dm.seeded.map(esc).join('、')}</b>`
+        : '<b>Cooked in the app just now</b>'
+      const text = `${head}\n<blockquote>${esc(dm.text)}</blockquote>\nIt is on your reading side in the app too.`
+      const res = await sendMessage(botToken, Number(link.chat_id), text)
+      const sent = !!(res as { ok?: boolean } | null)?.ok
+      await logEvent(dm.userId, 'passage_dm', { sent, seeded: dm.seeded.length })
+      return json({ ok: true, sent })
+    }
+
     // The web automatic path (Doc 22): one chunk posted by the
     // app (?webchunk=1, JWT already validated at routing). Same
     // pipeline as a bot stretch — transcribe, match, count,
@@ -2752,6 +2832,12 @@ serve(async (req: Request) => {
     // transcribe, match, count, drop, and answer with counts.
     if (webChunk) {
       return await handleWebChunk(webChunk)
+    }
+
+    // A DM mirror call has no Telegram update — deliver the
+    // cooked passage to the chat and answer with the outcome.
+    if (webDm) {
+      return await handleDmPassage(webDm)
     }
 
     // A dispatch call has no Telegram update — serve and return.

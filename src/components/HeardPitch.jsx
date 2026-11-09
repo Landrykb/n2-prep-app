@@ -257,11 +257,44 @@ export default function HeardPitch({ variant = 'full', onReadPassage }) {
     chipTimersRef.current.push(setTimeout(() => { setActiveChip(null); setGulp(false) }, 1200))
   }, [chipQueue, activeChip])
 
+  // The door shows its work (2026-11-10: "the button does
+  // not do anything or does not show it is doing anything").
+  // While a cook serve runs, the button wears the digging
+  // label and cannot be re-tapped; the Reader announces the
+  // outcome on 'yonde:cook-result', and a failure prints its
+  // reason here, beside the door that was tapped — never in
+  // another column, never nowhere. The safety timer frees the
+  // door if an outcome somehow never arrives.
+  const [cookBusy, setCookBusy] = useState(false)
+  const [cookNote, setCookNote] = useState('')
+  useEffect(() => {
+    const onResult = (e) => {
+      setCookBusy(false)
+      if (!e?.detail?.ok) setCookNote(t('today.heardPitchCookBusy'))
+      else setCookNote('')
+    }
+    window.addEventListener('yonde:cook-result', onResult)
+    return () => window.removeEventListener('yonde:cook-result', onResult)
+  }, [t])
+  useEffect(() => {
+    if (!cookBusy) return
+    const id = setTimeout(() => setCookBusy(false), 150000)
+    return () => clearTimeout(id)
+  }, [cookBusy])
+
   // "Then produce it back to me for reading" — the cook door:
   // the flag tells the Reader to go straight to a generated,
   // heard-seeded serve; the event covers already being there.
   const cook = () => {
-    try { sessionStorage.setItem('jpn:reader-cook', '1') } catch { /* private mode: the event still fires */ }
+    setCookBusy(true)
+    setCookNote('')
+    // The flag is the cross-page route (Today → Reader). On
+    // the Reader page itself (the compact variant) the event
+    // does the work — a lingering flag would re-cook
+    // unprompted on the next mount.
+    if (variant !== 'compact') {
+      try { sessionStorage.setItem('jpn:reader-cook', '1') } catch { /* private mode: the event still fires */ }
+    }
     try { window.dispatchEvent(new Event('yonde:cook')) } catch { /* nothing to notify */ }
     onReadPassage?.()
   }
@@ -271,9 +304,10 @@ export default function HeardPitch({ variant = 'full', onReadPassage }) {
         <BookOpen size={16} className="text-[#E07B39] shrink-0" />
         {t('today.heardPitchCookLine')}
       </p>
-      <button onClick={cook} className="inline-flex items-center gap-2 rounded-xl border border-white/15 hover:border-white/30 transition px-4 py-2.5 text-sm font-semibold text-slate-200">
-        {t('today.heardPitchCookCta')}
+      <button onClick={cook} disabled={cookBusy} className="inline-flex items-center gap-2 rounded-xl border border-white/15 hover:border-white/30 transition px-4 py-2.5 text-sm font-semibold text-slate-200 disabled:opacity-50">
+        {cookBusy ? t('reader.loading') : t('today.heardPitchCookCta')}
       </button>
+      {cookNote && <p className="w-full text-xs leading-relaxed text-amber-200/90">{cookNote}</p>}
     </div>
   ) : null
 
