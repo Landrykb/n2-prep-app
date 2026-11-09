@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Ear, MonitorPlay, BookOpen, ShieldCheck } from 'lucide-react'
+import { Ear, MonitorPlay, BookOpen, ShieldCheck, ChevronDown } from 'lucide-react'
 import Mascot from './Mascot.jsx'
 import { useLanguage } from '../hooks/useLanguage.js'
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient.js'
@@ -64,18 +64,18 @@ function RecordingDot() {
 
 function WordList({ words, exprs, readingFor }) {
   return (
-    <ul className="space-y-1.5">
+    <ul className="space-y-2">
       {words.map((r) => (
-        <li key={r.item} className="text-sm text-slate-200">
-          <span className="font-semibold text-white">{r.item}</span>
+        <li key={r.item} className="text-base text-slate-200">
+          <span className="text-lg font-bold text-white">{r.item}</span>
           {readingFor(r.item) && <span className="text-[#FFB59D]"> （{readingFor(r.item)}）</span>}
-          <span key={r.count} className="heard-pop text-slate-400"> ×{r.count}</span>
+          <span key={r.count} className="heard-pop text-sm text-slate-400"> ×{r.count}</span>
         </li>
       ))}
       {exprs.map((r) => (
-        <li key={r.item} className="text-sm text-slate-200">
-          <span className="font-semibold text-white">{r.item}</span>
-          <span key={r.count} className="heard-pop text-slate-400"> ×{r.count}</span>
+        <li key={r.item} className="text-base text-slate-200">
+          <span className="text-lg font-bold text-white">{r.item}</span>
+          <span key={r.count} className="heard-pop text-sm text-slate-400"> ×{r.count}</span>
         </li>
       ))}
     </ul>
@@ -209,6 +209,13 @@ export default function HeardPitch({ variant = 'full', onReadPassage }) {
   const dispWords = sticking.filter((r) => r.kind === 'word').slice(0, 15)
   const dispExprs = sticking.filter((r) => r.kind === 'expr').slice(0, 8)
   const onceWords = merged.filter((r) => r.kind === 'word' && r.count < HEARD_FLOOR).length
+  // The once-heard, peekable on tap (his ask, 2026-11-09):
+  // they stay below the naming floor in the record, but the
+  // owner can open the line and SEE them — evidence on demand,
+  // in his accordion pattern (tap expands under the line).
+  const [showOnce, setShowOnce] = useState(false)
+  const onceWordItems = merged.filter((r) => r.kind === 'word' && r.count < HEARD_FLOOR)
+  const onceExprItems = merged.filter((r) => r.kind === 'expr' && r.count < HEARD_FLOOR)
   const hasAny = merged.length > 0
   const totalHearings = merged.reduce((n, r) => n + r.count, 0)
   const readingFor = (item) => auto.readingsOf?.get(item) ?? readings[item] ?? null
@@ -288,8 +295,8 @@ export default function HeardPitch({ variant = 'full', onReadPassage }) {
         <span
           key={activeChip.seq}
           aria-hidden="true"
-          className="heard-chip-fly pointer-events-none select-none absolute z-20 max-w-[190px] truncate rounded-full border border-white/10 bg-[#241d3f] px-2.5 py-1 text-[13px] font-semibold text-white"
-          style={{ left: 224, top: 5 }}
+          className="heard-chip-fly pointer-events-none select-none absolute z-20 max-w-[230px] truncate rounded-full border border-white/10 bg-[#241d3f] px-3 py-1.5 text-[15px] font-bold text-white"
+          style={{ left: 'min(224px, 55%)', top: 5 }}
         >
           {activeChip.item}
         </span>
@@ -305,7 +312,21 @@ export default function HeardPitch({ variant = 'full', onReadPassage }) {
         <WordList words={dispWords} exprs={dispExprs} readingFor={readingFor} />
       )}
       {onceWords > 0 && (
-        <p className="text-xs text-slate-500">{t('today.heardPitchOnce', { n: onceWords })}</p>
+        <>
+          <button
+            onClick={() => setShowOnce((v) => !v)}
+            aria-expanded={showOnce}
+            className="flex items-center gap-1.5 text-[13px] text-slate-400 hover:text-slate-200 transition"
+          >
+            <span>{t('today.heardPitchOnce', { n: onceWords })}</span>
+            <ChevronDown size={14} className={`shrink-0 transition-transform ${showOnce ? 'rotate-180' : ''}`} />
+          </button>
+          {showOnce && (
+            <div className="opacity-75">
+              <WordList words={onceWordItems} exprs={onceExprItems} readingFor={readingFor} />
+            </div>
+          )}
+        </>
       )}
     </>
   )

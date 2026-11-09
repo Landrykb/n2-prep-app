@@ -117,6 +117,7 @@ export function useAutoListen({ onFlush } = {}) {
   const everHeardRef = useRef(false)
   const restartsRef = useRef(0)
   const chunkFailBeaconRef = useRef(false)
+  const chunkTimerRef = useRef(null)
   const relaunchTimerRef = useRef(null)
   const flushTimerRef = useRef(null)
   const capTimerRef = useRef(null)
@@ -316,6 +317,9 @@ export function useAutoListen({ onFlush } = {}) {
 
   const runRecorderRef = useRef(null)
   const runRecorder = useCallback(() => {
+    // A recorder the OS quietly ended while the page was away
+    // must not block the restart with its stale reference.
+    if (recorderRef.current && recorderRef.current.state === 'inactive') recorderRef.current = null
     if (!activeRef.current || recorderRef.current || !streamRef.current) return
     const mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg']
       .find((m) => { try { return window.MediaRecorder.isTypeSupported(m) } catch { return false } }) ?? ''
@@ -331,10 +335,23 @@ export function useAutoListen({ onFlush } = {}) {
     rec.onstop = () => {
       recorderRef.current = null
       if (activeRef.current) {
-        relaunchTimerRef.current = setTimeout(() => runRecorderRef.current?.(), 300)
+        relaunchTimerRef.current = setTimeout(() => runRecorderRef.current?.(), 250)
       }
     }
-    try { rec.start(CHUNK_MS) } catch { recorderRef.current = null }
+    rec.onerror = () => { try { rec.stop() } catch { /* onstop relaunches */ } }
+    // STOP/START, never timeslice (his session, 2026-11-09:
+    // five words in chunk one, then silence): a timeslice blob
+    // after the first is a headerless continuation fragment
+    // that no transcription service can decode — the receipts
+    // showed chunk 1 ok and every later chunk dead at an exact
+    // 15s cadence. Each chunk here is a complete file: record
+    // CHUNK_MS, stop (the stop flushes one whole file), and
+    // onstop starts the next recorder on the same stream. The
+    // gap is ~250ms per chunk — the price of decodable audio.
+    try {
+      rec.start()
+      chunkTimerRef.current = setTimeout(() => { try { rec.stop() } catch { /* already stopped */ } }, CHUNK_MS)
+    } catch { recorderRef.current = null }
   }, [sendChunk, permissionWall])
   runRecorderRef.current = runRecorder
 
@@ -356,6 +373,7 @@ export function useAutoListen({ onFlush } = {}) {
   const stop = useCallback(() => {
     activeRef.current = false
     if (relaunchTimerRef.current) clearTimeout(relaunchTimerRef.current)
+    if (chunkTimerRef.current) clearTimeout(chunkTimerRef.current)
     if (flushTimerRef.current) clearInterval(flushTimerRef.current)
     if (capTimerRef.current) clearTimeout(capTimerRef.current)
     const rec = recRef.current
@@ -445,6 +463,7 @@ export function useAutoListen({ onFlush } = {}) {
   useEffect(() => () => {
     activeRef.current = false
     if (relaunchTimerRef.current) clearTimeout(relaunchTimerRef.current)
+    if (chunkTimerRef.current) clearTimeout(chunkTimerRef.current)
     if (flushTimerRef.current) clearInterval(flushTimerRef.current)
     if (capTimerRef.current) clearTimeout(capTimerRef.current)
     const rec = recRef.current

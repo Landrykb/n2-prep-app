@@ -2233,9 +2233,15 @@ serve(async (req: Request) => {
     // the transcript or null on ANY failure; the caller drops the
     // audio either way and the transcript never leaves the
     // invocation that asked for it.
-    const groqTranscribeBytes = async (audio: ArrayBuffer, mime: string): Promise<string | null> => {
+    // Transcription with its failure reason attached: a chunk
+    // receipt that only says ok:false cannot tell a rate limit
+    // from an undecodable file from a network death (the three
+    // presented identically during the 2026-11-09 session
+    // diagnosis). Kinds: 'no-key' | 'http-<status>' | 'empty'
+    // (service answered, no speech) | 'fetch' (threw/aborted).
+    const groqTranscribeDetailed = async (audio: ArrayBuffer, mime: string): Promise<{ transcript: string | null; error: string | null }> => {
       const key = Deno.env.get('READER_STT_API_KEY') ?? ''
-      if (!key) return null
+      if (!key) return { transcript: null, error: 'no-key' }
       const ctrl = new AbortController()
       const timer = setTimeout(() => ctrl.abort(), 120000)
       try {
@@ -2253,17 +2259,19 @@ serve(async (req: Request) => {
         })
         if (!res.ok) {
           console.error(`reader-bot: groq transcription HTTP ${res.status}`)
-          return null
+          return { transcript: null, error: `http-${res.status}` }
         }
         const data = await res.json().catch(() => null)
         const transcript = typeof data?.text === 'string' ? data.text.trim() : ''
-        return transcript || null
+        return transcript ? { transcript, error: null } : { transcript: null, error: 'empty' }
       } catch {
-        return null
+        return { transcript: null, error: 'fetch' }
       } finally {
         clearTimeout(timer)
       }
     }
+    const groqTranscribeBytes = async (audio: ArrayBuffer, mime: string): Promise<string | null> =>
+      (await groqTranscribeDetailed(audio, mime)).transcript
 
     const tryTranscribeAmbient = async (voice: Record<string, unknown>): Promise<string | null> => {
       const key = Deno.env.get('READER_STT_API_KEY') ?? ''
@@ -2365,7 +2373,10 @@ serve(async (req: Request) => {
       const day = ambientDay()
       let stats: Record<string, unknown> | null = null
       try {
-        const transcript = await groqTranscribeBytes(chunk.audio, chunk.mime)
+        const { transcript, error: sttError } = await groqTranscribeDetailed(chunk.audio, chunk.mime)
+        if (!transcript) {
+          stats = { surface: 'web-auto', ok: false, reason: sttError ?? 'empty' }
+        }
         if (transcript) {
           const { counts, matched, total } = matchHeardWords(transcript, await loadHeardDict())
           if (counts.size > 0) {
