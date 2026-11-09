@@ -1,0 +1,14 @@
+# Dependabot: grouped weekly updates.
+# Minor and patch bumps arrive as ONE grouped PR per ecosystem.
+# Major bumps stay individual PRs on purpose (they can break builds).
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Tokyo"
+    # Security updates only (Expo-aligned versions are pinned as a set).
+    open-pull-requests-limit: 0
