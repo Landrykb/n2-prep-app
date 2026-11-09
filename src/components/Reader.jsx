@@ -21,6 +21,7 @@ import KanjiTapText from './KanjiTapText.jsx'
 import KanjiChips from './KanjiChips.jsx'
 import TtsButton from './TtsButton.jsx'
 import Mascot from './Mascot.jsx'
+import HeardPitch from './HeardPitch.jsx'
 import { PassageSkeleton } from './Skeleton.jsx'
 
 // THE READER (Doc 16 §2/§7 R1) — the web surface of Hori's Reader, the
@@ -979,6 +980,11 @@ export default function Reader({ setActive, onSignIn }) {
           </section>
         </>
       )}
+
+      {/* Heard Words (Doc 22): Hori's other ear. The Mini App
+          opens on this page, so the pitch lives here too — the
+          compact variant, under whatever the fit served. */}
+      <HeardPitch variant="compact" />
     </div>
   )
 }
