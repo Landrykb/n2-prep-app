@@ -870,8 +870,11 @@ export default function Reader({ setActive, onSignIn }) {
 
       {phase === 'ready' && pick && (
         <>
-          <section className="rounded-3xl glass p-6 sm:p-8 card-glow space-y-5">
-            <p className="text-sm text-slate-400">{t('reader.dugUp', { topic: pick.passage.topic || t('reader.defaultTopic'), band: pick.passage.band })}</p>
+          <section className="rounded-3xl bg-[#151129] p-6 sm:p-8 space-y-5">
+            <div className="flex items-center gap-3">
+              <Mascot agent="hori" size={38} showName={false} />
+              <h2 className="text-base font-bold text-white leading-snug">{t('reader.dugUp', { topic: pick.passage.topic || t('reader.defaultTopic'), band: pick.passage.band })}</h2>
+            </div>
             <PassageText text={pick.passage.text} newWords={pick.newWords} highlightWord={pulseWord} />
             {/* The listen step (audit P2-6): the bot sends a voice
                 note with every passage; the web surface had no way
@@ -882,13 +885,13 @@ export default function Reader({ setActive, onSignIn }) {
             </div>
             <KanjiChips key={String(pick.passage.id)} chips={chips} activeWord={pulseWord} onHighlight={setPulseWord} onMineWord={mineCandidates} />
             {pick.newWords.length > 0 && (
-              <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4">
+              <div className="rounded-xl bg-white/5 p-4">
                 <h3 className="text-sm font-bold text-[#FF8A75] mb-2">{t('reader.newWordsHeading')}</h3>
                 <ul className="space-y-1">
                   {pick.newWords.map((c, i) => (
                     <li key={i} className="text-sm text-slate-200">
                       <span className="font-semibold text-white">{c.h || c.word}</span>
-                      {c.reading && c.reading !== (c.h || c.word) && <span className="text-cyan-300"> （{c.reading}）</span>}
+                      {c.reading && c.reading !== (c.h || c.word) && <span className="text-[#FFB59D]"> （{c.reading}）</span>}
                       {c.meaning && <span className="text-slate-400"> — {c.meaning}</span>}
                     </li>
                   ))}
@@ -932,7 +935,7 @@ export default function Reader({ setActive, onSignIn }) {
           {mineNote && <p className="text-sm text-emerald-300 flex items-center gap-2"><CheckCircle2 size={15} /> {mineNote}</p>}
           {note && <p className="text-sm text-slate-400">{note}</p>}
 
-          <section className="rounded-3xl glass p-6 card-glow space-y-3">
+          <section className="rounded-3xl bg-[#151129] p-6 space-y-3">
             <h3 className="text-base font-bold text-white">{t('reader.readAloudTitle')}</h3>
             <p className="text-sm text-slate-400">{t('reader.readAloudIntro')}<span className="text-slate-200">{t('reader.readAloudIntroEmphasis')}</span></p>
             {!speechSupported ? (

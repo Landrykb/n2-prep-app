@@ -1233,14 +1233,20 @@ serve(async (req: Request) => {
       // felt), then the passage itself is the body, then the
       // detail (readings, footer) and the detailed voice
       // instruction last.
+      // Display law (2026-11-09, the first user: "make the
+      // reading passage very visible"): the header is bold and
+      // the passage body rides in a blockquote — Telegram tints
+      // it and bars its left edge, so the passage reads as the
+      // main event of the chat, not as one more chat line. The
+      // stored passage text is untouched; only the frame is new.
       const lines = [
-        bt(lang, 'passage.header', {
+        `<b>${bt(lang, 'passage.header', {
           topic: esc(String(passage.topic || bt(lang, 'passage.defaultTopic'))),
           band: esc(String(passage.band)),
-        }),
+        })}</b>`,
         bt(lang, 'passage.howTo'),
         '',
-        renderPassage(String(passage.text), newWords),
+        `<blockquote>${renderPassage(String(passage.text), newWords)}</blockquote>`,
         ...(readingsBlock ? ['', readingsBlock] : []),
         '',
         footerText,
@@ -2079,12 +2085,39 @@ serve(async (req: Request) => {
       const row = await loadState(userId)
       const state = (row?.state ?? {}) as Record<string, unknown>
       const { known } = knownFor(state, declaredOf(link))
+      // The card proves it is alive: stretches heard today and
+      // when the last one landed (ambient_chunk events are the
+      // only trace — counts and times, never content).
+      let statsLine: string | null = null
+      try {
+        const dayStart = Date.parse(`${day}T00:00:00+09:00`)
+        const { data: chunks } = await supabaseAdmin
+          .from('metrics_events')
+          .select('created_at')
+          .eq('user_id', userId)
+          .eq('type', 'ambient_chunk')
+          .gte('created_at', new Date(dayStart).toISOString())
+          .lt('created_at', new Date(dayStart + 86400000).toISOString())
+          .order('created_at', { ascending: false })
+        if (chunks && chunks.length > 0) {
+          const last = new Intl.DateTimeFormat('en-GB', {
+            timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit',
+          }).format(new Date(String((chunks[0] as { created_at: string }).created_at)))
+          statsLine = bt(lang, 'ambient.cardStats', { n: chunks.length, time: last })
+        }
+      } catch { /* the stats line is decoration; the card never fails for it */ }
+      // Display law (2026-11-09, the first user: "make the
+      // recording very visible"): the STATE is the first line,
+      // bold — an open session must be unmissable, not implied
+      // by a card somewhere up the chat.
       const lines: string[] = [
+        `<b>${bt(lang, 'ambient.cardLive')}</b>`,
         bt(lang, 'ambient.cardTitle', { date: day }),
         bt(lang, 'ambient.cardContract'),
         bt(lang, 'ambient.cardLegend'),
         '',
       ]
+      if (statsLine) lines.splice(2, 0, statsLine)
       const words = s.sticking.filter((r) => r.kind === 'word').slice(0, 15)
       const exprs = s.sticking.filter((r) => r.kind === 'expr').slice(0, 8)
       if (words.length === 0 && exprs.length === 0) {
@@ -2117,16 +2150,29 @@ serve(async (req: Request) => {
       lang: BotLang,
     ) => {
       const text = await ambientCardText(session.user_id, lang, link)
-      if (session.card_message_id) {
-        const res = await tg(botToken, 'editMessageText', {
-          chat_id: chatId, message_id: session.card_message_id, text, parse_mode: 'HTML',
-        })
-        if (res?.ok) return
-      }
+      // Visibility law (2026-11-09): the card is REPOSTED as the
+      // newest message on every refresh and pinned — an edited
+      // card stays wherever it was first posted, invisible after
+      // an hour of chat; a fresh card at the bottom + the pin at
+      // the top means the listening state is the first and last
+      // thing the learner sees in this chat. The old card is
+      // deleted, so the chat never accumulates cards. Every step
+      // is best-effort: if the repost fails, fall back to editing
+      // the old card in place.
       const sent = await sendMessage(botToken, chatId, text)
       const mid = (sent?.result as Record<string, unknown> | undefined)?.message_id
       if (typeof mid === 'number') {
+        if (session.card_message_id && session.card_message_id !== mid) {
+          await tg(botToken, 'deleteMessage', { chat_id: chatId, message_id: session.card_message_id })
+        }
         await supabaseAdmin.from('ambient_sessions').update({ card_message_id: mid }).eq('chat_id', chatId)
+        await tg(botToken, 'pinChatMessage', { chat_id: chatId, message_id: mid, disable_notification: true })
+        return
+      }
+      if (session.card_message_id) {
+        await tg(botToken, 'editMessageText', {
+          chat_id: chatId, message_id: session.card_message_id, text, parse_mode: 'HTML',
+        })
       }
     }
 
@@ -2801,6 +2847,9 @@ serve(async (req: Request) => {
           const lang = await langForLink(link)
           const rows = await heardRowsFor(session.user_id, ambientDay())
           const s = summariseHeard(rows)
+          if (session.card_message_id) {
+            await tg(botToken, 'unpinChatMessage', { chat_id: chatId, message_id: session.card_message_id })
+          }
           await supabaseAdmin.from('ambient_sessions').delete().eq('chat_id', chatId)
           await logEvent(session.user_id, 'ambient_session_closed', { sticking: s.sticking.length, total: s.totalHearings })
           await sendMessage(botToken, chatId, bt(lang, 'ambient.closed', { sticking: s.sticking.length, total: s.totalHearings }))
