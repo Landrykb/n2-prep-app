@@ -831,6 +831,17 @@ export default function Reader({ setActive, onSignIn }) {
         <p className="text-sm text-slate-400">{t('reader.intro')}</p>
       </div>
 
+      {/* Reading and listening, side by side (his layout call,
+          2026-11-09: "less needing to scroll in the mini app —
+          the start listening button among the first things —
+          have them side by side, the reading part and the
+          listening part"). The phase column and Hori's panel
+          share a two-column grid at EVERY width: on a phone
+          each column is narrow, and both doors sit at the top
+          of the first screen instead of one buried under the
+          other's scroll. */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-6 items-start">
+        <div className="space-y-6 min-w-0">
       {phase === 'guest' && (
         <div className="rounded-2xl glass p-5 card-glow space-y-3">
           <div className="flex items-start gap-3">
@@ -921,7 +932,7 @@ export default function Reader({ setActive, onSignIn }) {
 
       {phase === 'ready' && pick && (
         <>
-          <section className="rounded-3xl bg-[#151129] p-6 sm:p-8 space-y-5">
+          <section className="rounded-3xl bg-[#151129] p-4 sm:p-8 space-y-5">
             <div className="flex items-center gap-3">
               <Mascot agent="hori" size={38} showName={false} />
               <h2 className="text-base font-bold text-white leading-snug">{t('reader.dugUp', { topic: pick.passage.topic || t('reader.defaultTopic'), band: pick.passage.band })}</h2>
@@ -992,7 +1003,7 @@ export default function Reader({ setActive, onSignIn }) {
             <p className="text-sm text-slate-400 whitespace-pre-line">{footerFor(pick)}</p>
           </section>
 
-          <section className="rounded-3xl bg-[#151129] p-6 space-y-3">
+          <section className="rounded-3xl bg-[#151129] p-4 sm:p-6 space-y-3">
             <h3 className="text-base font-bold text-white">{t('reader.readAloudTitle')}</h3>
             <p className="text-sm text-slate-400">{t('reader.readAloudIntro')}<span className="text-slate-200">{t('reader.readAloudIntroEmphasis')}</span></p>
             {!speechSupported ? (
@@ -1041,10 +1052,15 @@ export default function Reader({ setActive, onSignIn }) {
         </>
       )}
 
-      {/* Heard Words (Doc 22): Hori's other ear. The Mini App
-          opens on this page, so the pitch lives here too — the
-          compact variant, under whatever the fit served. */}
-      <HeardPitch variant="compact" />
+        </div>
+
+        {/* Heard Words (Doc 22): Hori's other ear — the right
+            column of the pair, beside the reading at every
+            width (see the grid note above). */}
+        <div className="min-w-0">
+          <HeardPitch variant="compact" />
+        </div>
+      </div>
     </div>
   )
 }

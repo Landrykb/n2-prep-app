@@ -253,8 +253,8 @@ export default function HeardPitch({ variant = 'full', onReadPassage }) {
     const [next, ...rest] = chipQueue
     setChipQueue(rest)
     setActiveChip(next)
-    chipTimersRef.current.push(setTimeout(() => setGulp(true), 620))
-    chipTimersRef.current.push(setTimeout(() => { setActiveChip(null); setGulp(false) }, 1000))
+    chipTimersRef.current.push(setTimeout(() => setGulp(true), 740))
+    chipTimersRef.current.push(setTimeout(() => { setActiveChip(null); setGulp(false) }, 1200))
   }, [chipQueue, activeChip])
 
   // "Then produce it back to me for reading" — the cook door:
@@ -285,7 +285,7 @@ export default function HeardPitch({ variant = 'full', onReadPassage }) {
   )
   const header = (title, sub, eating = false) => (
     <div className="relative flex items-start gap-3">
-      <HoriEats size={38} eating={eating} gulp={gulp} />
+      <HoriEats size={eating ? 46 : 38} eating={eating} gulp={gulp} />
       <div className="min-w-0">
         <p className="text-[11px] font-semibold tracking-[0.18em] text-[#E07B39] uppercase">{t('today.heardPitchEyebrow')}</p>
         <h3 className="text-lg font-bold text-white leading-snug mt-0.5">{title}</h3>
@@ -295,7 +295,7 @@ export default function HeardPitch({ variant = 'full', onReadPassage }) {
         <span
           key={activeChip.seq}
           aria-hidden="true"
-          className="heard-chip-fly pointer-events-none select-none absolute z-20 max-w-[230px] truncate rounded-full border border-white/10 bg-[#241d3f] px-3 py-1.5 text-[15px] font-bold text-white"
+          className="heard-chip-fly pointer-events-none select-none absolute z-20 max-w-[260px] truncate rounded-2xl border border-white/15 bg-[#241d3f] px-4 py-2 text-[22px] font-extrabold text-white"
           style={{ left: 'min(224px, 55%)', top: 5 }}
         >
           {activeChip.item}
@@ -334,7 +334,7 @@ export default function HeardPitch({ variant = 'full', onReadPassage }) {
   // ---------- AUTOMATIC state ----------
   if (autoActive || auto.phase === 'interrupted' || auto.phase === 'denied') {
     return (
-      <section className="rounded-3xl bg-[#151129] border border-white/5 p-5 sm:p-6 space-y-4">
+      <section className="rounded-3xl bg-[#151129] border border-white/5 p-4 sm:p-6 space-y-4">
         {header(
           t('today.heardPitchAutoLive'),
           auto.phase === 'listening' && auto.startedAt ? (
@@ -414,7 +414,7 @@ export default function HeardPitch({ variant = 'full', onReadPassage }) {
   // ---------- BOT-LIVE state: the Heard Today strip ----------
   if (live && (live.listening || hasAny)) {
     return (
-      <section className="rounded-3xl bg-[#151129] border border-white/5 p-5 sm:p-6 space-y-4">
+      <section className="rounded-3xl bg-[#151129] border border-white/5 p-4 sm:p-6 space-y-4">
         {header(
           live.listening ? t('today.heardPitchLiveTitle') : t('today.heardPitchTodayTitle'),
           live.listening ? (
@@ -509,7 +509,7 @@ export default function HeardPitch({ variant = 'full', onReadPassage }) {
 
   if (variant === 'compact') {
     return (
-      <section className="rounded-3xl bg-[#151129] border border-white/5 p-5 sm:p-6 space-y-4">
+      <section className="rounded-3xl bg-[#151129] border border-white/5 p-4 sm:p-6 space-y-4">
         <div className="flex items-start gap-3">
           <Mascot agent="hori" size={38} mood="happy" showName={false} />
           <div className="min-w-0">

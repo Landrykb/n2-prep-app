@@ -335,18 +335,19 @@ rt {
 .hori-nom { animation: horiNom 1.5s ease-in-out infinite; transform-origin: 50% 85%; }
 @keyframes horiGulp {
   0% { transform: scale(1, 1); }
-  35% { transform: scale(1.16, 0.84); }
-  65% { transform: scale(0.96, 1.05); }
+  35% { transform: scale(1.24, 0.76); }
+  65% { transform: scale(0.94, 1.08); }
   100% { transform: scale(1, 1); }
 }
 .hori-gulp { animation: horiGulp 0.55s ease-in-out 1; transform-origin: 50% 85%; }
 @keyframes chipFly {
-  0% { transform: translate(0, 0) scale(1); opacity: 0; }
-  10% { opacity: 1; }
-  72% { opacity: 1; }
-  100% { transform: translate(-206px, 5px) scale(0.3); opacity: 0; }
+  0% { transform: translate(0, 0) scale(0.6) rotate(-6deg); opacity: 0; }
+  14% { transform: translate(-28px, -20px) scale(1.12) rotate(3deg); opacity: 1; }
+  45% { transform: translate(-98px, -28px) scale(1.05) rotate(-3deg); opacity: 1; }
+  74% { transform: translate(-168px, -8px) scale(0.95) rotate(1deg); opacity: 1; }
+  100% { transform: translate(-206px, 6px) scale(0.28) rotate(0deg); opacity: 0; }
 }
-.heard-chip-fly { animation: chipFly 0.95s ease-in both; }
+.heard-chip-fly { animation: chipFly 1.15s ease-in-out both; }
 @keyframes heardPop {
   0% { transform: scale(1.35); color: #FFB59D; }
   100% { transform: scale(1); }
