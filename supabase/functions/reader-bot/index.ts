@@ -515,7 +515,30 @@ serve(async (req: Request) => {
     const routeParams = new URL(req.url).searchParams
     let dispatchMode = false
     let voiceJobId: string | null = null
-    if (routeParams.get('dispatch') === '1' || routeParams.get('voicejob')) {
+    // ---------- web automatic-listening chunks (Doc 22) ----------
+    // The app's automatic mode records short chunks in the page
+    // and posts them here: ?webchunk=1 with the learner's own
+    // Supabase JWT as Bearer. Auth is the JWT itself (validated
+    // against Auth with the service client) — no Telegram secret,
+    // no cron secret; the chunk is transcribed, matched against
+    // the same dictionary, counted, and dropped, exactly like a
+    // bot stretch (handleWebChunk, beside handleAmbientChunk).
+    // Fail closed at every step: no token, no user, no audio,
+    // no service.
+    let webChunk: { userId: string; audio: ArrayBuffer; mime: string } | null = null
+    const supabaseAdmin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
+    if (routeParams.get('webchunk') === '1') {
+      const token = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '').trim()
+      if (!token) return json({ error: 'Unauthorized' }, 401)
+      const { data: userData } = await supabaseAdmin.auth.getUser(token)
+      const userId = userData?.user?.id
+      if (!userId) return json({ error: 'Unauthorized' }, 401)
+      const form = await req.formData().catch(() => null)
+      const file = form?.get('audio')
+      if (!(file instanceof File)) return json({ error: 'audio required' }, 400)
+      if (file.size === 0 || file.size > 20 * 1024 * 1024) return json({ error: 'bad audio size' }, 400)
+      webChunk = { userId, audio: await file.arrayBuffer(), mime: file.type || 'audio/webm' }
+    } else if (routeParams.get('dispatch') === '1' || routeParams.get('voicejob')) {
       const cronSecret = Deno.env.get('READER_CRON_SECRET') ?? ''
       const providedCron = req.headers.get('x-cron-secret') ?? ''
       if (!cronSecret || !providedCron || providedCron !== cronSecret) {
@@ -539,10 +562,8 @@ serve(async (req: Request) => {
       }
     }
 
-    const update = (dispatchMode || voiceJobId) ? null : await req.json().catch(() => null)
-    if (!dispatchMode && !voiceJobId && !update) return json({ ok: true })
-
-    const supabaseAdmin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
+    const update = (dispatchMode || voiceJobId || webChunk) ? null : await req.json().catch(() => null)
+    if (!dispatchMode && !voiceJobId && !webChunk && !update) return json({ ok: true })
 
     const logEvent = async (userId: string, type: string, payload: Record<string, unknown>) => {
       const { error } = await supabaseAdmin.from('metrics_events').insert({ user_id: userId, type, payload })
@@ -2181,6 +2202,44 @@ serve(async (req: Request) => {
     // stretches run minutes, not seconds. Returns the transcript or
     // null on ANY failure; the caller deletes the recording either
     // way and the transcript never leaves this invocation.
+    // One Groq transcription of raw audio bytes — shared by the
+    // Telegram stretch path (bytes downloaded from Telegram) and
+    // the web automatic path (bytes posted by the app). Returns
+    // the transcript or null on ANY failure; the caller drops the
+    // audio either way and the transcript never leaves the
+    // invocation that asked for it.
+    const groqTranscribeBytes = async (audio: ArrayBuffer, mime: string): Promise<string | null> => {
+      const key = Deno.env.get('READER_STT_API_KEY') ?? ''
+      if (!key) return null
+      const ctrl = new AbortController()
+      const timer = setTimeout(() => ctrl.abort(), 120000)
+      try {
+        const ext = mime.includes('mp4') ? 'm4a' : mime.includes('ogg') ? 'ogg' : mime.includes('wav') ? 'wav' : 'webm'
+        const form = new FormData()
+        form.append('file', new Blob([audio], { type: mime }), `chunk.${ext}`)
+        form.append('model', 'whisper-large-v3-turbo')
+        form.append('language', 'ja')
+        form.append('response_format', 'json')
+        const res = await fetch(GROQ_TRANSCRIBE_URL, {
+          method: 'POST',
+          signal: ctrl.signal,
+          headers: { 'Authorization': `Bearer ${key}` },
+          body: form,
+        })
+        if (!res.ok) {
+          console.error(`reader-bot: groq transcription HTTP ${res.status}`)
+          return null
+        }
+        const data = await res.json().catch(() => null)
+        const transcript = typeof data?.text === 'string' ? data.text.trim() : ''
+        return transcript || null
+      } catch {
+        return null
+      } finally {
+        clearTimeout(timer)
+      }
+    }
+
     const tryTranscribeAmbient = async (voice: Record<string, unknown>): Promise<string | null> => {
       const key = Deno.env.get('READER_STT_API_KEY') ?? ''
       if (!key) return null
@@ -2196,24 +2255,7 @@ serve(async (req: Request) => {
         if (!fileRes.ok) return null
         const audio = await fileRes.arrayBuffer()
         if (!audio.byteLength || audio.byteLength > 20 * 1024 * 1024) return null
-        const form = new FormData()
-        form.append('file', new Blob([audio], { type: 'audio/ogg' }), 'voice.ogg')
-        form.append('model', 'whisper-large-v3-turbo')
-        form.append('language', 'ja')
-        form.append('response_format', 'json')
-        const res = await fetch(GROQ_TRANSCRIBE_URL, {
-          method: 'POST',
-          signal: ctrl.signal,
-          headers: { 'Authorization': `Bearer ${key}` },
-          body: form,
-        })
-        if (!res.ok) {
-          console.error(`reader-bot: ambient groq transcription HTTP ${res.status}`)
-          return null
-        }
-        const data = await res.json().catch(() => null)
-        const transcript = typeof data?.text === 'string' ? data.text.trim() : ''
-        return transcript || null
+        return await groqTranscribeBytes(audio, 'audio/ogg')
       } catch {
         return null
       } finally {
@@ -2284,6 +2326,55 @@ serve(async (req: Request) => {
       } else {
         await sendMessage(botToken, chatId, bt(lang, 'ambient.chunkFailed'))
       }
+    }
+
+    // The web automatic path (Doc 22): one chunk posted by the
+    // app (?webchunk=1, JWT already validated at routing). Same
+    // pipeline as a bot stretch — transcribe, match, count,
+    // drop — minus Telegram: there is no message to delete
+    // because the audio was never stored anywhere; it arrived
+    // in this invocation's memory and dies with it. The reply
+    // carries counts only (how many items matched, how many
+    // hearings), never words, never text.
+    const handleWebChunk = async (chunk: { userId: string; audio: ArrayBuffer; mime: string }) => {
+      const day = ambientDay()
+      let stats: Record<string, unknown> | null = null
+      try {
+        const transcript = await groqTranscribeBytes(chunk.audio, chunk.mime)
+        if (transcript) {
+          const { counts, matched, total } = matchHeardWords(transcript, await loadHeardDict())
+          if (counts.size > 0) {
+            const existing = await heardRowsFor(chunk.userId, day)
+            const byItem = new Map(existing.map((r) => [r.item, r]))
+            const upserts = [...counts.entries()].map(([item, c]) => ({
+              user_id: chunk.userId,
+              day,
+              item,
+              kind: c.kind,
+              count: (byItem.get(item)?.count ?? 0) + c.count,
+            }))
+            const { error } = await supabaseAdmin
+              .from('heard_words')
+              .upsert(upserts, { onConflict: 'user_id,day,item' })
+            if (error) console.error('reader-bot: web chunk heard_words upsert failed')
+          }
+          stats = {
+            surface: 'web-auto',
+            matched: counts.size,
+            hearings: [...counts.values()].reduce((n, c) => n + c.count, 0),
+            coverage: total > 0 ? Math.round((matched / total) * 1000) / 1000 : 0,
+            ok: true,
+          }
+        }
+      } catch (err) {
+        console.error('reader-bot: web chunk failed', err)
+      }
+      await logEvent(chunk.userId, 'ambient_chunk', stats ?? { surface: 'web-auto', ok: false })
+      return json({
+        ok: !!stats?.ok,
+        matched: typeof stats?.matched === 'number' ? stats.matched : 0,
+        hearings: typeof stats?.hearings === 'number' ? stats.hearings : 0,
+      })
     }
 
     // Returns true when the voice note was a listening stretch
@@ -2612,6 +2703,12 @@ serve(async (req: Request) => {
         }
       }
       return json({ ok: true, due, sent })
+    }
+
+    // A web automatic-listening chunk has no Telegram update —
+    // transcribe, match, count, drop, and answer with counts.
+    if (webChunk) {
+      return await handleWebChunk(webChunk)
     }
 
     // A dispatch call has no Telegram update — serve and return.

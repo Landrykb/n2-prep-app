@@ -318,3 +318,38 @@ rt {
 @media (prefers-reduced-motion: reduce) {
   .tank-spill-dot { animation: none; opacity: 0.9; }
 }
+
+/* Heard Words (Doc 22): Hori eats the air. While a listening state
+   is live, Hori does a small nom-nom bob and kana motes drift in
+   from the right and shrink into him; when new hearings land, one
+   gulp squash, and a caught word's count pops. Gentle and flat —
+   transform/opacity only, nothing glows. */
+@keyframes horiNom {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  30% { transform: translateY(1px) scale(1.06, 0.93); }
+  55% { transform: translateY(-2px) scale(0.98, 1.03); }
+  75% { transform: translateY(1px) scale(1.04, 0.95); }
+}
+.hori-nom { animation: horiNom 1.5s ease-in-out infinite; transform-origin: 50% 85%; }
+@keyframes horiGulp {
+  0% { transform: scale(1, 1); }
+  35% { transform: scale(1.16, 0.84); }
+  65% { transform: scale(0.96, 1.05); }
+  100% { transform: scale(1, 1); }
+}
+.hori-gulp { animation: horiGulp 0.55s ease-in-out 1; transform-origin: 50% 85%; }
+@keyframes moteDrift {
+  0% { transform: translate(0, 0) scale(1); opacity: 0; }
+  18% { opacity: 0.9; }
+  82% { opacity: 0.9; }
+  100% { transform: translate(-54px, 4px) scale(0.45); opacity: 0; }
+}
+.heard-mote { animation: moteDrift 2.8s linear infinite; }
+@keyframes heardPop {
+  0% { transform: scale(1.35); color: #FFB59D; }
+  100% { transform: scale(1); }
+}
+.heard-pop { display: inline-block; animation: heardPop 0.45s ease-out 1; }
+@media (prefers-reduced-motion: reduce) {
+  .hori-nom, .hori-gulp, .heard-mote, .heard-pop { animation: none; }
+}

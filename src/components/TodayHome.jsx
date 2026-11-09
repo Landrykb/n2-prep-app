@@ -309,7 +309,7 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
         </section>
       ) : null}
 
-      <HeardPitch />
+      <HeardPitch onReadPassage={() => setActive?.('reader')} />
 
       {tomorrowPlan && (
         <section className="rounded-2xl bg-[#151129] border border-white/5 p-4 flex items-start gap-3">

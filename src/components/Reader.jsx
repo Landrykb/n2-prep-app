@@ -461,11 +461,23 @@ export default function Reader({ setActive, onSignIn }) {
         setBandSource(source)
         setDisplayBand(band)
         setCanFit(hasLink)
-        const first = doPick(ctx, [])
-        if (first) { present(first); return }
-        // Bank miss: before declaring the shelf empty, ask the
-        // server pipeline (amendment #16) — it can fit from the
-        // full bank and generate a fitted passage, like the bot.
+        // Cooked from Heard Words (Doc 22): the Heard panel's
+        // door sets this flag — go straight to the server
+        // pipeline, whose generation is seeded with the words
+        // the learner actually heard, and fall back to the
+        // shelf only if it serves nothing.
+        let cook = false
+        try {
+          cook = sessionStorage.getItem('jpn:reader-cook') === '1'
+          if (cook) sessionStorage.removeItem('jpn:reader-cook')
+        } catch { /* storage unavailable: the flag is a nicety */ }
+        if (!cook) {
+          const first = doPick(ctx, [])
+          if (first) { present(first); return }
+        }
+        // Bank miss (or a cook request): ask the server pipeline
+        // (amendment #16) — it can fit from the full bank and
+        // generate a fitted passage, like the bot.
         if (!cold && bank.length > 0) {
           setPhase('digging')
           const served = await tryServe(ctx, [])
@@ -473,6 +485,10 @@ export default function Reader({ setActive, onSignIn }) {
           if (served && !served.needLevel) { present(served); return }
           // need_level: the empty state below renders the one-tap
           // level question (bandSource is 'none' in that world).
+        }
+        if (cook) {
+          const first = doPick(ctx, [])
+          if (first) { present(first); return }
         }
         setEmptyKind(bank.length === 0 || cold ? 'shelf' : 'nofit')
         setPhase('empty')
@@ -506,6 +522,36 @@ export default function Reader({ setActive, onSignIn }) {
     }
     setBusy(false)
   }
+
+  // Cooked from Heard Words (Doc 22): the panel on THIS page
+  // fires 'yonde:cook' — serve generation-first, because the
+  // server's generation is the one seeded with heard words;
+  // the local shelf is the fallback, not the lead.
+  const cookServe = async () => {
+    const ctx = ctxRef.current
+    if (!ctx || busy) return
+    setBusy(true)
+    const excluded = [...excludedRef.current, ...(pick ? [String(pick.passage.id)] : [])]
+    setNote(t('reader.loading'))
+    let next = !ctx.cold ? await tryServe(ctx, excluded) : null
+    if (next?.needLevel) next = null
+    if (!next) next = doPick(ctx, excluded)
+    if (!next || (pick && String(next.passage.id) === String(pick.passage.id))) {
+      setNote(t('reader.nothingElse'))
+    } else {
+      excludedRef.current = excluded
+      setNote('')
+      present(next)
+    }
+    setBusy(false)
+  }
+  const cookServeRef = useRef(cookServe)
+  cookServeRef.current = cookServe
+  useEffect(() => {
+    const onCook = () => { cookServeRef.current() }
+    window.addEventListener('yonde:cook', onCook)
+    return () => window.removeEventListener('yonde:cook', onCook)
+  }, [])
 
   // Mining — the queue front is the HEADWORD (it dedupes against the
   // same word added anywhere via the shared queueItemId hash, and
