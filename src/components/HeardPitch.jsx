@@ -10,12 +10,14 @@ import { useAutoListen } from '../lib/useAutoListen.js'
 // solid panel, thin line icons, exactly one coral door per state.
 //
 // AUTOMATIC state (the one-tap answer): press Start once and
-// the app itself listens — continuous recognition in the page,
-// matched against the dictionary on the device, only counts
-// kept (useAutoListen / heardMatch). Foreground only: iPhone
-// pauses a page's mic when the page is left, and the panel
-// says so instead of pretending otherwise. The Telegram bot
-// remains the pocket route, one sent stretch at a time.
+// the app itself listens — recorder chunks through the bot's
+// own pipeline by default, in-page recognition only where no
+// recorder exists; only counts are ever kept (useAutoListen).
+// Foreground only: iPhone pauses a page's mic when the page
+// is left, and the panel says so instead of pretending
+// otherwise. The Telegram bot remains the pocket route, one
+// sent stretch at a time. ONE coral primary per state — the
+// other routes ride as quiet text, never competing buttons.
 //
 // BOT-LIVE state: a bot session is open, or words landed today
 // (from either route — the strip merges the database rows with
@@ -80,38 +82,20 @@ function WordList({ words, exprs, readingFor }) {
   )
 }
 
-// Hori, eating the air (his ask, 2026-11-09: "there should be
-// an animation ingesting words — Hori open mouth and eat them
-// all"). The fleet art is flat PNGs with four expressions, so
-// the eating is motion, not a redraw: a nom-nom bob while a
-// listening state is live, kana motes drifting in from the
-// right and shrinking into him, and a gulp squash (the .hori-gulp
-// class on this same wrapper) the moment new hearings land.
-// The motes are abstract kana — decoration, never data: a word
-// is only ever NAMED by the list below, at the floor, as ever.
-const MOTES = [
-  { ch: 'か', top: -4, delay: '0s', dur: '2.8s' },
-  { ch: 'こ', top: 8, delay: '0.7s', dur: '3.1s' },
-  { ch: 'と', top: 18, delay: '1.4s', dur: '2.6s' },
-  { ch: 'ば', top: 2, delay: '1.9s', dur: '3.3s' },
-  { ch: 'ひ', top: 13, delay: '2.4s', dur: '2.9s' },
-]
+// Hori, mid-meal. The fleet art is flat PNGs with four
+// expressions, so the eating is motion, not a redraw: a
+// nom-nom bob while a listening state is live, and a gulp
+// squash (the .hori-gulp class on this same wrapper) as a
+// caught word lands in his mouth. The words themselves fly —
+// see the chip machinery in the component: his correction of
+// the first cut (2026-11-09) was that abstract kana motes are
+// not evidence; the IDENTIFIED word is the animation.
 function HoriEats({ size = 38, eating = false, gulp = false }) {
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
       <div className={gulp ? 'hori-gulp' : eating ? 'hori-nom' : ''}>
         <Mascot agent="hori" size={size} mood="happy" showName={false} />
       </div>
-      {eating && MOTES.map((m) => (
-        <span
-          key={m.ch}
-          aria-hidden="true"
-          className="heard-mote pointer-events-none select-none absolute text-[11px] font-bold text-[#E07B39]/80"
-          style={{ left: size + 16, top: m.top, animationDelay: m.delay, animationDuration: m.dur }}
-        >
-          {m.ch}
-        </span>
-      ))}
     </div>
   )
 }
@@ -229,22 +213,42 @@ export default function HeardPitch({ variant = 'full', onReadPassage }) {
   const totalHearings = merged.reduce((n, r) => n + r.count, 0)
   const readingFor = (item) => auto.readingsOf?.get(item) ?? readings[item] ?? null
 
-  // The gulp: when the day's hearing total RISES, Hori swallows
-  // — one squash, then back to the nom bob. The first load only
-  // sets the baseline; a rise is the animation's whole trigger.
+  // The flight (his correction, 2026-11-09: "the words that
+  // is identified or grammar should be animated into Hori's
+  // mouth"). When any item's count RISES — whichever route
+  // caught it — the word itself queues up, flies across the
+  // header into Hori, and he gulps as it lands. The flight is
+  // transient feedback on the owner's own screen; what may be
+  // NAMED in the list below still obeys the floor. The first
+  // load only sets the baseline — old catches never replay.
   const [gulp, setGulp] = useState(false)
-  const prevTotalRef = useRef(null)
+  const [chipQueue, setChipQueue] = useState([])
+  const [activeChip, setActiveChip] = useState(null)
+  const prevRowsRef = useRef(null)
+  const chipSeqRef = useRef(0)
+  const chipTimersRef = useRef([])
+  useEffect(() => () => { chipTimersRef.current.forEach(clearTimeout) }, [])
   useEffect(() => {
-    if (prevTotalRef.current === null) { prevTotalRef.current = totalHearings; return undefined }
-    if (totalHearings > prevTotalRef.current) {
-      prevTotalRef.current = totalHearings
-      setGulp(true)
-      const id = setTimeout(() => setGulp(false), 600)
-      return () => clearTimeout(id)
+    const prev = prevRowsRef.current
+    prevRowsRef.current = new Map(merged.map((r) => [r.item, r.count]))
+    if (!prev) return
+    const fresh = []
+    for (const r of merged) {
+      if (r.count > (prev.get(r.item) ?? 0)) {
+        chipSeqRef.current += 1
+        fresh.push({ item: r.item, kind: r.kind, seq: chipSeqRef.current })
+      }
     }
-    prevTotalRef.current = totalHearings
-    return undefined
-  }, [totalHearings])
+    if (fresh.length > 0) setChipQueue((q) => [...q, ...fresh.slice(0, 6)].slice(0, 8))
+  }, [merged])
+  useEffect(() => {
+    if (activeChip || chipQueue.length === 0) return
+    const [next, ...rest] = chipQueue
+    setChipQueue(rest)
+    setActiveChip(next)
+    chipTimersRef.current.push(setTimeout(() => setGulp(true), 620))
+    chipTimersRef.current.push(setTimeout(() => { setActiveChip(null); setGulp(false) }, 1000))
+  }, [chipQueue, activeChip])
 
   // "Then produce it back to me for reading" — the cook door:
   // the flag tells the Reader to go straight to a generated,
@@ -273,13 +277,23 @@ export default function HeardPitch({ variant = 'full', onReadPassage }) {
     </p>
   )
   const header = (title, sub, eating = false) => (
-    <div className="flex items-start gap-3">
+    <div className="relative flex items-start gap-3">
       <HoriEats size={38} eating={eating} gulp={gulp} />
       <div className="min-w-0">
         <p className="text-[11px] font-semibold tracking-[0.18em] text-[#E07B39] uppercase">{t('today.heardPitchEyebrow')}</p>
         <h3 className="text-lg font-bold text-white leading-snug mt-0.5">{title}</h3>
         {sub}
       </div>
+      {activeChip && (
+        <span
+          key={activeChip.seq}
+          aria-hidden="true"
+          className="heard-chip-fly pointer-events-none select-none absolute z-20 max-w-[190px] truncate rounded-full border border-white/10 bg-[#241d3f] px-2.5 py-1 text-[13px] font-semibold text-white"
+          style={{ left: 224, top: 5 }}
+        >
+          {activeChip.item}
+        </span>
+      )}
     </div>
   )
   const caughtSuffix = totalHearings > 0 ? ` · ${t('today.heardPitchCaught', { n: totalHearings })}` : ''
@@ -318,11 +332,9 @@ export default function HeardPitch({ variant = 'full', onReadPassage }) {
         )}
         {auto.phase === 'listening' && (
           <>
-            {auto.dictReady || auto.engine === 'recorder'
-              ? wordBlock(t('today.heardPitchNoWords'))
-              : (dispWords.length === 0 && dispExprs.length === 0
-                ? <p className="text-sm text-slate-300 leading-relaxed">{t('today.heardPitchWarming')}</p>
-                : wordBlock(t('today.heardPitchNoWords')))}
+            {auto.engine === 'sr' && !auto.dictReady && dispWords.length === 0 && dispExprs.length === 0
+              ? <p className="text-sm text-slate-300 leading-relaxed">{t('today.heardPitchWarming')}</p>
+              : wordBlock(t('today.heardPitchAutoEmpty'))}
             <p className="text-xs text-slate-500 leading-relaxed">{t('today.heardPitchAutoKeep')}</p>
           </>
         )}
@@ -377,7 +389,6 @@ export default function HeardPitch({ variant = 'full', onReadPassage }) {
     </a>
   )
   const doorSlot = auto.supported ? autoDoor : browserDoor
-  const botLinkCls = 'inline-flex items-center gap-2 rounded-xl border border-white/15 hover:border-white/30 transition px-4 py-2.5 text-sm font-semibold text-slate-200'
 
   // ---------- BOT-LIVE state: the Heard Today strip ----------
   if (live && (live.listening || hasAny)) {
@@ -393,30 +404,50 @@ export default function HeardPitch({ variant = 'full', onReadPassage }) {
           ) : null,
           live.listening,
         )}
-        {wordBlock(t('today.heardPitchNoWords'))}
+        {wordBlock(live.listening ? t('today.heardPitchNoWords') : t('today.heardPitchNoneYet'))}
         {cookBlock}
         {privacy}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          {live.listening ? (
-            <>
-              {doorSlot}
-              <a href={BOT_CHAT_URL} target="_blank" rel="noreferrer" onClick={openLink(BOT_CHAT_URL)} className={botLinkCls}>
+        {live.listening ? (
+          // ONE primary per state (his question, 2026-11-09:
+          // "Why do I have 2 buttons for listening?"): the bot
+          // session is the live thing, so Open-the-bot is the
+          // door; automatic is a quiet switch that migrates
+          // the session in one tap; Stop is quiet text last.
+          <div className="space-y-2.5">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <a href={BOT_CHAT_URL} target="_blank" rel="noreferrer" onClick={openLink(BOT_CHAT_URL)} className="inline-flex items-center gap-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] transition px-4 py-2.5 text-sm font-semibold text-white">
                 {t('today.heardPitchOpenBot')}
               </a>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              {auto.supported ? (
+                <button onClick={() => { void stopBot(); auto.start() }} className="text-sm text-slate-400 hover:text-slate-200 transition">
+                  {t('today.heardPitchSwitchAuto')}
+                </button>
+              ) : (
+                <a href={APP_URL} target="_blank" rel="noreferrer" onClick={openExternal} className="text-sm text-slate-400 hover:text-slate-200 transition">
+                  {t('today.heardPitchOpenBrowser')}
+                </a>
+              )}
               <button onClick={stopBot} disabled={stopping} className="text-sm text-slate-400 hover:text-slate-200 transition disabled:opacity-40">
                 {t('today.heardPitchStop')}
               </button>
-            </>
-          ) : (
-            <>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
               {doorSlot}
-              <a href={BOT_URL} target="_blank" rel="noreferrer" onClick={openLink(BOT_URL)} className={botLinkCls}>
-                {t('today.heardPitchCta')}
-              </a>
               <button onClick={hide} className="ml-auto text-xs text-slate-500 hover:text-slate-300 transition">{t('today.heardPitchHide')}</button>
-            </>
-          )}
-        </div>
+            </div>
+            <p className="text-xs text-slate-500">
+              <a href={BOT_URL} target="_blank" rel="noreferrer" onClick={openLink(BOT_URL)} className="underline decoration-slate-600 underline-offset-2 hover:text-slate-300 transition">
+                {t('today.heardPitchOrBot')}
+              </a>
+              {' · '}{t('today.heardPitchHow')}
+            </p>
+          </div>
+        )}
       </section>
     )
   }

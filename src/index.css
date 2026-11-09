@@ -319,11 +319,13 @@ rt {
   .tank-spill-dot { animation: none; opacity: 0.9; }
 }
 
-/* Heard Words (Doc 22): Hori eats the air. While a listening state
-   is live, Hori does a small nom-nom bob and kana motes drift in
-   from the right and shrink into him; when new hearings land, one
-   gulp squash, and a caught word's count pops. Gentle and flat —
-   transform/opacity only, nothing glows. */
+/* Heard Words (Doc 22): Hori eats. While a listening state is
+   live, Hori does a small nom-nom bob; when a word is caught,
+   the word itself flies across the header into his mouth
+   (chipFly — chip starts over the title, lands on Hori at
+   translate(-206px)) and he gulps; a named word's count pops
+   as it climbs. Gentle and flat — transform/opacity only,
+   nothing glows. */
 @keyframes horiNom {
   0%, 100% { transform: translateY(0) scale(1, 1); }
   30% { transform: translateY(1px) scale(1.06, 0.93); }
@@ -338,18 +340,18 @@ rt {
   100% { transform: scale(1, 1); }
 }
 .hori-gulp { animation: horiGulp 0.55s ease-in-out 1; transform-origin: 50% 85%; }
-@keyframes moteDrift {
+@keyframes chipFly {
   0% { transform: translate(0, 0) scale(1); opacity: 0; }
-  18% { opacity: 0.9; }
-  82% { opacity: 0.9; }
-  100% { transform: translate(-54px, 4px) scale(0.45); opacity: 0; }
+  10% { opacity: 1; }
+  72% { opacity: 1; }
+  100% { transform: translate(-206px, 5px) scale(0.3); opacity: 0; }
 }
-.heard-mote { animation: moteDrift 2.8s linear infinite; }
+.heard-chip-fly { animation: chipFly 0.95s ease-in both; }
 @keyframes heardPop {
   0% { transform: scale(1.35); color: #FFB59D; }
   100% { transform: scale(1); }
 }
 .heard-pop { display: inline-block; animation: heardPop 0.45s ease-out 1; }
 @media (prefers-reduced-motion: reduce) {
-  .hori-nom, .hori-gulp, .heard-mote, .heard-pop { animation: none; }
+  .hori-nom, .hori-gulp, .heard-chip-fly, .heard-pop { animation: none; }
 }

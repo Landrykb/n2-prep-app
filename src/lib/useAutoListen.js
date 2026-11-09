@@ -4,25 +4,30 @@ import { loadHeardDict, matchHeardWords } from './heardMatch.js'
 import { recordMetric } from './metrics.js'
 
 // Automatic Heard Words (Doc 22): ONE tap and the app itself
-// listens. Two engines, chosen by what the surface offers:
+// listens. Two engines; the RECORDER is the default wherever
+// it exists, the recogniser is the fallback:
 //
-//   'sr'       — continuous SpeechRecognition in the page,
-//                matched against the dictionary on the device
-//                (heardMatch), counts flushed through the
-//                bump_heard_words RPC. A recognised segment
-//                lives only in the onresult closure: matched,
-//                counted, dropped.
 //   'recorder' — MediaRecorder chunks (~15s) posted to the
 //                reader-bot's ?webchunk=1 route, which runs
 //                the BOT's own pipeline (Groq transcription,
 //                the same matcher server-side, counts, drop).
-//                This is the engine for surfaces with a
-//                microphone but no SpeechRecognition — the
-//                Telegram Mini App webview on iOS is one: it
-//                exposes no recogniser at all, which is why
-//                the first automatic build silently had no
-//                door there (diagnosed 2026-11-09 from the
-//                owner's screenshot + a zero-row database).
+//                Whisper hears a room; a dictation recogniser
+//                hears a phone held to a mouth. The owner's
+//                anime test (2026-11-09) proved the difference:
+//                an evening of TV Japanese through the webview
+//                recogniser landed exactly ONE dictionary word.
+//                The recorder also leaves a server receipt per
+//                chunk, so a failure is diagnosable without a
+//                screenshot.
+//   'sr'       — continuous SpeechRecognition in the page,
+//                matched against the dictionary on the device
+//                (heardMatch), counts flushed through the
+//                bump_heard_words RPC. Only where no recorder
+//                exists. A recognised segment lives only in
+//                the onresult closure: matched, counted,
+//                dropped. A recogniser that restarts six times
+//                without ever answering is surfaced as
+//                'interrupted' ('silent'), never fake-listening.
 //
 // Probes (recordMetric 'auto_listen_probe', flags and counts
 // only — never audio, never text) make the next device failure
@@ -176,8 +181,10 @@ export function useAutoListen({ onFlush } = {}) {
     if (capTimerRef.current) clearTimeout(capTimerRef.current)
     // A permission wall AFTER speech has flowed means the OS
     // wants a fresh gesture — resumable. Before any speech, it
-    // is a real block in this browser.
-    setPhase(everHeardRef.current ? 'interrupted' : 'denied')
+    // is a real block in this browser. A recogniser that loops
+    // silently without ever answering ('silent') is resumable
+    // too — Resume is the honest next step, not mic settings.
+    setPhase(everHeardRef.current || kind === 'silent' ? 'interrupted' : 'denied')
   }, [])
 
   // ---------- engine: SpeechRecognition ----------
@@ -215,6 +222,7 @@ export function useAutoListen({ onFlush } = {}) {
     }
     rec.onerror = (event) => {
       const err = event?.error
+      if (err && err !== 'aborted' && err !== 'no-speech') probe({ event: 'error', engine: 'sr', kind: err })
       if (err === 'not-allowed' || err === 'service-not-allowed' || err === 'audio-capture') {
         permissionWall(err)
       }
@@ -223,6 +231,14 @@ export function useAutoListen({ onFlush } = {}) {
       recRef.current = null
       if (!activeRef.current) return
       restartsRef.current += 1
+      // The silent-loop guard: a webview recogniser can exist
+      // yet never answer — relaunching forever would show
+      // "listening" while nothing can ever land. After six
+      // empty restarts with no result ever, say so honestly.
+      if (restartsRef.current > 6 && !everHeardRef.current) {
+        permissionWall('silent')
+        return
+      }
       const delay = Math.min(300 * restartsRef.current, 2500)
       relaunchTimerRef.current = setTimeout(() => launchSRRef.current?.(), delay)
     }
@@ -325,7 +341,13 @@ export function useAutoListen({ onFlush } = {}) {
     // A resume keeps the session's memory (a second permission
     // pause is still 'interrupted') and its clock.
     const resuming = phase === 'interrupted'
-    const chosen = srAvailable() ? 'sr' : 'recorder'
+    // RECORDER FIRST (his anime test, 2026-11-09): the webview
+    // recogniser exists but is a dictation service — near-field,
+    // phone-in-hand speech. Against a TV across the room it
+    // produced ONE match in an evening. Whisper (the bot lane)
+    // is built for exactly that audio, and every chunk leaves a
+    // server receipt. SR remains only where no recorder exists.
+    const chosen = recorderAvailable() ? 'recorder' : 'sr'
     activeRef.current = true
     engineRef.current = chosen
     setEngine(chosen)
