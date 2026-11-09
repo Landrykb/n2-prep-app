@@ -30,7 +30,8 @@
     "test:coach-shadow": "TZ=UTC node tests/coach-shadow.test.mjs",
     "test:day30": "TZ=UTC node tests/day30.test.mjs",
     "eval:corrector": "TZ=UTC node scripts/eval-corrector.mjs",
-    "test:ambient": "TZ=UTC node tests/ambient.test.mjs"
+    "test:ambient": "TZ=UTC node tests/ambient.test.mjs",
+    "test:heardauto": "TZ=UTC node tests/heardauto.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.109.0",
