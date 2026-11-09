@@ -526,6 +526,7 @@ serve(async (req: Request) => {
     // Fail closed at every step: no token, no user, no audio,
     // no service.
     let webChunk: { userId: string; audio: ArrayBuffer; mime: string } | null = null
+    let webProbe: { userId: string; payload: Record<string, unknown> } | null = null
     const supabaseAdmin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
     if (routeParams.get('webchunk') === '1') {
       const token = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '').trim()
@@ -533,11 +534,35 @@ serve(async (req: Request) => {
       const { data: userData } = await supabaseAdmin.auth.getUser(token)
       const userId = userData?.user?.id
       if (!userId) return json({ error: 'Unauthorized' }, 401)
-      const form = await req.formData().catch(() => null)
-      const file = form?.get('audio')
-      if (!(file instanceof File)) return json({ error: 'audio required' }, 400)
-      if (file.size === 0 || file.size > 20 * 1024 * 1024) return json({ error: 'bad audio size' }, 400)
-      webChunk = { userId, audio: await file.arrayBuffer(), mime: file.type || 'audio/webm' }
+      // A JSON body is a PROBE, not audio (Doc 22 beacon): the
+      // app's own capability/failure report — which engine it
+      // chose, which microphone routes exist on this surface,
+      // where a chunk died. Client-side metric mirrors proved
+      // lossy in the Telegram webview (an evening of device
+      // failures left zero rows server-side), so the facts ride
+      // the same authenticated route as the audio and are logged
+      // here, with the service client. Only known keys with
+      // primitive values are kept — flags and counts, never
+      // audio, never text.
+      if ((req.headers.get('content-type') ?? '').includes('application/json')) {
+        const body = await req.json().catch(() => null) as Record<string, unknown> | null
+        const raw = (body?.probe && typeof body.probe === 'object') ? body.probe as Record<string, unknown> : {}
+        const payload: Record<string, unknown> = { surface: 'web-beacon' }
+        for (const k of ['event', 'engine', 'kind', 'gum']) {
+          if (typeof raw[k] === 'string') payload[k] = String(raw[k]).slice(0, 60)
+        }
+        for (const k of ['sr', 'rec', 'tg']) {
+          if (typeof raw[k] === 'boolean') payload[k] = raw[k]
+        }
+        if (typeof raw.http === 'number') payload.http = raw.http
+        webProbe = { userId, payload }
+      } else {
+        const form = await req.formData().catch(() => null)
+        const file = form?.get('audio')
+        if (!(file instanceof File)) return json({ error: 'audio required' }, 400)
+        if (file.size === 0 || file.size > 20 * 1024 * 1024) return json({ error: 'bad audio size' }, 400)
+        webChunk = { userId, audio: await file.arrayBuffer(), mime: file.type || 'audio/webm' }
+      }
     } else if (routeParams.get('dispatch') === '1' || routeParams.get('voicejob')) {
       const cronSecret = Deno.env.get('READER_CRON_SECRET') ?? ''
       const providedCron = req.headers.get('x-cron-secret') ?? ''
@@ -562,8 +587,8 @@ serve(async (req: Request) => {
       }
     }
 
-    const update = (dispatchMode || voiceJobId || webChunk) ? null : await req.json().catch(() => null)
-    if (!dispatchMode && !voiceJobId && !webChunk && !update) return json({ ok: true })
+    const update = (dispatchMode || voiceJobId || webChunk || webProbe) ? null : await req.json().catch(() => null)
+    if (!dispatchMode && !voiceJobId && !webChunk && !webProbe && !update) return json({ ok: true })
 
     const logEvent = async (userId: string, type: string, payload: Record<string, unknown>) => {
       const { error } = await supabaseAdmin.from('metrics_events').insert({ user_id: userId, type, payload })
@@ -2703,6 +2728,13 @@ serve(async (req: Request) => {
         }
       }
       return json({ ok: true, due, sent })
+    }
+
+    // A web probe has no Telegram update either — log the
+    // app's own report and answer (Doc 22 beacon).
+    if (webProbe) {
+      await logEvent(webProbe.userId, 'auto_listen_probe', webProbe.payload)
+      return json({ ok: true, pong: true })
     }
 
     // A web automatic-listening chunk has no Telegram update —

@@ -30,8 +30,14 @@ import { recordMetric } from './metrics.js'
 //                'interrupted' ('silent'), never fake-listening.
 //
 // Probes (recordMetric 'auto_listen_probe', flags and counts
-// only — never audio, never text) make the next device failure
-// diagnosable from the server instead of from a screenshot.
+// only — never audio, never text) were supposed to make device
+// failures diagnosable from the server. Two silent killers
+// proved otherwise on 2026-11-09: the local mirror is lossy
+// in the Telegram webview, and the metrics type whitelist
+// rejected 'auto_listen_probe' outright until migration
+// 00023. So the load-bearing reports ALSO ride the beacon
+// (below): a JSON POST on the same authenticated route as the
+// audio chunks, logged server-side with the service client.
 //
 // "The moment I press, it should go off" (Landry, 2026-11-09):
 // the press starts the engine IMMEDIATELY. For 'sr', the
@@ -68,6 +74,28 @@ const probe = (payload) => {
   try { recordMetric('auto_listen_probe', payload) } catch { /* telemetry never breaks listening */ }
 }
 
+// The beacon: the server-visible twin of probe() — session
+// starts, microphone outcomes, and a chunk's death are POSTed
+// as JSON to the ?webchunk=1 route with the learner's own
+// token; reader-bot logs them as auto_listen_probe rows.
+// Without it, a webview failure leaves no trace anywhere.
+const beacon = (payload) => {
+  try {
+    if (!isSupabaseConfigured || !supabase) return
+    void (async () => {
+      const { data } = await supabase.auth.getSession()
+      const token = data?.session?.access_token
+      const base = import.meta.env.VITE_SUPABASE_URL
+      if (!token || !base) return
+      await fetch(`${base}/functions/v1/reader-bot?webchunk=1`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ probe: payload }),
+      })
+    })()
+  } catch { /* telemetry never breaks listening */ }
+}
+
 export function useAutoListen({ onFlush } = {}) {
   const [phase, setPhase] = useState('idle') // idle | listening | interrupted | denied
   const [pending, setPending] = useState({}) // item -> { count, kind }, the unflushed SR delta
@@ -88,6 +116,7 @@ export function useAutoListen({ onFlush } = {}) {
   const bufferCharsRef = useRef(0)
   const everHeardRef = useRef(false)
   const restartsRef = useRef(0)
+  const chunkFailBeaconRef = useRef(false)
   const relaunchTimerRef = useRef(null)
   const flushTimerRef = useRef(null)
   const capTimerRef = useRef(null)
@@ -176,6 +205,7 @@ export function useAutoListen({ onFlush } = {}) {
 
   const permissionWall = useCallback((kind) => {
     probe({ event: 'error', engine: engineRef.current, kind })
+    beacon({ event: 'error', engine: engineRef.current, kind })
     activeRef.current = false
     if (flushTimerRef.current) clearInterval(flushTimerRef.current)
     if (capTimerRef.current) clearTimeout(capTimerRef.current)
@@ -262,6 +292,12 @@ export function useAutoListen({ onFlush } = {}) {
         headers: { Authorization: `Bearer ${token}` },
         body: form,
       })
+      if (!res.ok && !chunkFailBeaconRef.current) {
+        // A dead chunk route must not be silent: the FIRST
+        // failure of a session reports itself (status only).
+        chunkFailBeaconRef.current = true
+        beacon({ event: 'chunkfail', engine: 'recorder', kind: 'http', http: res.status })
+      }
       const out = res.ok ? await res.json().catch(() => null) : null
       probe({ event: 'chunk', ok: !!out?.ok, hearings: typeof out?.hearings === 'number' ? out.hearings : 0 })
       if (out?.ok) {
@@ -269,7 +305,13 @@ export function useAutoListen({ onFlush } = {}) {
         everHeardRef.current = true
         try { onFlushRef.current?.() } catch { /* panel refresh is best-effort */ }
       }
-    } catch { /* the next chunk is a natural retry */ }
+    } catch {
+      if (!chunkFailBeaconRef.current) {
+        chunkFailBeaconRef.current = true
+        beacon({ event: 'chunkfail', engine: 'recorder', kind: 'network' })
+      }
+      /* the next chunk is a natural retry */
+    }
   }, [])
 
   const runRecorderRef = useRef(null)
@@ -304,6 +346,7 @@ export function useAutoListen({ onFlush } = {}) {
         return
       }
       streamRef.current = stream
+      beacon({ event: 'mic', engine: 'recorder', gum: 'ok' })
       runRecorder()
     } catch (err) {
       permissionWall(err?.name || 'getusermedia')
@@ -356,14 +399,17 @@ export function useAutoListen({ onFlush } = {}) {
       setStartedAt(Date.now())
     }
     restartsRef.current = 0
+    chunkFailBeaconRef.current = false
     setPhase('listening')
-    probe({
+    const startReport = {
       event: resuming ? 'resume' : 'start',
       engine: chosen,
       sr: srAvailable(),
       rec: recorderAvailable(),
       tg: typeof window !== 'undefined' && !!window.Telegram?.WebApp?.initData,
-    })
+    }
+    probe(startReport)
+    beacon(startReport)
     if (chosen === 'sr') {
       ensureDict()
       launchSR()

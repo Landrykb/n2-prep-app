@@ -143,8 +143,19 @@ export function buildHeardDict(wordbook?: { heads?: string[]; readings?: string[
   }
 }
 
-/** The wordbook ships as data with the app (sharded + manifest); the bot fetches it once per process. */
-export const WORDBOOK_URL = 'https://jpn2easy.vercel.app/data/wordbook/manifest.json'
+/**
+ * The FUNCTION lane's wordbook is the COMMON-WORDS edition
+ * (JMdict common subset: 22,650 heads, ~73k surfaces, 1.5 MB),
+ * not the app's full book (214k heads, 444k surfaces, 13 MB).
+ * The full book killed every chunk worker with
+ * WORKER_RESOURCE_LIMIT (proven 2026-11-09 by a live end-to-end
+ * test: even a 2-second chunk died before logging) — an edge
+ * worker cannot hold that dictionary and this bot at once.
+ * Ambient speech is overwhelmingly common words; the wide book
+ * still serves the in-page recogniser lane, where the browser
+ * can afford it. The bot fetches the lite book once per process.
+ */
+export const WORDBOOK_URL = 'https://jpn2easy.vercel.app/data/wordbook-lite/manifest.json'
 
 let dictCache: { at: number; dict: ReturnType<typeof buildHeardDict>; wide: boolean } | null = null
 
