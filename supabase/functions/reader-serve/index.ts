@@ -99,6 +99,11 @@ function trimDraftToFit(text: string, max = 1200): string | null {
 const GEN_MODEL_CHAIN = [
   'google/gemma-4-31b-it:free',
   'google/gemma-4-26b-a4b-it:free',
+  // A different provider pool for when Google's free endpoints
+  // rate-limit (2026-11-09: a 429 storm on both Gemmas no-fitted
+  // the first user's Mini App open; chain verified against
+  // OpenRouter's live free catalogue the same day).
+  'nvidia/nemotron-3-ultra-550b-a55b:free',
   'openrouter/free',
 ]
 
@@ -141,7 +146,7 @@ function extractContent(data: unknown): { text: string | null; reason: string } 
   return { text: null, reason: 'bad_response' }
 }
 
-async function generateDraft(band: string, topic: string, chars: number, forbidden: string[], model: string): Promise<{ text: string | null; reason: string }> {
+async function generateDraft(band: string, topic: string, chars: number, forbidden: string[], model: string, targets: string[] = []): Promise<{ text: string | null; reason: string }> {
   const key = Deno.env.get('OPENROUTER_API_KEY') ?? ''
   if (!key) return { text: null, reason: 'no_key' }
   const system =
@@ -151,9 +156,15 @@ async function generateDraft(band: string, topic: string, chars: number, forbidd
   const forbiddenLine = forbidden.length > 0
     ? `\nDo not use any of these words at all: ${forbidden.join('、')}.`
     : ''
+  // Heard Words seeding (Doc 22): the learner's own heard words
+  // are the preferred new-word dose — the passage is written
+  // around the Japanese their life already said to them.
+  const targetLine = targets.length > 0
+    ? `\nThe learner recently heard these words in real life. Work as many of them as fit naturally into the passage: ${targets.join('、')}. They count toward the at-most-8 unknown words.`
+    : ''
   const user =
     `Write a passage of about ${chars} Japanese characters at JLPT ${band} level about: ${topic}. ` +
-    `You may use at most about 8 words that a ${band} learner would not know yet.${forbiddenLine}`
+    `You may use at most about 8 words that a ${band} learner would not know yet.${forbiddenLine}${targetLine}`
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), 20000)
   try {
@@ -325,6 +336,38 @@ serve(async (req: Request) => {
     if (fit) picked = { passage: fit.passage as Record<string, unknown>, ratio: fit.ratio }
   }
 
+  // Heard Words seeding (Doc 22): the learner's heard words
+  // from the last 7 days (aggregated across days), minus the
+  // ones already known, become the foundry's target list —
+  // the bot twin's heardTargets, mirrored. Best-effort: any
+  // failure returns [] and generation proceeds as before.
+  const heardTargets = async (): Promise<string[]> => {
+    try {
+      const jstDay = (daysAgo: number) => new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit',
+      }).format(new Date(Date.now() - daysAgo * 86400000))
+      const { data } = await supabaseAdmin
+        .from('heard_words')
+        .select('item, kind, count')
+        .eq('user_id', userId)
+        .gte('day', jstDay(6))
+      if (!data) return []
+      const totals = new Map<string, { item: string; kind: string; count: number }>()
+      for (const row of data as { item: string; kind: string; count: number }[]) {
+        const cur = totals.get(row.item)
+        if (cur) cur.count += row.count
+        else totals.set(row.item, { item: row.item, kind: row.kind, count: row.count })
+      }
+      return [...totals.values()]
+        .filter((r) => r.kind === 'word' && r.item && !known.has(r.item))
+        .sort((a, b) => b.count - a.count || (a.item < b.item ? -1 : a.item > b.item ? 1 : 0))
+        .slice(0, 8)
+        .map((r) => r.item)
+    } catch {
+      return []
+    }
+  }
+
   let generationAttempted = false
   let genReason: string | null = null
   if (!picked && !cold) {
@@ -343,6 +386,7 @@ serve(async (req: Request) => {
     } else {
       generationAttempted = true
       const topic = topicFor(state, userId)
+      const targets = await heardTargets()
       const chars = GEN_LENGTH_BY_BAND[serveBand] ?? 200
       let forbidden: string[] = []
       let calls = 0
@@ -351,11 +395,18 @@ serve(async (req: Request) => {
       let lastReason: string | null = null
       for (let attempt = 1; attempt <= GEN_MAX_ATTEMPTS; attempt++) {
         lastModel = models[(attempt - 1) % models.length]
-        const { text: draft, reason } = await generateDraft(serveBand, topic, chars, forbidden, lastModel)
+        const { text: draft, reason } = await generateDraft(serveBand, topic, chars, forbidden, lastModel, targets)
         if (draft === null) {
           lastReason = reason
           console.error(`reader-serve: generation attempt ${attempt} produced no draft reason=${reason}`)
           if (reason === 'no_key') break
+          // A 429 is a rate limit, not a refusal: give the pool
+          // a breath before the next attempt instead of burning
+          // the whole chain inside a second (2026-11-09: a 429
+          // storm no-fitted the first user's Mini App open).
+          if (reason === 'http_429' && attempt < GEN_MAX_ATTEMPTS) {
+            await new Promise((r) => setTimeout(r, 1200 * attempt))
+          }
           continue
         }
         calls++
@@ -386,6 +437,7 @@ serve(async (req: Request) => {
           if (insertError) console.error('reader-serve: foundry passage cache insert failed')
           await logEvent('passage_generated', {
             passageId, band: serveBand, topic, attempts: attempt, ratio: Math.round(verdict.ratio * 1000) / 1000, model: lastModel, surface: 'web',
+            seeded: verdict.unknowns.filter((u) => targets.includes(u)).length, seededTargets: targets.length,
           })
           picked = { passage, ratio: verdict.ratio }
           generated = true

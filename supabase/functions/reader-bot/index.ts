@@ -7,7 +7,7 @@ import { JMDICT_COMPOUNDS } from './jmdict-gloss.ts'
 import { segmentText } from './segment.ts'
 import { synthesizeSpeechOgg } from './voice.ts'
 import { READ_ALOUD_PASS_SCORE, firstMissedCandidate, scoreReadAloud } from './score.ts'
-import { HEARD_FLOOR, heardReading, loadHeardDict, matchHeardWords, summariseHeard } from './ambient.ts'
+import { HEARD_FLOOR, heardReading, loadHeardDict, matchHeardWords, selectHeardTargets, summariseHeard } from './ambient.ts'
 import { bt, botFittedFooter, botLevelIntro, botTrialUpCopy, languageFromState, languageFromStateRow, voiceResultKeyboard, type BotLang } from './i18n.ts'
 
 // Yonde Reader bot (Doc 16 §6/§7 R0, Doc 12 step 3.6).
@@ -259,6 +259,11 @@ function trimDraftToFit(text: string, max = 1200): string | null {
 const GEN_MODEL_CHAIN = [
   'google/gemma-4-31b-it:free',
   'google/gemma-4-26b-a4b-it:free',
+  // A different provider pool for when Google's free endpoints
+  // rate-limit (2026-11-09: a 429 storm on both Gemmas no-fitted
+  // the first user's Mini App open; chain verified against
+  // OpenRouter's live free catalogue the same day).
+  'nvidia/nemotron-3-ultra-550b-a55b:free',
   'openrouter/free',
 ]
 
@@ -301,7 +306,7 @@ function extractContent(data: unknown): { text: string | null; reason: string } 
   return { text: null, reason: 'bad_response' }
 }
 
-async function generateDraft(band: string, topic: string, chars: number, forbidden: string[], model: string): Promise<{ text: string | null; reason: string }> {
+async function generateDraft(band: string, topic: string, chars: number, forbidden: string[], model: string, targets: string[] = []): Promise<{ text: string | null; reason: string }> {
   const key = Deno.env.get('OPENROUTER_API_KEY') ?? ''
   if (!key) return { text: null, reason: 'no_key' }
   const system =
@@ -311,9 +316,15 @@ async function generateDraft(band: string, topic: string, chars: number, forbidd
   const forbiddenLine = forbidden.length > 0
     ? `\nDo not use any of these words at all: ${forbidden.join('、')}.`
     : ''
+  // Heard Words seeding (Doc 22): the learner's own heard words
+  // are the preferred new-word dose — the passage is written
+  // around the Japanese their life already said to them.
+  const targetLine = targets.length > 0
+    ? `\nThe learner recently heard these words in real life. Work as many of them as fit naturally into the passage: ${targets.join('、')}. They count toward the at-most-8 unknown words.`
+    : ''
   const user =
     `Write a passage of about ${chars} Japanese characters at JLPT ${band} level about: ${topic}. ` +
-    `You may use at most about 8 words that a ${band} learner would not know yet.${forbiddenLine}`
+    `You may use at most about 8 words that a ${band} learner would not know yet.${forbiddenLine}${targetLine}`
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), 20000)
   try {
@@ -650,6 +661,32 @@ serve(async (req: Request) => {
       return { queue, known, encounters, hasDiagnosis, band, bandSource, basisBand: resolvedBand, joke, pace }
     }
 
+    // Heard Words seeding (Doc 22): the learner's heard words
+    // from the last 7 days (aggregated across days), minus the
+    // ones already known, become the foundry's target list.
+    // Best-effort by construction — any failure returns [] and
+    // generation proceeds exactly as before.
+    const heardTargets = async (userId: string, known: Set<string>): Promise<string[]> => {
+      try {
+        const cutoff = new Date(new Date(`${ambientDay()}T00:00:00Z`).getTime() - 6 * 86400000).toISOString().slice(0, 10)
+        const { data } = await supabaseAdmin
+          .from('heard_words')
+          .select('item, kind, count')
+          .eq('user_id', userId)
+          .gte('day', cutoff)
+        if (!data) return []
+        const totals = new Map<string, { item: string; kind: string; count: number }>()
+        for (const row of data as { item: string; kind: string; count: number }[]) {
+          const cur = totals.get(row.item)
+          if (cur) cur.count += row.count
+          else totals.set(row.item, { item: row.item, kind: row.kind, count: row.count })
+        }
+        return selectHeardTargets([...totals.values()], known)
+      } catch {
+        return []
+      }
+    }
+
     // ---------- R0.5 generation fallback ----------
     // Runs ONLY when the bank pick failed. One sequence per /read,
     // behind a per-user cooldown read from the generation events
@@ -674,6 +711,7 @@ serve(async (req: Request) => {
       }
 
       const topic = topicFor(state, link.user_id)
+      const targets = await heardTargets(link.user_id, known)
       const chars = GEN_LENGTH_BY_BAND[band] ?? 200
       const models = genModels()
       let forbidden: string[] = []
@@ -682,7 +720,7 @@ serve(async (req: Request) => {
       let lastModel = ''
       for (let attempt = 1; attempt <= GEN_MAX_ATTEMPTS; attempt++) {
         lastModel = models[(attempt - 1) % models.length]
-        const { text: draft, reason } = await generateDraft(band, topic, chars, forbidden, lastModel)
+        const { text: draft, reason } = await generateDraft(band, topic, chars, forbidden, lastModel, targets)
         if (draft === null) {
           // Amendment #7: a failed draft CONSUMES the attempt and
           // the loop retries — the old code broke on the first null,
@@ -693,6 +731,13 @@ serve(async (req: Request) => {
           lastReason = reason
           console.error(`reader-bot: generation attempt ${attempt} produced no draft reason=${reason}`)
           if (reason === 'no_key') break
+          // A 429 is a rate limit, not a refusal: give the pool
+          // a breath before the next attempt instead of burning
+          // the whole chain inside a second (2026-11-09: a 429
+          // storm no-fitted the first user's Mini App open).
+          if (reason === 'http_429' && attempt < GEN_MAX_ATTEMPTS) {
+            await new Promise((r) => setTimeout(r, 1200 * attempt))
+          }
           continue
         }
         calls++
@@ -730,6 +775,7 @@ serve(async (req: Request) => {
           if (insertError) console.error('reader-bot: foundry passage cache insert failed')
           await logEvent(link.user_id, 'passage_generated', {
             passageId, band, topic, attempts: attempt, ratio: Math.round(verdict.ratio * 1000) / 1000, model: lastModel,
+            seeded: verdict.unknowns.filter((u) => targets.includes(u)).length, seededTargets: targets.length,
           })
           return { picked: { passage, ratio: verdict.ratio }, attempted: true, reason: null }
         }

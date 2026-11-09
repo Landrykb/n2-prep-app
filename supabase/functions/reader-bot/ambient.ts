@@ -191,6 +191,28 @@ export function heardReading(dict: ReturnType<typeof buildHeardDict>, item: stri
 }
 
 /**
+ * Heard Words → Foundry seeding (Doc 22, the loop between
+ * Hori's two jobs): choose which of the learner's heard words
+ * the next generated passage should be written around.
+ * Words only (expressions are register units, not passage
+ * vocabulary), never a word the learner already knows (it
+ * needs no introduction), most-heard first, capped at the
+ * draft's unknown-word budget. The chosen words ride the
+ * passage's NEW-word dose — hearing becomes reading.
+ */
+export function selectHeardTargets(
+  rows: { item: string; kind: string; count: number }[],
+  known: Set<string>,
+  cap = 8,
+) {
+  return rows
+    .filter((r) => r.kind === 'word' && r.item && !known.has(r.item))
+    .sort((a, b) => b.count - a.count || (a.item < b.item ? -1 : a.item > b.item ? 1 : 0))
+    .slice(0, Math.max(0, cap))
+    .map((r) => r.item)
+}
+
+/**
  * Match a transcript against the dictionary.
  *   returns { counts, matched, total }
  * counts is a Map keyed by the dictionary surface itself, with

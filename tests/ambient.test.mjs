@@ -131,4 +131,21 @@ check('summary: the floor separates sticking words from heard-once words', () =>
   assert.equal(s.distinct, 4)
 })
 
+check('seeding targets: words only, unknown only, most-heard first, capped', () => {
+  const { selectHeardTargets } = ambient
+  const rows = [
+    { item: '納期', kind: 'word', count: 5 },
+    { item: '会議', kind: 'word', count: 9 },
+    { item: '検収', kind: 'word', count: 3 },
+    { item: 'ご査収ください', kind: 'expr', count: 7 },
+    { item: '資料', kind: 'word', count: 3 },
+  ]
+  const known = new Set(['会議'])
+  assert.deepEqual(selectHeardTargets(rows, known), ['納期', '検収', '資料'],
+    'known word and expression excluded; count desc, item asc on ties')
+  assert.deepEqual(selectHeardTargets(rows, known, 2), ['納期', '検収'], 'cap honoured')
+  assert.deepEqual(selectHeardTargets([], known), [], 'no rows, no targets')
+  assert.deepEqual(selectHeardTargets(rows, new Set(['納期', '会議', '検収', '資料'])), [], 'all known, no targets')
+})
+
 console.log(`ambient: ${passed} checks passed`)
