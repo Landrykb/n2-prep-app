@@ -7,7 +7,7 @@ import { JMDICT_COMPOUNDS } from './jmdict-gloss.ts'
 import { segmentText } from './segment.ts'
 import { synthesizeSpeechOgg } from './voice.ts'
 import { READ_ALOUD_PASS_SCORE, firstMissedCandidate, scoreReadAloud } from './score.ts'
-import { HEARD_FLOOR, matchHeardWords, summariseHeard } from './ambient.ts'
+import { HEARD_FLOOR, heardReading, loadHeardDict, matchHeardWords, summariseHeard } from './ambient.ts'
 import { bt, botFittedFooter, botLevelIntro, botTrialUpCopy, languageFromState, languageFromStateRow, voiceResultKeyboard, type BotLang } from './i18n.ts'
 
 // Yonde Reader bot (Doc 16 §6/§7 R0, Doc 12 step 3.6).
@@ -2046,7 +2046,14 @@ serve(async (req: Request) => {
       }
       if (words.length > 0) {
         lines.push(bt(lang, 'ambient.cardSticking', { floor: HEARD_FLOOR }))
-        for (const r of words) lines.push(`${known.has(r.item) ? '·' : '◆'} ${esc(r.item)} ×${r.count}`)
+        // Words carry their reading — hearing a word and later
+        // meeting its kanji is the moment this feature exists for.
+        const dict = await loadHeardDict()
+        for (const r of words) {
+          const reading = heardReading(dict, r.item)
+          const shown = reading && reading !== r.item ? `${r.item}（${reading}）` : r.item
+          lines.push(`${known.has(r.item) ? '·' : '◆'} ${esc(shown)} ×${r.count}`)
+        }
       }
       if (exprs.length > 0) {
         lines.push('', bt(lang, 'ambient.cardExprHead'))
@@ -2137,7 +2144,7 @@ serve(async (req: Request) => {
       try {
         const transcript = await tryTranscribeAmbient(voice)
         if (transcript) {
-          const { counts, matched, total } = matchHeardWords(transcript)
+          const { counts, matched, total } = matchHeardWords(transcript, await loadHeardDict())
           if (counts.size > 0) {
             const existing = await heardRowsFor(session.user_id, day)
             const byItem = new Map(existing.map((r) => [r.item, r]))

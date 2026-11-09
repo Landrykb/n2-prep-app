@@ -3,8 +3,12 @@
 // "Ears that can't remember": this module is the whole privacy
 // architecture in code. It receives a transcript (which the caller
 // discards immediately after this call) and returns ONLY counts of
-// dictionary items — words from the deck / JMdict glossaries the bot
-// already carries, and the curated business expressions below.
+// dictionary items — the curated business expressions below, the
+// deck / JMdict glossaries the bot ships, and the WIDE wordbook:
+// every written form of every entry of the full JMdict, shipped
+// as data (public/data/wordbook.json, built by
+// scripts/build-bot-wordsdb.mjs) and fetched once per process.
+// The names dictionary (JMnedict) is deliberately NOT a source.
 // Text that matches nothing is unrepresentable in the output: there
 // is no field that could hold a name, a company, a figure, or a
 // sentence. That is deliberate — storage bounded by the dictionary
@@ -54,39 +58,123 @@ export const HEARD_FLOOR = 2
 
 const HAN = /\p{Script=Han}/u
 
-let cachedDict: { byFirst: Map<string, string[]>; maxLen: number } | null = null
-
 /**
- * The match dictionary: every surface the matcher may ever return.
- * Built once per process from the three glossaries the bot already
- * ships (deck headwords, deck gloss, JMdict compounds). Entries are
- * bucketed by first character, longest first, so the scan is a
- * longest-match walk over the character stream.
+ * The match dictionary: every surface the matcher may ever return,
+ * mapped to the dictionary item a hearing counts under.
+ *
+ * Sources, first-wins:
+ *   1. the curated glossaries the bot ships (deck headwords, deck
+ *      gloss, JMdict compounds) — a surface they know counts as
+ *      itself, with their curated reading;
+ *   2. the wide wordbook (optional): every headword of the full
+ *      JMdict counts as itself, and every other written form
+ *      (kanji variants, kana forms) counts under its headword —
+ *      so a word heard as のうき lands on 納期, with its reading.
+ *
+ * Buckets are grouped by first character, then by length, so the
+ * scan tries a handful of Set lookups per position instead of
+ * walking a candidate list — that is what keeps a 465k-surface
+ * dictionary cheap to scan.
  */
-export function buildHeardDict() {
-  if (cachedDict) return cachedDict
-  const surfaces = new Set<string>()
-  for (const src of [DECK_LEVELS, DECK_GLOSS, JMDICT_COMPOUNDS]) {
-    for (const key of Object.keys(src as Record<string, unknown>)) {
-      const s = normalizeSpeechText(key)
-      if (s) surfaces.add(s)
+export function buildHeardDict(wordbook?: { heads?: string[]; readings?: string[]; forms?: Record<string, number> } | null) {
+  const itemOf = new Map<string, string>()
+  const readingsOf = new Map<string, string>()
+  const add = (surface: string, item: string) => {
+    const s = normalizeSpeechText(surface)
+    if (!s || itemOf.has(s)) return
+    // Defence in depth for Doc 22 law 3: a pure digit/letter
+    // string is data, not vocabulary — it can never become a
+    // surface or an item, whatever the data source carries.
+    if (/^[0-9a-zA-Z]+$/.test(s)) return
+    const it = normalizeSpeechText(item) || s
+    if (/^[0-9a-zA-Z]+$/.test(it)) return
+    itemOf.set(s, it)
+  }
+  for (const key of Object.keys(DECK_LEVELS)) add(key, key)
+  for (const key of Object.keys(DECK_GLOSS)) add(key, key)
+  for (const key of Object.keys(JMDICT_COMPOUNDS)) add(key, key)
+
+  const heads = Array.isArray(wordbook?.heads) ? wordbook.heads : []
+  const wbReadings = Array.isArray(wordbook?.readings) ? wordbook.readings : []
+  const wbForms = wordbook?.forms && typeof wordbook.forms === 'object' ? wordbook.forms : {}
+  for (let i = 0; i < heads.length; i++) {
+    add(heads[i], heads[i])
+    const item = normalizeSpeechText(heads[i])
+    const reading = wbReadings[i] ? normalizeSpeechText(wbReadings[i]) : ''
+    if (item && reading && reading !== item && !readingsOf.has(item)) readingsOf.set(item, reading)
+  }
+  for (const [surface, idx] of Object.entries(wbForms)) {
+    const head = heads[Number(idx)]
+    if (head) add(surface, head)
+  }
+  // Curated readings win over the wordbook's for the same item.
+  for (const [key, gloss] of Object.entries(DECK_GLOSS)) {
+    const item = normalizeSpeechText(key)
+    const reading = (gloss as { reading?: string })?.reading
+    if (item && reading && reading !== item) readingsOf.set(item, normalizeSpeechText(reading))
+  }
+  for (const [key, pair] of Object.entries(JMDICT_COMPOUNDS)) {
+    const item = normalizeSpeechText(key)
+    const reading = Array.isArray(pair) ? pair[0] : undefined
+    if (item && reading && reading !== item && !readingsOf.has(item)) {
+      readingsOf.set(item, normalizeSpeechText(reading))
     }
   }
-  const byFirst = new Map<string, string[]>()
+
+  const byFirst = new Map<string, Map<number, Set<string>>>()
   let maxLen = 0
-  for (const s of surfaces) {
+  for (const s of itemOf.keys()) {
     const chars = [...s]
+    if (!chars.length) continue
     if (chars.length > maxLen) maxLen = chars.length
-    const first = chars[0]
-    const list = byFirst.get(first)
-    if (list) list.push(s)
-    else byFirst.set(first, [s])
+    let byLen = byFirst.get(chars[0])
+    if (!byLen) { byLen = new Map(); byFirst.set(chars[0], byLen) }
+    let set = byLen.get(chars.length)
+    if (!set) { set = new Set(); byLen.set(chars.length, set) }
+    set.add(s)
   }
-  for (const list of byFirst.values()) {
-    list.sort((a, b) => [...b].length - [...a].length)
+  return {
+    byFirst,
+    itemOf,
+    readingsOf,
+    maxLen,
+    surfaces: new Set(itemOf.keys()),
+    items: new Set(itemOf.values()),
   }
-  cachedDict = { byFirst, maxLen }
-  return cachedDict
+}
+
+/** The wordbook ships as data with the app; the bot fetches it once per process. */
+export const WORDBOOK_URL = 'https://jpn2easy.vercel.app/data/wordbook.json'
+
+let dictCache: { at: number; dict: ReturnType<typeof buildHeardDict>; wide: boolean } | null = null
+
+/**
+ * The production dictionary: the wide wordbook when it can be
+ * fetched, the curated glossaries alone when it cannot (a fetch
+ * failure narrows recognition for a few minutes — it never
+ * breaks a session). Cached per process; a narrow result is
+ * retried after five minutes.
+ */
+export async function loadHeardDict(fetchFn: typeof fetch = fetch) {
+  const now = Date.now()
+  if (dictCache && (dictCache.wide || now - dictCache.at < 5 * 60 * 1000)) return dictCache.dict
+  let wordbook: { heads?: string[]; readings?: string[]; forms?: Record<string, number> } | null = null
+  let wide = false
+  try {
+    const res = await fetchFn(WORDBOOK_URL)
+    if (res.ok) {
+      const parsed = await res.json() as { heads?: string[] }
+      if (Array.isArray(parsed?.heads) && parsed.heads.length > 0) { wordbook = parsed; wide = true }
+    }
+  } catch { wordbook = null }
+  const dict = buildHeardDict(wordbook)
+  dictCache = { at: now, dict, wide }
+  return dict
+}
+
+/** An item's reading for display (word（reading）), or null when none is known. */
+export function heardReading(dict: ReturnType<typeof buildHeardDict>, item: string) {
+  return dict.readingsOf.get(normalizeSpeechText(item)) ?? null
 }
 
 /**
@@ -131,23 +219,27 @@ export function matchHeardWords(text: string, dict = buildHeardDict()) {
     }
   }
 
-  // Word pass — longest-match walk.
+  // Word pass — longest-match walk over the length-grouped
+  // buckets; a hit counts under its dictionary item (a kana form
+  // counts under its kanji headword).
   let matched = 0
   for (let i = 0; i < stream.length; i++) {
     const ch = stream[i]
     if (ch === '\u0000') { matched += 1; continue }
-    const candidates = dict.byFirst.get(ch)
-    if (!candidates) continue
+    const byLen = dict.byFirst.get(ch)
+    if (!byLen) continue
     let consumed = 0
-    for (const cand of candidates) {
-      const chars = [...cand]
-      if (chars.length === 1 && !HAN.test(ch)) continue
-      if (i + chars.length > stream.length) continue
-      let hit = true
-      for (let j = 0; j < chars.length; j++) {
-        if (stream[i + j] !== chars[j]) { hit = false; break }
+    const maxTry = Math.min(dict.maxLen, stream.length - i)
+    for (let len = maxTry; len >= 1; len--) {
+      if (len === 1 && !HAN.test(ch)) break
+      const set = byLen.get(len)
+      if (!set) continue
+      const cand = stream.slice(i, i + len).join('')
+      if (set.has(cand)) {
+        consumed = len
+        bump(dict.itemOf.get(cand) ?? cand, 'word')
+        break
       }
-      if (hit) { consumed = chars.length; bump(cand, 'word'); break }
     }
     if (consumed > 0) { matched += consumed; i += consumed - 1 }
   }

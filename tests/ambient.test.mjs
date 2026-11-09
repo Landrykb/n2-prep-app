@@ -4,26 +4,56 @@
 // adversarial fixture below is its proof: a meeting transcript full
 // of names, companies and figures must yield nothing but dictionary
 // words, because there is no field that could hold anything else.
+//
+// The dictionary under test is the production one: the bot's
+// curated glossaries PLUS the wide wordbook (public/data/
+// wordbook.json — every written form of every full-JMdict entry,
+// mapped to its headword). The names dictionary (JMnedict) is
+// deliberately not a source, and the fixtures pin that.
 
 import assert from 'node:assert'
+import { readFileSync } from 'node:fs'
 
 const ambient = await import('../supabase/functions/reader-bot/ambient.ts')
-const { matchHeardWords, summariseHeard, buildHeardDict, EXPRESSIONS, HEARD_FLOOR } = ambient
+const { matchHeardWords, summariseHeard, buildHeardDict, heardReading, EXPRESSIONS, HEARD_FLOOR } = ambient
 
 let passed = 0
 const check = (name, fn) => { fn(); passed++; console.log(`  ok ${name}`) }
 
-const dict = buildHeardDict()
-const surfaces = new Set()
-for (const list of dict.byFirst.values()) for (const s of list) surfaces.add(s)
+const wordbook = JSON.parse(readFileSync(new URL('../public/data/wordbook.json', import.meta.url), 'utf8'))
+const t0 = Date.now()
+const dict = buildHeardDict(wordbook)
+console.log(`  (wide dictionary built: ${dict.surfaces.size} surfaces in ${Date.now() - t0}ms)`)
+const narrowDict = buildHeardDict()
 
-check('dictionary is real: business words in, names and codenames out', () => {
+check('wide dictionary is real: business words in, names out', () => {
+  assert.ok(dict.surfaces.size > 400_000, 'the wide wordbook should carry 400k+ surfaces')
   for (const w of ['見積', '会議室', '会議', '書類', '確認', '連絡', '資料', '提出']) {
-    assert.ok(surfaces.has(w), `${w} should be matchable`)
+    assert.ok(dict.surfaces.has(w), `${w} should be matchable`)
   }
-  for (const w of ['田中', '山田', '鳳凰']) {
-    assert.ok(!surfaces.has(w), `${w} must NOT be in the dictionary`)
+  for (const w of ['田中', '山田', '鈴木', '佐藤']) {
+    assert.ok(!dict.surfaces.has(w), `${w} is a name — it must NOT be in the dictionary`)
   }
+})
+
+check('the widening lands: words outside the curated glossaries now match', () => {
+  // 納期 was the first real-world miss: absent from the deck, the
+  // glossaries AND JMdict's common subset — present in full JMdict.
+  for (const w of ['納期', '検収', '稟議', '見積書']) {
+    assert.ok(dict.items.has(w), `${w} should be a countable item now`)
+    assert.ok(!narrowDict.items.has(w), `${w} pins the widening: the curated-only fallback must NOT have it`)
+  }
+  const { counts } = matchHeardWords('納期を確認しました。検収と稟議も済ませました。', dict)
+  assert.equal(counts.get('納期')?.count, 1)
+  assert.equal(counts.get('検収')?.count, 1)
+  assert.equal(counts.get('稟議')?.count, 1)
+})
+
+check('a word heard in kana counts under its kanji headword, with a reading', () => {
+  const { counts } = matchHeardWords('のうきが遅れています。のうきの連絡は明日します。', dict)
+  assert.equal(counts.get('納期')?.count, 2, 'のうき hearings land on 納期')
+  assert.equal(heardReading(dict, '納期'), 'のうき')
+  assert.equal(heardReading(dict, '会議'), 'かいぎ')
 })
 
 check('counts repeated dictionary words in a work stretch', () => {
@@ -56,15 +86,18 @@ check('single kana never counts; a single kanji word can', () => {
 })
 
 check('ADVERSARIAL: names, companies, figures and codenames cannot persist', () => {
-  const text = '田中部長は山田商事との会議で、第三四半期の売上高が前年比120パーセントの4億3000万円に達したと報告し、来月から極秘プロジェクト「鳳凰」が始まると発表した。鈴木さんの内線番号は4832番です。'
+  const text = '田中部長は山田商事との会議で、第三四半期の売上高が前年比120パーセントの4億3000万円に達したと報告し、来月から極秘プロジェクト「ZX」が始まると発表した。鈴木さんの内線番号は4832番です。'
   const { counts } = matchHeardWords(text, dict)
   for (const item of counts.keys()) {
-    assert.ok(surfaces.has(item) || EXPRESSIONS.some((e) => e.surface === item),
+    assert.ok(dict.items.has(item) || EXPRESSIONS.some((e) => e.surface === item),
       `stored item ${item} must be a dictionary entry or a curated expression`)
+    assert.ok(!/^[0-9a-zA-Z]+$/.test(item), `stored item ${item} must be a dictionary word, never a bare figure or code from the room (an entry like 第3四半期 carries its own numeral — it is the same word for everyone)`)
   }
-  for (const banned of ['田中', '山田', '鳳凰', '鈴木']) {
+  for (const banned of ['田中', '山田', '鈴木']) {
     assert.ok(!counts.has(banned), `${banned} must not appear in the counts`)
   }
+  assert.ok(!counts.has('120'), 'a bare figure from the room must never become an item (JMdict carries numeric entries — the generator and the matcher both refuse pure digit/letter strings)')
+  assert.ok(counts.has('パーセント'), 'the word around the figure still counts')
   // …and the matcher still did its job on the same text: the
   // ordinary business words inside it are exactly what survives.
   assert.ok(counts.has('会議'), 'the dictionary word inside the sentence still counts')
