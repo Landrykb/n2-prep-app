@@ -126,18 +126,25 @@ export function loadHeardDict({ fetchImpl = fetch, deckEntries = [] } = {}) {
       const manifest = manifestRes.ok ? await manifestRes.json() : null
       const shardNames = Array.isArray(manifest?.shards) ? manifest.shards : []
       if (shardNames.length > 0) {
-        const merged = { heads: [], readings: [], forms: {} }
-        let ok = true
-        for (const name of shardNames) {
+        // Shards fetch in PARALLEL and merge in manifest order —
+        // a first load must never be the reason a press feels
+        // dead (the bot's sequential fetch is its own choice;
+        // the merge result is identical).
+        const shards = await Promise.all(shardNames.map(async (name) => {
           const res = await fetchImpl(`/data/wordbook/${name}`)
-          if (!res.ok) { ok = false; break }
+          if (!res.ok) return null
           const shard = await res.json()
-          if (!Array.isArray(shard?.heads)) { ok = false; break }
-          merged.heads.push(...shard.heads)
-          merged.readings.push(...(shard.readings ?? []))
-          Object.assign(merged.forms, shard.forms ?? {})
+          return Array.isArray(shard?.heads) ? shard : null
+        }))
+        if (shards.every((s) => s)) {
+          const merged = { heads: [], readings: [], forms: {} }
+          for (const shard of shards) {
+            merged.heads.push(...shard.heads)
+            merged.readings.push(...(shard.readings ?? []))
+            Object.assign(merged.forms, shard.forms ?? {})
+          }
+          if (merged.heads.length > 0) wordbook = merged
         }
-        if (ok && merged.heads.length > 0) wordbook = merged
       }
     } catch { wordbook = null }
     return buildHeardDict({ deckEntries, wordbook })

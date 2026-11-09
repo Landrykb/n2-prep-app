@@ -125,7 +125,7 @@ export default function HeardPitch({ variant = 'full' }) {
   }, [])
 
   const auto = useAutoListen({ onFlush: refresh })
-  const autoActive = auto.phase === 'loading' || auto.phase === 'listening'
+  const autoActive = auto.phase === 'listening'
 
   useEffect(() => {
     refresh()
@@ -217,7 +217,7 @@ export default function HeardPitch({ variant = 'full' }) {
   )
 
   // ---------- AUTOMATIC state ----------
-  if (autoActive || auto.phase === 'denied') {
+  if (autoActive || auto.phase === 'interrupted' || auto.phase === 'denied') {
     return (
       <section className="rounded-3xl bg-[#151129] border border-white/5 p-5 sm:p-6 space-y-4">
         {header(
@@ -229,15 +229,19 @@ export default function HeardPitch({ variant = 'full' }) {
             </p>
           ) : null,
         )}
-        {auto.phase === 'loading' && (
-          <p className="text-sm text-slate-300 leading-relaxed">{t('today.heardPitchAutoLoading')}</p>
-        )}
         {auto.phase === 'denied' && (
           <p className="text-sm text-slate-300 leading-relaxed">{t('today.heardPitchAutoDenied')}</p>
         )}
+        {auto.phase === 'interrupted' && (
+          <p className="text-sm text-slate-300 leading-relaxed">{t('today.heardPitchInterrupted')}</p>
+        )}
         {auto.phase === 'listening' && (
           <>
-            {wordBlock(t('today.heardPitchNoWords'))}
+            {auto.dictReady
+              ? wordBlock(t('today.heardPitchNoWords'))
+              : (dispWords.length === 0 && dispExprs.length === 0
+                ? <p className="text-sm text-slate-300 leading-relaxed">{t('today.heardPitchWarming')}</p>
+                : wordBlock(t('today.heardPitchNoWords')))}
             <p className="text-xs text-slate-500 leading-relaxed">{t('today.heardPitchAutoKeep')}</p>
           </>
         )}
@@ -247,17 +251,38 @@ export default function HeardPitch({ variant = 'full' }) {
             <button onClick={auto.stop} className="inline-flex items-center gap-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] transition px-4 py-2.5 text-sm font-semibold text-white">
               {t('today.heardPitchStop')}
             </button>
-          ) : auto.phase === 'denied' ? (
+          ) : auto.phase === 'interrupted' ? (
+            <>
+              <button onClick={auto.start} className="inline-flex items-center gap-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] transition px-4 py-2.5 text-sm font-semibold text-white">
+                {t('today.heardPitchResume')}
+              </button>
+              <button onClick={auto.stop} className="text-sm text-slate-400 hover:text-slate-200 transition">
+                {t('today.heardPitchStop')}
+              </button>
+            </>
+          ) : (
             <a href={BOT_URL} target="_blank" rel="noreferrer" onClick={openLink(BOT_URL)} className="inline-flex items-center gap-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] transition px-4 py-2.5 text-sm font-semibold text-white">
               {t('today.heardPitchCta')}
             </a>
-          ) : (
-            <span className="text-sm text-slate-400">{t('today.heardPitchAutoLoading')}</span>
           )}
         </div>
       </section>
     )
   }
+
+  // The automatic door rides EVERY state when the browser can
+  // listen — a learner whose bot session is open must never be
+  // stuck with only the manual route in front of him (that was
+  // the 2026-11-09 trap: bot session open → panel showed only
+  // bot doors → "make it automatic" had nowhere to tap).
+  const autoDoor = auto.supported ? (
+    <button onClick={auto.start} className="inline-flex items-center gap-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] transition px-4 py-2.5 text-sm font-semibold text-white">
+      {t('today.heardPitchAutoCta')}
+    </button>
+  ) : null
+  const botLinkCls = auto.supported
+    ? 'inline-flex items-center gap-2 rounded-xl border border-white/15 hover:border-white/30 transition px-4 py-2.5 text-sm font-semibold text-slate-200'
+    : 'inline-flex items-center gap-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] transition px-4 py-2.5 text-sm font-semibold text-white'
 
   // ---------- BOT-LIVE state: the Heard Today strip ----------
   if (live && (live.listening || hasAny)) {
@@ -277,7 +302,8 @@ export default function HeardPitch({ variant = 'full' }) {
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           {live.listening ? (
             <>
-              <a href={BOT_CHAT_URL} target="_blank" rel="noreferrer" onClick={openLink(BOT_CHAT_URL)} className="inline-flex items-center gap-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] transition px-4 py-2.5 text-sm font-semibold text-white">
+              {autoDoor}
+              <a href={BOT_CHAT_URL} target="_blank" rel="noreferrer" onClick={openLink(BOT_CHAT_URL)} className={botLinkCls}>
                 {t('today.heardPitchOpenBot')}
               </a>
               <button onClick={stopBot} disabled={stopping} className="text-sm text-slate-400 hover:text-slate-200 transition disabled:opacity-40">
@@ -286,7 +312,8 @@ export default function HeardPitch({ variant = 'full' }) {
             </>
           ) : (
             <>
-              <a href={BOT_URL} target="_blank" rel="noreferrer" onClick={openLink(BOT_URL)} className="inline-flex items-center gap-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] transition px-4 py-2.5 text-sm font-semibold text-white">
+              {autoDoor}
+              <a href={BOT_URL} target="_blank" rel="noreferrer" onClick={openLink(BOT_URL)} className={botLinkCls}>
                 {t('today.heardPitchCta')}
               </a>
               <button onClick={hide} className="ml-auto text-xs text-slate-500 hover:text-slate-300 transition">{t('today.heardPitchHide')}</button>
