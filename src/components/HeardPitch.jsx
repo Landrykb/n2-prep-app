@@ -458,11 +458,15 @@ export default function HeardPitch({ variant = 'full', onReadPassage }) {
   // the strip does not name (title + today's count).
   const strip = (
     <section className="rounded-3xl bg-[#151129] border border-white/5 px-4 py-3">
-      <div className="flex items-center gap-3">
-        <HoriEats size={30} eating={false} gulp={false} />
+      <div className="flex items-center gap-2.5">
+        <HoriEats size={28} eating={false} gulp={false} />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold text-white truncate">{hasAny ? t('today.heardPitchTodayTitle') : t('today.heardPitchTitle')}</p>
-          {hasAny && <p className="text-xs text-slate-400 truncate">{t('today.heardPitchCaught', { n: totalHearings })}</p>}
+          {/* The number is never truncated (his ruling,
+              2026-11-10): a count the user has to guess at is
+              a design flaw — the title is the flexible
+              element, the digits always show whole. */}
+          {hasAny && <p className="text-[13px] text-slate-300 whitespace-nowrap tabular-nums">{t('today.heardPitchCaught', { n: totalHearings })}</p>}
         </div>
         {auto.supported ? (
           <button onClick={() => { setExpanded(true); auto.start() }} className="inline-flex items-center gap-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] transition px-3.5 py-2 text-sm font-semibold text-white shrink-0">
