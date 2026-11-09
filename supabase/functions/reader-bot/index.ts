@@ -7,6 +7,7 @@ import { JMDICT_COMPOUNDS } from './jmdict-gloss.ts'
 import { segmentText } from './segment.ts'
 import { synthesizeSpeechOgg } from './voice.ts'
 import { READ_ALOUD_PASS_SCORE, firstMissedCandidate, scoreReadAloud } from './score.ts'
+import { HEARD_FLOOR, matchHeardWords, summariseHeard } from './ambient.ts'
 import { bt, botFittedFooter, botLevelIntro, botTrialUpCopy, languageFromState, languageFromStateRow, voiceResultKeyboard, type BotLang } from './i18n.ts'
 
 // Yonde Reader bot (Doc 16 §6/§7 R0, Doc 12 step 3.6).
@@ -1986,6 +1987,219 @@ serve(async (req: Request) => {
       }
     }
 
+    // ---------- Heard Words: ambient listening sessions (Doc 22) ----------
+    // A Telegram bot has no ambient microphone: it can only receive
+    // what the learner deliberately records and sends. That platform
+    // limit is the consent mechanism. Inside an open session a voice
+    // note is a listening stretch: it is transcribed, matched
+    // against the dictionary ONLY (ambient.ts — the output cannot
+    // hold a name, a figure or a sentence), counted, and then the
+    // recording is DELETED from the chat and the transcript dropped.
+    // Processed or not, nothing but word counts survives the call.
+    // Day boundaries are Asia/Tokyo in v1 (the cohort is Japan-based).
+    const ambientDay = (d = new Date()) =>
+      new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d)
+
+    const ambientSessionByChat = async (chatId: number) => {
+      const { data } = await supabaseAdmin
+        .from('ambient_sessions')
+        .select('chat_id, user_id, card_message_id, day')
+        .eq('chat_id', chatId)
+        .maybeSingle()
+      return data as { chat_id: number; user_id: string; card_message_id: number | null; day: string } | null
+    }
+
+    const heardRowsFor = async (userId: string, day: string) => {
+      const { data } = await supabaseAdmin
+        .from('heard_words')
+        .select('item, kind, count')
+        .eq('user_id', userId)
+        .eq('day', day)
+      return (data ?? []) as { item: string; kind: string; count: number }[]
+    }
+
+    // The living card: title, the contract in one breath, the
+    // sticking list with the floor applied (Doc 22 law 4 — below-
+    // floor words appear only as a NUMBER, never by name), and the
+    // ◆ legend. ◆ marks words outside the learner's known set.
+    const ambientCardText = async (
+      userId: string,
+      lang: BotLang,
+      link: { user_id: string; declared_band?: string | null; declared_at?: string | null } | null,
+    ) => {
+      const day = ambientDay()
+      const rows = await heardRowsFor(userId, day)
+      const s = summariseHeard(rows)
+      const row = await loadState(userId)
+      const state = (row?.state ?? {}) as Record<string, unknown>
+      const { known } = knownFor(state, declaredOf(link))
+      const lines: string[] = [
+        bt(lang, 'ambient.cardTitle', { date: day }),
+        bt(lang, 'ambient.cardContract'),
+        bt(lang, 'ambient.cardLegend'),
+        '',
+      ]
+      const words = s.sticking.filter((r) => r.kind === 'word').slice(0, 15)
+      const exprs = s.sticking.filter((r) => r.kind === 'expr').slice(0, 8)
+      if (words.length === 0 && exprs.length === 0) {
+        lines.push(bt(lang, 'ambient.cardNoneYet'))
+      }
+      if (words.length > 0) {
+        lines.push(bt(lang, 'ambient.cardSticking', { floor: HEARD_FLOOR }))
+        for (const r of words) lines.push(`${known.has(r.item) ? '·' : '◆'} ${esc(r.item)} ×${r.count}`)
+      }
+      if (exprs.length > 0) {
+        lines.push('', bt(lang, 'ambient.cardExprHead'))
+        for (const r of exprs) lines.push(`◆ ${esc(r.item)} ×${r.count}`)
+      }
+      if (s.onceWords > 0) lines.push('', bt(lang, 'ambient.cardOnce', { n: s.onceWords }))
+      lines.push('', bt(lang, 'ambient.sessionNote'))
+      return lines.join('\n')
+    }
+
+    const refreshAmbientCard = async (
+      chatId: number,
+      session: { user_id: string; card_message_id: number | null },
+      link: { user_id: string; declared_band?: string | null; declared_at?: string | null } | null,
+      lang: BotLang,
+    ) => {
+      const text = await ambientCardText(session.user_id, lang, link)
+      if (session.card_message_id) {
+        const res = await tg(botToken, 'editMessageText', {
+          chat_id: chatId, message_id: session.card_message_id, text, parse_mode: 'HTML',
+        })
+        if (res?.ok) return
+      }
+      const sent = await sendMessage(botToken, chatId, text)
+      const mid = (sent?.result as Record<string, unknown> | undefined)?.message_id
+      if (typeof mid === 'number') {
+        await supabaseAdmin.from('ambient_sessions').update({ card_message_id: mid }).eq('chat_id', chatId)
+      }
+    }
+
+    // Transcription for a listening stretch — the same Groq lane as
+    // the read-aloud proof (amendment #6), with a longer leash:
+    // stretches run minutes, not seconds. Returns the transcript or
+    // null on ANY failure; the caller deletes the recording either
+    // way and the transcript never leaves this invocation.
+    const tryTranscribeAmbient = async (voice: Record<string, unknown>): Promise<string | null> => {
+      const key = Deno.env.get('READER_STT_API_KEY') ?? ''
+      if (!key) return null
+      const fileId = typeof voice.file_id === 'string' ? voice.file_id : ''
+      if (!fileId) return null
+      const ctrl = new AbortController()
+      const timer = setTimeout(() => ctrl.abort(), 120000)
+      try {
+        const info = await tg(botToken, 'getFile', { file_id: fileId })
+        const filePath = info?.result?.file_path
+        if (!info?.ok || typeof filePath !== 'string' || !filePath) return null
+        const fileRes = await fetch(`https://api.telegram.org/file/bot${botToken}/${filePath}`, { signal: ctrl.signal })
+        if (!fileRes.ok) return null
+        const audio = await fileRes.arrayBuffer()
+        if (!audio.byteLength || audio.byteLength > 20 * 1024 * 1024) return null
+        const form = new FormData()
+        form.append('file', new Blob([audio], { type: 'audio/ogg' }), 'voice.ogg')
+        form.append('model', 'whisper-large-v3-turbo')
+        form.append('language', 'ja')
+        form.append('response_format', 'json')
+        const res = await fetch(GROQ_TRANSCRIBE_URL, {
+          method: 'POST',
+          signal: ctrl.signal,
+          headers: { 'Authorization': `Bearer ${key}` },
+          body: form,
+        })
+        if (!res.ok) {
+          console.error(`reader-bot: ambient groq transcription HTTP ${res.status}`)
+          return null
+        }
+        const data = await res.json().catch(() => null)
+        const transcript = typeof data?.text === 'string' ? data.text.trim() : ''
+        return transcript || null
+      } catch {
+        return null
+      } finally {
+        clearTimeout(timer)
+      }
+    }
+
+    const handleAmbientChunk = async (
+      voiceMsg: Record<string, unknown>,
+      session: { chat_id: number; user_id: string; card_message_id: number | null; day: string },
+    ) => {
+      const vChat = (voiceMsg.chat ?? {}) as Record<string, unknown>
+      const chatId = Number(vChat.id)
+      const voice = (voiceMsg.voice ?? {}) as Record<string, unknown>
+      const messageId = Number(voiceMsg.message_id)
+      const link = await linkByChat(chatId)
+      const lang = await langForLink(link)
+      const day = ambientDay()
+      let stats: Record<string, unknown> | null = null
+      try {
+        const transcript = await tryTranscribeAmbient(voice)
+        if (transcript) {
+          const { counts, matched, total } = matchHeardWords(transcript)
+          if (counts.size > 0) {
+            const existing = await heardRowsFor(session.user_id, day)
+            const byItem = new Map(existing.map((r) => [r.item, r]))
+            const upserts = [...counts.entries()].map(([item, c]) => ({
+              user_id: session.user_id,
+              day,
+              item,
+              kind: c.kind,
+              count: (byItem.get(item)?.count ?? 0) + c.count,
+            }))
+            const { error } = await supabaseAdmin
+              .from('heard_words')
+              .upsert(upserts, { onConflict: 'user_id,day,item' })
+            if (error) console.error('reader-bot: heard_words upsert failed')
+          }
+          stats = {
+            seconds: typeof voice.duration === 'number' ? voice.duration : null,
+            matched: counts.size,
+            hearings: [...counts.values()].reduce((n, c) => n + c.count, 0),
+            coverage: total > 0 ? Math.round((matched / total) * 1000) / 1000 : 0,
+            ok: true,
+          }
+        }
+      } catch (err) {
+        console.error('reader-bot: ambient chunk failed', err)
+      }
+      // Counts only — never a word list, never text (Doc 22).
+      await logEvent(session.user_id, 'ambient_chunk', stats ?? { ok: false })
+      // Processed or not, the recording is deleted and the
+      // transcript dies with this invocation. That is the law.
+      await tg(botToken, 'deleteMessage', { chat_id: chatId, message_id: messageId })
+      if (stats?.ok) {
+        const fresh = await ambientSessionByChat(chatId)
+        if (fresh) {
+          if (fresh.day !== day) {
+            await supabaseAdmin
+              .from('ambient_sessions')
+              .update({ day, card_message_id: null })
+              .eq('chat_id', chatId)
+            fresh.day = day
+            fresh.card_message_id = null
+          }
+          await refreshAmbientCard(chatId, fresh, link, lang)
+        }
+      } else {
+        await sendMessage(botToken, chatId, bt(lang, 'ambient.chunkFailed'))
+      }
+    }
+
+    // Returns true when the voice note was a listening stretch
+    // (an ambient session is open on this chat) — the caller then
+    // skips the read-aloud proof entirely.
+    const tryAmbientVoice = async (voiceMsg: Record<string, unknown>): Promise<boolean> => {
+      const vChat = (voiceMsg.chat ?? {}) as Record<string, unknown>
+      const chatId = Number(vChat.id)
+      if (!chatId) return false
+      const session = await ambientSessionByChat(chatId)
+      if (!session) return false
+      await handleAmbientChunk(voiceMsg, session)
+      return true
+    }
+
     const handleVoiceNote = async (voiceMsg: Record<string, unknown>) => {
       const vChat = (voiceMsg.chat ?? {}) as Record<string, unknown>
       const vFrom = (voiceMsg.from ?? {}) as Record<string, unknown>
@@ -2345,7 +2559,12 @@ serve(async (req: Request) => {
     // Voice notes route BEFORE the text gate: a voice message has
     // no .text at all, and it is the read-aloud proof (R2 v1).
     if (msg.voice) {
-      try { await handleVoiceNote(msg) } catch (err) { console.error('reader-bot: voice note handling failed', err) }
+      // An open ambient session claims the voice note first
+      // (Doc 22): inside a session, a voice note is a listening
+      // stretch, never a read-aloud.
+      try {
+        if (!(await tryAmbientVoice(msg))) await handleVoiceNote(msg)
+      } catch (err) { console.error('reader-bot: voice note handling failed', err) }
       return json({ ok: true })
     }
     if (typeof msg.text !== 'string') {
@@ -2498,6 +2717,41 @@ serve(async (req: Request) => {
         const helpLink = await linkByChat(chatId)
         const helpLang = await langForLink(helpLink)
         await sendMessage(botToken, chatId, bt(helpLang, 'help'), { reply_markup: appKeyboard(helpLang) })
+      } else if (cmd === '/listen') {
+        // Heard Words (Doc 22): open a listening session. Linked
+        // chats only — heard words need an account to land in.
+        const link = await linkByChat(chatId)
+        if (!link) {
+          await sendMessage(botToken, chatId, bt(telegramLang(), 'ambient.needLink'))
+        } else {
+          const lang = await langForLink(link)
+          const existing = await ambientSessionByChat(chatId)
+          const day = ambientDay()
+          if (existing && existing.day === day && existing.card_message_id) {
+            await sendMessage(botToken, chatId, bt(lang, 'ambient.alreadyOpen'))
+          } else {
+            await supabaseAdmin
+              .from('ambient_sessions')
+              .upsert(
+                { chat_id: chatId, user_id: link.user_id, card_message_id: null, day, opened_at: new Date().toISOString() },
+                { onConflict: 'chat_id' },
+              )
+            const fresh = await ambientSessionByChat(chatId)
+            if (fresh) await refreshAmbientCard(chatId, fresh, link, lang)
+            await logEvent(link.user_id, 'ambient_session_opened', { day })
+          }
+        }
+      } else if (cmd === '/stop') {
+        const session = await ambientSessionByChat(chatId)
+        if (session) {
+          const link = await linkByChat(chatId)
+          const lang = await langForLink(link)
+          const rows = await heardRowsFor(session.user_id, ambientDay())
+          const s = summariseHeard(rows)
+          await supabaseAdmin.from('ambient_sessions').delete().eq('chat_id', chatId)
+          await logEvent(session.user_id, 'ambient_session_closed', { sticking: s.sticking.length, total: s.totalHearings })
+          await sendMessage(botToken, chatId, bt(lang, 'ambient.closed', { sticking: s.sticking.length, total: s.totalHearings }))
+        }
       } else {
         // Free text (integration audit): any other words from a
         // linked chat are not a command, and dumping the command

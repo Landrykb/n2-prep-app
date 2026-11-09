@@ -69,6 +69,8 @@ Deno.serve(async (req) => {
       { command: 'unlink', description: 'Disconnect this chat from Yonde' },
       { command: 'start', description: 'Link this chat to your Yonde account' },
       { command: 'level', description: 'Tell Hori your level (one tap)' },
+      { command: 'listen', description: 'Heard Words — I keep only the words you hear' },
+      { command: 'stop', description: 'Stop listening (Heard Words session)' },
     ],
   })
   // The chat Menu button is this bot's exact door (integration
