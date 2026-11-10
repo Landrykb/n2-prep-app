@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../hooks/useAuth.js'
 import { Eye, EyeOff, Loader2, X } from 'lucide-react'
 import { brand } from '../lib/brand.js'
-import { bridgeTelegramSession, getTelegramInitData } from '../lib/telegramAuth.js'
+import { bridgeTelegramSession, getTelegramInitData, reportTelegramDiag } from '../lib/telegramAuth.js'
 import { supabase } from '../lib/supabaseClient.js'
 import { useLanguage } from '../hooks/useLanguage.js'
 import Mascot from './Mascot.jsx'
@@ -34,13 +34,25 @@ export default function AuthModal({ variant = 'gate', initialMode = 'signin', on
   // deliberate, retryable form of the same act.
   const [tgBusy, setTgBusy] = useState(false)
   const [tgError, setTgError] = useState('')
+  // The button shows whenever Telegram's own object is present,
+  // not only when launch data was captured: on 2026-11-11 the
+  // owner's Mini App sat on this wall with NO button at all —
+  // the launch-data capture came up empty in his webview, which
+  // hid the one retry (and the one error line) that could have
+  // named the failure. The force-run re-reads the launch data
+  // at tap time, so the button is both the fix attempt and the
+  // diagnosis.
   const inTelegram = getTelegramInitData().length > 0
+    || (typeof window !== 'undefined' && !!window.Telegram?.WebApp)
   const signInWithTelegram = async () => {
     setTgBusy(true)
     setTgError('')
     try {
       const status = await bridgeTelegramSession({ client: supabase, force: true })
-      if (status !== 'bridged' && status !== 'already') setTgError(status)
+      if (status !== 'bridged' && status !== 'already') {
+        setTgError(status)
+        reportTelegramDiag({ stage: `button:${status}` })
+      }
       // On success the session lands via onAuthStateChange and the
       // gate lifts on its own — nothing else to do here.
     } catch {
