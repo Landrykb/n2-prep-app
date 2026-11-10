@@ -1601,15 +1601,25 @@ const botI18n = await import('../supabase/functions/reader-bot/i18n.ts')
     )
     assert.equal(
       botFittedFooter('en', { bandSource: 'diagnosis', band: 'N2', pct: 95, newWordCount: 3 }),
-      'Fitted to your N2 level and your queue: about 95% of its words should already be familiar (an estimate) · 3 new words',
+      'Fitted to your N2 level and your queue · ~95% familiar (est.) · 3 new words',
     )
     assert.equal(
       botFittedFooter('en', { bandSource: 'declared', band: 'N3', pct: 94, newWordCount: 1, fitStep: 1, basisBand: 'N3', newKanjiCount: 1, recycledBatch: true }),
-      'Fitted to the N3 you told me and your queue: about 94% of its words should already be familiar (an estimate) · 1 new word' +
-        '\nYour checkup in Yonde sharpens this whenever you want it.' +
-        '\nStretching you a little past N3 today — Push Me works both ways: Too Hard brings us back.' +
-        '\n1 kanji here is new to you — it is in the readings block, and it will keep coming back until it is yours.' +
-        '\nThis one practises the batch you are learning now — the same words again, in new sentences, until they are yours.',
+      'Fitted to the N3 you told me and your queue · ~94% familiar (est.) · 1 new word' +
+        ' · the checkup sharpens this' +
+        ' · stretching past N3 today' +
+        ' · 1 new kanji ↓' +
+        ' · practises your current batch',
+    )
+    // Micro style (2026-11-11): the everyday footer after the
+    // learn-once sends — per-passage facts on one line.
+    assert.equal(
+      botFittedFooter('en', { bandSource: 'diagnosis', band: 'N2', pct: 95, newWordCount: 0, newKanjiCount: 14, style: 'micro' }),
+      'N2 · ~95% · 0 new words · 14 new kanji ↓',
+    )
+    assert.equal(
+      botFittedFooter('en', { bandSource: 'none', band: 'N4', pct: 93, newWordCount: 2, style: 'micro' }),
+      'Queue · ~93% · 2 new words',
     )
   })
 
@@ -1621,7 +1631,7 @@ const botI18n = await import('../supabase/functions/reader-bot/i18n.ts')
     const composed = `${passageText}\n\n${footer}\n\n${bt('fr', 'voice.instruction')}`
     assert.ok(footer.startsWith('Ajusté à ton niveau N2'), 'FR footer names the basis')
     assert.ok(footer.includes('3 nouveaux mots'), 'FR footer counts the new words')
-    assert.ok(footer.includes('2 kanji ici sont nouveaux pour toi'), 'FR footer carries the dose line')
+    assert.ok(footer.includes('2 kanji nouveaux ↓'), 'FR footer carries the dose line')
     assert.ok(bt('fr', 'voice.instruction').includes('maintiens le bouton microphone'), 'FR instruction teaches the gesture')
     assert.ok(composed.includes(passageText), 'the Japanese passage text is byte-identical inside the FR message')
     assert.equal(bt('ja', 'voice.instruction').includes('マイクボタン'), true, 'JA instruction teaches the gesture')

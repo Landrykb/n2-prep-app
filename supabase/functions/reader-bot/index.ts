@@ -1321,6 +1321,25 @@ serve(async (req: Request) => {
       // skip both lines: their footer already explains that no fit
       // was measured. botFittedFooter (i18n.ts) composes all of
       // this in the learner's language from the same facts.
+      // Footer cadence (2026-11-11, the owner's ruling: this
+      // explanation is learn-once information — "user might
+      // need to know this only once or on a few occasions").
+      // The FULL footer rides the first three fitted sends
+      // and every tenth after that; every other send gets
+      // the one-line micro footer (band · ~pct · new words
+      // · new kanji). The count is the learner's prior
+      // passage_sent total, read before this send logs its
+      // own.
+      let footerStyle = 'full'
+      if (!coldStart) {
+        const { count: priorSends } = await supabaseAdmin
+          .from('metrics_events')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', link.user_id)
+          .eq('type', 'passage_sent')
+        const n = priorSends ?? 0
+        footerStyle = n < 3 || n % 10 === 9 ? 'full' : 'micro'
+      }
       const footerText = coldStart
         ? bt(lang, 'starter.footer')
         : botFittedFooter(lang, {
@@ -1333,6 +1352,7 @@ serve(async (req: Request) => {
           basisBand,
           newKanjiCount: newKanji.length,
           recycledBatch,
+          style: footerStyle,
         })
       // Kanji readings breakdown (amendment #9): EVERY kanji-bearing
       // word in the passage, not just the new words — a word can be

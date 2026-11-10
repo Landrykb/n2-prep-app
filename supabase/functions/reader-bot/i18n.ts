@@ -48,20 +48,22 @@ const en: Record<string, string> = {
   'feedback.pushMax': 'Already at full stretch',
   'feedback.pushing': '🔥 Pushing you',
   'feedback.stepBack': 'Stepping back to your level',
-  'footer.checkupLine': '\nYour checkup in Yonde sharpens this whenever you want it.',
-  'footer.declared': 'Fitted to the {band} you told me and your queue: about {pct}% of its words should already be familiar (an estimate) · {words}',
-  'footer.declaredJoke': 'Fitted from the very beginning — your N7+ 😂 tap — and your queue: about {pct}% of its words should already be familiar (an estimate) · {words}',
-  'footer.defaultBandLine': '\nBand N4 is a gentle default — take the 10-minute checkup in Yonde and I will fit to your real level.',
-  'footer.diagnosis': 'Fitted to your {band} level and your queue: about {pct}% of its words should already be familiar (an estimate) · {words}',
-  'footer.foundationsLine': '\nFrom the bases, at an easy pace — we climb when your reads get comfortable, a little slower than usual.',
-  'footer.newKanjiMany': '\n{count} kanji here are new to you — they\'re in the readings block, and they\'ll keep coming back until they\'re yours.',
-  'footer.newKanjiOne': '\n1 kanji here is new to you — it is in the readings block, and it will keep coming back until it is yours.',
+  'footer.checkupLine': ' · the checkup sharpens this',
+  'footer.declared': 'Fitted to the {band} you told me and your queue · ~{pct}% familiar (est.) · {words}',
+  'footer.declaredJoke': 'Fitted from the very beginning (your N7+ 😂 tap) and your queue · ~{pct}% familiar (est.) · {words}',
+  'footer.defaultBandLine': ' · N4 is a gentle default — the checkup fits your real level',
+  'footer.diagnosis': 'Fitted to your {band} level and your queue · ~{pct}% familiar (est.) · {words}',
+  'footer.microBand': '{band} · ~{pct}% · {words}',
+  'footer.microQueue': 'Queue · ~{pct}% · {words}',
+  'footer.foundationsLine': ' · foundations pace',
+  'footer.newKanjiMany': ' · {count} new kanji ↓',
+  'footer.newKanjiOne': ' · 1 new kanji ↓',
   'footer.newWordOne': '{count} new word',
   'footer.newWordsMany': '{count} new words',
-  'footer.queue': 'Fitted to your queue: about {pct}% of its words should already be familiar (an estimate) · {words}',
-  'footer.recycled': '\nThis one practises the batch you are learning now — the same words again, in new sentences, until they are yours.',
-  'footer.stepGentler': '\nKeeping it a notch gentler than {band} while it settles.',
-  'footer.stepStretch': '\nStretching you a little past {band} today — Push Me works both ways: Too Hard brings us back.',
+  'footer.queue': 'Fitted to your queue · ~{pct}% familiar (est.) · {words}',
+  'footer.recycled': ' · practises your current batch',
+  'footer.stepGentler': ' · a notch gentler than {band}',
+  'footer.stepStretch': ' · stretching past {band} today',
   'help': 'Here is what I do:\n/read — a passage fitted to your words\n/app — open Yonde: sessions, the checkup, Koe\'s calls\n/level — tell me your level in one tap\n/unlink — disconnect this chat\n/listen — hear the room with you: I keep only the dictionary words you hear today\n🎙 Voice read: after a passage, hold the microphone button, read it out loud, and let go to send — I listen and answer with your reading match.\nReading when you feel like it is the whole design — no streaks, no nagging.',
   'level.ask': '🔍 One thing first — I do not know your level yet, and I fit every passage to it.\nTap yours and reading starts now. No forms, no homework: this tap is just where we start, and your checkup in Yonde is the sharper measure whenever you want it.',
   'level.bandToast': '{band} — got it.',
@@ -162,20 +164,22 @@ const fr: Record<string, string> = {
   'feedback.pushMax': 'Déjà au maximum de l\'étirement',
   'feedback.pushing': '🔥 Je te pousse',
   'feedback.stepBack': 'Retour à ton niveau',
-  'footer.checkupLine': '\nTon bilan dans Yonde précisera cela quand tu le voudras.',
-  'footer.declared': 'Ajusté au {band} que tu m\'as indiqué et à ta file : environ {pct}% de ses mots devraient déjà t\'être familiers (une estimation) · {words}',
-  'footer.declaredJoke': 'Ajusté depuis le tout début — ton toucher N7+ 😂 — et ta file : environ {pct}% de ses mots devraient déjà t\'être familiers (une estimation) · {words}',
-  'footer.defaultBandLine': '\nLe niveau N4 est un point de départ doux — fais le bilan de 10 minutes dans Yonde et je m\'ajusterai à ton vrai niveau.',
-  'footer.diagnosis': 'Ajusté à ton niveau {band} et à ta file : environ {pct}% de ses mots devraient déjà t\'être familiers (une estimation) · {words}',
-  'footer.foundationsLine': '\nDepuis les bases, à un rythme facile — on montera quand tes lectures deviendront confortables, un peu plus lentement que d\'habitude.',
-  'footer.newKanjiMany': '\n{count} kanji ici sont nouveaux pour toi — ils sont dans le bloc des lectures, et ils reviendront jusqu\'à ce qu\'ils soient à toi.',
-  'footer.newKanjiOne': '\n1 kanji ici est nouveau pour toi — il est dans le bloc des lectures, et il reviendra jusqu\'à ce qu\'il soit à toi.',
+  'footer.checkupLine': ' · le bilan précise cela',
+  'footer.declared': 'Ajusté au {band} que tu m\'as indiqué et à ta file · ~{pct}% familier (est.) · {words}',
+  'footer.declaredJoke': 'Ajusté depuis le tout début (ton toucher N7+ 😂) et ta file · ~{pct}% familier (est.) · {words}',
+  'footer.defaultBandLine': ' · N4 par défaut — le bilan ajuste à ton vrai niveau',
+  'footer.diagnosis': 'Ajusté à ton niveau {band} et à ta file · ~{pct}% familier (est.) · {words}',
+  'footer.microBand': '{band} · ~{pct}% · {words}',
+  'footer.microQueue': 'File · ~{pct}% · {words}',
+  'footer.foundationsLine': ' · rythme fondations',
+  'footer.newKanjiMany': ' · {count} kanji nouveaux ↓',
+  'footer.newKanjiOne': ' · 1 kanji nouveau ↓',
   'footer.newWordOne': '{count} nouveau mot',
   'footer.newWordsMany': '{count} nouveaux mots',
-  'footer.queue': 'Ajusté à ta file : environ {pct}% de ses mots devraient déjà t\'être familiers (une estimation) · {words}',
-  'footer.recycled': '\nCelui-ci entraîne le lot que tu apprends en ce moment — les mêmes mots, dans de nouvelles phrases, jusqu\'à ce qu\'ils soient à toi.',
-  'footer.stepGentler': '\nOn reste un cran plus doux que {band} pendant que ça se stabilise.',
-  'footer.stepStretch': '\nAujourd\'hui, je te pousse un peu au-delà de {band} — Push Me fonctionne dans les deux sens : Too Hard nous ramène.',
+  'footer.queue': 'Ajusté à ta file · ~{pct}% familier (est.) · {words}',
+  'footer.recycled': ' · entraîne ton lot actuel',
+  'footer.stepGentler': ' · un cran plus doux que {band}',
+  'footer.stepStretch': ' · un cran au-delà de {band} aujourd\'hui',
   'help': 'Voici ce que je fais :\n/read — un texte ajusté à tes mots\n/app — ouvrir Yonde : séances, bilan et appels de Koe\n/level — me dire ton niveau en un toucher\n/unlink — déconnecter ce chat\n/listen — écouter la pièce avec toi : je ne garde que les mots du dictionnaire que tu entends aujourd’hui\n🎙 Lecture à voix haute : après un texte, maintiens le bouton microphone, lis-le à voix haute, puis relâche pour envoyer — j\'écoute et je te réponds avec ta correspondance de lecture.\nLire quand tu en as envie, c\'est tout le principe — ni séries ni rappels insistants.',
   'level.ask': '🔍 Une chose d\'abord — je ne connais pas encore ton niveau, et j\'ajuste chaque texte en fonction de lui.\nTouche le tien et la lecture commence tout de suite. Ni formulaire ni devoir : ce toucher est simplement notre point de départ, et ton bilan dans Yonde restera la mesure la plus précise quand tu le voudras.',
   'level.bandToast': '{band} — compris.',
@@ -276,20 +280,22 @@ const ja: Record<string, string> = {
   'feedback.pushMax': 'すでに最大まで進んでいます',
   'feedback.pushing': '🔥 先へ進めます',
   'feedback.stepBack': 'あなたのレベルに戻します',
-  'footer.checkupLine': '\nYondeのチェックアップで、いつでもこれをもっと正確にできます。',
-  'footer.declared': 'あなたが教えてくれた{band}と、あなたのキューに合わせました： 単語の約{pct}%は、すでに知っているはずです（推定） · {words}',
-  'footer.declaredJoke': 'いちばん最初から — あなたのN7+ 😂のタップから — と、あなたのキューに合わせました： 単語の約{pct}%は、すでに知っているはずです（推定） · {words}',
-  'footer.defaultBandLine': '\nN4はやさしい初期値です — Yondeで10分のチェックアップを受けると、本当のレベルに合わせます。',
-  'footer.diagnosis': 'あなたの{band}レベルとキューに合わせました： 単語の約{pct}%は、すでに知っているはずです（推定） · {words}',
-  'footer.foundationsLine': '\n基礎から、やさしいペースで — 読みが無理なくできるようになったら、普段より少しゆっくり上がっていきます。',
-  'footer.newKanjiMany': '\nここに、あなたにとって新しい漢字が{count}つあります — 読み方のブロックにあり、あなたのものになるまで何度も戻ってきます。',
-  'footer.newKanjiOne': '\nここに、あなたにとって新しい漢字が1つあります — 読み方のブロックにあり、あなたのものになるまで何度も戻ってきます。',
+  'footer.checkupLine': ' · チェックアップで精度アップ',
+  'footer.declared': 'あなたが教えてくれた{band}とキューに合わせました · 約{pct}%は既知（推定） · {words}',
+  'footer.declaredJoke': 'いちばん最初から（あなたのN7+ 😂タップ）とキューに合わせました · 約{pct}%は既知（推定） · {words}',
+  'footer.defaultBandLine': ' · 既定はN4 — チェックアップで実力に合わせます',
+  'footer.diagnosis': 'あなたの{band}レベルとキューに合わせました · 約{pct}%は既知（推定） · {words}',
+  'footer.microBand': '{band} · 約{pct}% · {words}',
+  'footer.microQueue': 'キュー · 約{pct}% · {words}',
+  'footer.foundationsLine': ' · 基礎ペース',
+  'footer.newKanjiMany': ' · 新しい漢字{count}つ ↓',
+  'footer.newKanjiOne': ' · 新しい漢字1つ ↓',
   'footer.newWordOne': '{count}つの新しい単語',
   'footer.newWordsMany': '{count}つの新しい単語',
-  'footer.queue': 'あなたのキューに合わせました： 単語の約{pct}%は、すでに知っているはずです（推定） · {words}',
-  'footer.recycled': '\nこれは、今学んでいるまとまりの練習です — 同じ単語を、新しい文の中で、あなたのものになるまで。',
-  'footer.stepGentler': '\n落ち着くまで、{band}より1段階やさしく保ちます。',
-  'footer.stepStretch': '\n今日は{band}より少し先へ進みます — Push Meは双方向です： Too Hardで戻ります。',
+  'footer.queue': 'あなたのキューに合わせました · 約{pct}%は既知（推定） · {words}',
+  'footer.recycled': ' · 今のまとまりの復習',
+  'footer.stepGentler': ' · {band}より一段やさしく',
+  'footer.stepStretch': ' · 今日は{band}より少し先へ',
   'help': 'できることはこれです。\n/read — あなたの単語に合わせたテキスト\n/app — Yondeを開く：セッション、チェックアップ、Koeの電話\n/level — タップ1つでレベルを伝える\n/unlink — このチャットの連携を切る\n/listen — 部屋の音を一緒に聞く：今日聞いた辞書の単語だけを残します\n🎙 音声で読む：テキストのあと、マイクボタンを長押しして全文を声に出して読み、離して送ってください。聞き取って、読み取りの一致度を返します。\n読みたいときに読むのがすべてです。連続記録も催促もありません。',
   'level.ask': '🔍 まず1つだけ — あなたのレベルがまだ分かりません。すべてのテキストを、そのレベルに合わせて選んでいます。\nあなたのレベルをタップすると、すぐに読み始められます。フォームも宿題もありません。このタップが始める場所で、もっと正確な測定がほしいときは、Yondeのチェックアップがいつでも使えます。',
   'level.bandToast': '{band} — 了解です。',
@@ -417,10 +423,36 @@ export function botFittedFooter(
     basisBand?: string | null
     newKanjiCount?: number
     recycledBatch?: boolean
+    style?: string
   },
 ): string {
   const words = botNewWordsLabel(lang, opts.newWordCount)
   const vars = { band: opts.band, pct: opts.pct, words }
+  // Micro style (2026-11-11, the owner's ruling: the fitted
+  // explanation is learn-once information — "user might need
+  // to know this only once or on a few occasions"). After the
+  // first sends, the footer shrinks to the per-passage facts
+  // on one line: band · ~pct · new words, plus whichever of
+  // the step / new-kanji / recycled fragments apply. The full
+  // style below carries the explanation and returns on the
+  // cadence handleRead chooses (first three sends, then
+  // every tenth).
+  if (opts.style === 'micro') {
+    let micro = opts.bandSource === 'none'
+      ? bt(lang, 'footer.microQueue', vars)
+      : bt(lang, 'footer.microBand', vars)
+    const mStep = opts.fitStep ?? 0
+    if (mStep !== 0) {
+      micro += bt(lang, mStep > 0 ? 'footer.stepStretch' : 'footer.stepGentler', {
+        band: opts.basisBand ?? opts.band,
+      })
+    }
+    const mKanji = opts.newKanjiCount ?? 0
+    if (mKanji === 1) micro += bt(lang, 'footer.newKanjiOne')
+    else if (mKanji > 1) micro += bt(lang, 'footer.newKanjiMany', { count: mKanji })
+    if (opts.recycledBatch) micro += bt(lang, 'footer.recycled')
+    return micro
+  }
   let out = opts.bandSource === 'diagnosis'
     ? bt(lang, 'footer.diagnosis', vars)
     : opts.bandSource === 'declared' && opts.joke
