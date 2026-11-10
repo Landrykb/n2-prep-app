@@ -6,7 +6,7 @@ import { initStateSync, stopStateSync } from '../lib/stateSync.js'
 import { pullRemoteMetrics } from '../lib/metrics.js'
 import { adoptAnonKeys } from '../lib/anonMerge.js'
 import { syncCallWindows } from '../lib/callSync.js'
-import { bridgeTelegramSession, getTelegramInitData } from '../lib/telegramAuth.js'
+import { bridgeTelegramSession, getTelegramInitData, reportTelegramDiag } from '../lib/telegramAuth.js'
 import { loadGuestChoice, saveGuestChoice } from '../lib/guest.js'
 
 export const AuthProvider = ({ children }) => {
@@ -47,19 +47,28 @@ export const AuthProvider = ({ children }) => {
       // to the account this Telegram chat is linked to. With no
       // initData, this branch is skipped and bootstrap is exactly
       // the ordinary getSession path.
-      if (getTelegramInitData()) {
+      const tgInitData = getTelegramInitData()
+      if (tgInitData) {
         const status = await bridgeTelegramSession({
           client: supabase,
           currentSession,
         })
         if (!active) return
         setTelegramBridgeStatus(status)
+        if (status !== 'bridged' && status !== 'already') {
+          reportTelegramDiag({ stage: status, initData: tgInitData })
+        }
         if (status === 'bridged' || status === 'already') {
           const refreshed = await supabase.auth.getSession()
           if (!active) return
           currentSession = refreshed.data.session
         }
-}
+      } else if (globalThis.window?.Telegram?.WebApp) {
+        // Telegram is present but handed the app no launch data:
+        // the one case the bridge cannot even attempt — report
+        // it so the failure has a name (telegram_auth_diag).
+        reportTelegramDiag({ stage: 'no-initdata' })
+      }
 
       if (active) {
         setSession(currentSession)

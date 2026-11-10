@@ -1313,6 +1313,21 @@ await checkAsync('telegram initData: the production validator accepts the known 
   assert.equal(result.authDate, 1700000000)
 })
 
+await checkAsync('telegram initData: a signature field rides along without breaking the HMAC', async () => {
+  // Newer Telegram clients attach an Ed25519 `signature` field
+  // that is not part of the HMAC data-check-string: the same
+  // signed payload plus that field must still validate (the
+  // 2026-11-11 Mini App sign-in regression).
+  const withSignature = `${TELEGRAM_INIT_DATA}&signature=AAAABBBBCCCCDDDD`
+  const result = await telegramValidate.validateTelegramInitData(
+    withSignature,
+    TELEGRAM_TEST_TOKEN,
+    TELEGRAM_NOW,
+  )
+  assert.equal(result.ok, true)
+  assert.equal(result.telegramUserId, 123456789)
+})
+
 await checkAsync('telegram initData: altered signed content fails the HMAC', async () => {
   const altered = TELEGRAM_INIT_DATA.replace('%22Test%22', '%22Best%22')
   const result = await telegramValidate.validateTelegramInitData(

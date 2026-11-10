@@ -110,8 +110,8 @@ export async function validateTelegramInitData(
     return { ok: false, reason: 'future' }
   }
 
-  const dataCheckString = entries
-    .filter(([key]) => key !== 'hash')
+  const checkString = (excluded: Set<string>) => entries
+    .filter(([key]) => !excluded.has(key))
     .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
     .map(([key, value]) => `${key}=${value}`)
     .join('\n')
@@ -120,8 +120,24 @@ export async function validateTelegramInitData(
   // the literal string "WebAppData" over the bot token; initData's
   // hash is HMAC-SHA256 of the data-check-string under that secret.
   const secretKey = await hmacSha256(encoder.encode('WebAppData'), botToken)
-  const expectedHash = hexEncode(await hmacSha256(secretKey, dataCheckString))
-  if (!constantTimeEqual(suppliedHash.toLowerCase(), expectedHash)) {
+  const supplied = suppliedHash.toLowerCase()
+  const expectedHash = hexEncode(await hmacSha256(secretKey, checkString(new Set(['hash']))))
+  let signatureOk = constantTimeEqual(supplied, expectedHash)
+  if (!signatureOk && params.has('signature')) {
+    // Telegram's newer clients attach an Ed25519 `signature`
+    // field (Bot API 8.0+, third-party validation) that is NOT
+    // part of the HMAC data-check-string — a validator that
+    // folds it in rejects every launch from those clients
+    // (bad_signature at the wall: the Mini App stopped riding
+    // the linked Telegram account, reported 2026-11-11; it had
+    // worked on 2026-11-07). Accept the hash computed either
+    // way: both strings are HMACs under the same bot-token
+    // secret, so accepting the signature-excluded variant
+    // weakens nothing — an attacker can forge neither.
+    const expectedNoSig = hexEncode(await hmacSha256(secretKey, checkString(new Set(['hash', 'signature']))))
+    signatureOk = constantTimeEqual(supplied, expectedNoSig)
+  }
+  if (!signatureOk) {
     return { ok: false, reason: 'bad_signature' }
   }
 

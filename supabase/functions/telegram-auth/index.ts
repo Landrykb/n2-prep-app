@@ -76,8 +76,51 @@ serve(async (req: Request) => {
     auth: { persistSession: false },
   })
 
+  // Diag telemetry (migration 00027, 2026-11-11): stage words
+  // and booleans only — never initData, never token material.
+  // Written from the diagOnly branch below and from this
+  // function's own failure exits, so a broken bridge reports
+  // WHICH stage failed even when the client cannot.
+  const writeDiag = async (payload: Record<string, unknown>) => {
+    try {
+      await supabaseAdmin.from('telegram_auth_diag').insert({ payload })
+    } catch { /* telemetry never fails the door */ }
+  }
+
   const validation = await validateTelegramInitData(body?.initData, botToken)
+
+  // --- diagOnly: the client reports its bridge stage and what
+  // its side of the webview saw; the function answers with its
+  // own verdict on the same initData (validation + link), all
+  // recorded server-side for the operator.
+  if (body?.diagOnly === true) {
+    const client = (body.diag ?? {}) as Record<string, unknown>
+    let linkFound: boolean | null = null
+    if (validation.ok) {
+      const { data } = await supabaseAdmin
+        .from('telegram_links')
+        .select('user_id')
+        .or(`telegram_user_id.eq.${validation.telegramUserId},chat_id.eq.${validation.telegramUserId}`)
+        .not('linked_at', 'is', null)
+        .limit(1)
+      linkFound = !!(data && data.length > 0)
+    }
+    await writeDiag({
+      client: {
+        stage: typeof client.stage === 'string' ? client.stage.slice(0, 60) : null,
+        hasWebApp: client.hasWebApp === true,
+        initDataLen: typeof client.initDataLen === 'number' ? client.initDataLen : null,
+        hashHasTgData: client.hashHasTgData === true,
+        platform: typeof client.platform === 'string' ? client.platform.slice(0, 20) : null,
+      },
+      validation: validation.ok ? 'ok' : validation.reason,
+      linkFound,
+    })
+    return json({ ok: true })
+  }
+
   if (!validation.ok) {
+    await writeDiag({ client: { stage: 'exchange' }, validation: validation.reason, linkFound: null })
     return json({ error: 'invalid_init_data' }, 401)
   }
 
@@ -206,6 +249,7 @@ serve(async (req: Request) => {
     const email = existing?.user?.email
     if (userError || !existing?.user || existing.user.id !== userId || !email) {
       console.error('telegram-auth: account could not be resolved')
+      await writeDiag({ client: { stage: 'exchange' }, validation: 'ok', linkFound: true, exchange: 'account_unavailable' })
       return json({ error: 'account_unavailable' }, 500)
     }
 
@@ -216,6 +260,7 @@ serve(async (req: Request) => {
     const tokenHash = generated?.properties?.hashed_token
     if (linkError || !generated?.user || generated.user.id !== userId || !tokenHash) {
       console.error('telegram-auth: session exchange could not be created')
+      await writeDiag({ client: { stage: 'exchange' }, validation: 'ok', linkFound: true, exchange: 'session_unavailable' })
       return json({ error: 'session_unavailable' }, 500)
     }
 
@@ -225,6 +270,7 @@ serve(async (req: Request) => {
     return json({ ok: true, token_hash: tokenHash, user_id: userId, is_new: isNew })
   } catch {
     console.error('telegram-auth: exchange failed')
+    await writeDiag({ client: { stage: 'exchange' }, validation: 'ok', linkFound: null, exchange: 'exception' })
     return json({ error: 'Service unavailable' }, 500)
   }
 })

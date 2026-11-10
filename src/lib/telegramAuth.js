@@ -189,6 +189,29 @@ export function bridgeTelegramSession(options = {}) {
   return bridgePromise
 }
 
+// Diag beacon (2026-11-11): when the bridge does not land, the
+// client tells the function what ITS side saw — the bridge stage
+// word plus environment booleans (is the Telegram object there,
+// did the launch fragment carry data, how long is initData).
+// Stage words and booleans only; the function validates the
+// initData independently and records the pair server-side
+// (telegram_auth_diag, migration 00027). Fire-and-forget:
+// diagnostics never break the app.
+export function reportTelegramDiag({ stage, initData } = {}) {
+  try {
+    const webApp = globalThis.window?.Telegram?.WebApp
+    const data = typeof initData === 'string' ? initData : getTelegramInitData()
+    const diag = {
+      stage: typeof stage === 'string' ? stage : 'unknown',
+      hasWebApp: !!webApp,
+      initDataLen: data ? data.length : 0,
+      hashHasTgData: (globalThis.window?.location?.hash ?? '').includes('tgWebAppData'),
+      platform: typeof webApp?.platform === 'string' ? webApp.platform : null,
+    }
+    telegramAuthPost({ initData: data || undefined, diagOnly: true, diag }).catch(() => {})
+  } catch { /* diagnostics never break the app */ }
+}
+
 // --- Link management (v3, Landry's design 2026-11-07) -----------
 // The button in the app does three jobs against the same door:
 // sign in (bridgeTelegramSession above), report the link state,

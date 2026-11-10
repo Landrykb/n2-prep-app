@@ -785,6 +785,7 @@ serve(async (req: Request) => {
       state: Record<string, unknown>,
       known: Set<string>,
       band: string,
+      maxAttempts: number = GEN_MAX_ATTEMPTS,
     ): Promise<{ picked: { passage: Record<string, unknown>; ratio: number } | null; attempted: boolean; reason: string | null }> => {
       const since = new Date(Date.now() - GEN_COOLDOWN_MS).toISOString()
       const { data: recentGen } = await supabaseAdmin
@@ -816,7 +817,7 @@ serve(async (req: Request) => {
       let calls = 0
       let lastReason: string | null = null
       let lastModel = ''
-      for (let attempt = 1; attempt <= GEN_MAX_ATTEMPTS; attempt++) {
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         lastModel = models[(attempt - 1 + modelOffset) % models.length]
         const { text: draft, reason } = await generateDraft(band, topic, chars, forbidden, lastModel, targets)
         if (draft === null) {
@@ -833,7 +834,7 @@ serve(async (req: Request) => {
           // a breath before the next attempt instead of burning
           // the whole chain inside a second (2026-11-09: a 429
           // storm no-fitted the first user's Mini App open).
-          if (reason === 'http_429' && attempt < GEN_MAX_ATTEMPTS) {
+          if (reason === 'http_429' && attempt < maxAttempts) {
             await new Promise((r) => setTimeout(r, 1200 * attempt))
           }
           continue
@@ -1006,7 +1007,7 @@ serve(async (req: Request) => {
     // morning is diagnosable from metrics alone instead of silent.
     const handleRead = async (
       chatId: number,
-      opts: { declaredBand?: string | null; declaredAt?: string | null; fromLevelTap?: boolean; forceStarter?: boolean; kind?: string; againPassageId?: string; lang?: BotLang } = {},
+      opts: { declaredBand?: string | null; declaredAt?: string | null; fromLevelTap?: boolean; forceStarter?: boolean; kind?: string; againPassageId?: string; lang?: BotLang; interactive?: boolean } = {},
     ): Promise<string> => {
       const link = await linkByChat(chatId)
       if (!link) {
@@ -1150,6 +1151,31 @@ serve(async (req: Request) => {
           : pickPassage(bank, known, serveBand, recentIds, fitOpts)
         if (fit) picked = { passage: fit.passage as Record<string, unknown>, ratio: fit.ratio }
       }
+      // Interactive serves (a tap is waiting: /read, Next
+      // Passage, Push Me, the level doors) show a working note
+      // the moment the slow part starts — generation can burn
+      // the better part of a minute in the free-model lottery,
+      // and a silent bot reads as a dead button (the owner's
+      // 2026-11-11 report: "Next passage does not fire
+      // anything", ~51 s of nothing before the reply landed).
+      // The note is deleted at every exit below; interactive
+      // serves also get a shorter generation budget (3
+      // attempts) — a person is watching this clock, while
+      // the morning dispatch keeps the full six.
+      let workingMsgId: number | null = null
+      const clearWorking = async () => {
+        if (workingMsgId === null) return
+        const id = workingMsgId
+        workingMsgId = null
+        try {
+          await tg(botToken, 'deleteMessage', { chat_id: chatId, message_id: id })
+        } catch { /* the note is furniture; never fail a serve over it */ }
+      }
+      if (opts.interactive && !picked && !cold) {
+        const noteRes = await sendMessage(botToken, chatId, bt(lang, 'read.working')) as Record<string, unknown> | null
+        const mid = (noteRes?.message_id ?? (noteRes?.result as Record<string, unknown> | undefined)?.message_id) as number | undefined
+        if (typeof mid === 'number') workingMsgId = mid
+      }
       let genOutcome: { attempted: boolean; reason: string | null } = { attempted: false, reason: null }
       if (!picked && !cold) {
         // R0.5: fitted generation — the bank was never written to
@@ -1159,7 +1185,7 @@ serve(async (req: Request) => {
         // cold: generation validates drafts against the known set,
         // and against ~nothing every verdict is meaningless — the
         // spend buys rejections, not passages.
-        const gen = await tryGenerate(link, state, known, serveBand)
+        const gen = await tryGenerate(link, state, known, serveBand, opts.interactive ? 3 : GEN_MAX_ATTEMPTS)
         genOutcome = { attempted: gen.attempted, reason: gen.reason }
         if (gen.picked) picked = gen.picked
       }
@@ -1218,6 +1244,7 @@ serve(async (req: Request) => {
             }
           }
           if (!picked) {
+            await clearWorking()
             await logEvent(link.user_id, 'passage_heldback', {
               passageId: String(againPassage.id),
               kind: opts.kind ?? 'read',
@@ -1238,6 +1265,7 @@ serve(async (req: Request) => {
           }
         }
         if (!picked && queue.length === 0) {
+          await clearWorking()
           await sendMessage(
             botToken,
             chatId,
@@ -1264,6 +1292,7 @@ serve(async (req: Request) => {
         if (!cold && bandSource === 'none') noFit += bt(lang, 'checkup.switch')
         // Exact door: the copy names a study session as the way
         // forward, so the button lands on the session itself.
+        await clearWorking()
         await sendMessage(botToken, chatId, noFit, { reply_markup: appKeyboard(lang, [], 'session') })
         return 'nofit_gate'
         }
@@ -1449,6 +1478,7 @@ serve(async (req: Request) => {
       if (opts.kind === 'morning') {
         await sendMessage(botToken, chatId, bt(lang, 'morning.greeting'))
       }
+      await clearWorking()
       await sendMessage(botToken, chatId, lines.join('\n'), extra)
       // Voice out: the passage as a voice note, AFTER the text —
       // hearing it is also the model for the learner's own read-
@@ -1525,7 +1555,7 @@ serve(async (req: Request) => {
         return
       }
       await answer('')
-      await handleRead(chatId, { lang: await langForUser(link.user_id) })
+      await handleRead(chatId, { lang: await langForUser(link.user_id), interactive: true })
     }
 
     // ---------- voice-result actions (amendment #15) ----------
@@ -1551,7 +1581,7 @@ serve(async (req: Request) => {
         return
       }
       await answer('')
-      await handleRead(chatId, { lang: await langForUser(link.user_id) })
+      await handleRead(chatId, { lang: await langForUser(link.user_id), interactive: true })
     }
 
     const handleVoicePush = async (cb: Record<string, unknown>) => {
@@ -1617,7 +1647,7 @@ serve(async (req: Request) => {
         return
       }
       await answer(bt(lang, 'feedback.pushing'))
-      await handleRead(chatId, { lang })
+      await handleRead(chatId, { lang, interactive: true })
     }
 
     // ---------- mine callback ----------
@@ -3114,7 +3144,7 @@ serve(async (req: Request) => {
           }
         }
       } else if (cmd === '/read') {
-        await handleRead(chatId)
+        await handleRead(chatId, { interactive: true })
       } else if (cmd === '/app') {
         // The typed door (amendment #7): the whole app, one tap —
         // the chat stays the reading shelf; sessions, the checkup
