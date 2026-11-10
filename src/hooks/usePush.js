@@ -21,6 +21,7 @@ export function usePush() {
   const { user } = useAuth()
   const [supported] = useState(() => typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window && !!publicKey)
   const [subscribed, setSubscribed] = useState(false)
+  const [saveFailed, setSaveFailed] = useState(false)
   const [permission, setPermission] = useState(getNotificationPermission())
 
   useEffect(() => {
@@ -50,7 +51,16 @@ export function usePush() {
           applicationServerKey: urlBase64ToUint8Array(publicKey),
         })
       }
-      await savePushSubscription(user.id, sub.toJSON())
+      const saved = await savePushSubscription(user.id, sub.toJSON())
+      if (!saved) {
+        // The browser subscription exists but the server has no
+        // row, so nothing could ever be delivered — never claim
+        // "on" for that (the exact lie the card told until
+        // 2026-11-11).
+        setSaveFailed(true)
+        return false
+      }
+      setSaveFailed(false)
       setSubscribed(true)
       return true
     } catch (err) {
@@ -93,5 +103,5 @@ export function usePush() {
     return data
   }
 
-  return { supported, subscribed, permission, subscribe, unsubscribe, requestPermission, sendTest, sendPushFromApp }
+  return { supported, subscribed, saveFailed, permission, subscribe, unsubscribe, requestPermission, sendTest, sendPushFromApp }
 }

@@ -5,7 +5,7 @@ import { useLanguage } from '../hooks/useLanguage.js'
 
 export default function NotificationCard() {
   const { t } = useLanguage()
-  const { supported, subscribed, permission, subscribe, unsubscribe, sendTest } = usePush()
+  const { supported, subscribed, saveFailed, permission, subscribe, unsubscribe, sendTest } = usePush()
   const [loading, setLoading] = useState(false)
 
   if (!supported) {
@@ -58,6 +58,7 @@ export default function NotificationCard() {
           {subscribed ? t('notify.turnOff') : needsPermission ? t('notify.blocked') : t('notify.allow')}
         </button>
       </div>
+      {saveFailed && <p className="text-xs text-rose-300">{t('notify.saveFailed')}</p>}
     </div>
   )
 }

@@ -1182,21 +1182,62 @@ serve(async (req: Request) => {
           : null
         if (recentFit) {
           const againPassage = recentFit.passage as Record<string, unknown>
-          await sendMessage(
-            botToken,
-            chatId,
-            bt(lang, 'nofit.recent', {
-              topic: esc(String(againPassage.topic || bt(lang, 'passage.defaultTopic'))),
-            }),
-            {
-              reply_markup: appKeyboard(lang, [
-                [{ text: bt(lang, 'nofit.readAgainButton'), callback_data: `again:${String(againPassage.id)}` }],
-              ], 'session'),
-            },
-          )
-          return 'nofit_recent'
+          // Morning anti-repeat (2026-11-11): the card below is
+          // the right answer to a /read the learner ASKED for,
+          // but as a proactive morning message it must never
+          // repeat verbatim — the owner received this identical
+          // card on consecutive mornings while generation kept
+          // failing. Morning rule: the card goes out at most
+          // once per passage per three days; after that the
+          // held passage itself is served as a re-read (a real
+          // passage beats a repeated apology), and if it was
+          // already re-served within three days the morning
+          // stays silent rather than nagging a third time.
+          if (opts.kind === 'morning') {
+            const since = new Date(Date.now() - 3 * 86400000).toISOString()
+            const { data: cardRows } = await supabaseAdmin
+              .from('metrics_events')
+              .select('id')
+              .eq('user_id', link.user_id)
+              .eq('type', 'passage_heldback')
+              .eq('payload->>passageId', String(againPassage.id))
+              .gte('created_at', since)
+              .limit(1)
+            if (cardRows && cardRows.length > 0) {
+              const { data: servedRows } = await supabaseAdmin
+                .from('metrics_events')
+                .select('id')
+                .eq('user_id', link.user_id)
+                .eq('type', 'passage_sent')
+                .eq('payload->>passageId', String(againPassage.id))
+                .gte('created_at', since)
+                .limit(1)
+              if (servedRows && servedRows.length > 0) return 'nofit_recent_repeat'
+              picked = { passage: againPassage, ratio: recentFit.ratio }
+              again = true
+            }
+          }
+          if (!picked) {
+            await logEvent(link.user_id, 'passage_heldback', {
+              passageId: String(againPassage.id),
+              kind: opts.kind ?? 'read',
+            })
+            await sendMessage(
+              botToken,
+              chatId,
+              bt(lang, 'nofit.recent', {
+                topic: esc(String(againPassage.topic || bt(lang, 'passage.defaultTopic'))),
+              }),
+              {
+                reply_markup: appKeyboard(lang, [
+                  [{ text: bt(lang, 'nofit.readAgainButton'), callback_data: `again:${String(againPassage.id)}` }],
+                ], 'session'),
+              },
+            )
+            return 'nofit_recent'
+          }
         }
-        if (queue.length === 0) {
+        if (!picked && queue.length === 0) {
           await sendMessage(
             botToken,
             chatId,
@@ -1214,6 +1255,7 @@ serve(async (req: Request) => {
         // switch that turns level-fitting on; the starter track
         // above already covers the truly cold, and a declared
         // learner already has a basis.)
+        if (!picked) {
         let noFit = bt(lang, 'nofit.base')
         if (genOutcome.attempted && genOutcome.reason !== 'cooldown') {
           noFit += bt(lang, 'nofit.generated')
@@ -1224,6 +1266,7 @@ serve(async (req: Request) => {
         // forward, so the button lands on the session itself.
         await sendMessage(botToken, chatId, noFit, { reply_markup: appKeyboard(lang, [], 'session') })
         return 'nofit_gate'
+        }
       }
 
       const passage = picked.passage as Record<string, unknown>

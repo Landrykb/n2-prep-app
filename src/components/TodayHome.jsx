@@ -85,6 +85,7 @@ import { OnboardingFlow, ProofLadderView } from './ProblemStart.jsx'
 import ProgressCard from './ProgressCard.jsx'
 import { useLanguage } from '../hooks/useLanguage.js'
 import NotificationCard from './NotificationCard.jsx'
+import PushAsk from './PushAsk.jsx'
 
 const WEEK_KEY = 'jpn:week:v1'
 const MAX_NEW = 10
@@ -359,6 +360,8 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
           </div>
         )}
       </section>
+
+      <PushAsk />
 
       <ProofLadderView diagnosis={diagnosis} profile={profile} />
 

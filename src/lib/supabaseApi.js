@@ -22,14 +22,24 @@ export async function setUserProgress(userId, { streak, daily, anki, mocks, sett
 }
 
 export async function savePushSubscription(userId, subscription) {
-  if (!supabase || !userId || !subscription?.endpoint) return
+  // Returns whether the row actually landed. It console.error'd
+  // and returned undefined until 2026-11-11, while the settings
+  // card read the LOCAL browser subscription and showed "on" —
+  // the server held zero rows (the upsert itself was failing on
+  // a missing updated_at column, migration 00026), so no push
+  // could ever be delivered. Callers now fail honestly.
+  if (!supabase || !userId || !subscription?.endpoint) return false
   const { error } = await supabase.from('push_subscriptions').upsert({
     user_id: userId,
     endpoint: subscription.endpoint,
     keys: subscription.keys,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'user_id,endpoint' })
-  if (error) console.error('savePushSubscription error:', error)
+  if (error) {
+    console.error('savePushSubscription error:', error)
+    return false
+  }
+  return true
 }
 
 export async function deletePushSubscription(userId, endpoint) {
