@@ -2813,7 +2813,32 @@ serve(async (req: Request) => {
             .eq('payload->>kind', 'morning')
             .gte('created_at', dayStartUtc)
             .limit(1)
-          if (checkRows && checkRows.length > 0) sent++
+          if (checkRows && checkRows.length > 0) {
+            sent++
+            // Web Push mirror (2026-11-10): the same morning
+            // passage also pings the learner's PWA subscriptions
+            // through push-send, so the passage reaches the phone
+            // even with Telegram muted or closed. Fire-and-forget
+            // by design: a push failure never marks the morning
+            // unsent (the Telegram send above is the delivery of
+            // record) and never breaks the dispatch loop.
+            try {
+              const pushSecret = Deno.env.get('PUSH_ADMIN_SECRET') ?? ''
+              if (pushSecret) {
+                const lang = await langForLink(link)
+                const copy = {
+                  en: { title: 'Yonde Reader — your morning passage', body: 'Hori fitted a short passage to your level. It is waiting in Telegram and on your reading side in the app.' },
+                  fr: { title: 'Yonde Reader — votre passage du matin', body: 'Hori a préparé un court passage à votre niveau. Il vous attend dans Telegram et sur votre page de lecture.' },
+                  ja: { title: 'Yonde Reader — 朝の課題文', body: 'あなたのレベルに合わせた短い文章を用意しました。Telegramとアプリの読解ページで待っています。' },
+                }[lang]
+                await fetch(`${Deno.env.get('SUPABASE_URL') ?? ''}/functions/v1/push-send`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': pushSecret, apikey: Deno.env.get('SUPABASE_ANON_KEY') ?? '' },
+                  body: JSON.stringify({ user_id: link.user_id, title: copy.title, body: copy.body, url: '/#reader', tag: 'morning-passage' }),
+                })
+              }
+            } catch { /* mirror only — dispatch stands on the Telegram send */ }
+          }
         } catch (err) {
           console.error('reader-bot: dispatch serve failed for one learner', err)
         }

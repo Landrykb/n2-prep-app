@@ -69,11 +69,14 @@ serve(async (req: Request) => {
 
     let userId: string | null = null
     const providedAdminSecret = req.headers.get('X-Admin-Secret') ?? ''
+    // The body is parsed ONCE, below: the previous shape read it
+    // in the admin branch and again for the payload fields, and
+    // the second read throws (body already consumed) — every
+    // admin-secret send (the call scheduler's route) died as a
+    // 500 before reaching a single subscription.
+    const isAdmin = !!providedAdminSecret && providedAdminSecret === adminSecret
 
-    if (providedAdminSecret && providedAdminSecret === adminSecret) {
-      const body = await req.json()
-      userId = body.user_id ?? null
-    } else {
+    if (!isAdmin) {
       const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
       if (userError || !user) {
         return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
@@ -82,7 +85,7 @@ serve(async (req: Request) => {
     }
 
     const { title = 'Yonde — a light few minutes, when you are ready', body = 'Your fleet kept today small on purpose. One short session is waiting whenever you are — no pile, no pressure.', url = '/', tag = 'study-reminder', user_id, kind, slotId, slotDate, slotIdx } = await req.json()
-    if (providedAdminSecret) userId = user_id ?? userId
+    if (isAdmin) userId = user_id ?? null
     if (typeof title !== 'string' || title.length > 120 || typeof body !== 'string' || body.length > 240) {
       return new Response(JSON.stringify({ error: 'Invalid title or body' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
