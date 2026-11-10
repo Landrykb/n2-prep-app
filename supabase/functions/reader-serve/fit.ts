@@ -655,8 +655,15 @@ export function voiceReadWindow(chars, durationSec) {
   return { expectedSec, minSec, maxSec, plausible }
 }
 
-/** The morning send window: [morning_time, morning_time + 30min). */
-export const DISPATCH_WINDOW_MIN = 30
+/** The morning send window: [morning_time, morning_time + 90min).
+ *  Widened 30 → 90 on 2026-11-10 after the silent-mornings
+ *  diagnosis: the cron ticks every 30 minutes, so a 30-minute
+ *  window gave each morning exactly ONE tick — and when that
+ *  serve ran past pg_net's timeout or the free models failed,
+ *  the morning was silently lost. Ninety minutes gives the
+ *  07:30 / 08:00 / 08:30 ticks three chances; the
+ *  sentMorningToday dedupe still guarantees one passage. */
+export const DISPATCH_WINDOW_MIN = 90
 
 /**
  * Is this linked learner due their morning passage?

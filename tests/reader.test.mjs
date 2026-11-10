@@ -823,15 +823,16 @@ check('voice proof trace: a plausible voice read counts ONCE, through the tap ma
   assert.equal(fit.voiceReadWindow(390, 10).plausible, false)
 })
 
-check('isDispatchDue: inside [morning, morning+30min) is due; the edges behave', () => {
+check('isDispatchDue: inside [morning, morning+90min) is due; the edges behave', () => {
   const base = { morningMinutes: 450, sentMorningToday: false } // 07:30
   assert.equal(fit.isDispatchDue({ ...base, nowMinutes: 450 }), true) // the minute itself
   assert.equal(fit.isDispatchDue({ ...base, nowMinutes: 465.5 }), true) // mid-window, fractional
-  assert.equal(fit.isDispatchDue({ ...base, nowMinutes: 479.99 }), true)
-  assert.equal(fit.isDispatchDue({ ...base, nowMinutes: 480 }), false) // window end is exclusive
+  assert.equal(fit.isDispatchDue({ ...base, nowMinutes: 480 }), true) // the 08:00 tick retries
+  assert.equal(fit.isDispatchDue({ ...base, nowMinutes: 539.99 }), true)
+  assert.equal(fit.isDispatchDue({ ...base, nowMinutes: 540 }), false) // window end is exclusive
   assert.equal(fit.isDispatchDue({ ...base, nowMinutes: 449.99 }), false) // not yet
   assert.equal(fit.isDispatchDue({ ...base, nowMinutes: 600 }), false) // long past
-  assert.equal(fit.DISPATCH_WINDOW_MIN, 30)
+  assert.equal(fit.DISPATCH_WINDOW_MIN, 90)
 })
 
 check('isDispatchDue: an already-sent morning blocks the day; junk inputs never dispatch', () => {
