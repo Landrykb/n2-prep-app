@@ -42,6 +42,16 @@ export function getTelegramInitData(source) {
   return capturedHashInitData
 }
 
+// Capture at module evaluation, before React mounts and any
+// router effect can rewrite the fragment (2026-11-11: the lazy
+// first-read capture could lose the race; module load cannot —
+// this module is imported by the entry chain). The WebApp copy
+// is preferred whenever the SDK is present; this is the copy of
+// last resort for launches where the SDK never appears.
+try {
+  capturedHashInitData = initDataFromUrlHash(globalThis.window?.location?.hash ?? '')
+} catch { /* non-browser contexts keep the lazy path */ }
+
 // The pure bridge decision, kept separate so the phase2 suite can
 // pin it without a browser, Telegram, or a network:
 //   no signed launch       → do nothing (ordinary web behaviour)
