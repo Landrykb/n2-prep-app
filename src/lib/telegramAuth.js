@@ -209,7 +209,17 @@ export function bridgeTelegramSession(options = {}) {
 // keyed off the very signals that were missing.
 export function telegramDoorPresent() {
   try {
-    if (globalThis.window?.Telegram?.WebApp) return true
+    const wa = globalThis.window?.Telegram?.WebApp
+    // The SDK object ALONE is not evidence: since the CSP fix
+    // let telegram-web-app.js load everywhere, the object now
+    // exists in plain browsers too — with platform 'unknown'
+    // and empty initData (Landry's Safari screenshot,
+    // 2026-11-11: a Telegram button in Safari that can never
+    // work, because the signed identity exists only inside a
+    // real Telegram launch). A real launch carries a real
+    // platform ('ios', 'android', 'tdesktop', …) or data.
+    if (wa && typeof wa.initData === 'string' && wa.initData) return true
+    if (wa && typeof wa.platform === 'string' && wa.platform && wa.platform !== 'unknown') return true
     if ((globalThis.window?.location?.search ?? '').includes('tg=')) return true
     if ((globalThis.window?.location?.hash ?? '').includes('tgWebAppData')) return true
   } catch { /* non-browser contexts: not a door */ }
