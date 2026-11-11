@@ -119,21 +119,23 @@ export function computeSixtyDayPromise(diagnosis, profile) {
     const next = ORDER[idx + 1]
     const nextLevel = jlptLevel(next)
     kind = 'next-level'
-    height = `Pass ${next} (JLPT ${nextLevel.passMark}/180, every section ≥ ${nextLevel.sectionMin}/60)`
+    height = `Pass ${next} — ${nextLevel.passMark}/180 · every section ≥ ${nextLevel.sectionMin}/60`
     heightKey = { key: 'promise.height.nextLevel', vars: { next, passMark: nextLevel.passMark, sectionMin: nextLevel.sectionMin } }
-    reasoning.push(`Your checkup estimates you at ${diagnosis.jlptEstimate} with ${total}/180 — ${gapToPass <= 0 ? 'already at/above' : `within ${gapToPass} points of`} the ${diagnosis.jlptEstimate} pass mark (${passMark}), so ${diagnosis.jlptEstimate} is treated as your base, not your ceiling.`)
+    reasoning.push(gapToPass <= 0
+      ? `Checkup: ${diagnosis.jlptEstimate} at ${total}/180 — already at the ${passMark} pass mark. ${diagnosis.jlptEstimate} is your base, not your ceiling.`
+      : `Checkup: ${diagnosis.jlptEstimate} at ${total}/180 — ${gapToPass} points from the ${passMark} pass mark. ${diagnosis.jlptEstimate} is your base, not your ceiling.`)
     reasoningKeys.push(gapToPass <= 0
       ? { key: 'promise.reason.baseAt', vars: { level: diagnosis.jlptEstimate, total, passMark } }
       : { key: 'promise.reason.baseWithin', vars: { level: diagnosis.jlptEstimate, total, passMark, gap: gapToPass } })
-    reasoning.push(`No section is under the ${level.sectionMin}/60 survival line (weakest: ${weakestLabel} ${weakestScore}/60) and your strongest section is ${strongest}/60 — that strength is a latent base that transfers upward when the input is pitched one level up.`)
+    reasoning.push(`No section under the ${level.sectionMin}/60 survival line (weakest: ${weakestLabel} ${weakestScore}/60); strongest is ${strongest}/60 — a base that transfers upward.`)
     reasoningKeys.push({ key: 'promise.reason.strength', vars: { sectionMin: level.sectionMin, weakestLabel: sectionLabelSpec, weakestScore, strongest } })
-    reasoning.push(`So the honest 60-day height is the next rung, ${next} — trained at ${next} for technique, with input from ${next} and above, and sat only when practice mocks clear it with margin.`)
+    reasoning.push(`So the height is the next rung: ${next}. Train at ${next} — and sit the real one only when mocks clear it with margin.`)
     reasoningKeys.push({ key: 'promise.reason.nextRung', vars: { next } })
-    plan.push(`Daily: the One Session — one scene, your cards, one listening bite, all pitched at ${next}.`)
+    plan.push(`Daily · One Session at ${next} — one scene, your cards, one listening bite`)
     planKeys.push({ key: 'promise.plan.dailyNext', vars: { next } })
-    plan.push(`Weakest first: ${weakestLabel} (${weakestScore}/60) gets the extra 15 minutes until it is safely over 30/60 in practice.`)
+    plan.push(`Weakest first · ${weakestLabel} (${weakestScore}/60) gets +15 min until it is over 30/60`)
     planKeys.push({ key: 'promise.plan.weakestFirst', vars: { weakestLabel: sectionLabelSpec, weakestScore } })
-    plan.push(`Day 30 and Day 55: timed ${next} mocks. Day-60 rule: book the real ${next} only if mocks sit ≥ ${nextLevel.passMark + 15}/180 with every section ≥ 30/60 — margin, not luck.`)
+    plan.push(`Day 30 · 55 · Timed ${next} mocks — book the real one only at ≥ ${nextLevel.passMark + 15}/180, every section ≥ 30/60`)
     planKeys.push({ key: 'promise.plan.mocksNext', vars: { next, target: nextLevel.passMark + 15 } })
   } else {
     kind = idx >= ORDER.length - 1 ? 'n1-margin' : 'rescue'
@@ -142,28 +144,28 @@ export function computeSixtyDayPromise(diagnosis, profile) {
     const lifeLower = life.text.charAt(0).toLowerCase() + life.text.slice(1)
     const lifeVar = life.key ? { key: life.key, lower: true } : lifeLower
     height = kind === 'n1-margin'
-      ? `N1 with real margin — mocks at ${passMark + 15}+/180 — plus: ${lifeLower}`
-      : `${diagnosis.jlptEstimate} secured — pass mark ${passMark}/180 with margin, ${weakestLabel} rescued — plus: ${lifeLower}`
+      ? `N1 with margin — mocks at ${passMark + 15}+/180 · plus: ${lifeLower}`
+      : `${diagnosis.jlptEstimate} secured — ${passMark}/180 with margin · ${weakestLabel} rescued · plus: ${lifeLower}`
     heightKey = kind === 'n1-margin'
       ? { key: 'promise.height.n1Margin', vars: { target: passMark + 15, life: lifeVar } }
       : { key: 'promise.height.rescue', vars: { level: diagnosis.jlptEstimate, passMark, weakestLabel: sectionLabelSpec, life: lifeVar } }
     if (anyBelowLine) {
-      reasoning.push(`Your checkup estimates ${diagnosis.jlptEstimate} at ${total}/180, but ${weakestLabel} is ${weakestScore}/60 — under the ${level.sectionMin}/60 survival line. One section under the line fails the whole exam, so the next level is NOT the honest promise yet; rescuing this section is.`)
+      reasoning.push(`Checkup: ${diagnosis.jlptEstimate} at ${total}/180 — but ${weakestLabel} is ${weakestScore}/60, under the ${level.sectionMin}/60 survival line. One section under the line fails the whole exam, so the promise is rescuing it first.`)
       reasoningKeys.push({ key: 'promise.reason.belowLine', vars: { level: diagnosis.jlptEstimate, total, weakestLabel: sectionLabelSpec, weakestScore, sectionMin: level.sectionMin } })
     } else if (gapToPass > 10) {
-      reasoning.push(`Your checkup estimates ${total}/180 against the ${diagnosis.jlptEstimate} pass mark of ${passMark} — a gap of ${gapToPass} points. Sixty days closes that gap at this level far more reliably than it buys the next level as well, so this level, secured with margin, is the honest promise.`)
+      reasoning.push(`Checkup: ${total}/180 against a ${passMark} pass mark — a ${gapToPass}-point gap. Sixty days closes it here far more surely than it also buys the next level.`)
       reasoningKeys.push({ key: 'promise.reason.gap', vars: { total, level: diagnosis.jlptEstimate, passMark, gap: gapToPass } })
     } else {
-      reasoning.push(`Your checkup estimates ${diagnosis.jlptEstimate} at ${total}/180 with ${weakestLabel} weakest at ${weakestScore}/60 and no section showing the 36+/60 latent strength that makes a level jump realistic in 60 days — so this level, secured, is the honest promise.`)
+      reasoning.push(`Checkup: ${diagnosis.jlptEstimate} at ${total}/180, weakest ${weakestLabel} ${weakestScore}/60 — no section shows the 36+/60 strength that makes a jump realistic in 60 days. Securing this level is the promise.`)
       reasoningKeys.push({ key: 'promise.reason.noStrength', vars: { level: diagnosis.jlptEstimate, total, weakestLabel: sectionLabelSpec, weakestScore } })
     }
     reasoning.push(`And because exam dates are only twice a year, the height includes one you can prove any week: ${lifeLower}.`)
     reasoningKeys.push({ key: 'promise.reason.lifeProof', vars: { life: lifeVar } })
-    plan.push(`Daily: the One Session, pitched at ${diagnosis.jlptEstimate} — with ${weakestLabel} first until it clears 30/60 in practice (safe margin over the ${level.sectionMin}/60 line).`)
+    plan.push(`Daily · One Session at ${diagnosis.jlptEstimate} — ${weakestLabel} first, until it clears 30/60`)
     planKeys.push({ key: 'promise.plan.dailyRescue', vars: { level: diagnosis.jlptEstimate, weakestLabel: sectionLabelSpec, sectionMin: level.sectionMin } })
-    plan.push(`Rehearse the real-life height in the Voice Loop at least 3× per week, then do it for real once before Day 60.`)
+    plan.push(`Real life · Rehearse it in the Voice Loop 3× a week — do it for real before Day 60`)
     planKeys.push({ key: 'promise.plan.rehearse', vars: {} })
-    plan.push(`Day 30: timed ${diagnosis.jlptEstimate} mock, target ≥ ${passMark + 10}/180. Day 55: target ≥ ${passMark + 15}/180 with every section ≥ 30/60 — then book, or re-run the diagnosis and let it re-promise honestly.`)
+    plan.push(`Day 30 · 55 · Mocks at ≥ ${passMark + 10}/180, then ≥ ${passMark + 15}/180 with sections ≥ 30/60 — then book, or re-check`)
     planKeys.push({ key: 'promise.plan.mocksRescue', vars: { level: diagnosis.jlptEstimate, target10: passMark + 10, target15: passMark + 15 } })
   }
 
@@ -187,7 +189,7 @@ export function computeSixtyDayPromise(diagnosis, profile) {
     reasoningKeys,
     plan,
     planKeys,
-    honesty: 'This height is computed from the latent base your diagnosis actually found — a resident re-climbing a level they once held moves faster than a first-time learner at the same score, and a weaker base gets a rescue height, not a fantasy. Timelines depend on that base and on the daily sessions actually happening; the Day-30/Day-55 mock gates are how we check the promise is on track.',
+    honesty: 'Built from the base your diagnosis found — never a fantasy height. It holds if the daily sessions happen; the Day-30 and Day-55 mocks verify it.',
     honestyKey: 'promise.honesty',
   }
 }

@@ -587,7 +587,7 @@ console.log('i18n round 2 — promise mirrors, loop stats, diagnosis draft:')
     const p = computeSixtyDayPromise({ jlptEstimate: 'N3', sections: { language: 45, reading: 40, listening: 42 }, total: 127 }, {})
     const fr = resolveAll(p, frTr2)
     assert.ok(fr.height.startsWith('Réussir N2'), fr.height)
-    assert.ok(fr.reasoning[0].startsWith('Votre bilan vous estime'), fr.reasoning[0])
+    assert.ok(fr.reasoning[0].startsWith('Bilan : N3'), fr.reasoning[0])
     assert.ok(p.height.startsWith('Pass N2'), p.height)
   })
 

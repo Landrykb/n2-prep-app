@@ -25,13 +25,24 @@ export default function PromisePanel({ promise }) {
   return (
     <section className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5 sm:p-6 space-y-3">
       <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-emerald-300"><Flag size={14} /> {t('promise.eyebrow')}</p>
-      <h3 className="text-lg sm:text-xl font-bold text-white">{t('promise.heightTitle', { height: heightText })}</h3>
+      {/* Glanceable (Landry, 2026-11-11: "less wordy, more to
+          the point — understood at a glance"): the GOAL is the
+          headline, alone and big; the plan is designed rows —
+          a bold lead word, then the fact. No paragraphs. */}
+      <h3 className="text-xl sm:text-2xl font-extrabold text-white leading-snug">{heightText}</h3>
       {planLines.length > 0 && (
-        <div className="rounded-xl bg-bun-900/40 border border-emerald-500/20 p-4 space-y-1.5">
-          <p className="text-xs font-bold text-emerald-200 uppercase tracking-wider">{t('promise.planTitle')}</p>
-          {planLines.map((line, i) => (
-            <p key={i} className="text-sm text-slate-200">{line}</p>
-          ))}
+        <div className="rounded-xl bg-bun-900/40 border border-emerald-500/20 px-4 py-2">
+          <p className="text-xs font-bold text-emerald-200 uppercase tracking-wider pt-2">{t('promise.planTitle')}</p>
+          {planLines.map((line, i) => {
+            const cut = line.indexOf(' · ')
+            const lead = cut > 0 ? line.slice(0, cut) : null
+            const rest = cut > 0 ? line.slice(cut + 3) : line
+            return (
+              <p key={i} className={`text-sm text-slate-200 py-2 ${i > 0 ? 'border-t border-white/5' : ''}`}>
+                {lead && <span className="font-bold text-white">{lead} · </span>}{rest}
+              </p>
+            )
+          })}
         </div>
       )}
       {reasoningLines.length > 0 && (
