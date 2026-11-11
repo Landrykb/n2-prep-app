@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense, useSyncExternalStore } from 'react'
 import {
   LayoutDashboard,
   BookOpen,
@@ -42,6 +42,7 @@ import {
   Mail,
 } from 'lucide-react'
 import { brand } from './lib/brand.js'
+import { subscribeStateSync, isFirstSyncPending } from './lib/stateSync.js'
 import { useAuth } from './hooks/useAuth.js'
 import { useKanjiModal } from './hooks/useKanjiModal.js'
 import { useFurigana } from './hooks/useFurigana.js'
@@ -1844,6 +1845,12 @@ function ErrorLog() {
 function App() {
   const { t } = useLanguage()
   const { user, loading, isSupabaseConfigured, signOut, guest } = useAuth()
+  // First-sync gate: auth resolving is not data resolving — while
+  // the account's first state pull is in flight, the shell stays
+  // a skeleton instead of painting factory defaults (an N4, an
+  // empty queue, the welcome questionnaire) as if they were the
+  // learner's real state (Landry, 2026-11-11).
+  const syncPending = useSyncExternalStore(subscribeStateSync, isFirstSyncPending, () => false)
   // Privacy/Terms are real routes (TwinView + the legal pages link to
   // them) but not menu items — the router's valid list must still
   // know them, or #/privacy silently falls back to Today (audit P0-1).
@@ -1997,13 +2004,32 @@ function App() {
     errors: <ErrorLog />,
   }
 
-  if (isSupabaseConfigured && loading) {
+  if (isSupabaseConfigured && (loading || (user && syncPending))) {
+    // Page-shaped skeleton: a header strip and stacked cards in
+    // the real layout's proportions, so the app reads as "your
+    // page, loading" — never as somebody else's empty account.
     return (
-      <div className="min-h-screen bg-bun-900 flex items-center justify-center p-6">
-        <div className="w-full max-w-md rounded-3xl glass p-8 card-glow space-y-5">
-          <Skeleton className="h-12 w-12 rounded-xl" />
-          <SkeletonText lines={3} />
-          <Skeleton className="h-10 w-full" />
+      <div className="min-h-screen bg-bun-900 p-5 sm:p-6" aria-busy="true" aria-label={t('shell.loading')}>
+        <div className="max-w-6xl mx-auto space-y-5">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-11 w-11 rounded-2xl shrink-0" />
+            <Skeleton className="h-6 w-40" />
+            <div className="flex-1" />
+            <Skeleton className="h-9 w-28 rounded-full" />
+          </div>
+          <div className="rounded-3xl glass p-6 space-y-4">
+            <Skeleton className="h-7 w-56" />
+            <SkeletonText lines={2} />
+            <Skeleton className="h-11 w-44 rounded-xl" />
+          </div>
+          <div className="rounded-3xl glass p-6 space-y-4">
+            <Skeleton className="h-6 w-36" />
+            <SkeletonText lines={3} />
+          </div>
+          <div className="rounded-3xl glass p-6 space-y-4">
+            <Skeleton className="h-6 w-44" />
+            <SkeletonText lines={2} />
+          </div>
         </div>
       </div>
     )

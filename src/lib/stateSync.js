@@ -25,6 +25,30 @@ let unsubscribeSave = null
 let pushTimer = null
 const statusListeners = new Set()
 
+// First-sync gate (Landry, 2026-11-11: "It showed me N4 level,
+// everything empty and the welcome questionnaire for several
+// seconds or minutes before showing my real account info"):
+// auth resolving is NOT data resolving. Until the FIRST pull
+// has landed and been applied, the app must show skeletons —
+// never the factory-default profile (an N4, an empty queue, a
+// welcome questionnaire) dressed as the learner's real state.
+// Pending settles on success AND on error (local state is the
+// fallback, never a trap), plus a hard 15s escape so a stalled
+// network can never skeleton-lock the app; the pull continues
+// in the background and applies when it lands.
+let firstSyncPending = false
+let firstSyncTimer = null
+
+export function isFirstSyncPending() {
+  return firstSyncPending
+}
+
+function setFirstSyncPending(next) {
+  if (firstSyncPending === next) return
+  firstSyncPending = next
+  for (const fn of statusListeners) { try { fn(status) } catch { /* ignore */ } }
+}
+
 export function getStateSyncState() {
   return activeUserId ? status : 'local-only'
 }
@@ -91,6 +115,9 @@ export async function initStateSync(user) {
   stopStateSync()
   activeUserId = user.id
   setStatus('syncing')
+  setFirstSyncPending(true)
+  if (firstSyncTimer) clearTimeout(firstSyncTimer)
+  firstSyncTimer = setTimeout(() => setFirstSyncPending(false), 15000)
 
   try {
     const { data, error } = await supabase
@@ -100,16 +127,35 @@ export async function initStateSync(user) {
       .maybeSingle()
     if (error) throw error
     const cloudState = data?.state || null
-    if (cloudState) {
-      const merged = mergeLearnerState(collectLearnerState(), cloudState)
-      applyLearnerState(merged)
-    }
-    // Push the (possibly merged) local truth up so the cloud reflects
-    // this device — including first-sign-in adoption of guest work.
-    await pushStateNow()
+    const state = cloudState
+      ? mergeLearnerState(collectLearnerState(), cloudState)
+      : collectLearnerState()
+    if (cloudState) applyLearnerState(state)
+    // The account's data is ON SCREEN from this line — unblock
+    // the skeleton before the write-back below finishes.
+    setFirstSyncPending(false)
+    if (firstSyncTimer) { clearTimeout(firstSyncTimer); firstSyncTimer = null }
+    // Push the (possibly merged) local truth up so the cloud
+    // reflects this device — including first-sign-in adoption
+    // of guest work. This used to route through pushStateNow,
+    // which PULLED THE ROW A SECOND TIME before upserting —
+    // two serial selects on every cold start for a merge window
+    // of milliseconds. The init upsert writes the document the
+    // pull above just produced; every LATER push keeps the full
+    // pull-merge-push guard in pushStateNow.
+    const { error: upError } = await supabase
+      .from('learner_state')
+      .upsert(
+        { user_id: user.id, state, updated_at: new Date().toISOString() },
+        { onConflict: 'user_id' }
+      )
+    if (upError) throw upError
+    setStatus('synced')
   } catch (err) {
     console.error('stateSync pull error:', err)
     setStatus('error')
+    setFirstSyncPending(false)
+    if (firstSyncTimer) { clearTimeout(firstSyncTimer); firstSyncTimer = null }
   }
 
   unsubscribeSave = onLearnerStateSaved(() => schedulePush())
@@ -118,6 +164,8 @@ export async function initStateSync(user) {
 export function stopStateSync() {
   if (unsubscribeSave) { unsubscribeSave(); unsubscribeSave = null }
   if (pushTimer) { clearTimeout(pushTimer); pushTimer = null }
+  if (firstSyncTimer) { clearTimeout(firstSyncTimer); firstSyncTimer = null }
+  setFirstSyncPending(false)
   activeUserId = null
   setStatus('local-only')
 }
