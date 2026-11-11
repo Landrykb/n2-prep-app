@@ -397,6 +397,21 @@ function Section({ title, children, hint }) {
   )
 }
 
+// Where each fleet member works — the line-up tile's door.
+// The destination is the surface the tile's own job line
+// describes: Koe calls (Yobidashi), Nao fixes (the fix log),
+// Saki plans (Today, where tomorrow is prepared), Tsuku
+// makes (the Reader's passages), Hori digs (Mining), Michi
+// coaches (the weekly letter).
+const FLEET_HOMES = {
+  koe: 'sensei',
+  nao: 'errors',
+  saki: 'today',
+  tsuku: 'reader',
+  hori: 'mine',
+  michi: 'coach',
+}
+
 export default function TwinView({ setActive }) {
   const { lang, setLang, languages, t } = useLanguage()
   const [voiceCastChoice, setVoiceCastChoice] = useState(() => modelCast())
@@ -577,19 +592,31 @@ export default function TwinView({ setActive }) {
         <ChevronRight size={18} className="text-slate-400 shrink-0" />
       </button>
 
-      {/* Fleet line-up (Doc 06 §3: the line-up belongs here and on the letter) */}
+      {/* Fleet line-up (Doc 06 §3: the line-up belongs here and on the letter).
+          Clickable (Landry, 2026-11-11: "make these clickable"):
+          each tile is a door to the surface where that agent
+          works — the destination matches the job line printed
+          on the tile itself. */}
       <section className="rounded-2xl glass p-5 card-glow">
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-          {brand.fleet.map((m) => (
-            <div key={m.id} className="flex items-start gap-2.5">
-              <Mascot agent={m.id} size={38} showName={false} />
-              <div>
-                <p className="text-sm font-bold text-white">{m.name} <span className="text-slate-400 font-medium">· {m.kanji}</span></p>
-                <p className="text-xs text-[#FF8A75]">{m.roleKey ? t(m.roleKey) : m.role}</p>
-                <p className="text-xs text-slate-400 mt-0.5">{m.jobKey ? t(m.jobKey) : m.job}</p>
-              </div>
-            </div>
-          ))}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {brand.fleet.map((m) => {
+            const home = FLEET_HOMES[m.id]
+            return (
+              <button
+                key={m.id}
+                onClick={() => home && setActive?.(home)}
+                aria-label={`${m.name} — ${m.roleKey ? t(m.roleKey) : m.role}`}
+                className="flex items-start gap-2.5 rounded-xl p-2 -m-0.5 text-left transition hover:bg-white/[0.05] active:scale-[0.98]"
+              >
+                <Mascot agent={m.id} size={38} showName={false} />
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-white">{m.name} <span className="text-slate-400 font-medium">· {m.kanji}</span></p>
+                  <p className="text-xs text-[#FF8A75]">{m.roleKey ? t(m.roleKey) : m.role}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{m.jobKey ? t(m.jobKey) : m.job}</p>
+                </div>
+              </button>
+            )
+          })}
         </div>
       </section>
 
