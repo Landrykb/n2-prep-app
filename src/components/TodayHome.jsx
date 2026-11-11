@@ -363,7 +363,7 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
 
       <PushAsk />
 
-      <ProofLadderView diagnosis={diagnosis} profile={profile} />
+      <ProofLadderView diagnosis={diagnosis} profile={profile} setActive={setActive} />
 
       <PromisePanel promise={promise} />
 
