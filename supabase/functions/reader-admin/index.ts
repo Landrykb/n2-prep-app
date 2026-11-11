@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
     menu_button: {
       type: 'web_app',
       text: 'Open Yonde',
-      web_app: { url: 'https://jpn2easy.vercel.app/reader?tg=4' },
+      web_app: { url: 'https://jpn2easy.vercel.app/reader?tg=5' },
     },
   })
   const getMe = await tg('getMe', {})

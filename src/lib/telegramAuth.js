@@ -189,6 +189,37 @@ export function bridgeTelegramSession(options = {}) {
   return bridgePromise
 }
 
+// Did this page arrive through a Telegram door? Every Mini App
+// door the bot and the app hand out carries ?tg=<n> in its URL
+// (the cache-buster marker), so the marker identifies a
+// Telegram launch even when Telegram's own globals never
+// appear — the exact blind spot the 2026-11-11 Mini App
+// investigation hit: no window.Telegram, no initData, and
+// therefore no button, no bridge attempt and no beacon, all
+// keyed off the very signals that were missing.
+export function telegramDoorPresent() {
+  try {
+    if (globalThis.window?.Telegram?.WebApp) return true
+    if ((globalThis.window?.location?.search ?? '').includes('tg=')) return true
+    if ((globalThis.window?.location?.hash ?? '').includes('tgWebAppData')) return true
+  } catch { /* non-browser contexts: not a door */ }
+  return false
+}
+
+// What the client side can see, as stage words and booleans —
+// the AuthModal wall prints this line verbatim during the
+// investigation so the failure can be read off a screenshot.
+export function telegramDiagSnapshot(stage) {
+  const webApp = globalThis.window?.Telegram?.WebApp
+  return {
+    stage: typeof stage === 'string' ? stage : 'unknown',
+    hasWebApp: !!webApp,
+    initDataLen: getTelegramInitData()?.length ?? 0,
+    hashHasTgData: (globalThis.window?.location?.hash ?? '').includes('tgWebAppData'),
+    platform: typeof webApp?.platform === 'string' ? webApp.platform : null,
+  }
+}
+
 // Diag beacon (2026-11-11): when the bridge does not land, the
 // client tells the function what ITS side saw — the bridge stage
 // word plus environment booleans (is the Telegram object there,
@@ -199,15 +230,9 @@ export function bridgeTelegramSession(options = {}) {
 // diagnostics never break the app.
 export function reportTelegramDiag({ stage, initData } = {}) {
   try {
-    const webApp = globalThis.window?.Telegram?.WebApp
     const data = typeof initData === 'string' ? initData : getTelegramInitData()
-    const diag = {
-      stage: typeof stage === 'string' ? stage : 'unknown',
-      hasWebApp: !!webApp,
-      initDataLen: data ? data.length : 0,
-      hashHasTgData: (globalThis.window?.location?.hash ?? '').includes('tgWebAppData'),
-      platform: typeof webApp?.platform === 'string' ? webApp.platform : null,
-    }
+    const diag = telegramDiagSnapshot(stage)
+    if (data) diag.initDataLen = data.length
     telegramAuthPost({ initData: data || undefined, diagOnly: true, diag }).catch(() => {})
   } catch { /* diagnostics never break the app */ }
 }

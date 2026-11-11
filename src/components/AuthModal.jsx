@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../hooks/useAuth.js'
 import { Eye, EyeOff, Loader2, X } from 'lucide-react'
 import { brand } from '../lib/brand.js'
-import { bridgeTelegramSession, getTelegramInitData, reportTelegramDiag } from '../lib/telegramAuth.js'
+import { bridgeTelegramSession, getTelegramInitData, reportTelegramDiag, telegramDoorPresent, telegramDiagSnapshot } from '../lib/telegramAuth.js'
 import { supabase } from '../lib/supabaseClient.js'
 import { useLanguage } from '../hooks/useLanguage.js'
 import Mascot from './Mascot.jsx'
@@ -42,8 +42,12 @@ export default function AuthModal({ variant = 'gate', initialMode = 'signin', on
   // named the failure. The force-run re-reads the launch data
   // at tap time, so the button is both the fix attempt and the
   // diagnosis.
-  const inTelegram = getTelegramInitData().length > 0
-    || (typeof window !== 'undefined' && !!window.Telegram?.WebApp)
+  const inTelegram = telegramDoorPresent()
+  // The wall testifies (2026-11-11 investigation): inside a
+  // Telegram door, a small line prints exactly what this side
+  // can see — so a screenshot of the failure carries its own
+  // diagnosis instead of another guessing round.
+  const tgSnap = inTelegram ? telegramDiagSnapshot(telegramBridgeStatus) : null
   const signInWithTelegram = async () => {
     setTgBusy(true)
     setTgError('')
@@ -145,6 +149,11 @@ export default function AuthModal({ variant = 'gate', initialMode = 'signin', on
             </button>
             {tgError && (
               <p className="mt-2 text-sm text-rose-300">{t('auth.telegramFailed', { status: tgError })}</p>
+            )}
+            {tgSnap && (
+              <p className="mt-2 break-all text-[11px] leading-relaxed text-slate-500">
+                {`diag · stage ${tgSnap.stage} · webapp ${tgSnap.hasWebApp ? 'yes' : 'no'} · data ${tgSnap.initDataLen} · hash ${tgSnap.hashHasTgData ? 'yes' : 'no'} · ${tgSnap.platform ?? 'no-platform'}`}
+              </p>
             )}
           </div>
         )}

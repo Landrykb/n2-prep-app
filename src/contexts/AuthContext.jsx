@@ -6,7 +6,7 @@ import { initStateSync, stopStateSync } from '../lib/stateSync.js'
 import { pullRemoteMetrics } from '../lib/metrics.js'
 import { adoptAnonKeys } from '../lib/anonMerge.js'
 import { syncCallWindows } from '../lib/callSync.js'
-import { bridgeTelegramSession, getTelegramInitData, reportTelegramDiag } from '../lib/telegramAuth.js'
+import { bridgeTelegramSession, getTelegramInitData, reportTelegramDiag, telegramDoorPresent } from '../lib/telegramAuth.js'
 import { loadGuestChoice, saveGuestChoice } from '../lib/guest.js'
 
 export const AuthProvider = ({ children }) => {
@@ -63,10 +63,11 @@ export const AuthProvider = ({ children }) => {
           if (!active) return
           currentSession = refreshed.data.session
         }
-      } else if (globalThis.window?.Telegram?.WebApp) {
-        // Telegram is present but handed the app no launch data:
-        // the one case the bridge cannot even attempt — report
-        // it so the failure has a name (telegram_auth_diag).
+      } else if (telegramDoorPresent()) {
+        // Arrived through a Telegram door (?tg= marker, or
+        // Telegram's object) but with no launch data the bridge
+        // can use: the one case the bridge cannot even attempt —
+        // report it so the failure has a name (telegram_auth_diag).
         reportTelegramDiag({ stage: 'no-initdata' })
       }
 
