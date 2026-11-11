@@ -822,14 +822,36 @@ export default function SenseiCall({ setActive } = {}) {
       {/* Settings */}
       <section className="rounded-2xl glass p-5 card-glow space-y-4">
         <h3 className="font-bold text-white">{t('call.settingsTitle')}</h3>
-        <label className="flex items-center justify-between gap-3 rounded-xl bg-bun-700/40 border border-bun-600/20 px-4 py-3 cursor-pointer">
-          <span className="text-sm text-slate-200">{t('call.toggleIs')}<strong>{t(settings.enabled ? 'call.on' : 'call.off')}</strong><span className="block text-xs text-slate-400 mt-0.5">{reachMode === 'server'
+        {/* The switch row (design pass, Landry 2026-11-11): the
+            state line and the switch share one row; the explainer
+            sits full-width underneath in quiet type instead of
+            crushing the text column. The switch itself is built
+            robustly — a relative track with an absolutely
+            centred knob — because the old block knob positioned
+            itself off the browser's default button padding, so
+            it rendered differently (and wrong) per webview; its
+            off track also blended into the card, so the control
+            did not read as a switch at a glance. No <label>
+            wrapper: a label around a button is invalid nesting
+            and can double-fire the toggle. */}
+        <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 px-4 py-3.5">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm text-slate-200">{t('call.toggleIs')}<strong>{t(settings.enabled ? 'call.on' : 'call.off')}</strong></span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={settings.enabled}
+              aria-label={t('call.settingsTitle')}
+              onClick={() => setSettings((st) => ({ ...st, enabled: !st.enabled }))}
+              className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${settings.enabled ? 'bg-emerald-500' : 'bg-slate-500/50 ring-1 ring-white/15'}`}
+            >
+              <span className={`absolute left-1 top-1/2 block h-5 w-5 -translate-y-1/2 rounded-full bg-white shadow transition-transform ${settings.enabled ? 'translate-x-5' : 'translate-x-0'}`} />
+            </button>
+          </div>
+          <p className="text-xs text-slate-400 mt-1.5">{reachMode === 'server'
             ? t('call.reachServer')
-            : t('call.reachDevice')}</span></span>
-          <button role="switch" aria-checked={settings.enabled} onClick={() => setSettings((st) => ({ ...st, enabled: !st.enabled }))} className={`w-12 h-7 rounded-full shrink-0 transition ${settings.enabled ? 'bg-emerald-500' : 'bg-bun-600'}`}>
-            <span className={`block w-5 h-5 rounded-full bg-white shadow transition-transform ${settings.enabled ? 'translate-x-6' : 'translate-x-1'}`} />
-          </button>
-        </label>
+            : t('call.reachDevice')}</p>
+        </div>
         {/* Progressive disclosure (audit P1-4): while calls are off,
             the form's details stay folded behind the toggle — the
             page's sequence is enable → try a call → then, only if
