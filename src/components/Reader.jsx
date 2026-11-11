@@ -22,6 +22,7 @@ import KanjiChips from './KanjiChips.jsx'
 import TtsButton from './TtsButton.jsx'
 import Mascot from './Mascot.jsx'
 import HeardPitch from './HeardPitch.jsx'
+import HeardVault from './HeardVault.jsx'
 import { PassageSkeleton } from './Skeleton.jsx'
 
 // THE READER (Doc 16 §2/§7 R1) — the web surface of Hori's Reader, the
@@ -1115,8 +1116,12 @@ export default function Reader({ setActive, onSignIn }) {
         {/* Heard Words (Doc 22): Hori's other ear — the right
             column on wide screens, the strip at the top on
             phones (see the layout note above). */}
-        <div className="order-1 min-[720px]:order-2 min-w-0">
+        <div className="order-1 min-[720px]:order-2 min-w-0 space-y-4">
           <HeardPitch variant="compact" />
+          {/* The Vault (Doc 22): the collection itself, always
+              visible under Hori's panel — today's words reset
+              at midnight; the vault does not. */}
+          <HeardVault />
         </div>
       </div>
     </div>
