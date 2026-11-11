@@ -707,11 +707,19 @@ export const KANJI_READINGS_CAP = 40
 
 /**
  * The readings breakdown for a passage's tokens: [{ word, reading }]
- * in order of first appearance, deduped by surface word. A token
- * qualifies when its SURFACE carries at least one kanji character,
- * readingOf(headword) yields a reading, and that reading differs
- * from the surface (a "reading" identical to the word itself is no
- * aid). String tokens (legacy bank rows) read as { s: token,
+ * in order of first appearance, deduped by the word shown. A token
+ * qualifies when its SURFACE carries at least one kanji character
+ * and a resolution yields a reading that differs from the word
+ * shown (a "reading" identical to the word itself is no aid).
+ * Resolution law (2026-11-11, Landry's accuracy flag on the
+ * shopping-street card — the list offered 通り as とおる "to go
+ * through" where the text means the street, and chopped stems
+ * like 並ん・買っ as if they were words):
+ *   1. a surface that is itself a dictionary word resolves as
+ *      THAT word （通り → とおり, the street);
+ *   2. anything else resolves by headword and is DISPLAYED in
+ *      its dictionary form （並ん → 並ぶ, 買っ → 買う).
+ * String tokens (legacy bank rows) read as { s: token,
  * h: token } — the same normalisation as tokenIsKnown. readingOf is
  * INJECTED: the bot passes the DECK_GLOSS lookup, the app passes its
  * own gloss source, and the rule stays identical either way. Junk
@@ -757,6 +765,18 @@ export function kanjiReadings(tokens, readingOf, meaningOf, compoundOf) {
       for (let len = Math.min(4, runEnd - i); len >= 2; len--) {
         const cand = chars.slice(i, i + len).map((c) => c.ch).join('')
         if (seen.has(cand)) continue
+        // Phrase-token guard (2026-11-11): a compound lying
+        // entirely inside ONE token whose surface is a set
+        // phrase longer than the candidate （今日は the greeting)
+        // must not eat the phrase and list its first half as a
+        // different word （今日 きょう, against the text's own
+        // こんにちは ruby).
+        const startTok = chars[i].tok
+        if (startTok === chars[i + len - 1].tok) {
+          const tokSurface = typeof toks[startTok]?.s === 'string' ? toks[startTok].s : ''
+          const tokHead = typeof toks[startTok]?.h === 'string' ? toks[startTok].h : ''
+          if (tokSurface.length > len && tokHead === tokSurface) continue
+        }
         let hit = null
         try {
           hit = compoundOf(cand)
@@ -779,38 +799,49 @@ export function kanjiReadings(tokens, readingOf, meaningOf, compoundOf) {
       i += matched || 1
     }
   }
-  // Per-token pass (the original rule), skipping consumed tokens.
+  // Per-token pass, skipping consumed tokens: surface-first
+  // resolution, dictionary-form display (the law in the header).
   toks.forEach((t, ti) => {
     if (consumed.has(ti)) return
     const surface = typeof t?.s === 'string' ? t.s : ''
-    if (!surface || seen.has(surface)) return
-    seen.add(surface)
-    if (!KANJI_RE.test(surface)) return
+    if (!surface || !KANJI_RE.test(surface)) return
     const headword = typeof t?.h === 'string' && t.h ? t.h : surface
-    let reading = null
-    try {
-      reading = readingOf(headword)
-    } catch {
-      reading = null
-    }
-    if (typeof reading !== 'string' || !reading || reading === surface) return
-    // Meanings ride along only when a meaning source is injected
-    // (amendment #13): the entry gains the gloss for the headword;
-    // without one the entry is exactly { word, reading } as before.
-    let meaning = null
-    if (typeof meaningOf === 'function') {
+    const lookup = (w) => {
+      let reading = null
       try {
-        meaning = meaningOf(headword)
+        reading = readingOf(w)
       } catch {
-        meaning = null
+        reading = null
       }
+      if (typeof reading !== 'string' || !reading || reading === w) return null
+      // Meanings ride along only when a meaning source is injected
+      // (amendment #13): the entry gains the gloss for the word it
+      // resolved as; without one it is exactly { word, reading }.
+      let meaning = null
+      if (typeof meaningOf === 'function') {
+        try {
+          meaning = meaningOf(w)
+        } catch {
+          meaning = null
+        }
+      }
+      return typeof meaning === 'string' && meaning
+        ? { word: w, reading, meaning }
+        : { word: w, reading }
     }
-    entries.push({
-      pos: tokenStart[ti],
-      entry: typeof meaning === 'string' && meaning
-        ? { word: surface, reading, meaning }
-        : { word: surface, reading },
-    })
+    // Inflection refinement: a surface followed by a verb-chain
+    // auxiliary （覚え+て, 行き+ます) is mid-inflection — the
+    // headword's entry is the word being used, even when the
+    // stem alone is also a dictionary word （覚え the noun).
+    // A surface standing complete （通り+が) resolves as itself.
+    const nextSurface = typeof toks[ti + 1]?.s === 'string' ? toks[ti + 1].s : ''
+    const midInflection = /^(て|で|た|ます|ました|ません|ない|なかった|たい|たかった|れる|られる|せる|させる|ちゃ|じゃ)/.test(nextSurface)
+    const entry = midInflection
+      ? (lookup(headword) || lookup(surface))
+      : (lookup(surface) || (headword !== surface ? lookup(headword) : null))
+    if (!entry || seen.has(entry.word)) return
+    seen.add(entry.word)
+    entries.push({ pos: tokenStart[ti], entry })
   })
   entries.sort((a, b) => a.pos - b.pos)
   return entries.slice(0, KANJI_READINGS_CAP).map((e) => e.entry)

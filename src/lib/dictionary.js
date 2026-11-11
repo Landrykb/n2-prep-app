@@ -121,12 +121,27 @@ function merge(...groups) {
   return entries.filter((e) => e.reading || !wordsWithReading.has(e.word))
 }
 
+// Accuracy corrections (Landry, 2026-11-11): the merged sources
+// lead 私 with its formal reading （わたくし) and 通り with a
+// suffix sense; the app must lead with the everyday word — the
+// same corrections the bank builder's OVERRIDES carry for the
+// bot's gloss (scripts/build-reader-bank.mjs). Keep the two in
+// step.
+const DICTIONARY_OVERRIDES = {
+  '私': { reading: 'わたし', meaning: 'I; me' },
+  '通り': { reading: 'とおり', meaning: 'street; avenue' },
+}
+
 function index(entries) {
   const byWord = new Map()
   for (const entry of entries) {
     const existing = byWord.get(entry.word)
     // Prefer an entry that actually has a reading for tap/selection lookups.
     if (!existing || (!existing.reading && entry.reading)) byWord.set(entry.word, entry)
+  }
+  for (const [word, fix] of Object.entries(DICTIONARY_OVERRIDES)) {
+    const existing = byWord.get(word)
+    if (existing) byWord.set(word, { ...existing, ...fix })
   }
   // Longest-first so greedy matching in running text prefers the longest word.
   const byLength = [...entries].sort((a, b) => b.word.length - a.word.length)

@@ -1130,7 +1130,7 @@ check('levelKeyboard: bands, the N7+ joke, Not sure — identical in both twins,
 
 const glossOf = (book) => (h) => book[h]
 
-check('kanjiReadings: first-appearance order; lookup by headword, display by surface', () => {
+check('kanjiReadings: first-appearance order; an inflected stem displays in dictionary form', () => {
   const toks = [
     { s: '猫', h: '猫', l: 'N5' },
     { s: 'は', h: 'は', l: null },
@@ -1143,7 +1143,51 @@ check('kanjiReadings: first-appearance order; lookup by headword, display by sur
   assert.deepEqual(fit.kanjiReadings(toks, glossOf(book)), [
     { word: '猫', reading: 'ねこ' },
     { word: '学校', reading: 'がっこう' },
-    { word: '行き', reading: 'いく' },
+    { word: '行く', reading: 'いく' },
+  ])
+})
+
+check('kanjiReadings: a surface that is itself a word wins over its headword (通り the street)', () => {
+  // Landry's 2026-11-11 flag: 市場のある通り was offered as 通る
+  // とおる "to go through" — the list must resolve the surface's
+  // own dictionary entry when it has one.
+  const toks = [
+    { s: '市場', h: '市場', l: 'N3' },
+    { s: 'の', h: 'の', l: null },
+    { s: '通り', h: '通る', l: 'N4' },
+    { s: '並ん', h: '並ぶ', l: 'N5' },
+  ]
+  const book = { '市場': 'いちば', '通り': 'とおり', '通る': 'とおる', '並ぶ': 'ならぶ' }
+  assert.deepEqual(fit.kanjiReadings(toks, glossOf(book)), [
+    { word: '市場', reading: 'いちば' },
+    { word: '通り', reading: 'とおり' },
+    { word: '並ぶ', reading: 'ならぶ' },
+  ])
+})
+
+check('kanjiReadings: a stem before a verb auxiliary resolves as the verb, not the stem-noun (覚えて)', () => {
+  const toks = [
+    { s: '覚え', h: '覚える', l: 'N5' },
+    { s: 'て', h: 'て', l: null },
+    { s: '通り', h: '通る', l: 'N4' },
+    { s: 'が', h: 'が', l: null },
+  ]
+  const book = { '覚え': 'おぼえ', '覚える': 'おぼえる', '通り': 'とおり', '通る': 'とおる' }
+  assert.deepEqual(fit.kanjiReadings(toks, glossOf(book)), [
+    { word: '覚える', reading: 'おぼえる' },
+    { word: '通り', reading: 'とおり' },
+  ])
+})
+
+check('kanjiReadings: a set-phrase token is never halved by the compound pass (今日は)', () => {
+  const toks = [
+    { s: '今日は', h: '今日は', l: 'N1' },
+    { s: '大根', h: '大根', l: 'N3' },
+  ]
+  const book = { '今日': 'きょう', '大根': 'だいこん' }
+  const compoundOf = (w) => (book[w] ? { reading: book[w] } : null)
+  assert.deepEqual(fit.kanjiReadings(toks, glossOf(book), undefined, compoundOf), [
+    { word: '大根', reading: 'だいこん' },
   ])
 })
 

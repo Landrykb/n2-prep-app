@@ -126,6 +126,11 @@ export const OVERRIDES = {
   '在留カード': { reading: 'ざいりゅうカード', meaning: 'residence card' },
   '食後': { reading: 'しょくご', meaning: 'after a meal / after eating' },
   '引っ越し': { reading: 'ひっこし', meaning: 'moving house' },
+  // Accuracy corrections (Landry, 2026-11-11): the merged deck
+  // leads 私 with its formal reading and 通り with a suffix
+  // sense; a learner's list must lead with the everyday word.
+  '私': { reading: 'わたし', meaning: 'I; me' },
+  '通り': { reading: 'とおり', meaning: 'street; avenue' },
 }
 
 // --- stem machinery -------------------------------------------------
@@ -467,7 +472,7 @@ function main() {
   // the bot then bolds the word without a reading (never invents one).
   const glossObj = {}
   for (const word of [...deckLevels.keys()].sort()) {
-    const entry = dict.byWord.get(word) || (OVERRIDES[word] ? { ...OVERRIDES[word] } : undefined)
+    const entry = (OVERRIDES[word] ? { ...OVERRIDES[word] } : undefined) || dict.byWord.get(word)
     if (!entry) continue
     const reading = cleanReading(entry.reading || '')
     const meaning = firstGloss(entry.meaning || '')
