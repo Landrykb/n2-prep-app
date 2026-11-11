@@ -11,6 +11,11 @@
 //     scene's own level band, topic = its domain.
 //   source 'bank'  — the app's existing mock-exam reading passages
 //     (src/data.js `passages`, all N2), topic = the passage title.
+//   source 'graded' — the graded-reader lane (src/data/readerBank.js,
+//     2026-11-11): passages written FOR the bank in mostly below-band
+//     vocabulary with a light at-band dose, so fitted learners have
+//     a shelf that can actually pass the 93–97% gate. Labelled
+//     'graded' per row — authored, never passed off as found text.
 //
 // SEGMENTER SIBLINGS: the tokeniser below is one of three copies of
 // one matcher — src/lib/readerSegment.js (data-injected core, pinned
@@ -49,6 +54,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import { scenes } from '../src/data/scenes.js'
 import { passages } from '../src/data.js'
+import { gradedPassages } from '../src/data/readerBank.js'
 import { parseDeckEntry, localEntries } from '../src/lib/dictionary.js'
 import { segmentFurigana, buildFuriganaIndex, cleanReading } from '../src/lib/furigana.js'
 import { bandRank } from '../src/lib/readerFit.js'
@@ -383,6 +389,16 @@ export function buildRows() {
       extra: (p.glossary || []).map((g) => g.word),
     })
   })
+  for (const p of gradedPassages) {
+    rows.push({
+      id: p.id,
+      band: p.band,
+      topic: p.topic,
+      text: p.text,
+      source: 'graded',
+      extra: [],
+    })
+  }
   return rows.map((r) => {
     const tokens = tokenise(r.text)
     if (tokens.map((t) => t.s).join('') !== r.text) {
@@ -406,7 +422,8 @@ function main() {
     '-- seed never duplicates or overwrites a row.',
     `-- Coverage: ${rows.length} passages (${Object.entries(byBand).map(([b, n]) => `${b}×${n}`).join(', ')}).`,
     '-- Sources: scene dialogues (src/data/scenes.js) + the mock-exam',
-    '-- reading bank (src/data.js). No invented texts.',
+    '-- reading bank (src/data.js) + the graded lane written for the',
+    '-- bank (src/data/readerBank.js, source \'graded\').',
     '-- tokens: [{ s, h, l }] — surface, dictionary headword, deck level',
     '-- (Doc 16 §5 amendment, 2026-11-06). Surfaces join back to the text.',
     '',

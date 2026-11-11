@@ -18,16 +18,18 @@ import { collectEncounterWords } from '../lib/encounters.js'
 // It records nothing new — a pure view over the per-day
 // heard_words rows the owner can already read (migration
 // 00021), plus the queue/encounters the app already holds for
-// the mastery join. Dictionary readings/meanings come from
-// the app's deck; a word the deck does not know shows without
-// one — never a guessed reading or meaning.
+// the mastery join. Dictionary readings/meanings resolve
+// WIDE via heardInfo (deck → WordsDB index → the full
+// wordbook the matcher uses), so a word matched from the
+// wide book still shows its reading; a word no layer knows
+// shows without one — never a guessed reading or meaning.
 const INITIAL_ROWS = 60
 
 export default function HeardVault() {
   const { t, language } = useLanguage()
   const [entries, setEntries] = useState(null)
   const [mastered, setMastered] = useState(() => new Set())
-  const [dict, setDict] = useState(null)
+  const [info, setInfo] = useState(null)
   const [expanded, setExpanded] = useState(false)
   const [sortMode, setSortMode] = useState('heard')
   const [openItem, setOpenItem] = useState(null)
@@ -63,14 +65,17 @@ export default function HeardVault() {
   }, [refresh])
 
   useEffect(() => {
-    if (!entries || entries.length === 0 || dict) return
+    if (!entries || entries.length === 0 || info) return
     let live = true
-    import('../lib/dictionary.js')
-      .then(({ loadDictionary }) => loadDictionary())
-      .then((d) => { if (live) setDict(d) })
+    Promise.all([
+      import('../lib/dictionary.js').then(({ loadDictionary }) => loadDictionary()).catch(() => null),
+      import('../lib/heardInfo.js'),
+    ])
+      .then(([deck, { resolveHeardInfo }]) => resolveHeardInfo(entries.map((e) => e.item), deck))
+      .then((map) => { if (live) setInfo(map) })
       .catch(() => {})
     return () => { live = false }
-  }, [entries, dict])
+  }, [entries, info])
 
   const summary = useMemo(() => vaultSummary(entries ?? [], mastered), [entries, mastered])
   const named = useMemo(
@@ -92,7 +97,7 @@ export default function HeardVault() {
       }).format(new Date(`${day}T12:00:00+09:00`))
     } catch { return day }
   }
-  const dictFor = (item) => dict?.byWord?.get(item) ?? null
+  const dictFor = (item) => info?.get(item) ?? null
 
   const stat = (value, label) => (
     <div className="min-w-0">

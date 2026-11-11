@@ -130,16 +130,19 @@ export default function HeardPitch({ variant = 'full', onReadPassage }) {
       })
       const items = all.filter((r) => r.count >= HEARD_FLOOR && r.kind === 'word').map((r) => r.item)
       if (items.length > 0) {
-        // Readings from the app's deck (the bot's card and the
-        // automatic dictionary carry the wide readings; here a
-        // word the deck does not know shows without one — never
-        // a guessed reading).
-        import('../lib/dictionary.js')
-          .then(({ loadDictionary }) => loadDictionary())
-          .then((dict) => {
+        // Readings resolve WIDE via heardInfo (deck → WordsDB
+        // index → the full wordbook): the matcher hears far
+        // beyond the deck, and a matched word must still show
+        // its reading — never a guessed one (Landry, 2026-11-11).
+        Promise.all([
+          import('../lib/dictionary.js').then(({ loadDictionary }) => loadDictionary()).catch(() => null),
+          import('../lib/heardInfo.js'),
+        ])
+          .then(([dict, { resolveHeardInfo }]) => resolveHeardInfo(items, dict))
+          .then((resolved) => {
             const map = {}
             for (const item of items) {
-              const reading = dict?.byWord?.get(item)?.reading
+              const reading = resolved.get(item)?.reading
               if (reading && reading !== item) map[item] = reading
             }
             setReadings(map)
