@@ -125,6 +125,20 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
+// Ring the voice worker's doorbell (2026-11-13, the
+// invocation diet): the worker no longer polls — it sleeps
+// until a job's INSERT on worker_wake reaches it over a
+// Realtime websocket, or its slow backstop timer fires
+// (Landry's rule: idle means at rest). The insert rides THIS
+// invocation, so the ring costs no extra function call.
+// Best-effort: a failed ring costs latency, never the job.
+export const pokeWorker = async (
+  admin: { from: (table: string) => any },
+): Promise<void> => {
+  try {
+    await admin.from('worker_wake').insert({})
+  } catch { /* the backstop covers a failed ring */ }
+}
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
@@ -933,6 +947,7 @@ serve(async (req: Request) => {
           console.error('reader-bot: voice job enqueue failed')
           return false
         }
+        await pokeWorker(supabaseAdmin)
         return true
       } catch (err) {
         console.error('reader-bot: voice job enqueue failed', err)

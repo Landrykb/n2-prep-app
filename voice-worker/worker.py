@@ -37,33 +37,25 @@ TMP_DIR = os.path.join(HOME, "tmp")
 VOICE = "ja-JP-NanamiNeural"
 MAX_TEXT_CHARS = 1200
 
-# Long-polling (2026-11-13, Supabase fair-use fix): claims pass
-# waitSeconds and the voice-queue function holds the request
-# open server-side until a job appears or the wait expires.
-# The old fixed polls (10s passage / 1.5s tts) burned ~66k
-# function invocations a DAY doing nothing — 622k in one
-# billing period against the free plan's 550k line, while real
-# jobs numbered in the dozens. An idle worker now costs ~2
-# invocations a minute across both lanes. The EMPTY_FLOOR
-# sleeps bound the damage even if an old function version
-# answers instantly: an empty reply that came back fast is
-# padded out to the floor before the next claim.
-LONG_POLL_SECONDS = 45
-LONG_POLL_TIMEOUT = 90
-EMPTY_FLOOR_SECONDS = 10
+# Event-driven rest (2026-11-13, Landry's rule: "if I'm not
+# using it, it should not be doing anything"). The lanes do NOT
+# poll. Each sleeps on its own wake event until either
+#   (a) the doorbell rings — the functions that enqueue jobs
+#       (reader-bot, tts-vm) insert a row on the content-free
+#       worker_wake table and this worker hears the INSERT
+#       over one outbound Realtime websocket (migration
+#       00029), or
+#   (b) a slow backstop timer fires, so a missed poke can only
+#       ever cost latency, never a stranded job.
+# History: fixed polls (1.5s/10s) burned 622k Supabase function
+# invocations in a billing period (two worker copies running);
+# a long-poll step (~2/minute) still spent ~115k/month at
+# idle. At rest this design costs the backstops only: ~14k
+# invocations a month, and the poke makes them almost never
+# fire. Idle pickup latency after a poke: ~1s.
+BACKSTOP_TTS_SECONDS = 300
+BACKSTOP_PASSAGE_SECONDS = 1800
 
-# The synchronous tts lane (Doc 17 addendum 5, 2026-11-08): the
-# app's play buttons ask the `tts-vm` function for one line; the
-# function enqueues a kind='tts' job and waits, so this lane
-# claims in its own thread and returns MP3 (the web plays it
-# everywhere — the passage lane's ogg/opus conversion is a
-# Telegram requirement, not a web one). It long-polls like the
-# passage lane (2026-11-13): the function's server-side wait
-# re-checks every 2.5s, so pickup latency stays ~3s without a
-# 1.5s client poll. Casts mirror src/lib/voiceCast.js in the
-# app: the free Edge route has two Japanese neural voices;
-# girl/boy are pitch lifts.
-TTS_EMPTY_FLOOR_SECONDS = 5
 CASTS = {
     "female": ("ja-JP-NanamiNeural", "+0Hz"),
     "male": ("ja-JP-KeitaNeural", "+0Hz"),
@@ -152,6 +144,106 @@ def synthesize_tts_audio(text, job_id, cast):
     return data
 
 
+# One wake event per lane; the poke handler sets both (a poke
+# means "something was enqueued" — each lane simply re-checks
+# its own queue; the wrong lane's extra claim is one call).
+WAKE_TTS = threading.Event()
+WAKE_PASSAGE = threading.Event()
+
+
+def start_wake_listener(cfg):
+    """Doorbell listener: ONE outbound Realtime websocket to
+    Supabase, subscribed to INSERTs on the content-free
+    worker_wake table (migration 00029). The functions that
+    enqueue jobs ring it from inside their own invocation; a
+    ring sets both lane events (each lane re-checks its own
+    queue; the wrong lane's empty claim costs one call, and
+    only on real enqueues). Outbound-only by design: an
+    earlier inbound HTTP listener on port 8791 never received
+    a single poke — Oracle's security list admits only SSH
+    to this VM, which the 2026-11-13 tts-vm proof showed
+    (504, job untouched). Reconnects forever with backoff;
+    if Realtime is down the backstop timers still bound every
+    wait, so a dead doorbell costs latency, never a job.
+    """
+    queue_url = cfg.get("VOICE_QUEUE_URL", "")
+    anon = cfg.get("SUPABASE_ANON_KEY", "")
+    if not queue_url or not anon:
+        log("wake listener disabled (missing queue URL or anon key); backstops only")
+        return
+    host = queue_url.split("://", 1)[1].split("/", 1)[0]
+
+    async def run():
+        import websockets
+
+        url = "wss://%s/realtime/v1/websocket?apikey=%s&vsn=1.0.0" % (host, anon)
+        backoff = 5
+        ref_counter = [0]
+
+        def next_ref():
+            ref_counter[0] += 1
+            return str(ref_counter[0])
+
+        while True:
+            try:
+                async with websockets.connect(url, ping_interval=None) as ws:
+                    join = {
+                        "topic": "realtime:public:worker_wake",
+                        "event": "phx_join",
+                        "payload": {
+                            "config": {
+                                "broadcast": {"ack": False, "self": False},
+                                "presence": {"key": ""},
+                                "postgres_changes": [
+                                    {"event": "INSERT", "schema": "public", "table": "worker_wake"}
+                                ],
+                            },
+                            "access_token": anon,
+                        },
+                        "ref": next_ref(),
+                    }
+                    await ws.send(json.dumps(join))
+                    log("wake listener connected; doorbell join sent")
+                    backoff = 5
+                    last_hb = 0.0
+                    while True:
+                        try:
+                            raw = await asyncio.wait_for(ws.recv(), timeout=10)
+                        except asyncio.TimeoutError:
+                            raw = None
+                        now = time.time()
+                        if now - last_hb >= 25:
+                            last_hb = now
+                            await ws.send(json.dumps({
+                                "topic": "phoenix",
+                                "event": "heartbeat",
+                                "payload": {},
+                                "ref": next_ref(),
+                            }))
+                        if raw is None:
+                            continue
+                        try:
+                            msg = json.loads(raw)
+                        except ValueError:
+                            continue
+                        if msg.get("event") == "postgres_changes":
+                            WAKE_TTS.set()
+                            WAKE_PASSAGE.set()
+                        elif (
+                            msg.get("event") == "phx_reply"
+                            and (msg.get("payload") or {}).get("status") == "ok"
+                            and str(msg.get("topic", "")).startswith("realtime:")
+                        ):
+                            log("wake listener subscribed to worker_wake")
+            except Exception as e:
+                log("wake listener dropped: %s; reconnecting in %ds" % (repr(e)[:120], backoff))
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * 2, 60)
+
+    thread = threading.Thread(target=lambda: asyncio.run(run()), daemon=True)
+    thread.start()
+
+
 def tts_loop(cfg):
     """Fast lane: claim kind='tts' jobs and hand AAC/m4a bytes back.
 
@@ -161,14 +253,14 @@ def tts_loop(cfg):
     """
     url = cfg.get("VOICE_QUEUE_URL", "")
     secret = cfg.get("VOICE_WORKER_SECRET", "")
-    log("tts lane started (long-poll %ds)" % LONG_POLL_SECONDS)
+    log("tts lane started (event-driven, backstop %ds)" % BACKSTOP_TTS_SECONDS)
     while True:
         try:
-            t_claim = time.time()
-            res = post_json(url, secret, {"action": "tts-claim", "waitSeconds": LONG_POLL_SECONDS}, timeout=LONG_POLL_TIMEOUT)
+            res = post_json(url, secret, {"action": "tts-claim"}, timeout=30)
             job = res.get("job") if isinstance(res, dict) else None
             if not job:
-                time.sleep(max(1, TTS_EMPTY_FLOOR_SECONDS - (time.time() - t_claim)))
+                WAKE_TTS.wait(timeout=BACKSTOP_TTS_SECONDS)
+                WAKE_TTS.clear()
                 continue
             job_id = str(job["id"])
             text = str(job.get("text", ""))[:MAX_TEXT_CHARS]
@@ -197,10 +289,12 @@ def tts_loop(cfg):
                     pass
         except urllib.error.HTTPError as e:
             log("tts queue HTTP %s; backing off" % e.code)
-            time.sleep(15)
+            WAKE_TTS.wait(timeout=15)
+            WAKE_TTS.clear()
         except Exception as e:
             log("tts poll error: %s; backing off" % repr(e)[:160])
-            time.sleep(15)
+            WAKE_TTS.wait(timeout=15)
+            WAKE_TTS.clear()
 
 
 def synthesize_ogg(text, job_id):
@@ -235,15 +329,16 @@ def main():
         log("FATAL: worker.env missing VOICE_QUEUE_URL or VOICE_WORKER_SECRET")
         return 1
     log("voice worker started (voice=%s)" % VOICE)
+    start_wake_listener(cfg)
     lane = threading.Thread(target=tts_loop, args=(cfg,), daemon=True)
     lane.start()
     while True:
         try:
-            t_claim = time.time()
-            res = post_json(url, secret, {"action": "claim", "waitSeconds": LONG_POLL_SECONDS}, timeout=LONG_POLL_TIMEOUT)
+            res = post_json(url, secret, {"action": "claim"}, timeout=30)
             job = res.get("job") if isinstance(res, dict) else None
             if not job:
-                time.sleep(max(1, EMPTY_FLOOR_SECONDS - (time.time() - t_claim)))
+                WAKE_PASSAGE.wait(timeout=BACKSTOP_PASSAGE_SECONDS)
+                WAKE_PASSAGE.clear()
                 continue
             job_id = str(job["id"])
             text = str(job.get("text", ""))[:MAX_TEXT_CHARS]
@@ -272,10 +367,12 @@ def main():
                     pass
         except urllib.error.HTTPError as e:
             log("queue HTTP %s; backing off" % e.code)
-            time.sleep(30)
+            WAKE_PASSAGE.wait(timeout=30)
+            WAKE_PASSAGE.clear()
         except Exception as e:  # network down, DNS, etc — keep polling
             log("poll error: %s; backing off" % repr(e)[:160])
-            time.sleep(30)
+            WAKE_PASSAGE.wait(timeout=30)
+            WAKE_PASSAGE.clear()
 
 
 if __name__ == "__main__":
