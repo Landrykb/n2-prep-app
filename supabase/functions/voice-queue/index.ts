@@ -13,7 +13,20 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 // THIS function, synthesizes with edge-tts, and hands the ogg/opus
 // bytes back. Passages are cached assets — synthesized once, then
 // reused forever via the Telegram file_id reader-bot caches on the
-// passage row — so a 10-second poll loop covers the whole Reader.
+// passage row — so a tiny worker covers the whole Reader.
+//
+// Invocation budget (2026-11-13, Supabase fair-use letter):
+// the worker used to poll claim every 10s and tts-claim every
+// 1.5s AROUND THE CLOCK — ~66k invocations a day at idle,
+// 622k in a billing period against the free plan's 550k line,
+// with real jobs numbering in the dozens. Claims are now
+// LONG-POLLS: the worker passes waitSeconds and this function
+// holds the request open, re-checking the queue every 2.5s,
+// until a job appears or the wait expires. Idle cost drops to
+// ~2 calls/minute across both lanes (~115k/month worst case,
+// most of it headroom), and pickup latency stays under ~3s —
+// the wait is server-side, so a job landing mid-wait is
+// claimed inside the same invocation.
 //
 // Protocol (POST JSON, header `x-worker-secret` == env
 // VOICE_WORKER_SECRET — the worker's ONE single-purpose secret; it
@@ -54,6 +67,10 @@ const json = (body: unknown, status = 200) =>
 const MAX_AUDIO_BYTES = 2 * 1024 * 1024
 const BUCKET = 'voice-cache'
 
+const LONG_POLL_MAX_S = 50
+const LONG_POLL_STEP_MS = 2500
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -86,38 +103,65 @@ serve(async (req: Request) => {
     // loser's update matches zero rows and the loop moves on to
     // the next pending job. One worker polls today; the guard is
     // what makes a second one safe tomorrow.
-    if (action === 'claim') {
+    // tryClaim: one atomic claim attempt for a lane. Returns
+    // { job } on a win, { job: null } when the lane is empty,
+    // or { response } when a database error must surface as-is.
+    const tryClaim = async (kind: 'passage' | 'tts') => {
       for (let attempt = 0; attempt < 3; attempt++) {
         const { data: pending, error: selError } = await supabaseAdmin
           .from('voice_jobs')
-          .select('id, text')
+          .select(kind === 'tts' ? 'id, text, voice_cast' : 'id, text')
           .eq('status', 'pending')
-          .eq('kind', 'passage')
+          .eq('kind', kind)
           .order('created_at', { ascending: true })
           .limit(1)
         if (selError) {
           console.error('voice-queue: pending scan failed')
-          return json({ error: 'Queue read failed' }, 500)
+          return { response: json({ error: 'Queue read failed' }, 500) }
         }
         const next = pending?.[0]
-        if (!next) return json({ job: null })
+        if (!next) return { job: null }
         const { data: claimed, error: claimError } = await supabaseAdmin
           .from('voice_jobs')
           .update({ status: 'claimed', claimed_at: new Date().toISOString() })
           .eq('id', next.id)
           .eq('status', 'pending')
-          .eq('kind', 'passage')
-          .select('id, text')
+          .eq('kind', kind)
+          .select(kind === 'tts' ? 'id, text, voice_cast' : 'id, text')
         if (claimError) {
           console.error('voice-queue: claim write failed')
-          return json({ error: 'Claim failed' }, 500)
+          return { response: json({ error: 'Claim failed' }, 500) }
         }
         if (claimed && claimed.length > 0) {
-          return json({ job: { id: claimed[0].id, text: claimed[0].text } })
+          const row = claimed[0] as { id: string; text: string; voice_cast?: string }
+          return {
+            job: kind === 'tts'
+              ? { id: row.id, text: row.text, cast: row.voice_cast || 'female' }
+              : { id: row.id, text: row.text },
+          }
         }
         // Lost the race for this row — try the next pending one.
       }
-      return json({ job: null })
+      return { job: null }
+    }
+
+    // Long-poll claim (both lanes): hold the request open up to
+    // waitSeconds (clamped), re-checking every 2.5s, so an idle
+    // worker costs one invocation per wait instead of one per
+    // breath — and a job arriving mid-wait is still claimed in
+    // ~3s. waitSeconds absent/0 keeps the old instant behaviour.
+    if (action === 'claim' || action === 'tts-claim') {
+      const kind = action === 'claim' ? 'passage' : 'tts'
+      const waitRaw = Number((body as Record<string, unknown>)?.waitSeconds)
+      const waitS = Number.isFinite(waitRaw) ? Math.min(Math.max(waitRaw, 0), LONG_POLL_MAX_S) : 0
+      const deadline = Date.now() + waitS * 1000
+      for (;;) {
+        const r = await tryClaim(kind)
+        if ('response' in r && r.response) return r.response
+        if (r.job) return json({ job: r.job })
+        if (Date.now() >= deadline) return json({ job: null })
+        await sleep(Math.min(LONG_POLL_STEP_MS, Math.max(deadline - Date.now(), 0)))
+      }
     }
 
     // ---------- complete: store the audio, mark done, poke ----------
@@ -191,43 +235,6 @@ serve(async (req: Request) => {
         }
       }
       return json({ ok: true })
-    }
-
-    // ---------- tts-claim: the synchronous lane (Doc 17 add. 5) --
-    // Same conditional-update claim discipline as the passage
-    // lane, scoped to kind='tts', and the cast rides along so the
-    // worker knows which voice to speak in.
-    if (action === 'tts-claim') {
-      for (let attempt = 0; attempt < 3; attempt++) {
-        const { data: pending, error: selError } = await supabaseAdmin
-          .from('voice_jobs')
-          .select('id, text, voice_cast')
-          .eq('status', 'pending')
-          .eq('kind', 'tts')
-          .order('created_at', { ascending: true })
-          .limit(1)
-        if (selError) {
-          console.error('voice-queue: tts pending scan failed')
-          return json({ error: 'Queue read failed' }, 500)
-        }
-        const next = pending?.[0]
-        if (!next) return json({ job: null })
-        const { data: claimed, error: claimError } = await supabaseAdmin
-          .from('voice_jobs')
-          .update({ status: 'claimed', claimed_at: new Date().toISOString() })
-          .eq('id', next.id)
-          .eq('status', 'pending')
-          .eq('kind', 'tts')
-          .select('id, text, voice_cast')
-        if (claimError) {
-          console.error('voice-queue: tts claim write failed')
-          return json({ error: 'Claim failed' }, 500)
-        }
-        if (claimed && claimed.length > 0) {
-          return json({ job: { id: claimed[0].id, text: claimed[0].text, cast: claimed[0].voice_cast || 'female' } })
-        }
-      }
-      return json({ job: null })
     }
 
     // ---------- tts-complete: AAC/m4a bytes back, no Telegram poke ---

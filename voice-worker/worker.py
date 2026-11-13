@@ -35,18 +35,35 @@ ENV_PATH = os.path.join(HOME, "worker.env")
 LOG_PATH = os.path.join(HOME, "worker.log")
 TMP_DIR = os.path.join(HOME, "tmp")
 VOICE = "ja-JP-NanamiNeural"
-POLL_SECONDS = 10
 MAX_TEXT_CHARS = 1200
+
+# Long-polling (2026-11-13, Supabase fair-use fix): claims pass
+# waitSeconds and the voice-queue function holds the request
+# open server-side until a job appears or the wait expires.
+# The old fixed polls (10s passage / 1.5s tts) burned ~66k
+# function invocations a DAY doing nothing — 622k in one
+# billing period against the free plan's 550k line, while real
+# jobs numbered in the dozens. An idle worker now costs ~2
+# invocations a minute across both lanes. The EMPTY_FLOOR
+# sleeps bound the damage even if an old function version
+# answers instantly: an empty reply that came back fast is
+# padded out to the floor before the next claim.
+LONG_POLL_SECONDS = 45
+LONG_POLL_TIMEOUT = 90
+EMPTY_FLOOR_SECONDS = 10
 
 # The synchronous tts lane (Doc 17 addendum 5, 2026-11-08): the
 # app's play buttons ask the `tts-vm` function for one line; the
 # function enqueues a kind='tts' job and waits, so this lane
-# polls FAST (1.5 s) in its own thread and returns MP3 (the web
-# plays it everywhere — the passage lane's ogg/opus conversion
-# is a Telegram requirement, not a web one). Casts mirror
-# src/lib/voiceCast.js in the app: the free Edge route has two
-# Japanese neural voices; girl/boy are pitch lifts.
-TTS_POLL_SECONDS = 1.5
+# claims in its own thread and returns MP3 (the web plays it
+# everywhere — the passage lane's ogg/opus conversion is a
+# Telegram requirement, not a web one). It long-polls like the
+# passage lane (2026-11-13): the function's server-side wait
+# re-checks every 2.5s, so pickup latency stays ~3s without a
+# 1.5s client poll. Casts mirror src/lib/voiceCast.js in the
+# app: the free Edge route has two Japanese neural voices;
+# girl/boy are pitch lifts.
+TTS_EMPTY_FLOOR_SECONDS = 5
 CASTS = {
     "female": ("ja-JP-NanamiNeural", "+0Hz"),
     "male": ("ja-JP-KeitaNeural", "+0Hz"),
@@ -144,13 +161,14 @@ def tts_loop(cfg):
     """
     url = cfg.get("VOICE_QUEUE_URL", "")
     secret = cfg.get("VOICE_WORKER_SECRET", "")
-    log("tts lane started (poll %.1fs)" % TTS_POLL_SECONDS)
+    log("tts lane started (long-poll %ds)" % LONG_POLL_SECONDS)
     while True:
         try:
-            res = post_json(url, secret, {"action": "tts-claim"}, timeout=30)
+            t_claim = time.time()
+            res = post_json(url, secret, {"action": "tts-claim", "waitSeconds": LONG_POLL_SECONDS}, timeout=LONG_POLL_TIMEOUT)
             job = res.get("job") if isinstance(res, dict) else None
             if not job:
-                time.sleep(TTS_POLL_SECONDS)
+                time.sleep(max(1, TTS_EMPTY_FLOOR_SECONDS - (time.time() - t_claim)))
                 continue
             job_id = str(job["id"])
             text = str(job.get("text", ""))[:MAX_TEXT_CHARS]
@@ -221,10 +239,11 @@ def main():
     lane.start()
     while True:
         try:
-            res = post_json(url, secret, {"action": "claim"}, timeout=30)
+            t_claim = time.time()
+            res = post_json(url, secret, {"action": "claim", "waitSeconds": LONG_POLL_SECONDS}, timeout=LONG_POLL_TIMEOUT)
             job = res.get("job") if isinstance(res, dict) else None
             if not job:
-                time.sleep(POLL_SECONDS)
+                time.sleep(max(1, EMPTY_FLOOR_SECONDS - (time.time() - t_claim)))
                 continue
             job_id = str(job["id"])
             text = str(job.get("text", ""))[:MAX_TEXT_CHARS]
