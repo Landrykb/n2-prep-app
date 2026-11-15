@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { buildKnownSet, countKnownContent, currentBatchWords, deckCreditSet, evaluateDraft, isColdStart, nextForbiddenList, passageNewKanji, passageRatio, pickGentle, pickPassage, pickStarter, resolveBand, seenKanjiSet, serveBandFor, shouldGenerate } from './fit.ts'
+import { BASIC_KANJI } from './kanji-basic.ts'
 import { DECK_LEVELS } from './deck.ts'
 import { DECK_GLOSS } from './gloss.ts'
 import { segmentText } from './segment.ts'
@@ -553,6 +554,7 @@ serve(async (req: Request) => {
       if (!cardKanji.length) {
         cardKanji = passageNewKanji(picked.passage.tokens, seenKanji)
       }
+      cardKanji = cardKanji.filter((k) => !BASIC_KANJI.has(k))
       if (cardKanji.length) {
         await supabaseAdmin.from('kanji_cards').upsert(
           cardKanji.map((kanji) => ({ user_id: userId, kanji })),

@@ -9,6 +9,7 @@ import { synthesizeSpeechOgg } from './voice.ts'
 import { READ_ALOUD_PASS_SCORE, firstMissedCandidate, scoreReadAloud } from './score.ts'
 import { HEARD_FLOOR, heardReading, loadHeardDict, matchHeardWords, selectHeardTargets, summariseHeard } from './ambient.ts'
 import { bt, botFittedFooter, botLevelIntro, botTrialUpCopy, languageFromState, languageFromStateRow, voiceResultKeyboard, type BotLang } from './i18n.ts'
+import { BASIC_KANJI } from './kanji-basic.ts'
 
 // Yonde Reader bot (Doc 16 §6/§7 R0, Doc 12 step 3.6).
 //
@@ -2915,7 +2916,11 @@ serve(async (req: Request) => {
     const CARD_ECHO_HOURS = [0, 4, 9, 24, 48, 96, 168, 336, 720, 1440]
 
     const registerKanjiCards = async (userId: string, kanjiList: string[]) => {
-      const fresh = [...new Set(kanjiList)].filter((k) => k && k.length === 1)
+      // Never card the basics (old-JLPT N5/N4): a card exists
+      // to teach a NEW kanji, and fallback glyphs from a
+      // passage include plenty the learner has known for
+      // years (owner receipts, 2026-11-15: 日・月・口 cards).
+      const fresh = [...new Set(kanjiList)].filter((k) => k && k.length === 1 && !BASIC_KANJI.has(k))
       if (!fresh.length) return
       const rows = fresh.map((kanji) => ({ user_id: userId, kanji }))
       const { error } = await supabaseAdmin.from('kanji_cards')
@@ -2984,8 +2989,11 @@ serve(async (req: Request) => {
     }
 
     // The dispatch sweep: every linked learner's due echoes go
-    // out in their daytime (07:00–21:59 local), at most 4 cards
-    // per learner per sweep.
+    // out in their daytime (07:00–21:59 local), in batches of
+    // at most 4, with at least ~2 hours between batches — a
+    // few calm batches a day, never a drip (owner, 2026-11-15:
+    // a batch every 30 minutes all afternoon was too much).
+    const CARD_BATCH_GAP_MS = 2 * 3600_000
     const deliverDueCards = async () => {
       const { data: links } = await supabaseAdmin
         .from('telegram_links').select('user_id, chat_id, tz')
@@ -2996,6 +3004,13 @@ serve(async (req: Request) => {
             hour: 'numeric', hourCycle: 'h23', timeZone: tz,
           }).format(new Date()))
           if (!(hour >= 7 && hour <= 21)) continue
+          const { data: lastRows } = await supabaseAdmin.from('kanji_cards')
+            .select('last_sent_at').eq('user_id', link.user_id)
+            .not('last_sent_at', 'is', null)
+            .order('last_sent_at', { ascending: false }).limit(1)
+          const lastSent = lastRows?.[0]?.last_sent_at
+            ? new Date(String(lastRows[0].last_sent_at)).getTime() : 0
+          if (Date.now() - lastSent < CARD_BATCH_GAP_MS) continue
           const { data: due } = await supabaseAdmin.from('kanji_cards')
             .select('user_id, kanji, sends, first_seen_at')
             .eq('user_id', link.user_id)
@@ -3016,23 +3031,15 @@ serve(async (req: Request) => {
         .select('id, text, status').eq('id', jobId).eq('kind', 'card').maybeSingle()
       if (!job) return json({ ok: false, error: 'Job not found' }, 404)
       if (job.status !== 'done') return json({ ok: true, skipped: String(job.status) })
-      const kanji = String(job.text ?? '')
-      const { data: due } = await supabaseAdmin.from('kanji_cards')
-        .select('user_id, kanji, sends, first_seen_at')
-        .eq('kanji', kanji)
-        .lte('next_due_at', new Date().toISOString())
-        .lt('sends', CARD_ECHO_HOURS.length).limit(10)
-      let delivered = 0
-      for (const row of (due ?? []) as CardRow[]) {
-        const { data: link } = await supabaseAdmin.from('telegram_links')
-          .select('chat_id').eq('user_id', row.user_id).maybeSingle()
-        if (!link?.chat_id) continue
-        if (await sendKanjiCard(Number(link.chat_id), row) === 'sent') delivered++
-      }
+      // The render is cached in storage — and that is all
+      // that happens here. Delivery belongs to the dispatch
+      // sweep alone, so cards arrive in the calm batch rhythm
+      // instead of trickling in one by one as renders finish
+      // (owner, 2026-11-15).
       // Process-and-delete: the PNG lives in storage; the job
       // row was only the courier.
       await supabaseAdmin.from('voice_jobs').delete().eq('id', jobId)
-      return json({ ok: true, delivered })
+      return json({ ok: true, delivered: 0 })
     }
 
     // Card callbacks: Show answer swaps the question photo for
