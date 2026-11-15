@@ -547,6 +547,7 @@ serve(async (req: Request) => {
     const routeParams = new URL(req.url).searchParams
     let dispatchMode = false
     let voiceJobId: string | null = null
+    let cardJobId: string | null = null
     // ---------- web automatic-listening chunks (Doc 22) ----------
     // The app's automatic mode records short chunks in the page
     // and posts them here: ?webchunk=1 with the learner's own
@@ -619,7 +620,7 @@ serve(async (req: Request) => {
         if (file.size === 0 || file.size > 20 * 1024 * 1024) return json({ error: 'bad audio size' }, 400)
         webChunk = { userId, audio: await file.arrayBuffer(), mime: file.type || 'audio/webm' }
       }
-    } else if (routeParams.get('dispatch') === '1' || routeParams.get('voicejob')) {
+    } else if (routeParams.get('dispatch') === '1' || routeParams.get('voicejob') || routeParams.get('cardjob')) {
       const cronSecret = Deno.env.get('READER_CRON_SECRET') ?? ''
       const providedCron = req.headers.get('x-cron-secret') ?? ''
       if (!cronSecret || !providedCron || providedCron !== cronSecret) {
@@ -630,6 +631,7 @@ serve(async (req: Request) => {
         return json({ error: 'Bot is not configured' }, 500)
       }
       if (routeParams.get('dispatch') === '1') dispatchMode = true
+      else if (routeParams.get('cardjob')) cardJobId = routeParams.get('cardjob')
       else voiceJobId = routeParams.get('voicejob')
     } else {
       // ---------- webhook route ----------
@@ -1581,6 +1583,16 @@ serve(async (req: Request) => {
         // the learning loop turning, not just passages moving.
         ...(coldStart ? {} : { newKanji: newKanji.length, recycledBatch }),
       })
+      // Kanji cards (2026-11-15): the kanji of this serve's
+      // NEW WORDS join the learner's flash-card echo schedule —
+      // the bot will show each of them many times, starting
+      // today. (The dose words are the learning target; when a
+      // serve carried no new words, its new glyphs register
+      // instead.)
+      const cardKanji = [...new Set(
+        newWords.flatMap((w) => [...String(w)].filter((ch) => /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/.test(ch))),
+      )]
+      await registerKanjiCards(link.user_id, cardKanji.length ? cardKanji : newKanji)
       return 'sent'
     }
 
@@ -2885,6 +2897,120 @@ serve(async (req: Request) => {
       return json({ ok: delivered })
     }
 
+    // ---------- kanji flash cards (2026-11-15) ----------
+    // Landry's ask: when a learner meets NEW kanji, show them
+    // many many times in a nice designed visual way — the bot
+    // sends a big picture card (the kanji drawn from its stroke
+    // paths, readings, meaning, common words) several times a
+    // day at first, then across days. Echo offsets from the
+    // first meeting: now, +4h, +9h, then days 1, 2, 4, 7.
+    // Rendering happens on the Voice Worker (card lane); the
+    // PNG is per-kanji and cached in storage forever.
+    const CARD_ECHO_HOURS = [0, 4, 9, 24, 48, 96, 168]
+
+    const registerKanjiCards = async (userId: string, kanjiList: string[]) => {
+      const fresh = [...new Set(kanjiList)].filter((k) => k && k.length === 1)
+      if (!fresh.length) return
+      const rows = fresh.map((kanji) => ({ user_id: userId, kanji }))
+      const { error } = await supabaseAdmin.from('kanji_cards')
+        .upsert(rows, { onConflict: 'user_id,kanji', ignoreDuplicates: true })
+      if (error) console.error('reader-bot: kanji card register failed', error.message)
+    }
+
+    const enqueueCardJob = async (userId: string, kanji: string) => {
+      const { data: existing } = await supabaseAdmin.from('voice_jobs')
+        .select('id').eq('kind', 'card').eq('text', kanji)
+        .in('status', ['pending', 'claimed']).limit(1)
+      if (existing && existing.length > 0) return
+      const { error } = await supabaseAdmin.from('voice_jobs')
+        .insert({ user_id: userId, kind: 'card', text: kanji, status: 'pending' })
+      if (error) {
+        console.error('reader-bot: card job insert failed', error.message)
+        return
+      }
+      await pokeWorker(supabaseAdmin)
+    }
+
+    type CardRow = { user_id: string; kanji: string; sends: number; first_seen_at: string }
+
+    const sendKanjiCard = async (chatId: number, row: CardRow): Promise<string> => {
+      const { data: signed, error } = await supabaseAdmin.storage
+        .from('voice-cache')
+        .createSignedUrl(`cards/${(row.kanji.codePointAt(0) ?? 0).toString(16)}.png`, 3600)
+      if (error || !signed?.signedUrl) {
+        await enqueueCardJob(row.user_id, row.kanji)
+        return 'queued'
+      }
+      const res = await tg(botToken, 'sendPhoto', {
+        chat_id: chatId,
+        photo: signed.signedUrl,
+        caption: `${row.kanji} · ${row.sends + 1}/${CARD_ECHO_HOURS.length}`,
+      }).catch(() => null) as { ok?: boolean } | null
+      if (!res?.ok) return 'failed'
+      const sends = row.sends + 1
+      const firstSeen = new Date(row.first_seen_at).getTime()
+      const nextDue = sends < CARD_ECHO_HOURS.length
+        ? new Date(firstSeen + CARD_ECHO_HOURS[sends] * 3600_000).toISOString()
+        : new Date(firstSeen + 365 * 24 * 3600_000).toISOString()
+      await supabaseAdmin.from('kanji_cards')
+        .update({ sends, next_due_at: nextDue, last_sent_at: new Date().toISOString() })
+        .eq('user_id', row.user_id).eq('kanji', row.kanji)
+      await logEvent(row.user_id, 'kanji_card_sent', { kanji: row.kanji, send: sends })
+      return 'sent'
+    }
+
+    // The dispatch sweep: every linked learner's due echoes go
+    // out in their daytime (07:00–21:59 local), at most 4 cards
+    // per learner per sweep.
+    const deliverDueCards = async () => {
+      const { data: links } = await supabaseAdmin
+        .from('telegram_links').select('user_id, chat_id, tz')
+      for (const link of links ?? []) {
+        try {
+          const tz = String(link.tz || 'Asia/Tokyo')
+          const hour = Number(new Intl.DateTimeFormat('en-US', {
+            hour: 'numeric', hourCycle: 'h23', timeZone: tz,
+          }).format(new Date()))
+          if (!(hour >= 7 && hour <= 21)) continue
+          const { data: due } = await supabaseAdmin.from('kanji_cards')
+            .select('user_id, kanji, sends, first_seen_at')
+            .eq('user_id', link.user_id)
+            .lte('next_due_at', new Date().toISOString())
+            .lt('sends', CARD_ECHO_HOURS.length)
+            .order('next_due_at', { ascending: true }).limit(4)
+          for (const row of (due ?? []) as CardRow[]) {
+            await sendKanjiCard(Number(link.chat_id), row)
+          }
+        } catch (err) {
+          console.error('reader-bot: card delivery failed for a learner', err)
+        }
+      }
+    }
+
+    const handleCardJob = async (jobId: string) => {
+      const { data: job } = await supabaseAdmin.from('voice_jobs')
+        .select('id, text, status').eq('id', jobId).eq('kind', 'card').maybeSingle()
+      if (!job) return json({ ok: false, error: 'Job not found' }, 404)
+      if (job.status !== 'done') return json({ ok: true, skipped: String(job.status) })
+      const kanji = String(job.text ?? '')
+      const { data: due } = await supabaseAdmin.from('kanji_cards')
+        .select('user_id, kanji, sends, first_seen_at')
+        .eq('kanji', kanji)
+        .lte('next_due_at', new Date().toISOString())
+        .lt('sends', CARD_ECHO_HOURS.length).limit(10)
+      let delivered = 0
+      for (const row of (due ?? []) as CardRow[]) {
+        const { data: link } = await supabaseAdmin.from('telegram_links')
+          .select('chat_id').eq('user_id', row.user_id).maybeSingle()
+        if (!link?.chat_id) continue
+        if (await sendKanjiCard(Number(link.chat_id), row) === 'sent') delivered++
+      }
+      // Process-and-delete: the PNG lives in storage; the job
+      // row was only the courier.
+      await supabaseAdmin.from('voice_jobs').delete().eq('id', jobId)
+      return json({ ok: true, delivered })
+    }
+
     // ---------- morning dispatch (R1) ----------
     // Fired by pg_cron (READER_CRON_SECRET header — authorised in
     // the route check above, before the webhook secret is even
@@ -2929,6 +3055,13 @@ serve(async (req: Request) => {
         const { data: staleTts } = await supabaseAdmin
           .from('voice_jobs').select('id, storage_path')
           .eq('kind', 'tts').eq('status', 'done').lt('completed_at', hourAgo).limit(50)
+        const { data: staleCards } = await supabaseAdmin.from('voice_jobs')
+          .select('id')
+          .eq('kind', 'card').eq('status', 'done').lt('completed_at', hourAgo).limit(50)
+        for (const j of staleCards ?? []) {
+          await supabaseAdmin.from('voice_jobs').delete().eq('id', j.id)
+          dropped++
+        }
         if (staleTts?.length) await dropJobs(staleTts as Array<Record<string, unknown>>)
         const { data: failedJobs } = await supabaseAdmin
           .from('voice_jobs').select('id, storage_path')
@@ -2955,6 +3088,7 @@ serve(async (req: Request) => {
         .from('voice_jobs')
         .select('id, passage_id, chat_id, status, storage_path')
         .eq('status', 'done')
+        .neq('kind', 'card')
         .order('completed_at', { ascending: true })
         .limit(25)
       for (const job of doneJobs ?? []) {
@@ -3071,6 +3205,8 @@ serve(async (req: Request) => {
           console.error('reader-bot: dispatch serve failed for one learner', err)
         }
       }
+      // Kanji card echoes ride the same sweep (2026-11-15).
+      await deliverDueCards()
       return json({ ok: true, due, sent })
     }
 
@@ -3102,6 +3238,12 @@ serve(async (req: Request) => {
     // one worker-made voice and return.
     if (voiceJobId) {
       return await handleVoiceJob(voiceJobId)
+    }
+
+    // A cardjob call has no Telegram update either — the worker
+    // finished rendering a kanji card; deliver its due echoes.
+    if (cardJobId) {
+      return await handleCardJob(cardJobId)
     }
 
     // ---------- update routing ----------

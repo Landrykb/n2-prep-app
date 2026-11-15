@@ -106,7 +106,7 @@ serve(async (req: Request) => {
     // tryClaim: one atomic claim attempt for a lane. Returns
     // { job } on a win, { job: null } when the lane is empty,
     // or { response } when a database error must surface as-is.
-    const tryClaim = async (kind: 'passage' | 'tts') => {
+    const tryClaim = async (kind: 'passage' | 'tts' | 'card') => {
       for (let attempt = 0; attempt < 3; attempt++) {
         const { data: pending, error: selError } = await supabaseAdmin
           .from('voice_jobs')
@@ -150,8 +150,8 @@ serve(async (req: Request) => {
     // worker costs one invocation per wait instead of one per
     // breath — and a job arriving mid-wait is still claimed in
     // ~3s. waitSeconds absent/0 keeps the old instant behaviour.
-    if (action === 'claim' || action === 'tts-claim') {
-      const kind = action === 'claim' ? 'passage' : 'tts'
+    if (action === 'claim' || action === 'tts-claim' || action === 'card-claim') {
+      const kind = action === 'claim' ? 'passage' : action === 'tts-claim' ? 'tts' : 'card'
       const waitRaw = Number((body as Record<string, unknown>)?.waitSeconds)
       const waitS = Number.isFinite(waitRaw) ? Math.min(Math.max(waitRaw, 0), LONG_POLL_MAX_S) : 0
       const deadline = Date.now() + waitS * 1000
@@ -282,6 +282,87 @@ serve(async (req: Request) => {
         return json({ error: 'Job is not in a claimed state' }, 409)
       }
       console.log(`voice-queue: tts job ${jobId} done (${bytes.length} bytes)`)
+      return json({ ok: true })
+    }
+
+    // ---------- card-complete: PNG back, cached forever, poke ------
+    // Kanji flash cards (2026-11-15): the worker renders one
+    // kanji's card; the PNG is per-kanji (not per-user), so it is
+    // stored at cards/<kanji>.png and reused for every learner
+    // and every echo. reader-bot is poked to deliver any due
+    // sends for that kanji.
+    if (action === 'card-complete') {
+      const jobId = typeof body?.jobId === 'string' ? body.jobId : ''
+      const audioBase64 = typeof body?.audioBase64 === 'string' ? body.audioBase64 : ''
+      if (!jobId || !audioBase64) {
+        return json({ error: 'jobId and audioBase64 are required' }, 400)
+      }
+      let bytes: Uint8Array
+      try {
+        const bin = atob(audioBase64)
+        bytes = new Uint8Array(bin.length)
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+      } catch {
+        return json({ error: 'audioBase64 is not valid base64' }, 400)
+      }
+      if (bytes.length === 0 || bytes.length > MAX_AUDIO_BYTES) {
+        return json({ error: 'Image size out of bounds' }, 400)
+      }
+      const { data: jobRow } = await supabaseAdmin
+        .from('voice_jobs')
+        .select('text')
+        .eq('id', jobId)
+        .eq('kind', 'card')
+        .maybeSingle()
+      const kanji = String(jobRow?.text ?? '').trim()
+      if (!kanji) {
+        return json({ error: 'Card job not found' }, 404)
+      }
+      // Storage keys must be ASCII: the card lives under the
+      // kanji's codepoint (cards/8ac7.png for 談).
+      const storagePath = `cards/${(kanji.codePointAt(0) ?? 0).toString(16)}.png`
+      const { error: uploadError } = await supabaseAdmin.storage
+        .from(BUCKET)
+        .upload(storagePath, bytes, { contentType: 'image/png', upsert: true })
+      if (uploadError) {
+        console.error(`voice-queue: card storage upload failed job=${jobId}`)
+        return json({ error: 'Storage upload failed' }, 500)
+      }
+      const { data: done, error: doneError } = await supabaseAdmin
+        .from('voice_jobs')
+        .update({
+          status: 'done',
+          storage_path: storagePath,
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', jobId)
+        .eq('status', 'claimed')
+        .eq('kind', 'card')
+        .select('id')
+      if (doneError) {
+        console.error(`voice-queue: card done write failed job=${jobId}`)
+        return json({ error: 'Job update failed' }, 500)
+      }
+      if (!done || done.length === 0) {
+        return json({ error: 'Job is not in a claimed state' }, 409)
+      }
+      console.log(`voice-queue: card job ${jobId} done (${kanji}, ${bytes.length} bytes)`)
+      const cronSecret = Deno.env.get('READER_CRON_SECRET') ?? ''
+      if (cronSecret && supabaseUrl) {
+        try {
+          const ctrl = new AbortController()
+          const timer = setTimeout(() => ctrl.abort(), 15000)
+          await fetch(`${supabaseUrl}/functions/v1/reader-bot?cardjob=${encodeURIComponent(jobId)}`, {
+            method: 'POST',
+            signal: ctrl.signal,
+            headers: { 'x-cron-secret': cronSecret, 'Content-Type': 'application/json' },
+            body: '{}',
+          }).catch(() => null)
+          clearTimeout(timer)
+        } catch {
+          console.error(`voice-queue: reader-bot card poke failed job=${jobId}`)
+        }
+      }
       return json({ ok: true })
     }
 
