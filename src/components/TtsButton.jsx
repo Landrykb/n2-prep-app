@@ -96,6 +96,11 @@ export default function TtsButton({ text, className = '', cast = null, audioSrc 
       >
         {speaking ? <Loader2 size={18} className="animate-spin" /> : <Volume2 size={18} />}
       </button>
+      {speaking && (
+        <span className="voice-wave-box bg-bun-700" aria-hidden="true">
+          <span /><span /><span /><span /><span />
+        </span>
+      )}
       {fallback && <span className="text-[10px] leading-tight text-amber-300/90 max-w-[110px]">{t('shell.tts.noVoice')}</span>}
       {failNote && <span className="text-[10px] leading-tight text-amber-300/90 max-w-[180px]">voice: {failNote}</span>}
     </span>

@@ -126,6 +126,35 @@ rt {
     0 0 40px -20px rgba(113, 54, 138, 0.14);
 }
 
+/* The reading-voice indicator (Landry, 2026-11-15): a small
+   rectangular box with animated sound waves, shown beside the
+   speaker button while the voice is on. Flat bars in the one
+   accent — no glow, no gradient (DESIGN-RULES). */
+@keyframes wavebar {
+  0%, 100% { transform: scaleY(0.3) }
+  50% { transform: scaleY(1) }
+}
+.voice-wave-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 2.5px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 7px;
+}
+.voice-wave-box > span {
+  width: 3px;
+  height: 12px;
+  border-radius: 9999px;
+  background: #FF8A75;
+  transform-origin: center;
+  animation: wavebar 0.9s ease-in-out infinite;
+}
+.voice-wave-box > span:nth-child(2) { animation-delay: 0.12s; animation-duration: 0.75s }
+.voice-wave-box > span:nth-child(3) { animation-delay: 0.24s; animation-duration: 1s }
+.voice-wave-box > span:nth-child(4) { animation-delay: 0.36s; animation-duration: 0.8s }
+.voice-wave-box > span:nth-child(5) { animation-delay: 0.48s; animation-duration: 0.95s }
+
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
   15% { transform: translateX(-8px) rotate(-2deg); }

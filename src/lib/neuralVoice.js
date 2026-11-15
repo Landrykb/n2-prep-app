@@ -139,6 +139,13 @@ async function fetchAudioBytes(source) {
 async function playDecoded(source, { rate = 1, onEnded, onStarted, shouldContinue } = {}) {
   const ctx = audioCtx()
   if (!ctx) return false
+  // Give the resume a real chance to land before anything is
+  // scheduled: audioCtx() fires it without awaiting, and a
+  // context still suspended at start() time plays into a
+  // frozen clock (see the probe below).
+  if (ctx.state === 'suspended') {
+    try { await ctx.resume() } catch { /* the probe below judges */ }
+  }
   let bytes
   try { bytes = await fetchAudioBytes(source) } catch { return false }
   if (shouldContinue && !shouldContinue()) return false
@@ -153,6 +160,26 @@ async function playDecoded(source, { rate = 1, onEnded, onStarted, shouldContinu
   node.onended = () => { if (currentSource === node) currentSource = null; if (onEnded) onEnded() }
   try { node.start() } catch { return false }
   if (onStarted) onStarted((buffer.duration * 1000) / (rate > 0 ? rate : 1))
+  // Started is not the same as AUDIBLE (2026-11-15, the
+  // owner's webview): after the long synthesis wait the
+  // context can sit suspended — the node starts into a frozen
+  // clock, no sound ever comes out, onended never fires, and
+  // the line hangs in silence until the watchdog ends it (his
+  // passage read at 12:12: the server delivered in 11s, the
+  // phone played nothing). Probe the clock: if it has not
+  // advanced shortly after start, this route is silent —
+  // stop the node and report failure, so the caller drops to
+  // the element route and then the device voice, with the
+  // reason printed on the button instead of silence.
+  const t0 = ctx.currentTime
+  await new Promise((r) => setTimeout(r, 700))
+  if (shouldContinue && !shouldContinue()) return true
+  if (ctx.state !== 'running' || ctx.currentTime <= t0) {
+    try { node.onended = null; node.stop() } catch { /* already stopped */ }
+    if (currentSource === node) currentSource = null
+    logVoice('decoded-silent', { state: ctx.state })
+    return false
+  }
   return true
 }
 function stopDecoded() {
