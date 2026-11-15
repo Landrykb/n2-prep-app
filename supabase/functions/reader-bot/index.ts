@@ -1091,13 +1091,23 @@ serve(async (req: Request) => {
       const since = new Date(Date.now() - RECENT_DAYS * 86400000).toISOString()
       const { data: sentRows } = await supabaseAdmin
         .from('metrics_events')
-        .select('payload')
+        .select('payload, created_at')
         .eq('user_id', link.user_id)
         .eq('type', 'passage_sent')
         .gte('created_at', since)
       const recentIds = (sentRows || [])
         .map((r) => (r.payload as Record<string, unknown>)?.passageId)
         .filter((x): x is string => typeof x === 'string')
+      // Last-sent time per recent passage — the re-read lane
+      // below rotates by it (least-recently served first).
+      const lastSentAt = new Map<string, string>()
+      for (const r of sentRows || []) {
+        const pid = (r.payload as Record<string, unknown>)?.passageId
+        const at = (r as Record<string, unknown>)?.created_at
+        if (typeof pid === 'string' && typeof at === 'string') {
+          if (!lastSentAt.has(pid) || at > (lastSentAt.get(pid) as string)) lastSentAt.set(pid, at)
+        }
+      }
 
       const { data: bank, error: bankError } = await supabaseAdmin
         .from('reading_passages')
@@ -1165,6 +1175,43 @@ serve(async (req: Request) => {
           ? (pickGentle(bank, known, serveBand, recentIds, fitOpts) ?? pickPassage(bank, known, serveBand, recentIds, fitOpts))
           : pickPassage(bank, known, serveBand, recentIds, fitOpts)
         if (fit) picked = { passage: fit.passage as Record<string, unknown>, ratio: fit.ratio }
+      }
+      if (!picked && !cold && opts.kind !== 'morning') {
+        // Re-read lane (2026-11-15): the 14-day freshness
+        // exclusion is a PROACTIVE-serve rule — it keeps the
+        // morning dispatch from repeating itself. A learner
+        // standing here tapping Next Passage or Push Me is
+        // asking for a passage NOW; when every fitting passage
+        // is recent (a keen reader, a small shelf), serving
+        // the least-recent fit again — framed honestly as a
+        // re-read — beats a minute in the generation lottery
+        // that usually ends at the same shelf. Receipts: by
+        // 2026-11-15 all eight passages that fit the owner
+        // were inside the window, so every tap dug through
+        // generation first ("Hori digging through the shelves
+        // takes too long", on every surface). Push Me (fit
+        // step up) takes the HARDEST fitting re-read — the
+        // lowest known ratio, the most new material; a plain
+        // Next takes the least-recently served. Morning
+        // serves keep their own anti-repeat law below.
+        const recentRows = bank.filter((pg) => recentIds.includes(String(pg.id)))
+        if (recentRows.length > 0) {
+          const fits: Array<{ passage: Record<string, unknown>; ratio: number }> = []
+          const excluded: string[] = []
+          for (let i = 0; i < recentRows.length; i++) {
+            const fit = pickPassage(recentRows as Array<Record<string, unknown>>, known, serveBand, excluded, fitOpts)
+            if (!fit) break
+            fits.push({ passage: fit.passage as Record<string, unknown>, ratio: fit.ratio })
+            excluded.push(String(fit.passage.id))
+          }
+          if (fits.length > 0) {
+            const chosen = fitStep >= 1
+              ? fits.reduce((a, b) => (b.ratio < a.ratio ? b : a))
+              : fits.reduce((a, b) => ((lastSentAt.get(String(b.passage.id)) ?? '') < (lastSentAt.get(String(a.passage.id)) ?? '') ? b : a))
+            picked = { passage: chosen.passage, ratio: chosen.ratio }
+            again = true
+          }
+        }
       }
       // Interactive serves (a tap is waiting: /read, Next
       // Passage, Push Me, the level doors) show a working note
@@ -2793,6 +2840,20 @@ serve(async (req: Request) => {
           .eq('id', String(job.id))
           .eq('status', 'done')
         if (sentError) console.error('reader-bot: voice job sent write failed')
+        // Process-and-delete (Landry's rule, 2026-11-15): the
+        // durable copy of a passage's voice is Telegram's
+        // file_id, cached on the passage above — the bucket
+        // object was only the courier. Remove it and the job
+        // row so storage never grows with usage. A failure here
+        // leaves the 'sent' row for the dispatch janitor to
+        // finish; if the file_id write failed, the next serve
+        // simply re-synthesizes (sendPassageVoice re-enqueues).
+        const { error: rmError } = await supabaseAdmin.storage.from('voice-cache').remove([storagePath])
+        if (rmError) console.error('reader-bot: voice job audio cleanup failed')
+        else {
+          const { error: delError } = await supabaseAdmin.from('voice_jobs').delete().eq('id', String(job.id)).eq('status', 'sent')
+          if (delError) console.error('reader-bot: voice job row cleanup failed')
+        }
         return true
       } catch (err) {
         console.error('reader-bot: voice job delivery failed', err)
@@ -2824,7 +2885,54 @@ serve(async (req: Request) => {
     // band basis are skipped SILENTLY — a dispatch must never nag a
     // stranger into declaring a level (§9); their /read asks the
     // question when THEY come.
+    // Storage janitor (2026-11-15, process-and-delete): voice
+    // artifacts are couriers, not archives. On every dispatch
+    // pass, finish any cleanup delivery left behind and clear
+    // the terminal states nothing will ever read again:
+    //  · passage jobs already 'sent' — remove object + row
+    //    (the passage keeps Telegram's file_id);
+    //  · tts jobs 'done' for over an hour — their one reader
+    //    (the tts-vm request that waited 20s) is long gone,
+    //    and the line itself lives on in the content cache;
+    //  · jobs 'failed' for over a day — remove object + row;
+    //  · jobs stuck 'claimed' for over an hour — the worker
+    //    died mid-job; fail them so a future serve re-enqueues
+    //    (a stale 'claimed' otherwise counts as live forever).
+    // Every step is best-effort and logged, never thrown: the
+    // morning serves below matter more than a clean bucket.
+    const janitorVoiceStorage = async () => {
+      try {
+        const hourAgo = new Date(Date.now() - 3600_000).toISOString()
+        const dayAgo = new Date(Date.now() - 24 * 3600_000).toISOString()
+        const dropJobs = async (rows: Array<Record<string, unknown>>) => {
+          for (const row of rows) {
+            const path = typeof row.storage_path === 'string' ? row.storage_path : ''
+            if (path) await supabaseAdmin.storage.from('voice-cache').remove([path]).catch(() => null)
+            await supabaseAdmin.from('voice_jobs').delete().eq('id', String(row.id))
+          }
+        }
+        const { data: sentJobs } = await supabaseAdmin
+          .from('voice_jobs').select('id, storage_path').eq('status', 'sent').limit(50)
+        if (sentJobs?.length) await dropJobs(sentJobs as Array<Record<string, unknown>>)
+        const { data: staleTts } = await supabaseAdmin
+          .from('voice_jobs').select('id, storage_path')
+          .eq('kind', 'tts').eq('status', 'done').lt('completed_at', hourAgo).limit(50)
+        if (staleTts?.length) await dropJobs(staleTts as Array<Record<string, unknown>>)
+        const { data: failedJobs } = await supabaseAdmin
+          .from('voice_jobs').select('id, storage_path')
+          .eq('status', 'failed').lt('created_at', dayAgo).limit(50)
+        if (failedJobs?.length) await dropJobs(failedJobs as Array<Record<string, unknown>>)
+        await supabaseAdmin
+          .from('voice_jobs')
+          .update({ status: 'failed', error: 'claim expired (janitor)' })
+          .eq('status', 'claimed').lt('claimed_at', hourAgo)
+      } catch (err) {
+        console.error('reader-bot: voice janitor failed', err)
+      }
+    }
+
     const handleDispatch = async () => {
+      await janitorVoiceStorage()
       // Voice backstop (amendment #6): any job the worker finished
       // whose completion poke never landed — or whose delivery
       // failed — is retried on the cron's regular pass, before the

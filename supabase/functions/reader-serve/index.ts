@@ -314,16 +314,24 @@ serve(async (req: Request) => {
   const since = new Date(Date.now() - RECENT_DAYS * 86400000).toISOString()
   const { data: sentRows } = await supabaseAdmin
     .from('metrics_events')
-    .select('payload')
+    .select('payload, created_at')
     .eq('user_id', userId)
     .eq('type', 'passage_sent')
     .gte('created_at', since)
-  const recentIds = [
-    ...(sentRows || [])
-      .map((r) => (r.payload as Record<string, unknown>)?.passageId)
-      .filter((x): x is string => typeof x === 'string'),
-    ...excludeIds,
-  ]
+  const dbRecentIds = (sentRows || [])
+    .map((r) => (r.payload as Record<string, unknown>)?.passageId)
+    .filter((x): x is string => typeof x === 'string')
+  const recentIds = [...dbRecentIds, ...excludeIds]
+  // Last-sent time per recent passage — the re-read lane
+  // below rotates by it (least-recently served first).
+  const lastSentAt = new Map<string, string>()
+  for (const r of sentRows || []) {
+    const pid = (r.payload as Record<string, unknown>)?.passageId
+    const at = (r as Record<string, unknown>)?.created_at
+    if (typeof pid === 'string' && typeof at === 'string') {
+      if (!lastSentAt.has(pid) || at > (lastSentAt.get(pid) as string)) lastSentAt.set(pid, at)
+    }
+  }
 
   const { data: bank, error: bankError } = await supabaseAdmin
     .from('reading_passages')
@@ -336,6 +344,7 @@ serve(async (req: Request) => {
   let picked: { passage: Record<string, unknown>; ratio: number } | null = null
   let coldStart = false
   let generated = false
+  let again = false
 
   if (cold) {
     const starter = pickStarter(bank, known, recentIds)
@@ -352,6 +361,36 @@ serve(async (req: Request) => {
       ? (pickGentle(bank, known, serveBand, recentIds, fitOpts) ?? pickPassage(bank, known, serveBand, recentIds, fitOpts))
       : pickPassage(bank, known, serveBand, recentIds, fitOpts)
     if (fit) picked = { passage: fit.passage as Record<string, unknown>, ratio: fit.ratio }
+  }
+
+  if (!picked && !cold) {
+    // Re-read lane (2026-11-15, the bot twin's law): the
+    // 14-day freshness exclusion governs proactive serves,
+    // not a learner tapping Next in the app. When every
+    // fitting passage is recent, serve the least-recent fit
+    // again (flagged `again` in the response) instead of
+    // entering the generation lottery — by 2026-11-15 the
+    // owner's whole fitting shelf was inside the window and
+    // every serve on every surface dug for a minute first.
+    // A stepped-up fit (Push Me) takes the hardest re-read.
+    const recentRows = bank.filter((pg) => dbRecentIds.includes(String(pg.id)) && !excludeIds.includes(String(pg.id)))
+    if (recentRows.length > 0) {
+      const fits: Array<{ passage: Record<string, unknown>; ratio: number }> = []
+      const excluded: string[] = []
+      for (let i = 0; i < recentRows.length; i++) {
+        const fit = pickPassage(recentRows as Array<Record<string, unknown>>, known, serveBand, excluded, fitOpts)
+        if (!fit) break
+        fits.push({ passage: fit.passage as Record<string, unknown>, ratio: fit.ratio })
+        excluded.push(String(fit.passage.id))
+      }
+      if (fits.length > 0) {
+        const chosen = fitStep >= 1
+          ? fits.reduce((a, b) => (b.ratio < a.ratio ? b : a))
+          : fits.reduce((a, b) => ((lastSentAt.get(String(b.passage.id)) ?? '') < (lastSentAt.get(String(a.passage.id)) ?? '') ? b : a))
+        picked = { passage: chosen.passage, ratio: chosen.ratio }
+        again = true
+      }
+    }
   }
 
   // Heard Words seeding (Doc 22): the learner's heard words
@@ -493,6 +532,7 @@ serve(async (req: Request) => {
       ratio: picked.ratio,
       coldStart,
       generated,
+      again,
       seededWords,
     })
   }

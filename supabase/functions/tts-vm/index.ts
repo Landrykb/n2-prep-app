@@ -185,6 +185,14 @@ serve(async (req: Request) => {
       // Seed the content cache for the next identical line
       // (best effort — the bytes are already in hand).
       await admin.storage.from(BUCKET).upload(cachePath, bytes, { contentType: 'audio/mpeg', upsert: true }).catch(() => null)
+      // Process-and-delete (Landry's rule, 2026-11-15): the
+      // per-job original was a courier — the content cache
+      // (and the bytes in hand) are the keepers. Remove the
+      // job's file and row so a busy call day leaves nothing
+      // behind. Best-effort: the dispatch janitor in
+      // reader-bot sweeps any 'done' job older than an hour.
+      await admin.storage.from(BUCKET).remove([row.storage_path]).catch(() => null)
+      await admin.from('voice_jobs').delete().eq('id', job.id).then(() => null, () => null)
       await probe('done')
       return await urlResponse(admin, cachePath) ?? audioResponse(bytes)
     }
