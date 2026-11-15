@@ -1,14 +1,23 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Volume2, Loader2 } from 'lucide-react'
 import { ttsAvailable } from '../lib/tts.js'
-import { playAudioFile, speakSenseiLine, speakTurns, getLastVoiceFailure, primeAudioOutput } from '../lib/neuralVoice.js'
+import { playAudioFile, speakSenseiLine, speakTurns, getLastVoiceFailure, primeAudioOutput, prewarmNeuralAudio } from '../lib/neuralVoice.js'
 import { parseScriptTurns } from '../lib/voiceCast.js'
 import { modelCast } from '../lib/voicePreference.js'
 import { useLanguage } from '../hooks/useLanguage.js'
 
 export default function TtsButton({ text, className = '', cast = null, audioSrc = null, browserTimeoutMs = 6000 }) {
   const { t } = useLanguage()
-  const [speaking, setSpeaking] = useState(false)
+  // Two visible states, not one (Landry, 2026-11-15: "it seems
+  // to be loading a few sec before starting... make a loading
+  // indication to know exactly when it starts"): 'loading'
+  // while the voice is still being fetched/synthesized —
+  // spinner + a Loading voice label; 'playing' from the
+  // moment sound actually begins (onStart) — the wave box.
+  // Before this split the spinner covered both and a slow
+  // start read as a broken button.
+  const [phase, setPhase] = useState('idle') // idle | loading | playing
+  const speaking = phase !== 'idle'
   const [fallback, setFallback] = useState(false)
   const [failNote, setFailNote] = useState(null)
   // Neural audio needs only an Audio element; the device voice
@@ -29,6 +38,18 @@ export default function TtsButton({ text, className = '', cast = null, audioSrc 
     if (bits.length) setFailNote(bits.join(' · '))
   }
 
+  // Instant-voice warming (2026-11-15, "all others too"): a
+  // button whose line is known at render warms the server
+  // voice cache on mount, so the tap is a cache answer on
+  // every surface that uses this button, not just the Reader.
+  // Dialogue scripts (turns) and pre-rendered files skip it —
+  // turns speak per-speaker and files are already audio.
+  useEffect(() => {
+    if (!text || audioSrc) return
+    if (parseScriptTurns(text)) return
+    prewarmNeuralAudio(text, cast || modelCast())
+  }, [text, cast, audioSrc])
+
   const speak = (e) => {
     e?.stopPropagation()
     if (!available || !text) return
@@ -38,7 +59,7 @@ export default function TtsButton({ text, className = '', cast = null, audioSrc 
     // the device voice were both dropped by Safari.
     primeAudioOutput()
     setFailNote(null)
-    setSpeaking(true)
+    setPhase('loading')
     // The neural chain first (Doc 17): Edge's Nanami from this
     // device, then the tts function, then the device voice. These
     // lines are the model a learner listens to and repeats — the
@@ -58,7 +79,8 @@ export default function TtsButton({ text, className = '', cast = null, audioSrc 
     // the live chain below take over.
     if (audioSrc) {
       playAudioFile(audioSrc, {
-        onEnd: () => setSpeaking(false),
+        onStart: () => setPhase('playing'),
+        onEnd: () => setPhase('idle'),
         onError: (info) => { noteFailure(info); speakLive() },
       })
       return
@@ -70,7 +92,8 @@ export default function TtsButton({ text, className = '', cast = null, audioSrc 
     const turns = parseScriptTurns(text)
     if (turns) {
       speakTurns(turns, {
-        onEnd: () => setSpeaking(false),
+        onStart: () => setPhase('playing'),
+        onEnd: () => setPhase('idle'),
         onFallback: () => noteFailure(),
         browserTimeoutMs,
       })
@@ -79,7 +102,8 @@ export default function TtsButton({ text, className = '', cast = null, audioSrc 
     speakSenseiLine(text, {
       cast: cast || modelCast(),
       browserTimeoutMs,
-      onEnd: () => setSpeaking(false),
+      onStart: () => setPhase('playing'),
+      onEnd: () => setPhase('idle'),
       // Honest label (P1-2): the device voice had to serve and it
       // has no Japanese voice — say so, as before.
       onFallback: (res) => { noteFailure(); if (res?.fallback) setFallback(true) },
@@ -94,9 +118,10 @@ export default function TtsButton({ text, className = '', cast = null, audioSrc 
         title={t('shell.tts.readAloud')}
         className={`p-2 rounded-xl bg-bun-700 text-[#FF8A75] hover:bg-[#FF6B57]/20 hover:text-[#FFA08D] transition ${className}`}
       >
-        {speaking ? <Loader2 size={18} className="animate-spin" /> : <Volume2 size={18} />}
+        {phase === 'loading' ? <Loader2 size={18} className="animate-spin" /> : <Volume2 size={18} />}
       </button>
-      {speaking && (
+      {phase === 'loading' && <span className="text-[11px] leading-tight text-slate-300">{t('shell.tts.loading')}</span>}
+      {phase === 'playing' && (
         <span className="voice-wave-box bg-bun-700" aria-hidden="true">
           <span /><span /><span /><span /><span />
         </span>

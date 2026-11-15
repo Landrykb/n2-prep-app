@@ -413,10 +413,20 @@ async function fetchNeuralAudio(text, cast = 'female') {
  * takes time"). Fire-and-forget; signed-out callers no-op inside
  * fetchNeuralAudio.
  */
+const warmedVoiceKeys = new Set()
 export async function prewarmNeuralAudio(text, cast = 'female') {
   try {
     const clean = prepareNeuralText(text)
     if (!clean) return
+    // Deduped per page session: every voice button warms its
+    // line on mount (TtsButton), and a screen can carry many
+    // buttons over the same lines — the cache answer is cheap
+    // but not free, and the point is the FIRST tap, not a
+    // standing conversation with the function.
+    const key = `${cast}\n${clean}`
+    if (warmedVoiceKeys.has(key)) return
+    warmedVoiceKeys.add(key)
+    if (warmedVoiceKeys.size > 400) warmedVoiceKeys.clear()
     await fetchNeuralAudio(clean, cast)
   } catch { /* warming is best effort */ }
 }
@@ -531,10 +541,11 @@ export function speakSenseiLine(text, { rate = 1, onEnd, onStart, onFallback, ca
  * the last turn (or when the chain is stopped — the stop path
  * completes the pending line exactly like a single line).
  */
-export function speakTurns(turns, { onEnd, onFallback, browserTimeoutMs = null } = {}) {
+export function speakTurns(turns, { onEnd, onStart, onFallback, browserTimeoutMs = null } = {}) {
   const list = (turns || []).filter((t) => t && t.text)
   if (!list.length) { if (onEnd) onEnd(); return }
   const token = {}
+  let startFired = false
   activeChainToken = token
   let i = 0
   let finished = false
@@ -549,6 +560,7 @@ export function speakTurns(turns, { onEnd, onFallback, browserTimeoutMs = null }
     const turn = list[i++]
     speakSenseiLine(turn.text, {
       cast: turn.cast || 'female',
+      onStart: (ms) => { if (!startFired) { startFired = true; if (onStart) onStart(ms) } },
       onEnd: () => next(),
       ...(onFallback ? { onFallback } : {}),
       ...(browserTimeoutMs ? { browserTimeoutMs } : {}),
