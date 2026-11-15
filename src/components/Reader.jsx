@@ -8,6 +8,9 @@ import { collectLearnerState, saveDeclaredLevel } from '../lib/learnerState.js'
 import { addToQueue, loadQueue, queueItemId } from '../lib/queue.js'
 import { loadDictionary } from '../lib/dictionary.js'
 import { recordMetric } from '../lib/metrics.js'
+import { loadWordSearchIndex } from '../lib/wordsDb.js'
+import { prewarmNeuralAudio } from '../lib/neuralVoice.js'
+import { modelCast } from '../lib/voicePreference.js'
 import {
   BANDS, bandRank, buildKnownSet, countKnownContent, currentBatchWords, deckCreditSet,
   isColdStart, kanjiReadings, passageNewKanji, passageRatio, passageRecyclesBatch,
@@ -185,6 +188,33 @@ export default function Reader({ setActive, onSignIn }) {
   const [busy, setBusy] = useState(false)
   const [reloadKey, setReloadKey] = useState(0) // error retry / level tap re-runs load
   const [canFit, setCanFit] = useState(false) // fit verdicts persist only on a linked row (for now)
+  // Wide word index for the kanji strip's compound pass (the
+  // readings law, amendment #14, web twin): the deck alone does
+  // not carry every compound the segmenter can cut — 面談 was
+  // served as 面 めん because nothing injected a compound
+  // source on this surface (the bot has had one since #14).
+  // The WordsDB common index resolves them; loaded once,
+  // through the same loader the Heard panel uses.
+  const [wordIndex, setWordIndex] = useState(null)
+  useEffect(() => {
+    let live = true
+    loadWordSearchIndex()
+      .then((rows) => {
+        if (!live || !Array.isArray(rows)) return
+        const m = new Map()
+        for (const row of rows) {
+          const w = row?.[1]
+          const r = row?.[2]
+          if (!w || !r) continue
+          for (const v of String(w).split('/')) {
+            if (v && !m.has(v)) m.set(v, { reading: r, meaning: typeof row?.[3] === 'string' ? row[3] : '' })
+          }
+        }
+        setWordIndex(m)
+      })
+      .catch(() => {})
+    return () => { live = false }
+  }, [])
 
   // The fitting context, computed once per sign-in and kept in refs so
   // Another Passage re-picks without re-reading the world. knownRef is
@@ -317,6 +347,12 @@ export default function Reader({ setActive, onSignIn }) {
     setFinished(false)
     setMineNote('')
     setPhase('ready')
+    // Voice pre-warm (2026-11-15): synthesis at serve time, not
+    // at tap time. The bot synthesizes a passage's voice when it
+    // sends it; the web asks the voice function for this text in
+    // the background now, so the learner's tap on play meets a
+    // hot cache (~1s) instead of the synthesizer (~10s).
+    prewarmNeuralAudio(next.passage.text, modelCast())
     // Doc 16 §8: reading_opened is THIS surface's event (the bot logs
     // passage_sent only); passage_sent is logged too, in the bot's
     // payload shape, so the 14-day exclusion spans both surfaces and
@@ -850,7 +886,13 @@ export default function Reader({ setActive, onSignIn }) {
       if (t && typeof t.s === 'string' && !headOf.has(t.s)) headOf.set(t.s, typeof t.h === 'string' && t.h ? t.h : t.s)
     }
     const readingOf = (h) => gloss.get(h)?.reading || byWord.get(h)?.reading || undefined
-    return kanjiReadings(pick.passage.tokens, readingOf).map((r) => {
+    // Compound + meaning sources, widest truth last-resort in
+    // the right order: the passage's own gloss first, then the
+    // WordsDB common index (JMdict readings — 心配 is しんぱい
+    // there, not the deck's しんぱいする）, then the deck.
+    const meaningOf = (h) => gloss.get(h)?.meaning || wordIndex?.get(h)?.meaning || byWord.get(h)?.meaning || undefined
+    const compoundOf = (w) => gloss.get(w) || wordIndex?.get(w) || byWord.get(w) || undefined
+    return kanjiReadings(pick.passage.tokens, readingOf, meaningOf, compoundOf).map((r) => {
       const head = headOf.get(r.word) || r.word
       const candidate = pick.newWords.find((c) => c.word === r.word || (c.h || c.word) === head) || null
       return {
@@ -859,7 +901,7 @@ export default function Reader({ setActive, onSignIn }) {
         candidate,
       }
     })
-  }, [pick])
+  }, [pick, wordIndex])
 
   // A strip tap pulses the word in the passage and scrolls the
   // first occurrence into view.
@@ -1002,7 +1044,7 @@ export default function Reader({ setActive, onSignIn }) {
                 to hear the passage at all. Same order as the bot:
                 listen first, then read it back. */}
             <div>
-              <TtsButton text={pick.passage.text} className="px-4 py-2 text-sm font-medium" />
+              <TtsButton text={pick.passage.text} browserTimeoutMs={2500} className="px-4 py-2 text-sm font-medium" />
             </div>
             {/* Actions sit directly under the passage (hierarchy:
                 the passage is the job, these are its one tier of

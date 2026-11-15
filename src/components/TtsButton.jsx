@@ -6,7 +6,7 @@ import { parseScriptTurns } from '../lib/voiceCast.js'
 import { modelCast } from '../lib/voicePreference.js'
 import { useLanguage } from '../hooks/useLanguage.js'
 
-export default function TtsButton({ text, className = '', cast = null, audioSrc = null }) {
+export default function TtsButton({ text, className = '', cast = null, audioSrc = null, browserTimeoutMs = 6000 }) {
   const { t } = useLanguage()
   const [speaking, setSpeaking] = useState(false)
   const [fallback, setFallback] = useState(false)
@@ -72,13 +72,13 @@ export default function TtsButton({ text, className = '', cast = null, audioSrc 
       speakTurns(turns, {
         onEnd: () => setSpeaking(false),
         onFallback: () => noteFailure(),
-        browserTimeoutMs: 6000,
+        browserTimeoutMs,
       })
       return
     }
     speakSenseiLine(text, {
       cast: cast || modelCast(),
-      browserTimeoutMs: 6000,
+      browserTimeoutMs,
       onEnd: () => setSpeaking(false),
       // Honest label (P1-2): the device voice had to serve and it
       // has no Japanese voice — say so, as before.

@@ -405,6 +405,23 @@ async function fetchNeuralAudio(text, cast = 'female') {
 }
 
 /**
+ * Warm the server voice cache for a text without playing it
+ * (2026-11-15): the Reader calls this the moment a passage is
+ * served, so synthesis happens at serve time — by the time the
+ * learner taps play, the answer is the content cache's ~1s, not
+ * the synthesizer's ~10s (the owner's report: "it plays but it
+ * takes time"). Fire-and-forget; signed-out callers no-op inside
+ * fetchNeuralAudio.
+ */
+export async function prewarmNeuralAudio(text, cast = 'female') {
+  try {
+    const clean = prepareNeuralText(text)
+    if (!clean) return
+    await fetchNeuralAudio(clean, cast)
+  } catch { /* warming is best effort */ }
+}
+
+/**
  * Speak one of Sensei's lines: neural voice first, device voice on
  * any failure. `onEnd` fires exactly once either way. Not async from
  * the caller's point of view — the fetch starts immediately and the
