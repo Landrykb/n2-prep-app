@@ -1205,9 +1205,21 @@ serve(async (req: Request) => {
             excluded.push(String(fit.passage.id))
           }
           if (fits.length > 0) {
+            // Rotation guard: never serve the passage that was
+            // served most recently AGAIN on the very next tap
+            // (unless it is the only fit). Without this, the
+            // Push Me hardest-rule re-picks the same passage
+            // forever — the owner's second tap at 12:11 JST
+            // got city hall twice in 33 seconds.
+            let pool = fits
+            if (fits.length > 1) {
+              const newestId = [...lastSentAt.entries()].sort((a, b) => (b[1] > a[1] ? 1 : -1))[0]?.[0]
+              const rest = fits.filter((f) => String(f.passage.id) !== newestId)
+              if (rest.length > 0) pool = rest
+            }
             const chosen = fitStep >= 1
-              ? fits.reduce((a, b) => (b.ratio < a.ratio ? b : a))
-              : fits.reduce((a, b) => ((lastSentAt.get(String(b.passage.id)) ?? '') < (lastSentAt.get(String(a.passage.id)) ?? '') ? b : a))
+              ? pool.reduce((a, b) => (b.ratio < a.ratio ? b : a))
+              : pool.reduce((a, b) => ((lastSentAt.get(String(b.passage.id)) ?? '') < (lastSentAt.get(String(a.passage.id)) ?? '') ? b : a))
             picked = { passage: chosen.passage, ratio: chosen.ratio }
             again = true
           }
