@@ -1590,7 +1590,10 @@ serve(async (req: Request) => {
       // serve carried no new words, its new glyphs register
       // instead.)
       const cardKanji = [...new Set(
-        newWords.flatMap((w) => [...String(w)].filter((ch) => /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/.test(ch))),
+        newWords.flatMap((c) => {
+          const w = typeof c === 'string' ? c : String((c as { h?: string; word?: string })?.h || (c as { word?: string })?.word || '')
+          return [...w].filter((ch) => /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/.test(ch))
+        }),
       )]
       await registerKanjiCards(link.user_id, cardKanji.length ? cardKanji : newKanji)
       return 'sent'
@@ -2906,7 +2909,10 @@ serve(async (req: Request) => {
     // first meeting: now, +4h, +9h, then days 1, 2, 4, 7.
     // Rendering happens on the Voice Worker (card lane); the
     // PNG is per-kanji and cached in storage forever.
-    const CARD_ECHO_HOURS = [0, 4, 9, 24, 48, 96, 168]
+    // Echo schedule (best practice, owner-approved 2026-11-15):
+    // three showings the first day, then expanding gaps out to
+    // two months — 0h, +4h, +9h, 1d, 2d, 4d, 7d, 14d, 30d, 60d.
+    const CARD_ECHO_HOURS = [0, 4, 9, 24, 48, 96, 168, 336, 720, 1440]
 
     const registerKanjiCards = async (userId: string, kanjiList: string[]) => {
       const fresh = [...new Set(kanjiList)].filter((k) => k && k.length === 1)
@@ -2933,18 +2939,36 @@ serve(async (req: Request) => {
 
     type CardRow = { user_id: string; kanji: string; sends: number; first_seen_at: string }
 
-    const sendKanjiCard = async (chatId: number, row: CardRow): Promise<string> => {
-      const { data: signed, error } = await supabaseAdmin.storage
+    const cardSignedUrl = async (kanji: string, face: 'answer' | 'question'): Promise<string | null> => {
+      const cp = (kanji.codePointAt(0) ?? 0).toString(16)
+      const path = face === 'answer' ? `cards/${cp}.png` : `cards/q-${cp}.png`
+      const { data, error } = await supabaseAdmin.storage
         .from('voice-cache')
-        .createSignedUrl(`cards/${(row.kanji.codePointAt(0) ?? 0).toString(16)}.png`, 3600)
-      if (error || !signed?.signedUrl) {
+        .createSignedUrl(path, 3600)
+      return error || !data?.signedUrl ? null : data.signedUrl
+    }
+
+    const sendKanjiCard = async (chatId: number, row: CardRow): Promise<string> => {
+      // Retrieval first (the testing effect): the QUESTION face
+      // goes out — the kanji alone, big — and the learner says
+      // the reading and meaning before tapping Show answer,
+      // which swaps in the full card. Both faces must exist;
+      // a missing one queues a render job instead.
+      const questionUrl = await cardSignedUrl(row.kanji, 'question')
+      const answerUrl = questionUrl ? await cardSignedUrl(row.kanji, 'answer') : null
+      if (!questionUrl || !answerUrl) {
         await enqueueCardJob(row.user_id, row.kanji)
         return 'queued'
       }
       const res = await tg(botToken, 'sendPhoto', {
         chat_id: chatId,
-        photo: signed.signedUrl,
+        photo: questionUrl,
         caption: `${row.kanji} · ${row.sends + 1}/${CARD_ECHO_HOURS.length}`,
+        reply_markup: {
+          inline_keyboard: [[
+            { text: 'Show answer', callback_data: `cardshow:${row.kanji}` },
+          ]],
+        },
       }).catch(() => null) as { ok?: boolean } | null
       if (!res?.ok) return 'failed'
       const sends = row.sends + 1
@@ -3009,6 +3033,72 @@ serve(async (req: Request) => {
       // row was only the courier.
       await supabaseAdmin.from('voice_jobs').delete().eq('id', jobId)
       return json({ ok: true, delivered })
+    }
+
+    // Card callbacks: Show answer swaps the question photo for
+    // the full card (same message, media edit); Got it leaves
+    // the schedule as advanced at send; Forgot it repeats THIS
+    // step in ~3 hours instead of moving on.
+    const handleCardCallback = async (cb: Record<string, unknown>) => {
+      const data = String(cb.data ?? '')
+      const kanji = data.split(':')[1] ?? ''
+      const msg = (cb.message ?? {}) as Record<string, unknown>
+      const chatId = Number((msg.chat as Record<string, unknown> | undefined)?.id ?? 0)
+      const messageId = Number(msg.message_id ?? 0)
+      if (!kanji || !chatId || !messageId) return
+      const answer = (text: string) =>
+        tg(botToken, 'answerCallbackQuery', { callback_query_id: String(cb.id), text }).catch(() => null)
+      const clearButtons = () =>
+        tg(botToken, 'editMessageReplyMarkup', {
+          chat_id: chatId, message_id: messageId, reply_markup: { inline_keyboard: [] },
+        }).catch(() => null)
+      const { data: link } = await supabaseAdmin.from('telegram_links')
+        .select('user_id').eq('chat_id', chatId).maybeSingle()
+      if (!link?.user_id) { await answer(''); return }
+      const { data: row } = await supabaseAdmin.from('kanji_cards')
+        .select('user_id, kanji, sends, first_seen_at')
+        .eq('user_id', link.user_id).eq('kanji', kanji).maybeSingle()
+      if (data.startsWith('cardshow:')) {
+        const url = await cardSignedUrl(kanji, 'answer')
+        if (!url || !row) { await answer(''); return }
+        await answer('')
+        await tg(botToken, 'editMessageMedia', {
+          chat_id: chatId,
+          message_id: messageId,
+          media: {
+            type: 'photo',
+            media: url,
+            caption: `${kanji} · ${row.sends}/${CARD_ECHO_HOURS.length}`,
+          },
+          reply_markup: {
+            inline_keyboard: [[
+              { text: 'Got it', callback_data: `cardgot:${kanji}` },
+              { text: 'Forgot it', callback_data: `cardforgot:${kanji}` },
+            ]],
+          },
+        }).catch(() => null)
+        return
+      }
+      if (data.startsWith('cardgot:')) {
+        await answer('✓')
+        await clearButtons()
+        if (row) await logEvent(link.user_id, 'kanji_card_sent', { kanji, action: 'got', send: row.sends })
+        return
+      }
+      if (data.startsWith('cardforgot:')) {
+        await answer('It comes back in a few hours')
+        await clearButtons()
+        if (row) {
+          await supabaseAdmin.from('kanji_cards')
+            .update({
+              sends: Math.max(0, row.sends - 1),
+              next_due_at: new Date(Date.now() + 3 * 3600_000).toISOString(),
+            })
+            .eq('user_id', link.user_id).eq('kanji', kanji)
+          await logEvent(link.user_id, 'kanji_card_sent', { kanji, action: 'forgot', send: row.sends })
+        }
+        return
+      }
     }
 
     // ---------- morning dispatch (R1) ----------
@@ -3263,6 +3353,8 @@ serve(async (req: Request) => {
         try { await handleLevel(cb) } catch (err) { console.error('reader-bot: level failed', err) }
       } else if (String(cb.data ?? '').startsWith('fit:')) {
         try { await handleFeedback(cb) } catch (err) { console.error('reader-bot: feedback failed', err) }
+      } else if (String(cb.data ?? '').startsWith('card')) {
+        try { await handleCardCallback(cb) } catch (err) { console.error('reader-bot: card callback failed', err) }
       } else if (cb.id) {
         await tg(botToken, 'answerCallbackQuery', { callback_query_id: String(cb.id), text: '' })
       }

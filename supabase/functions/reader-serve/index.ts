@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { buildKnownSet, countKnownContent, currentBatchWords, deckCreditSet, evaluateDraft, isColdStart, nextForbiddenList, passageRatio, pickGentle, pickPassage, pickStarter, resolveBand, seenKanjiSet, serveBandFor, shouldGenerate } from './fit.ts'
+import { buildKnownSet, countKnownContent, currentBatchWords, deckCreditSet, evaluateDraft, isColdStart, nextForbiddenList, passageNewKanji, passageRatio, pickGentle, pickPassage, pickStarter, resolveBand, seenKanjiSet, serveBandFor, shouldGenerate } from './fit.ts'
 import { DECK_LEVELS } from './deck.ts'
 import { DECK_GLOSS } from './gloss.ts'
 import { segmentText } from './segment.ts'
@@ -536,6 +536,30 @@ serve(async (req: Request) => {
   }
 
   if (picked) {
+    // Kanji cards (2026-11-15, harmonized with the bot): a web
+    // serve registers its dose kanji into the same echo
+    // schedule Telegram sends from — one deck, two doors. The
+    // kanji of the serve's new words first; the serve's new
+    // glyphs when it carried no new words.
+    try {
+      const rawCandidates = Array.isArray(picked.passage.new_word_candidates)
+        ? picked.passage.new_word_candidates as unknown[]
+        : []
+      const newHeads = rawCandidates
+        .map((c) => (typeof c === 'string' ? c : String((c as { h?: string; word?: string })?.h || (c as { word?: string })?.word || '')))
+        .filter((w) => w && !known.has(w))
+      const KANJI_RE = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/
+      let cardKanji = [...new Set(newHeads.flatMap((w) => [...w].filter((ch) => KANJI_RE.test(ch))))]
+      if (!cardKanji.length) {
+        cardKanji = passageNewKanji(picked.passage.tokens, seenKanji)
+      }
+      if (cardKanji.length) {
+        await supabaseAdmin.from('kanji_cards').upsert(
+          cardKanji.map((kanji) => ({ user_id: userId, kanji })),
+          { onConflict: 'user_id,kanji', ignoreDuplicates: true },
+        )
+      }
+    } catch { /* cards never break a serve */ }
     return json({
       status: 'picked',
       passage: picked.passage,

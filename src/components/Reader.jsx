@@ -26,6 +26,7 @@ import TtsButton from './TtsButton.jsx'
 import Mascot from './Mascot.jsx'
 import HeardPitch from './HeardPitch.jsx'
 import HeardVault from './HeardVault.jsx'
+import KanjiCards from './KanjiCards.jsx'
 import { PassageSkeleton } from './Skeleton.jsx'
 
 // THE READER (Doc 16 §2/§7 R1) — the web surface of Hori's Reader, the
@@ -1164,6 +1165,10 @@ export default function Reader({ setActive, onSignIn }) {
               visible under Hori's panel — today's words reset
               at midnight; the vault does not. */}
           <HeardVault />
+          {/* Kanji cards (Doc 16, 2026-11-15): the app door of
+              the Telegram flash-card deck — same rows, same
+              echo schedule. */}
+          <KanjiCards />
         </div>
       </div>
     </div>
