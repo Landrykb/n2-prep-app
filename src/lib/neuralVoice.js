@@ -293,6 +293,7 @@ export function playAudioFile(src, { onEnd, onError, onStart } = {}) {
   const fireEnd = () => {
     if (endFired) return
     endFired = true
+    clearStartTimer()
     teardownAudio()
     if (pendingEnd === fireEnd) pendingEnd = null
     if (onEnd) onEnd()
@@ -300,6 +301,7 @@ export function playAudioFile(src, { onEnd, onError, onStart } = {}) {
   const fail = (err) => {
     if (endFired) return
     endFired = true
+    clearStartTimer()
     const mediaCode = currentAudio?.error?.code ?? null
     teardownAudio()
     if (pendingEnd === fireEnd) pendingEnd = null
@@ -313,6 +315,16 @@ export function playAudioFile(src, { onEnd, onError, onStart } = {}) {
     else if (onEnd) onEnd()
   }
   pendingEnd = fireEnd
+  // Start watchdog (2026-11-17): a file whose fetch or decode
+  // stalls used to hang the caller forever — no end, no error
+  // (in the call, Sensei's opening line never finished, the
+  // mic never opened, and the owner had to press buttons).
+  // Sound must START within 8 s; once it starts, the line
+  // plays to its real end however long it is.
+  let startedFlag = false
+  let startTimer = setTimeout(() => { if (!startedFlag) fail(new Error('start-timeout')) }, 8000)
+  const clearStartTimer = () => { if (startTimer) { clearTimeout(startTimer); startTimer = null } }
+  const markStarted = (ms) => { startedFlag = true; clearStartTimer(); if (onStart) onStart(ms) }
   const playOnElement = () => {
     if (endFired) return
     try {
@@ -323,7 +335,8 @@ export function playAudioFile(src, { onEnd, onError, onStart } = {}) {
       audio.onerror = () => fail(null)
       audio.onplaying = () => {
         const d = audio.duration
-        if (onStart && Number.isFinite(d) && d > 0) onStart(d * 1000)
+        if (Number.isFinite(d) && d > 0) markStarted(d * 1000)
+        else { startedFlag = true; clearStartTimer() }
       }
       const played = audio.play()
       if (played && typeof played.catch === 'function') played.catch((err) => fail(err))
@@ -332,7 +345,7 @@ export function playAudioFile(src, { onEnd, onError, onStart } = {}) {
   // WebAudio first (see playDecoded): on Landry's WebKit the
   // media element refuses these files outright, the decoder
   // does not. The element is the fallback, not the plan.
-  playDecoded(src, { rate: 1, onEnded: fireEnd, onStarted: (ms) => { if (onStart) onStart(ms) }, shouldContinue: () => !endFired })
+  playDecoded(src, { rate: 1, onEnded: fireEnd, onStarted: markStarted, shouldContinue: () => !endFired })
     .then((started) => { if (!endFired && !started) playOnElement() })
     .catch(() => { if (!endFired) playOnElement() })
 }

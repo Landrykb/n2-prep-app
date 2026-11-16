@@ -3,7 +3,7 @@ import { Phone, PhoneOff, Mic, MicOff, CheckCircle2, RotateCcw, Clock, Bell, Inb
 import { loadProfile } from '../lib/profile.js'
 import { micErrorCopy } from '../lib/speechErrors.js'
 import { primeSpeech, ttsAvailable } from '../lib/tts.js'
-import { speakSenseiLine, stopNeuralSpeech, primeAudioOutput, playAudioFile, resetAudioOutput } from '../lib/neuralVoice.js'
+import { speakSenseiLine, stopNeuralSpeech, primeAudioOutput, playAudioFile, resetAudioOutput, prewarmNeuralAudio } from '../lib/neuralVoice.js'
 import { useFurigana } from '../hooks/useFurigana.js'
 import { segmentFurigana, cleanReading } from '../lib/furigana.js'
 import { localDictionary, lookup } from '../lib/dictionary.js'
@@ -227,6 +227,17 @@ export default function SenseiCall({ setActive } = {}) {
   // `tts` function, signed-in users) and falls back to the device
   // voice (speakText) on any failure — its onEnd contract is the
   // same exactly-once one the state machine already relies on.
+  // A call is a conversation, not a document: a Sensei line
+  // that takes 15 s to start IS a broken call (owner,
+  // 2026-11-17: "no automatic answer"). The browser-direct
+  // Edge route gets the same 2.5 s cap the Reader settled on;
+  // past it, the server cache answers — and the model line is
+  // pre-warmed at exchange open (below), so by feedback time
+  // the server answer is a ~1 s cache hit, not a ~10 s
+  // synthesis. Before this, an uncached model line cost the
+  // browser timeout PLUS a full synthesis serially: 20 s+ of
+  // silence where Sensei's reply should be.
+  const CALL_BROWSER_TIMEOUT_MS = 2500
   const speakLine = (text, { rate = 0.95, onEnd, audioSrc } = {}) => {
     stopRecognition()
     if (senseiMutedRef.current) { if (onEnd) later(onEnd, 450); return }
@@ -238,12 +249,13 @@ export default function SenseiCall({ setActive } = {}) {
       playAudioFile(audioSrc, {
         onStart: (ms) => runSpotlight(text, ms),
         onEnd: finish,
-        onError: () => speakSenseiLine(text, { rate, onStart: (ms) => runSpotlight(text, ms), onEnd: finish }),
+        onError: () => speakSenseiLine(text, { rate, browserTimeoutMs: CALL_BROWSER_TIMEOUT_MS, onStart: (ms) => runSpotlight(text, ms), onEnd: finish }),
       })
       return
     }
     speakSenseiLine(text, {
       rate,
+      browserTimeoutMs: CALL_BROWSER_TIMEOUT_MS,
       onStart: (ms) => runSpotlight(text, ms),
       onEnd: finish,
     })
@@ -274,7 +286,7 @@ export default function SenseiCall({ setActive } = {}) {
     if (phaseRef.current !== 'incall') return
     if (micMutedRef.current) { dropToManual(t('call.manualMicMutedTurn')); return }
     if (!speechSupported) { dropToManual(t('call.manualNoVoice')); return }
-    if (!micExplained()) { setShowMicPrompt(true); dropToManual(); return }
+    if (!micExplained()) { if (!micDeclinedRef.current) setShowMicPrompt(true); dropToManual(); return }
     setInterim('')
     startListening({ auto: true })
   }
@@ -444,6 +456,16 @@ export default function SenseiCall({ setActive } = {}) {
 
   // ---------- the call ----------
   const [showMicPrompt, setShowMicPrompt] = useState(false)
+  // The one-time mic explanation belongs at ANSWER time, not
+  // inside exchange 1 (owner, 2026-11-17: in the Telegram Mini
+  // App — a fresh storage partition, so the PWA's consent flag
+  // is absent — the in-turn gate dropped his first turn to
+  // manual: "you still have to press buttons to speak"). The
+  // explanation still precedes any OS prompt and still needs
+  // his affirmative tap (Doc 15); it just happens before the
+  // call starts, so the hands-free loop is never interrupted.
+  const [pendingAccept, setPendingAccept] = useState(false)
+  const micDeclinedRef = useRef(false)
   // Same first-use microphone explanation as the Voice Loop (Doc 15).
   const requestListening = () => {
     if (micExplained()) startListening()
@@ -597,6 +619,10 @@ export default function SenseiCall({ setActive } = {}) {
     setManualOpen(false)
     setManualNote('')
     goTurn('sensei')
+    // Warm the model line's voice now: his attempt takes tens
+    // of seconds, so by feedback time the synthesis is a ~1 s
+    // cache hit instead of a ~10 s wait in silence.
+    prewarmNeuralAudio(scene.model)
     if (senseiMutedRef.current) later(() => beginUserTurn(), 900)
     else speakLine(scene.partner, { audioSrc: scene.partnerAudio || undefined, onEnd: () => later(() => beginUserTurn(), 900) })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -735,11 +761,17 @@ export default function SenseiCall({ setActive } = {}) {
     finishCall(results)
   }
 
-  const accept = () => {
+  const enterCall = () => {
     primeSpeech() // inside the tap, so iOS lets Sensei speak when her turn comes
     primeAudioOutput() // same tap: gesture credit for the shared audio element her neural lines play on
     setPhase('incall'); setExIdx(0); setResults([]); setCurrent(null); setInput(''); setLastAttempt(null); finishedExchangeRef.current = ''
   }
+  const accept = () => {
+    if (!micExplained() && speechSupported) { setPendingAccept(true); setShowMicPrompt(true); return }
+    enterCall()
+  }
+  const acceptWithMic = () => { markMicExplained(); setShowMicPrompt(false); setPendingAccept(false); enterCall() }
+  const acceptTyping = () => { micDeclinedRef.current = true; setShowMicPrompt(false); setPendingAccept(false); enterCall() }
 
   // ---------- settings ----------
   const saveSettings = () => {
@@ -959,6 +991,11 @@ export default function SenseiCall({ setActive } = {}) {
             </div>
           </div>
           {(ring.source === 'slot' || ring.source === 'callback' || ring.source === 'catchup') && <p className="text-[11px] text-slate-600 mt-10 max-w-sm">{t('call.ringDeclineSafe')}</p>}
+          {pendingAccept && showMicPrompt && (
+            <div className="mt-8 w-full max-w-sm text-left">
+              <MicPrompt onUseMic={acceptWithMic} onTypeInstead={acceptTyping} />
+            </div>
+          )}
         </div>
       )}
 
@@ -1065,7 +1102,7 @@ export default function SenseiCall({ setActive } = {}) {
                 <p className="text-xs text-amber-100/90">{manualNote}</p>
               </div>
             )}
-            {showMicPrompt && <MicPrompt onUseMic={confirmMic} onTypeInstead={() => setShowMicPrompt(false)} />}
+            {showMicPrompt && <MicPrompt onUseMic={confirmMic} onTypeInstead={() => { micDeclinedRef.current = true; setShowMicPrompt(false) }} />}
 
             {lastAttempt && (
               <div className={`rounded-xl border p-4 space-y-2 ${lastAttempt.score >= MASTERY ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-bun-700/40 border-bun-600/20'}`}>
