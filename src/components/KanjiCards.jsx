@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { useLanguage } from '../hooks/useLanguage.js'
 import {
@@ -220,6 +221,15 @@ export default function KanjiCards() {
       }).format(new Date(nextRow.next_due_at))
     : null
 
+  useEffect(() => {
+    if (!open) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [open ])
+
   const startReview = () => {
     setDeck(summary.due)
     setIndex(0)
@@ -274,8 +284,17 @@ export default function KanjiCards() {
         </div>
       )}
 
-      {open && deck.length > 0 && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-[#0D0B1A]/97">
+      {open && deck.length > 0 && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 200,
+            backgroundColor: '#0D0B1A',
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+          }}
+        >
           <div className="mx-auto max-w-md px-4 py-5">
             <div className="mb-4 flex items-center justify-between">
               <p className="text-sm font-bold text-white">{t('cards.title')}</p>
@@ -304,7 +323,8 @@ export default function KanjiCards() {
               </p>
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </section>
   )
