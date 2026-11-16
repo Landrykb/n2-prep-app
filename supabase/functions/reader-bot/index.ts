@@ -1179,24 +1179,37 @@ serve(async (req: Request) => {
           : pickPassage(bank, known, serveBand, recentIds, fitOpts)
         if (fit) picked = { passage: fit.passage as Record<string, unknown>, ratio: fit.ratio }
       }
-      if (!picked && !cold && opts.kind !== 'morning') {
-        // Re-read lane (2026-11-15): the 14-day freshness
-        // exclusion is a PROACTIVE-serve rule — it keeps the
-        // morning dispatch from repeating itself. A learner
-        // standing here tapping Next Passage or Push Me is
-        // asking for a passage NOW; when every fitting passage
-        // is recent (a keen reader, a small shelf), serving
-        // the least-recent fit again — framed honestly as a
-        // re-read — beats a minute in the generation lottery
-        // that usually ends at the same shelf. Receipts: by
-        // 2026-11-15 all eight passages that fit the owner
-        // were inside the window, so every tap dug through
-        // generation first ("Hori digging through the shelves
-        // takes too long", on every surface). Push Me (fit
-        // step up) takes the HARDEST fitting re-read — the
-        // lowest known ratio, the most new material; a plain
-        // Next takes the least-recently served. Morning
-        // serves keep their own anti-repeat law below.
+      if (!picked && !cold) {
+        // Re-read lane (2026-11-15; mornings joined 2026-11-16):
+        // the 14-day freshness exclusion is a PROACTIVE-serve
+        // rule — it keeps the morning dispatch from repeating
+        // itself. A learner standing here tapping Next Passage
+        // or Push Me is asking for a passage NOW; when every
+        // fitting passage is recent (a keen reader, a small
+        // shelf), serving the least-recent fit again — framed
+        // honestly as a re-read — beats a minute in the
+        // generation lottery that usually ends at the same
+        // shelf. Receipts: by 2026-11-15 all eight passages
+        // that fit the owner were inside the window, so every
+        // tap dug through generation first ("Hori digging
+        // through the shelves takes too long", on every
+        // surface). Push Me (fit step up) takes the HARDEST
+        // fitting re-read — the lowest known ratio, the most
+        // new material; a plain Next takes the least-recently
+        // served.
+        // Mornings (owner, 2026-11-16: "it does not send the
+        // fresh passage everyday anymore"): the old morning
+        // anti-repeat cycle — holdback card, then that one
+        // passage as a re-read, then silence — fixated on the
+        // single best-ratio recent fit and produced card-only
+        // and silent mornings (2026-11-16: card at 08:01,
+        // silence either side, no passage). A morning now
+        // takes this lane too, always on the plain rotation
+        // rule: the least-recently served fit, so a passage
+        // arrives every morning and the same one repeats only
+        // after the whole shelf has rotated. The anti-repeat
+        // card below survives only for a true no-fit, when
+        // nothing fits even counting recents.
         const recentRows = bank.filter((pg) => recentIds.includes(String(pg.id)))
         if (recentRows.length > 0) {
           const fits: Array<{ passage: Record<string, unknown>; ratio: number }> = []
@@ -1220,7 +1233,7 @@ serve(async (req: Request) => {
               const rest = fits.filter((f) => String(f.passage.id) !== newestId)
               if (rest.length > 0) pool = rest
             }
-            const chosen = fitStep >= 1
+            const chosen = fitStep >= 1 && opts.kind !== 'morning'
               ? pool.reduce((a, b) => (b.ratio < a.ratio ? b : a))
               : pool.reduce((a, b) => ((lastSentAt.get(String(b.passage.id)) ?? '') < (lastSentAt.get(String(a.passage.id)) ?? '') ? b : a))
             picked = { passage: chosen.passage, ratio: chosen.ratio }
