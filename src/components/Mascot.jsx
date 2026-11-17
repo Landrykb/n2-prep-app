@@ -16,6 +16,13 @@ import { useLanguage } from '../hooks/useLanguage.js'
 // mood="resting" sways slowly and softens — the bad-week expression.
 // There are no angry or disappointed variants — they do not exist in
 // this product, by rule. Reduced-motion users get stillness via CSS.
+//
+// Expressions (Doc 13 §5): each mascot has PROUD, GENTLE and SLEEPY
+// artwork in public/fleet/<id>-<mood>.png, cut out transparent at hero
+// scale. mood="resting" (bad week) shows the SLEEPY face — the same art,
+// keeping the sway and the softened opacity — because resting IS sleepy.
+// A missing file falls back to the colour disc, never a broken image.
+const EXPRESSION_FILE = { proud: 'proud', gentle: 'gentle', sleepy: 'sleepy', resting: 'sleepy' }
 const RHYTHM = { koe: 3.1, nao: 3.7, saki: 4.1, tsuku: 3.4, hori: 3.9, michi: 4.4 }
 
 export default function Mascot({ agent, size = 40, mood = 'happy', showName = true, label, motion = 'idle' }) {
@@ -23,6 +30,8 @@ export default function Mascot({ agent, size = 40, mood = 'happy', showName = tr
   const m = mascotById(agent)
   const roleText = m.roleKey ? t(m.roleKey) : m.role
   const resting = mood === 'resting'
+  const sleepy = mood === 'sleepy'
+  const exprFile = EXPRESSION_FILE[mood] || null
   const [imgOk, setImgOk] = useState(true)
   const motionClass = motion === 'none' ? '' : motion === 'bounce' ? 'mascot-bounce' : motion === 'hop' ? 'mascot-hop' : resting ? 'mascot-sway' : 'mascot-bob'
   const rhythm = RHYTHM[m.id] || 3.4
@@ -32,7 +41,7 @@ export default function Mascot({ agent, size = 40, mood = 'happy', showName = tr
       {imgOk ? (
         <span aria-hidden="true" className="relative inline-flex flex-col items-center select-none" style={{ width: Math.round(size * 1.12) }}>
           <img
-            src={`/fleet/${m.id}.png`}
+            src={exprFile ? `/fleet/${m.id}-${exprFile}.png` : `/fleet/${m.id}.png`}
             alt=""
             draggable="false"
             onError={() => setImgOk(false)}
@@ -73,7 +82,7 @@ export default function Mascot({ agent, size = 40, mood = 'happy', showName = tr
             textShadow: '0 1px 0 rgba(42,26,51,0.35)',
           }}
         >
-          {resting ? '〜' : m.kanji}
+          {resting || sleepy ? '〜' : m.kanji}
         </span>
       )}
       {showName && (

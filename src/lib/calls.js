@@ -15,6 +15,7 @@
 
 import { scenes } from '../data/scenes.js'
 import { todayStr } from './session.js'
+import { emitLearnerStateSaved } from './stateEvents.js'
 
 export const CALLS_KEY = 'jpn:calls:v1'
 export const INBOX_KEY = 'jpn:inbox:v1'
@@ -63,9 +64,50 @@ export function loadCallState() {
   } catch { return defaultCallState() }
 }
 
-export function saveCallState(state) {
+function writeCallState(state) {
   try { localStorage.setItem(CALLS_KEY, JSON.stringify(state)) } catch { /* ignore */ }
   return state
+}
+
+export function saveCallState(state) {
+  writeCallState(state)
+  // The history slice of this document rides the synced learner
+  // state (see loadCallHistory / applyCallHistory below), so any
+  // call-state save is a learner-state save for sync purposes.
+  emitLearnerStateSaved()
+  return state
+}
+
+/** The account-synced slice of the call state: the kept-calls
+ *  history. It used to live only in this device's localStorage,
+ *  so "Calls kept" read empty on every other surface (the PWA
+ *  vs the Telegram Mini App keep separate storage, and iOS
+ *  webviews evict) — Landry, 2026-11-18: "Calls kept is always
+ *  empty." Settings and day slots stay device-local (the server
+ *  scheduler has its own copy of the windows); history is the
+ *  learner's record and follows the account like everything else. */
+export function loadCallHistory() {
+  return loadCallState().history
+}
+
+/** Union an incoming (merged) history into the stored call state.
+ *  Never loses an entry: union by id, newest first, cap 60 — the
+ *  same rules mergeCallHistory applies document-side. Writes via
+ *  the raw writer (no save event): this runs inside the sync
+ *  apply path, and emitting there would schedule a push per push. */
+export function applyCallHistory(incoming) {
+  if (!Array.isArray(incoming)) return
+  const current = loadCallState()
+  const byId = new Map()
+  for (const h of [...incoming, ...current.history]) {
+    if (h && h.id && !byId.has(h.id)) byId.set(h.id, h)
+  }
+  const merged = [...byId.values()]
+    .sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')))
+    .slice(0, 60)
+  const same = merged.length === current.history.length
+    && merged.every((h, i) => h.id === current.history[i]?.id)
+  if (!same) writeCallState({ ...current, history: merged })
 }
 
 export function loadInbox() {

@@ -313,7 +313,7 @@ export default function OneSession({ setActive }) {
     <div className="space-y-6 max-w-3xl mx-auto pb-28">
       <div className="text-center space-y-2 pt-2">
         <p className="flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#FF8A75]"><Sparkles size={14} /> {t('session.eyebrow')}</p>
-        {state.done && <div className="mb-3"><Mascot agent="michi" size={64} showName={false} motion="hop" label={t('session.mascotDoneLabel', { name: 'Michi' })} /></div>}
+        {state.done && <div className="mb-3"><Mascot agent="michi" size={64} showName={false} mood="proud" motion="hop" label={t('session.mascotDoneLabel', { name: 'Michi' })} /></div>}
         <h2 className="text-2xl sm:text-3xl font-bold text-white">{state.done ? t('session.titleDone') : isBusy ? t('session.titleBusy') : t('session.titleStart')}</h2>
         <p className="text-sm text-slate-400 max-w-xl mx-auto">
           {state.step > 0 && !state.done

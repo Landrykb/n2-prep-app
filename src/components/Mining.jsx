@@ -83,7 +83,7 @@ setNote(added? `Added ${added} card${added === 1? '': 's'} to your review queue 
 return (
 <div className="space-y-6">
 <div>
-<div className="flex items-center gap-3 mb-1"><Pickaxe size={20} className="text-[#FF8A75]" /><h2 className="text-2xl font-bold text-white">Mine your own Japanese</h2><Mascot agent="hori" size={34} /></div>
+<div className="flex items-center gap-3 mb-1"><Pickaxe size={20} className="text-[#FF8A75]" /><h2 className="text-2xl font-bold text-white">Mine your own Japanese</h2><Mascot agent="tsuku" size={34} /></div>
 <p className="text-xs text-slate-500 mb-1">Hori digs; what Hori finds becomes material Tsuku shapes into your queue.</p>
 <p className="text-sm text-slate-400">Generic textbooks don’t contain your life. Paste a real work email, a school letter, a city-office notice — get i+1 cards (one new word per sentence) from the Japanese you actually have to survive. Processed locally in your browser; nothing is uploaded. Your queue currently holds {queueCount} personal cards.</p>
 </div>
