@@ -216,8 +216,19 @@ rt {
 .mascot-bob { animation: mascotBob 3.4s ease-in-out infinite; }
 .mascot-bounce { animation: mascotBounce 0.95s ease-in-out infinite; }
 .mascot-sway { animation: mascotSway 5.5s ease-in-out infinite; }
+/* Floating Z's for the sleepy / resting faces (Doc 13 §5): two
+   letters rise off the head and fade, staggered, on a slow loop —
+   the drawn Z in the art is the smallest of the three. */
+@keyframes mascotZzz {
+  0% { transform: translate(0, 0) rotate(-6deg) scale(0.7); opacity: 0; }
+  18% { opacity: 0.9; }
+  100% { transform: translate(10px, -26px) rotate(10deg) scale(1.15); opacity: 0; }
+}
+.mascot-zzz { animation: mascotZzz 3.6s ease-in infinite; }
+.mascot-zzz-late { animation: mascotZzz 3.6s ease-in 1.8s infinite; }
 @media (prefers-reduced-motion: reduce) {
-  .mascot-bob, .mascot-bounce, .mascot-sway { animation: none; }
+  .mascot-bob, .mascot-bounce, .mascot-sway, .mascot-hop, .mascot-zzz, .mascot-zzz-late { animation: none; }
+  .mascot-zzz, .mascot-zzz-late { opacity: 0; }
 }
 
 @keyframes mascotHop {
