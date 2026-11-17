@@ -4,6 +4,9 @@
 
 The charter in five pages, plus a summary board and a pairings annex.
 Rendered pages live in this folder; `make_charte_en.py` regenerates them.
+**The brand elements are not separated from the charter:** the logo lockups and
+the fleet artwork live as standalone, usable files in `assets/` below.
+The typeface is the system stack (page 3) — there is no font file to ship.
 Every value below is the product's own brand data (`src/lib/brand.js`,
 `tailwind.config.js`, Doc 13) — nothing here is decorative invention.
 
@@ -16,6 +19,19 @@ Every value below is the product's own brand data (`src/lib/brand.js`,
 | `charte-4-elements.png` | 4 · Graphic Elements |
 | `charte-5-composition.png` | 5 · Composition |
 | `charte-6-pairings.png` | Annex · The Good Pairings (contrast scores) |
+
+The elements, in `assets/` (rendered by `make_assets.py`):
+
+| File | Element |
+| --- | --- |
+| `assets/logo-wordmark.png` | Wordmark alone, on light |
+| `assets/logo-wordmark-slogan.png` | Wordmark + slogan, on dark |
+| `assets/logo-wordmark-icon.png` | Wordmark + icon — the default signature |
+| `assets/logo-icon.png` | Icon alone (Koe), on Coral |
+| `assets/logo-bw-on-white.png` | Black & white lockup, on white |
+| `assets/logo-bw-on-black.png` | Black & white lockup, on black |
+| `assets/koe-bw.png` | The icon in black & white |
+| `assets/koe.png` · `nao.png` · `saki.png` · `tsuku.png` · `hori.png` · `michi.png` | The fleet artwork, one file per agent |
 
 ## 1 · The Logos
 
