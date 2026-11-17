@@ -44,9 +44,9 @@ export default class ErrorBoundary extends Component {
       <div className="min-h-screen bg-bun-900 text-slate-100 flex items-center justify-center p-6">
         <div className="max-w-md w-full rounded-3xl glass p-8 card-glow text-center space-y-4">
           <div className="flex justify-center gap-2">
-            <Mascot agent="koe" size={44} showName={false} />
-            <Mascot agent="michi" size={44} showName={false} />
-            <Mascot agent="nao" size={44} showName={false} />
+            <Mascot agent="koe" size={44} showName={false} mood="sleepy" />
+            <Mascot agent="michi" size={44} showName={false} mood="sleepy" />
+            <Mascot agent="nao" size={44} showName={false} mood="sleepy" />
           </div>
           <h1 className="text-xl font-bold text-white">{t('shell.error.title')}</h1>
           <p className="text-sm text-slate-300">

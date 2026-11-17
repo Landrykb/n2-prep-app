@@ -450,8 +450,54 @@ console.log('encounters — collect derivations + union merge (Fit v2, amendment
   })
 }
 
+console.log('call history rides the account (Landry 2026-11-18 — "Calls kept is always empty"):')
+{
+  const { mergeCallHistory, mergeLearnerState } = await import('../src/lib/stateMerge.js')
+  const { collectLearnerState } = await import('../src/lib/learnerState.js')
+  const h = (id, at, status = 'completed') => ({ id, at, kind: 'call', scene: 'Pharmacy', status, bestScore: 90 })
 
-console.log('guest entry + first-run catalogs (Doc 12 audit #1/#2, fixed 2026-11-07):')
+  check('mergeCallHistory unions by id, newest first, never loses an entry', () => {
+    const a = [h('h-2', '2026-11-17T00:00:00Z'), h('h-1', '2026-11-07T00:00:00Z')]
+    const b = [h('h-3', '2026-11-18T00:00:00Z'), h('h-1', '2026-11-07T00:00:00Z')]
+    const merged = mergeCallHistory(a, b)
+    assert.deepEqual(merged.map((x) => x.id), ['h-3', 'h-2', 'h-1'])
+    assert.deepEqual(mergeCallHistory([], []), [])
+    assert.deepEqual(mergeCallHistory(null, b).map((x) => x.id), ['h-3', 'h-1'])
+    const viaDoc = mergeLearnerState({ callHistory: a }, { callHistory: b })
+    assert.deepEqual(viaDoc.callHistory.map((x) => x.id), ['h-3', 'h-2', 'h-1'])
+  })
+
+  check('recorded history collects into the document and applies back without loss', () => {
+    const store = new Map()
+    const prev = globalThis.localStorage
+    globalThis.localStorage = {
+      getItem: (k) => (store.has(k) ? store.get(k) : null),
+      setItem: (k, v) => store.set(k, String(v)),
+      removeItem: (k) => store.delete(k),
+    }
+    try {
+      let s = client.loadCallState()
+      s = client.recordHistory(s, { kind: 'call', scene: 'Pharmacy', status: 'completed', bestScore: 92, source: 'practice' })
+      client.saveCallState(s)
+      const collected = collectLearnerState()
+      assert.equal(collected.callHistory.length, 1)
+      assert.equal(collected.callHistory[0].bestScore, 92)
+      // A second device records its own call, then the merged
+      // document applies: both entries survive on this device.
+      const other = h('h-other', '2026-11-18T01:00:00Z', 'missed')
+      client.applyCallHistory([other, ...collected.callHistory])
+      const after = client.loadCallHistory()
+      assert.equal(after.length, 2)
+      assert.equal(after[0].id, 'h-other')
+      // Applying the same document again changes nothing.
+      client.applyCallHistory([other, ...collected.callHistory])
+      assert.equal(client.loadCallHistory().length, 2)
+    } finally {
+      if (prev === undefined) delete globalThis.localStorage
+      else globalThis.localStorage = prev
+    }
+  })
+}
 {
   const guest = await import('../src/lib/guest.js')
   const { adoptAnonKeys } = await import('../src/lib/anonMerge.js')
@@ -899,6 +945,34 @@ console.log('integration audit — shared mastery + diagnosis-history sync:')
       const css = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8')
       assert.match(css, /@keyframes loopSonar/)
       assert.match(css, /@keyframes loopUnfold/)
+    })
+    check('fleet faces and homes (2026-11-18): expressions resolve, tiles harmonized, Koe fronts her page', () => {
+      const mascot = readFileSync(new URL('../src/components/Mascot.jsx', import.meta.url), 'utf8')
+      assert.match(mascot, /EXPRESSION_FILE = \{ proud: 'proud', gentle: 'gentle', sleepy: 'sleepy', resting: 'sleepy' \}/, 'proud/gentle/sleepy art resolves; resting shows the sleepy face')
+      assert.match(mascot, /\/fleet\/\$\{m\.id\}-\$\{exprFile\}\.png/, 'expression files live beside the heroes in public/fleet')
+      const twin = readFileSync(new URL('../src/components/TwinView.jsx', import.meta.url), 'utf8')
+      assert.match(twin, /tsuku: 'mine'/, 'Tsuku tile opens the text-mining page — the Maker makes the material')
+      assert.match(twin, /hori: 'reader'/, 'Hori tile opens the Reader — his page in the app and on Telegram')
+      const mining = readFileSync(new URL('../src/components/Mining.jsx', import.meta.url), 'utf8')
+      assert.match(mining, /<Mascot agent="tsuku" size=\{34\} \/>/, 'the mining page header is the Maker, matching its results header')
+      const sensei = readFileSync(new URL('../src/components/SenseiCall.jsx', import.meta.url), 'utf8')
+      assert.match(sensei, /<Mascot agent="koe" size=\{40\} showName=\{false\} \/>/, 'Koe fronts the Yobidashi page header — she was missing from her own page')
+      assert.match(sensei, /mood="proud" motion="hop"/, 'a kept call celebrates with the proud face')
+      const boundary = readFileSync(new URL('../src/components/ErrorBoundary.jsx', import.meta.url), 'utf8')
+      assert.equal((boundary.match(/mood="sleepy"/g) || []).length, 3, 'the resting fleet on the error screen is sleepy, as the copy says')
+      const coach = readFileSync(new URL('../src/components/CoachLetter.jsx', import.meta.url), 'utf8')
+      assert.equal((coach.match(/mood="gentle"/g) || []).length, 2, 'the Coach letter wears the gentle face')
+    })
+    check('fleet drawn-in life (2026-11-18): heroes blink, sleepy faces shed floating Zs', () => {
+      const mascot = readFileSync(new URL('../src/components/Mascot.jsx', import.meta.url), 'utf8')
+      assert.match(mascot, /-blink\.png/, 'the blink frame resolves beside the hero')
+      assert.match(mascot, /canBlink = !exprFile && motion !== 'none'/, 'only the open-eyed hero blinks, and never in the static pose')
+      assert.match(mascot, /prefers-reduced-motion: reduce/, 'the blink engine respects reduced motion')
+      assert.match(mascot, /blinkOkRef\.current = false/, 'a missing blink frame disables blinking, never the hero')
+      assert.match(mascot, /mascot-zzz/, 'sleepy and resting faces render the floating Z overlay')
+      const css = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8')
+      assert.match(css, /@keyframes mascotZzz/, 'the Z rise-and-fade keyframes exist')
+      assert.match(css, /\.mascot-zzz, \.mascot-zzz-late \{ opacity: 0; \}/, 'reduced motion hides the Zs entirely')
     })
     check('skeleton loading everywhere; the service worker caches the fleet art too', () => {
       const skel = readFileSync(new URL('../src/components/Skeleton.jsx', import.meta.url), 'utf8')

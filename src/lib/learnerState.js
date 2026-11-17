@@ -3,12 +3,15 @@
 // cloud sync (stateSync.js) in the same shape the merge logic
 // (stateMerge.js) consumes:
 //
-//   { queue, profile, diagnosis, diagnosisHistory, promise, declaredLevel, encounters, language, modeSpells, plan, session }
+//   { queue, profile, diagnosis, diagnosisHistory, promise, declaredLevel, encounters, language, modeSpells, plan, session, callHistory }
 //
 // Local storage stays the offline source of truth; this module only
 // reads/writes the existing keys. Diagnosis history writes go through
 // twin.js's pushDiagnosisHistory, which emits on the save-event bus
-// itself so the history slice stays honest.
+// itself so the history slice stays honest. callHistory is the one
+// slice that lives inside another module's compound document (the
+// call state): collect reads its history out, apply unions a merged
+// history back in — settings and day slots never ride the document.
 
 import { QUEUE_KEY, loadQueue } from './queue.js'
 import { PROFILE_KEY, DIAGNOSIS_KEY, loadProfile, loadDiagnosis } from './profile.js'
@@ -19,6 +22,7 @@ import { MODE_SPELLS_KEY, loadModeSpells } from './day30.js'
 import { VOICE_CAST_KEY, loadVoiceCast } from './voicePreference.js'
 import { PLAN_KEY, loadPlanState } from './planner.js'
 import { SESSION_KEY, loadSessionState } from './session.js'
+import { loadCallHistory, applyCallHistory } from './calls.js'
 
 export const DIAGNOSIS_HISTORY_KEY = 'jpn:diagnosisHistory:v1'
 export const DECLARED_LEVEL_KEY = 'jpn:declaredLevel:v1'
@@ -105,6 +109,11 @@ export function collectLearnerState() {
     // the same on every device (merge rules in stateMerge.js).
     plan: loadPlanState(),
     session: loadSessionState(),
+    // Calls kept (calls.js): the history follows the account, so
+    // the list is the same in the PWA, the browser and the
+    // Telegram Mini App — it was device-local and read empty
+    // everywhere except the surface that recorded it.
+    callHistory: loadCallHistory(),
   }
 }
 
@@ -134,6 +143,9 @@ export function applyLearnerState(state) {
         localStorage.setItem(key, JSON.stringify(state[slice]))
       }
     }
+    // The call history lives inside the call state's own document;
+    // union the merged history back into it (never a blind write).
+    if (Array.isArray(state.callHistory)) applyCallHistory(state.callHistory)
     window.dispatchEvent(new CustomEvent(STATE_SYNCED_EVENT))
   } catch { /* storage unavailable — local state simply stays as it was */ }
 }

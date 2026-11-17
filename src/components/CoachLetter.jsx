@@ -141,7 +141,7 @@ export default function CoachLetter() {
       {current ? (
         <article className="rounded-3xl glass p-6 sm:p-8 card-glow space-y-4">
           <div className="flex items-center gap-3 border-b border-bun-600/30 pb-4">
-            <Mascot agent="michi" size={44} />
+            <Mascot agent="michi" size={44} mood="gentle" />
             <div>
               <p className="text-sm font-bold text-white">Week of {new Date(`${current.weekStart}T12:00:00`).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}</p>
               <p className="text-xs text-slate-400">Mode this week: {current.modeLabel} · written {new Date(current.generatedAt).toLocaleDateString()}</p>
@@ -153,7 +153,7 @@ export default function CoachLetter() {
         </article>
       ) : (
         <div className="rounded-3xl glass p-6 sm:p-8 card-glow space-y-4 text-center">
-          <span className="inline-flex justify-center"><Mascot agent="michi" size={52} /></span>
+          <span className="inline-flex justify-center"><Mascot agent="michi" size={52} mood="gentle" /></span>
           <p className="text-sm text-slate-300 max-w-md mx-auto">No letter yet for this week. Michi writes from your real record — sessions, calls kept, checkup movement — and invents nothing. Ask, and this week’s letter is written from what is actually there.</p>
           <button onClick={writeMine} className="px-5 py-2.5 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold inline-flex items-center gap-1.5"><PenLine size={15} /> Write This Week’s Letter</button>
         </div>

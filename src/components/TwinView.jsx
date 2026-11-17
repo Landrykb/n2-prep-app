@@ -398,17 +398,20 @@ function Section({ title, children, hint }) {
 }
 
 // Where each fleet member works — the line-up tile's door.
-// The destination is the surface the tile's own job line
-// describes: Koe calls (Yobidashi), Nao fixes (the fix log),
-// Saki plans (Today, where tomorrow is prepared), Tsuku
-// makes (the Reader's passages), Hori digs (Mining), Michi
-// coaches (the weekly letter).
+// The destination is the surface that member actually fronts:
+// Koe calls (Yobidashi), Nao fixes (the fix log), Saki plans
+// (Today, where tomorrow is prepared), Tsuku makes (the
+// text-mining page, whose output is new practice material),
+// Hori listens and fits (the Reader — his page in the app and
+// on Telegram), Michi coaches (the weekly letter). Harmonized
+// 2026-11-18 (Landry): the tiles previously sent Tsuku to the
+// Reader and Hori to Mining, against every other surface.
 const FLEET_HOMES = {
   koe: 'sensei',
   nao: 'errors',
   saki: 'today',
-  tsuku: 'reader',
-  hori: 'mine',
+  tsuku: 'mine',
+  hori: 'reader',
   michi: 'coach',
 }
 

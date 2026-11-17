@@ -22,6 +22,7 @@ import { recordVoiceAttempt, recordCallOutcome } from '../lib/twin.js'
 import Mascot from './Mascot.jsx'
 import MicPrompt from './MicPrompt.jsx'
 import { micExplained, markMicExplained } from '../lib/micConsent.js'
+import { STATE_SYNCED_EVENT } from '../lib/learnerState.js'
 import TtsButton from './TtsButton.jsx'
 import KanjiTapText from './KanjiTapText.jsx'
 
@@ -128,6 +129,19 @@ export default function SenseiCall({ setActive } = {}) {
   phaseRef.current = phase
 
   const updateState = (next) => { saveCallState(next); setCallState(next); return next }
+
+  // When a sync lands (a call kept on another device, say), adopt
+  // the merged call state — the history now follows the account.
+  // Never mid-call: the live machine owns the state until it
+  // settles back to idle.
+  useEffect(() => {
+    const onSynced = () => {
+      if (phaseRef.current !== 'idle') return
+      setCallState(ensureToday(loadCallState()))
+    }
+    window.addEventListener(STATE_SYNCED_EVENT, onSynced)
+    return () => window.removeEventListener(STATE_SYNCED_EVENT, onSynced)
+  }, [])
 
   const today = todayStr()
   const day = callState.days[today]
@@ -811,9 +825,12 @@ export default function SenseiCall({ setActive } = {}) {
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
-      <div>
-        <h2 className="text-2xl font-bold text-white flex items-center gap-2"><Phone size={22} className="text-emerald-300" /> {t('call.title')}</h2>
-        <p className="text-sm text-slate-400 mt-1 max-w-2xl">{t('call.introA')}<em>{t('call.introRequired')}</em>{t('call.introB')}<strong className="text-slate-200">{t('call.introOnce')}</strong>{t('call.introC')}</p>
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5"><Mascot agent="koe" size={40} showName={false} /></span>
+        <div>
+          <h2 className="text-2xl font-bold text-white flex items-center gap-2"><Phone size={22} className="text-emerald-300" /> {t('call.title')}</h2>
+          <p className="text-sm text-slate-400 mt-1 max-w-2xl">{t('call.introA')}<em>{t('call.introRequired')}</em>{t('call.introB')}<strong className="text-slate-200">{t('call.introOnce')}</strong>{t('call.introC')}</p>
+        </div>
       </div>
 
       {notice && (
@@ -1166,7 +1183,7 @@ export default function SenseiCall({ setActive } = {}) {
       {phase === 'wrapup' && wrap && (
         <div className="fixed inset-0 z-[80] bg-bun-900 overflow-y-auto">
           <div className="max-w-2xl mx-auto p-6 space-y-5 text-center pt-14">
-            <Mascot agent="koe" size={76} showName={false} motion="hop" label={t('call.wrapMascotLabel')} />
+            <Mascot agent="koe" size={76} showName={false} mood="proud" motion="hop" label={t('call.wrapMascotLabel')} />
             <CheckCircle2 size={42} className="text-emerald-400 mx-auto" />
             <div>
               <h3 className="text-2xl font-bold text-white">{t('call.wrapTitle')}</h3>

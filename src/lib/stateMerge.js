@@ -96,6 +96,25 @@ export function mergeDiagnosisHistory(localHist, otherHist) {
   return [sorted[0], ...sorted.slice(-23)]
 }
 
+/**
+ * Call history union (calls.js): entries carry unique ids and an
+ * `at` timestamp; a kept (or missed) call, once recorded on any
+ * device, is never un-recorded by a merge. Newest first, cap 60 —
+ * the same cap recordHistory keeps locally.
+ */
+export function mergeCallHistory(localHistory, otherHistory) {
+  const byId = new Map()
+  const put = (h) => {
+    if (!h || typeof h.id !== 'string' || !h.id) return
+    if (!byId.has(h.id)) byId.set(h.id, h)
+  }
+  for (const h of Array.isArray(localHistory) ? localHistory : []) put(h)
+  for (const h of Array.isArray(otherHistory) ? otherHistory : []) put(h)
+  return [...byId.values()]
+    .sort((a, b) => ts(b.at) - ts(a.at))
+    .slice(0, 60)
+}
+
 export function mergeModeSpells(localSpells, otherSpells) {
   const byStart = new Map()
   const put = (s) => {
@@ -207,7 +226,7 @@ export function mergeSessionStates(localState, otherState) {
 /**
  * Merge two learner-state documents ({ queue, profile, diagnosis,
  * diagnosisHistory, promise, declaredLevel, encounters, language,
- * modeSpells, plan, session }).
+ * modeSpells, plan, session, callHistory }).
  * Returns a new document; inputs untouched. declaredLevel and
  * language are single documents like the others — the newer one
  * (its `at`) wins whole.
@@ -231,6 +250,7 @@ export function mergeLearnerState(local, other) {
     voiceCast: pickDoc(L.voiceCast, O.voiceCast, (d) => d.at),
     encounters: mergeEncounters(L.encounters, O.encounters),
     modeSpells: mergeModeSpells(L.modeSpells, O.modeSpells),
+    callHistory: mergeCallHistory(L.callHistory, O.callHistory),
     plan: mergePlanStates(L.plan, O.plan),
     session: mergeSessionStates(L.session, O.session),
   }
