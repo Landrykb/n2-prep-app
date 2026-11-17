@@ -84,16 +84,34 @@ import Skeleton, { SkeletonText } from './components/Skeleton.jsx'
 // ONCE (rate-limited via sessionStorage so a genuinely broken
 // build cannot loop) to pick up the fresh bundle, then let the
 // boundary have any error that survives that.
+// The reload stamp lives in sessionStorage, with a 60-second
+// cookie as the fallback for webviews where storage access
+// itself throws (the Telegram Mini App is the standing
+// suspect: on 2026-11-17 the owner hit the boundary screen
+// right after a deploy, on a warm page, and no auto-reload
+// saved him). Either stamp rate-limits the reload the same
+// way; a successful load clears both.
+const chunkReloadAt = () => {
+  try { return Number(sessionStorage.getItem('yonde:chunkReloadAt') || 0) } catch { /* storage blocked — cookie below */ }
+  const m = document.cookie.match(/(?:^|; )yondeChunkReload=(\d+)/)
+  return m ? Number(m[1]) : 0
+}
+const markChunkReload = () => {
+  const now = String(Date.now())
+  try { sessionStorage.setItem('yonde:chunkReloadAt', now) } catch { /* cookie carries it */ }
+  try { document.cookie = `yondeChunkReload=${now}; max-age=60; path=/` } catch { /* nothing left to try */ }
+}
+const clearChunkReload = () => {
+  try { sessionStorage.removeItem('yonde:chunkReloadAt') } catch { /* ignore */ }
+  try { document.cookie = 'yondeChunkReload=; max-age=0; path=/' } catch { /* ignore */ }
+}
 const lazyView = (factory) => lazy(() => factory()
-  .then((m) => { try { sessionStorage.removeItem('yonde:chunkReloadAt') } catch { /* private mode */ } return m })
+  .then((m) => { clearChunkReload(); return m })
   .catch((err) => {
-    try {
-      const last = Number(sessionStorage.getItem('yonde:chunkReloadAt') || 0)
-      if (Date.now() - last > 30000) {
-        sessionStorage.setItem('yonde:chunkReloadAt', String(Date.now()))
-        window.location.reload()
-      }
-    } catch { /* storage unavailable — the boundary takes it */ }
+    if (Date.now() - chunkReloadAt() > 30000) {
+      markChunkReload()
+      window.location.reload()
+    }
     throw err
   }))
 

@@ -208,6 +208,17 @@ export default function KanjiCards() {
     return () => window.removeEventListener('focus', onFocus)
   }, [refresh])
 
+  // Scroll lock while the deck is open: the page behind must
+  // not scroll under the overlay.
+  useEffect(() => {
+    if (!open) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [open])
+
   if (!summary) return null
   const dueCount = summary.due.length
   const total = summary.rows.length
@@ -220,15 +231,6 @@ export default function KanjiCards() {
         minute: '2-digit',
       }).format(new Date(nextRow.next_due_at))
     : null
-
-  useEffect(() => {
-    if (!open) return
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = prev
-    }
-  }, [open ])
 
   const startReview = () => {
     setDeck(summary.due)
