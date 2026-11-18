@@ -107,3 +107,108 @@ export function firstMissedCandidate(candidates, transcript) {
   }
   return null
 }
+
+// ---------- the repair ladder (Doc 16 amendment #34) ----------
+// When a read misses, the learner is never again asked to repeat
+// the WHOLE passage and then graded on the whole passage for a
+// part-read (the 7% failure the owner hit on 2026-11-18: the bot
+// asked for one sentence, he sent one sentence, and it was scored
+// against everything). Instead the miss is repaired in chunks:
+// the missed sentences one at a time, then the passage in two
+// halves, then the whole passage once more. The helpers below are
+// the shared maths of that ladder — which sentences missed, how
+// the passage halves — so both surfaces climb the same ladder.
+// The hard rule the ladder exists for: a chunk retry is graded
+// against its chunk ONLY (scoreReadAloud(chunk, transcript)),
+// never against the passage it came from.
+
+/**
+ * Split a passage into its sentences: a sentence ends at 。！？
+ * or a newline, the terminator stays with its sentence, pieces
+ * are trimmed, and pieces with no speakable characters (a stray
+ * terminator) drop. The same split the surfaces already use to
+ * find the sentence a word lives in.
+ */
+export function splitPassageSentences(text) {
+  return String(text ?? '')
+    .split(/(?<=[。！？\n])/)
+    .map((s) => s.trim())
+    .filter((s) => normalizeSpeechText(s).length > 0)
+}
+
+/**
+ * The candidates (new words) that live in a chunk of text — the
+ * sentence or half currently being repaired — by surface word or
+ * headword. Nao's one fix inside a chunk runs over this subset,
+ * so the fix she names is always a word the chunk actually holds.
+ */
+export function candidatesInText(candidates, text) {
+  const t = String(text ?? '')
+  return (Array.isArray(candidates) ? candidates : []).filter((c) => {
+    if (!c?.word) return false
+    return t.includes(c.word) || (!!c.h && t.includes(c.h))
+  })
+}
+
+/**
+ * Which of the passage's sentences this read missed, as indexes
+ * into splitPassageSentences(passageText), in the order the
+ * repair ladder serves them. A sentence missed when its OWN
+ * coverage of the transcript sits under the same pass line a
+ * full read uses — the sentence was skipped, mangled, or never
+ * reached. The sentence holding Nao's one fix (the first missed
+ * candidate) always leads the queue when there is one: it is the
+ * part the surface already named and asked about, so the ladder
+ * starts exactly where the conversation left off; the remaining
+ * missed sentences follow in passage order. A sentence whose
+ * coverage passed can still be queued by the fix rule — speech
+ * recognition can cover a sentence's sounds while swapping the
+ * one word that mattered for a homophone.
+ */
+export function missedSentences(passageText, transcript, candidates) {
+  if (!normalizeSpeechText(transcript)) return [] // no transcript — no diagnosis claimed
+  const sentences = splitPassageSentences(passageText)
+  const missed = []
+  sentences.forEach((s, i) => {
+    if (scoreReadAloud(s, transcript).score < READ_ALOUD_PASS_SCORE) missed.push(i)
+  })
+  const fix = firstMissedCandidate(candidates, transcript)
+  if (fix) {
+    const forms = [fix.word, fix.h].filter(Boolean)
+    const idx = sentences.findIndex((s) => forms.some((f) => s.includes(f)))
+    if (idx !== -1) {
+      const at = missed.indexOf(idx)
+      if (at > 0) { missed.splice(at, 1); missed.unshift(idx) }
+      else if (at === -1) missed.unshift(idx)
+    }
+  }
+  return missed
+}
+
+/**
+ * The passage in two halves, split at a sentence boundary so the
+ * halves balance by normalised character count as closely as
+ * whole sentences allow. Returns { first, second, firstCount,
+ * secondCount } (the halves' texts and their sentence counts),
+ * or null when the passage has fewer than two sentences — a
+ * one-sentence passage has no halves to rebuild through, and
+ * its ladder goes from sentence repair straight to the full try.
+ */
+export function passageHalves(passageText) {
+  const sentences = splitPassageSentences(passageText)
+  if (sentences.length < 2) return null
+  const weights = sentences.map((s) => Math.max(1, normalizeSpeechText(s).length))
+  const total = weights.reduce((a, b) => a + b, 0)
+  let acc = 0
+  let bestCut = 1
+  let bestGap = Infinity
+  for (let i = 0; i < sentences.length - 1; i++) {
+    acc += weights[i]
+    const gap = Math.abs(total - 2 * acc)
+    if (gap < bestGap) { bestGap = gap; bestCut = i + 1 }
+  }
+  const first = sentences.slice(0, bestCut)
+  const second = sentences.slice(bestCut)
+  if (first.length === 0 || second.length === 0) return null
+  return { first: first.join(''), second: second.join(''), firstCount: first.length, secondCount: second.length }
+}
