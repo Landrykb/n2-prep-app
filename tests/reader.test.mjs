@@ -997,6 +997,115 @@ check('score twin: firstMissedCandidate agrees — same fix, same order', () => 
   assert.equal(scorePort.firstMissedCandidate(cands, ''), null)
 })
 
+// ---------- the repair ladder (Doc 16 amendment #34) ----------
+// When a read misses, the learner repairs it in chunks — the
+// missed sentences one at a time, then the passage in two
+// halves, then the whole passage once more — and a chunk retry
+// is graded against its chunk ONLY. The owner's 2026-11-18
+// session is the fixture that must never recur: the bot asked
+// for one sentence, he sent one sentence (4 seconds), and it
+// was scored against the whole passage — 7%.
+
+const LADDER_PASSAGE = '朝は駅まで歩きました。昼は図書館で本を読みました。夕方は持ち主が見つかって、よかったですね。夜は早く寝ました。'
+const LADDER_SENTENCES = [
+  '朝は駅まで歩きました。',
+  '昼は図書館で本を読みました。',
+  '夕方は持ち主が見つかって、よかったですね。',
+  '夜は早く寝ました。',
+]
+const LADDER_CANDS = [
+  { word: '図書館', h: '図書館', reading: 'としょかん', meaning: 'library' },
+  { word: '持ち主', h: '持ち主', reading: 'もちぬし', meaning: 'the owner' },
+]
+
+check('splitPassageSentences: terminators stay with their sentence; empties drop', () => {
+  for (const m of [aloud, scorePort]) {
+    assert.deepEqual(m.splitPassageSentences(LADDER_PASSAGE), LADDER_SENTENCES)
+    assert.deepEqual(m.splitPassageSentences('行きます！本当ですか？はい。'), ['行きます！', '本当ですか？', 'はい。'])
+    assert.deepEqual(m.splitPassageSentences('一行目です\n二行目です'), ['一行目です', '二行目です'])
+    assert.deepEqual(m.splitPassageSentences(''), [])
+    assert.deepEqual(m.splitPassageSentences(null), [])
+    assert.deepEqual(m.splitPassageSentences('。。。'), [])
+  }
+})
+
+check('repair ladder: a sentence-only retry passes against its sentence — and would fail against the passage', () => {
+  // The owner's geometry: he read ONLY the sentence he was asked
+  // for. Against that sentence the read is whole; against the
+  // whole passage it is a fraction — the 7% shape. The ladder
+  // grades the first, never the second.
+  const sentenceOnly = LADDER_SENTENCES[2]
+  for (const m of [aloud, scorePort]) {
+    assert.equal(m.scoreReadAloud(sentenceOnly, sentenceOnly).score, 1)
+    const againstPassage = m.scoreReadAloud(LADDER_PASSAGE, sentenceOnly).score
+    assert.ok(againstPassage < m.READ_ALOUD_PASS_SCORE, `sentence vs passage ${againstPassage} must sit under the line`)
+  }
+})
+
+check('missedSentences: a skipped sentence is queued; fully read sentences are not', () => {
+  const heard = LADDER_SENTENCES[0] + LADDER_SENTENCES[1] + LADDER_SENTENCES[3] // sentence 3 (持ち主) skipped whole
+  for (const m of [aloud, scorePort]) {
+    assert.deepEqual(m.missedSentences(LADDER_PASSAGE, heard, LADDER_CANDS), [2])
+    assert.deepEqual(m.missedSentences(LADDER_PASSAGE, LADDER_PASSAGE, LADDER_CANDS), []) // an honest full read misses nothing
+    assert.deepEqual(m.missedSentences(LADDER_PASSAGE, '', LADDER_CANDS), []) // no transcript — no queue claimed
+  }
+})
+
+check('missedSentences: Nao\'s fix sentence leads the queue, the rest follow in passage order', () => {
+  // Sentence 2 skipped whole (coverage miss) AND sentence 3 read
+  // with its new word dropped (持ち主 → 主): sentence 3's raw
+  // coverage still passes, but the missed candidate queues it —
+  // and as the named fix it leads, ahead of the earlier coverage
+  // miss. (The candidate list here holds only 持ち主: with 図書館
+  // also a candidate, IT would be the first missed candidate —
+  // it lives in the skipped sentence — and its sentence would
+  // rightly lead instead.)
+  const heard = LADDER_SENTENCES[0] + '夕方は主が見つかって、よかったですね。' + LADDER_SENTENCES[3]
+  const fixCands = [LADDER_CANDS[1]]
+  for (const m of [aloud, scorePort]) {
+    assert.deepEqual(m.missedSentences(LADDER_PASSAGE, heard, fixCands), [2, 1])
+    assert.deepEqual(m.missedSentences(LADDER_PASSAGE, heard, LADDER_CANDS), [1]) // 図書館's sentence is the fix here
+  }
+})
+
+check('passageHalves: split at a sentence boundary, balanced by characters; halves rejoin the passage', () => {
+  for (const m of [aloud, scorePort]) {
+    const halves = m.passageHalves(LADDER_PASSAGE)
+    assert.ok(halves)
+    assert.equal(halves.first + halves.second, LADDER_PASSAGE)
+    assert.equal(halves.firstCount + halves.secondCount, LADDER_SENTENCES.length)
+    // Weights 10/13/19/8: the closest balance is 23 | 27.
+    assert.equal(halves.first, LADDER_SENTENCES[0] + LADDER_SENTENCES[1])
+    assert.equal(halves.second, LADDER_SENTENCES[2] + LADDER_SENTENCES[3])
+    assert.equal(m.passageHalves('夜は早く寝ました。'), null) // one sentence — no halves
+    assert.equal(m.passageHalves(''), null)
+  }
+})
+
+check('candidatesInText: a chunk holds only its own new words', () => {
+  for (const m of [aloud, scorePort]) {
+    assert.deepEqual(m.candidatesInText(LADDER_CANDS, LADDER_SENTENCES[2]), [LADDER_CANDS[1]])
+    assert.deepEqual(m.candidatesInText(LADDER_CANDS, LADDER_SENTENCES[1]), [LADDER_CANDS[0]])
+    assert.deepEqual(m.candidatesInText(LADDER_CANDS, LADDER_SENTENCES[0]), [])
+    assert.deepEqual(m.candidatesInText(null, LADDER_SENTENCES[2]), [])
+  }
+})
+
+check('repair ladder: chunk grading uses the chunk ruler at every rung', () => {
+  // Sentences first, then halves, then the full passage: at each
+  // rung a verbatim read of the CURRENT chunk passes, and the
+  // same audio scored against the whole passage would not —
+  // until the final rung, where the chunk IS the passage.
+  const halves = aloud.passageHalves(LADDER_PASSAGE)
+  for (const m of [aloud, scorePort]) {
+    for (const chunk of [LADDER_SENTENCES[2], halves.first, halves.second]) {
+      assert.ok(m.scoreReadAloud(chunk, chunk).score >= m.READ_ALOUD_PASS_SCORE)
+      assert.ok(m.scoreReadAloud(LADDER_PASSAGE, chunk).score < m.READ_ALOUD_PASS_SCORE)
+    }
+    assert.equal(m.scoreReadAloud(LADDER_PASSAGE, LADDER_PASSAGE).score, 1)
+  }
+})
+
 // ---------- amendment #7: N7+, foundations pace, doors (2026-11-07) ----------
 
 check('resolveBand: raw N7 resolves to N5 with the joke remembered — and only there', () => {

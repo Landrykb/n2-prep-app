@@ -19,6 +19,7 @@ import {
 } from '../lib/readerFit.js'
 import {
   READ_ALOUD_PASS_SCORE, normalizeSpeechText, scoreReadAloud, firstMissedCandidate,
+  candidatesInText, missedSentences, passageHalves, splitPassageSentences,
 } from '../lib/readAloud.js'
 import KanjiTapText from './KanjiTapText.jsx'
 import KanjiChips from './KanjiChips.jsx'
@@ -230,11 +231,16 @@ export default function Reader({ setActive, onSignIn }) {
   // per passage — present() aborts it, so a stale transcript can
   // never be scored against a new passage.
   const [pulseWord, setPulseWord] = useState('') // kanji strip tap → passage highlight
-  const [aloud, setAloud] = useState(null) // listening | scored | empty | error
+  const [aloud, setAloud] = useState(null) // listening | scored | chunk | repairDone | empty | error
   const recogRef = useRef(null)
   const finalTextRef = useRef('')
   const listeningRef = useRef(false)
   const discardRef = useRef(false) // an aborted session's onend must not score
+  const sessionRef = useRef(0) // capture generation — stale handlers of a reused recognizer go silent
+  const wantRef = useRef(false) // the learner is still reading: an engine-ended session restarts
+  const errorRef = useRef(null) // a recognition error the onend handler must honour
+  const restartsRef = useRef(0) // engine-restart budget for one capture
+  const targetRef = useRef(null) // the capture's grading target { passage, newWords, kind, text }
   const creditedRef = useRef(new Set()) // passages a voice proof already comfy-credited
   const completedRef = useRef(new Set()) // passages already logged passage_completed
   const speechSupported = typeof window !== 'undefined'
@@ -242,9 +248,42 @@ export default function Reader({ setActive, onSignIn }) {
 
   function stopListening() {
     discardRef.current = true
+    wantRef.current = false
     listeningRef.current = false
+    sessionRef.current += 1 // in-flight handlers of the reused recognizer go silent
     try { recogRef.current?.abort() } catch { /* not running */ }
-    recogRef.current = null
+    // The recognizer itself is KEPT (One Session's reuse law,
+    // amendment #34): a fresh object per attempt re-asks the OS
+    // for the microphone every time.
+  }
+
+  // The repair ladder's state for one passage (Doc 16 amendment
+  // #34): { stage, sentences, queue, total } — stage 'sentences'
+  // serves sentences[queue[0]], 'half1'/'half2' the passage's
+  // halves, 'full' the whole passage. It persists in localStorage
+  // per passage, so leaving the Reader and coming back resumes
+  // the repair where it stopped; a stored state whose sentences
+  // no longer join to the passage's sentences is discarded.
+  const [repair, setRepair] = useState(null)
+  const repairRef = useRef(null)
+  const repairStoreKey = (id) => `yonde.reader.repair.${id}`
+  const storeRepair = (id, r) => {
+    repairRef.current = r
+    setRepair(r)
+    try {
+      if (r) localStorage.setItem(repairStoreKey(id), JSON.stringify(r))
+      else localStorage.removeItem(repairStoreKey(id))
+    } catch { /* storage is a convenience; the ladder lives in state regardless */ }
+  }
+  const recallRepair = (passage) => {
+    try {
+      const raw = localStorage.getItem(repairStoreKey(passage.id))
+      if (!raw) return null
+      const r = JSON.parse(raw)
+      if (!r || !Array.isArray(r.sentences) || !Array.isArray(r.queue)) return null
+      if (r.sentences.join('') !== splitPassageSentences(String(passage.text)).join('')) return null
+      return r
+    } catch { return null }
   }
 
   useEffect(() => () => stopListening(), [])
@@ -344,6 +383,9 @@ export default function Reader({ setActive, onSignIn }) {
     stopListening()
     setAloud(null)
     setPulseWord('')
+    const restoredRepair = next ? recallRepair(next.passage) : null
+    repairRef.current = restoredRepair
+    setRepair(restoredRepair)
     setPick(next)
     setFinished(false)
     setMineNote('')
@@ -767,37 +809,143 @@ export default function Reader({ setActive, onSignIn }) {
     setReloadKey((k) => k + 1)
   }
 
+  // The score-and-effect tail of a finished capture. The target
+  // carries its own grading text (amendment #34): a plain passage
+  // read grades against the passage; a repair chunk grades against
+  // the chunk ALONE — never the whole passage.
   const scoreTranscript = (target, transcript) => {
     const passage = target.passage
     const text = String(transcript || '')
     if (!normalizeSpeechText(text)) { setAloud({ status: 'empty' }); return }
-    const { score } = scoreReadAloud(String(passage.text), text)
+    const { score } = scoreReadAloud(target.text, text)
+    const pct = Math.round(score * 100)
     recordMetric('shadow_attempted', {
       passageId: String(passage.id),
       score: Math.round(score * 1000) / 1000,
       method: 'webspeech',
+      target: target.kind,
     })
     const passed = score >= READ_ALOUD_PASS_SCORE
-    if (passed) {
-      logCompleted(passage, 'webspeech')
-      void applyComfyRead(passage)
+    if (target.kind === 'passage') {
+      if (passed) {
+        logCompleted(passage, 'webspeech')
+        void applyComfyRead(passage)
+      }
+      // Nao's one fix: the first new word the voice never reached.
+      // Ladder entry (amendment #34): any missed sentence —
+      // including the one holding the skipped word — opens the
+      // repair panel; the next capture grades a chunk, never the
+      // whole passage.
+      const queue = missedSentences(String(passage.text), text, target.newWords)
+      if (queue.length > 0) {
+        storeRepair(String(passage.id), {
+          stage: 'sentences',
+          sentences: splitPassageSentences(String(passage.text)),
+          queue,
+          total: queue.length,
+        })
+      } else if (passed) {
+        // A clean full read proves the whole passage — any repair
+        // still open for it is finished by definition.
+        storeRepair(String(passage.id), null)
+      }
+      setAloud({ status: 'scored', pct, passed, fix: firstMissedCandidate(target.newWords, text) })
+      return
     }
-    // Nao's one fix: the first new word the voice never reached.
-    setAloud({ status: 'scored', pct: Math.round(score * 100), passed, fix: firstMissedCandidate(target.newWords, text) })
+    advanceRepair(target, pct, passed, text)
   }
 
-  const startAloud = () => {
+  // One graded chunk later: advance the ladder, or hold the chunk
+  // for another try. Chunks only ever clear or stay — a miss marks
+  // nothing and moves nothing backwards.
+  const advanceRepair = (target, pct, passed, transcript) => {
+    const passage = target.passage
+    const r = repairRef.current
+    if (!r) { setAloud({ status: 'scored', pct, passed, fix: null }); return }
+    const passageText = String(passage.text)
+    if (target.kind === 'sentence') {
+      if (!passed) {
+        setAloud({
+          status: 'chunk', pct, passed: false, kind: 'sentence',
+          fix: firstMissedCandidate(candidatesInText(target.newWords, target.text), transcript),
+          fixText: target.text,
+        })
+        return
+      }
+      const queue = r.queue.slice(1)
+      if (queue.length > 0) {
+        storeRepair(String(passage.id), { ...r, queue })
+        setAloud({ status: 'chunk', pct, passed: true, kind: 'sentence' })
+        return
+      }
+      const halves = passageHalves(passageText)
+      storeRepair(String(passage.id), { ...r, stage: halves ? 'half1' : 'full', queue: [] })
+      setAloud({ status: 'chunk', pct, passed: true, kind: 'sentence', sentencesDone: true })
+      return
+    }
+    if (target.kind === 'half') {
+      if (!passed) {
+        setAloud({
+          status: 'chunk', pct, passed: false, kind: 'half',
+          fix: firstMissedCandidate(candidatesInText(target.newWords, target.text), transcript),
+          fixText: target.text,
+        })
+        return
+      }
+      storeRepair(String(passage.id), { ...r, stage: r.stage === 'half1' ? 'half2' : 'full' })
+      setAloud({ status: 'chunk', pct, passed: true, kind: 'half' })
+      return
+    }
+    // 'full' — the whole passage at once, graded as a normal full read.
+    if (!passed) {
+      const queue = missedSentences(passageText, transcript, target.newWords)
+      if (queue.length > 0) {
+        storeRepair(String(passage.id), {
+          stage: 'sentences',
+          sentences: splitPassageSentences(passageText),
+          queue,
+          total: queue.length,
+        })
+      }
+      setAloud({
+        status: 'chunk', pct, passed: false, kind: 'full',
+        fix: firstMissedCandidate(target.newWords, transcript),
+        fixText: passageText,
+      })
+      return
+    }
+    storeRepair(String(passage.id), null)
+    logCompleted(passage, 'webspeech')
+    void applyComfyRead(passage)
+    setAloud({ status: 'repairDone', pct })
+  }
+
+  const startAloud = (target) => {
     if (!pick || listeningRef.current) return
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SR) return // unsupported browsers render the plain note instead of this button
-    const target = pick // the session is bound to THIS passage; present() aborts it on change
+    // ONE recognizer for this surface, reused across attempts —
+    // One Session's law (2026-11-08): a fresh object per tap
+    // re-asks the OS for the microphone every time. It is dropped
+    // only when the OS refuses it (not-allowed), so the next tap
+    // builds a clean one.
+    let recog = recogRef.current
+    if (!recog) {
+      recog = new SR()
+      recogRef.current = recog
+    }
+    const mySession = ++sessionRef.current
+    targetRef.current = target
     finalTextRef.current = ''
     discardRef.current = false
-    const recog = new SR()
+    errorRef.current = null
+    restartsRef.current = 0
+    wantRef.current = true
     recog.lang = 'ja-JP'
     recog.continuous = true
-    recog.interimResults = false
+    recog.interimResults = true
     recog.onresult = (e) => {
+      if (mySession !== sessionRef.current) return
       let finals = ''
       for (let i = e.resultIndex; i < e.results.length; i++) {
         if (e.results[i].isFinal) finals += e.results[i][0].transcript
@@ -805,36 +953,58 @@ export default function Reader({ setActive, onSignIn }) {
       if (finals) finalTextRef.current += finals
     }
     recog.onerror = (e) => {
+      if (mySession !== sessionRef.current) return
       if (e?.error === 'aborted') return
-      listeningRef.current = false
-      recogRef.current = null
-      setAloud({
-        status: 'error',
-        message: e?.error === 'not-allowed'
-          ? t('reader.micBlocked')
-          : t('reader.recogStopped'),
-      })
+      if (e?.error === 'not-allowed' || e?.error === 'service-not-allowed') recogRef.current = null
+      // A no-speech cut after real speech is a pause, not a
+      // failure: onend restarts capture. With nothing heard yet
+      // it stays the honest error path.
+      if (e?.error === 'no-speech' && finalTextRef.current) return
+      errorRef.current = e?.error || 'error'
     }
     recog.onend = () => {
-      recogRef.current = null
-      if (discardRef.current) { discardRef.current = false; return }
+      if (mySession !== sessionRef.current) return
+      if (discardRef.current) { discardRef.current = false; listeningRef.current = false; return }
       if (!listeningRef.current) return
+      // The engine ended the session itself — phone engines cut
+      // recognition at pauses and session limits, long before a
+      // whole passage is read. While the learner is still reading
+      // (no Stop tap, no error), restart and keep the transcript:
+      // a passage is one read, however many engine sessions it
+      // takes. This is the divergence that made the Reader's
+      // voice feel broken while One Session's one-sentence turns
+      // worked on the same engine (amendment #34, Step 0).
+      if (wantRef.current && !errorRef.current && restartsRef.current < 40) {
+        restartsRef.current += 1
+        try { recog.start(); return } catch { /* fall through and score what we have */ }
+      }
       listeningRef.current = false
-      scoreTranscript(target, finalTextRef.current)
+      wantRef.current = false
+      if (errorRef.current && errorRef.current !== 'no-speech') {
+        const err = errorRef.current
+        errorRef.current = null
+        setAloud({
+          status: 'error',
+          message: err === 'not-allowed' ? t('reader.micBlocked') : t('reader.recogStopped'),
+        })
+        return
+      }
+      errorRef.current = null
+      scoreTranscript(targetRef.current, finalTextRef.current)
     }
-    recogRef.current = recog
     listeningRef.current = true
-    setAloud({ status: 'listening' })
+    setAloud({ status: 'listening', kind: target.kind })
     try {
       recog.start()
     } catch {
       listeningRef.current = false
-      recogRef.current = null
+      wantRef.current = false
       setAloud({ status: 'error', message: t('reader.recogCantStart') })
     }
   }
 
   const stopAndScore = () => {
+    wantRef.current = false // the learner's Stop is what ends a capture — then onend scores
     try { recogRef.current?.stop() } catch { /* onend does the scoring */ }
   }
 
@@ -903,6 +1073,16 @@ export default function Reader({ setActive, onSignIn }) {
       }
     })
   }, [pick, wordIndex])
+
+  // The repair ladder's current chunk (amendment #34): the one
+  // piece the next capture is graded against.
+  const repairChunk = repair && pick ? (() => {
+    const passageText = String(pick.passage.text)
+    if (repair.stage === 'sentences') return { kind: 'sentence', text: repair.sentences[repair.queue[0]] ?? passageText }
+    if (repair.stage === 'half1') return { kind: 'half', text: passageHalves(passageText)?.first ?? passageText }
+    if (repair.stage === 'half2') return { kind: 'half', text: passageHalves(passageText)?.second ?? passageText }
+    return { kind: 'full', text: passageText }
+  })() : null
 
   // A strip tap pulses the word in the passage and scrolls the
   // first occurrence into view.
@@ -1115,10 +1295,10 @@ export default function Reader({ setActive, onSignIn }) {
                 <button onClick={stopAndScore} className="px-4 py-2 rounded-xl bg-[#FF6B57] hover:bg-[#FF7F6E] text-white text-sm font-semibold flex items-center gap-1.5">
                   <Square size={15} /> {t('reader.stopAndScore')}
                 </button>
-                <span className="text-sm text-slate-300">{t('reader.listening')}</span>
+                <span className="text-sm text-slate-300">{aloud.kind && aloud.kind !== 'passage' ? t('reader.listeningChunk') : t('reader.listening')}</span>
               </div>
             ) : (
-              <button onClick={startAloud} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1.5">
+              <button onClick={() => startAloud({ passage: pick.passage, newWords: pick.newWords, kind: 'passage', text: String(pick.passage.text) })} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1.5">
                 <Mic size={15} /> {t('reader.readAloudButton')}
               </button>
             )}
@@ -1148,6 +1328,56 @@ export default function Reader({ setActive, onSignIn }) {
                 ) : !aloud.passed ? (
                   <p className="text-sm text-slate-400">{t('reader.fixNone')}</p>
                 ) : null}
+              </div>
+            )}
+            {aloud?.status === 'chunk' && (
+              <div className="space-y-3">
+                <p className="text-sm text-slate-300">
+                  {aloud.passed
+                    ? t('reader.repairChunkPassed', { pct: aloud.pct })
+                    : t('reader.repairChunkMissed', { pct: aloud.pct })}
+                </p>
+                {aloud.sentencesDone && <p className="text-sm text-slate-300">{t('reader.repairAllSentencesDone')}</p>}
+                {!aloud.passed && aloud.fix && (
+                  <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4 flex items-start gap-3">
+                    <span className="mt-0.5"><Mascot agent="nao" size={28} showName={false} /></span>
+                    <div className="space-y-1">
+                      <p className="text-sm font-bold text-white">{t('reader.oneFixTitle')}</p>
+                      <p className="text-sm text-slate-200">
+                        <span className="font-semibold text-white">{aloud.fix.h || aloud.fix.word}</span>
+                        {aloud.fix.reading && aloud.fix.reading !== (aloud.fix.h || aloud.fix.word) && <span className="text-cyan-300"> （{aloud.fix.reading}）</span>}
+                        {aloud.fix.meaning && <span className="text-slate-400"> — {aloud.fix.meaning}</span>}
+                      </p>
+                      <p className="text-sm text-slate-300">{t('reader.fixSayLine', { sentence: sentenceWith(aloud.fixText || '', aloud.fix.word) })}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            {aloud?.status === 'repairDone' && (
+              <p className="text-sm text-slate-300">
+                {t('reader.readingMatch')} <span className="text-lg font-bold text-white">{aloud.pct}%</span> {t('reader.readingMatchCovered')} {t('reader.repairComplete')}
+              </p>
+            )}
+            {repair && repairChunk && (
+              <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4 space-y-3">
+                <p className="text-sm font-bold text-white">{t('reader.repairTitle')}</p>
+                <p className="text-sm text-slate-300">{t('reader.repairIntro')}</p>
+                <p className="text-sm text-slate-400">
+                  {repair.stage === 'sentences'
+                    ? t('reader.repairSentenceProgress', { done: repair.total - repair.queue.length + 1, total: repair.total })
+                    : repair.stage === 'half1'
+                      ? t('reader.repairHalfLabel', { n: 1 })
+                      : repair.stage === 'half2'
+                        ? t('reader.repairHalfLabel', { n: 2 })
+                        : t('reader.repairFullLabel')}
+                </p>
+                <p className="text-base text-slate-100 leading-relaxed">「{repairChunk.text}」</p>
+                {aloud?.status !== 'listening' && (
+                  <button onClick={() => startAloud({ passage: pick.passage, newWords: pick.newWords, kind: repairChunk.kind, text: repairChunk.text })} className="px-4 py-2 rounded-xl bg-bun-700 hover:bg-bun-600 text-slate-100 text-sm font-medium flex items-center gap-1.5">
+                    <Mic size={15} /> {repairChunk.kind === 'sentence' ? t('reader.repairReadSentence') : repairChunk.kind === 'half' ? t('reader.repairReadHalf') : t('reader.repairReadFull')}
+                  </button>
+                )}
               </div>
             )}
           </section>

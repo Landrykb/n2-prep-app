@@ -6,7 +6,7 @@ import { DECK_GLOSS } from './gloss.ts'
 import { JMDICT_COMPOUNDS } from './jmdict-gloss.ts'
 import { segmentText } from './segment.ts'
 import { synthesizeSpeechOgg } from './voice.ts'
-import { READ_ALOUD_PASS_SCORE, firstMissedCandidate, scoreReadAloud } from './score.ts'
+import { READ_ALOUD_PASS_SCORE, candidatesInText, firstMissedCandidate, missedSentences, passageHalves, scoreReadAloud, splitPassageSentences } from './score.ts'
 import { HEARD_FLOOR, heardReading, loadHeardDict, matchHeardWords, selectHeardTargets, summariseHeard } from './ambient.ts'
 import { bt, botFittedFooter, botLevelIntro, botTrialUpCopy, languageFromState, languageFromStateRow, voiceResultKeyboard, type BotLang } from './i18n.ts'
 import { BASIC_KANJI } from './kanji-basic.ts'
@@ -2266,17 +2266,16 @@ serve(async (req: Request) => {
     // tier's 28,800 audio-seconds/day dwarfs a Reader's ~20-second
     // notes). The transcript is scored HERE, in code (score.ts) —
     // the AI is a sense; the verdict is spine, like every Reader
-    // judgement. Returns { score, missed } or null on ANY failure —
+    // judgement. Returns the transcript or null on ANY failure —
     // no key, no file, HTTP error, timeout, empty transcript — and
     // null always means the caller runs the v1 duration proof
-    // instead. The transcript itself is never logged or stored;
-    // only the score and the one missed word leave this function.
+    // instead (unless a repair is mid-ladder: see handleVoiceNote).
+    // The transcript itself is never logged or stored; only the
+    // score and the one missed word leave this function.
     const GROQ_TRANSCRIBE_URL = 'https://api.groq.com/openai/v1/audio/transcriptions'
-    const tryTranscribeAndScore = async (
+    const transcribeVoiceNote = async (
       voice: Record<string, unknown>,
-      passage: Record<string, unknown>,
-      link: { user_id: string; declared_band?: string | null; declared_at?: string | null },
-    ): Promise<{ score: number; missed: Record<string, unknown> | null } | null> => {
+    ): Promise<string | null> => {
       const key = Deno.env.get('READER_STT_API_KEY') ?? ''
       if (!key) return null
       const fileId = typeof voice.file_id === 'string' ? voice.file_id : ''
@@ -2314,23 +2313,72 @@ serve(async (req: Request) => {
         // or a hallucination guard tripping) — fall back to the
         // duration proof rather than scoring a phantom read.
         if (!transcript) return null
-
-        const { score } = scoreReadAloud(String(passage.text ?? ''), transcript)
-        // Nao's one fix runs over THIS learner's new words for the
-        // passage — the same list /read bolded: the passage's
-        // candidates minus the learner's known set, in passage
-        // order, checked by surface then headword.
-        const stateRow = await loadState(link.user_id)
-        const sttState = (stateRow?.state ?? {}) as Record<string, unknown>
-        const { known } = knownFor(sttState, declaredOf(link))
-        const newWords = withCandidateLevels(passage).filter((c) => c.word && !known.has(c.h || c.word))
-        const missed = firstMissedCandidate(newWords, transcript) as unknown as Record<string, unknown> | null
-        return { score, missed }
+        return transcript
       } catch {
         return null
       } finally {
         clearTimeout(timer)
       }
+    }
+
+    // Score a transcript against a TARGET text — the whole passage
+    // for a full read, or one chunk (a sentence, a half) inside
+    // the repair ladder (amendment #34). The target is the whole
+    // law of the ladder: a chunk is graded against its chunk,
+    // never against the passage it came from. Nao's one fix runs
+    // over THIS learner's new words for the passage — the same
+    // list /read bolded: the passage's candidates minus the
+    // learner's known set, in passage order — scoped to the words
+    // the target actually holds, so the fix she names inside a
+    // chunk is a word of that chunk. Returns the score, the one
+    // missed candidate (or null), and the full new-word list (the
+    // ladder's missed-sentence maths runs over it).
+    const scoreAgainstTarget = async (
+      link: { user_id: string; declared_band?: string | null; declared_at?: string | null },
+      passage: Record<string, unknown>,
+      transcript: string,
+      targetText: string,
+    ): Promise<{ score: number; missed: Record<string, unknown> | null; newWords: Record<string, unknown>[] }> => {
+      const { score } = scoreReadAloud(targetText, transcript)
+      const stateRow = await loadState(link.user_id)
+      const sttState = (stateRow?.state ?? {}) as Record<string, unknown>
+      const { known } = knownFor(sttState, declaredOf(link))
+      const newWords = withCandidateLevels(passage).filter((c) => c.word && !known.has(c.h || c.word)) as unknown as Record<string, unknown>[]
+      const missed = firstMissedCandidate(candidatesInText(newWords, targetText), transcript) as unknown as Record<string, unknown> | null
+      return { score, missed, newWords }
+    }
+
+    // ---------- the repair ladder state (amendment #34) ----------
+    // When a scored read misses, the repair progresses across
+    // voice notes, so it persists: state.readerRepair inside the
+    // learner_state document, written with the same
+    // read-modify-write the Mine handler uses. Shape:
+    // { passageId, stage, sentences, queue, total } — stage
+    // 'sentences' serves sentences[queue[0]], 'half1' / 'half2'
+    // serve the passage's halves (passageHalves over the same
+    // text), 'full' serves the whole passage; total is the
+    // queue's starting length, for the progress line. A state
+    // whose passageId is not the learner's current passage is
+    // inert — serving a new passage leaves it behind, and the
+    // next scored read of anything else starts from the top.
+    type RepairState = { passageId: string; stage: string; sentences: string[]; queue: number[]; total: number }
+    const loadRepair = async (userId: string): Promise<RepairState | null> => {
+      const row = await loadState(userId)
+      const st = (row?.state ?? {}) as Record<string, unknown>
+      const r = st.readerRepair as RepairState | undefined
+      if (!r || typeof r.passageId !== 'string' || !Array.isArray(r.sentences) || !Array.isArray(r.queue)) return null
+      return r
+    }
+    const saveRepair = async (userId: string, repair: RepairState | null) => {
+      const row = await loadState(userId)
+      const st = (row?.state ?? {}) as Record<string, unknown>
+      const next = { ...st }
+      if (repair) next.readerRepair = repair
+      else delete next.readerRepair
+      const { error } = await supabaseAdmin
+        .from('learner_state')
+        .upsert({ user_id: userId, state: next, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+      if (error) console.error('reader-bot: repair state write failed')
     }
 
     // ---------- Heard Words: ambient listening sessions (Doc 22) ----------
@@ -2756,8 +2804,112 @@ serve(async (req: Request) => {
       // add up, never against the learner. On ANY transcription
       // failure (or no key) control falls through to the v1
       // duration proof below, untouched.
-      const scored = await tryTranscribeAndScore(voice, passage as Record<string, unknown>, link)
-      if (scored) {
+      //
+      // Amendment #34 — the repair ladder: when a scored read
+      // misses (or passes with a word skipped), the miss is
+      // repaired in pieces instead of by repeating the whole
+      // passage: the missed sentences one at a time, then the two
+      // halves, then the whole passage once more. While a repair
+      // is active for this passage, a voice note is graded
+      // against the CURRENT piece only — never the whole passage
+      // (the 7% failure: the bot asked for one sentence, the
+      // owner sent one sentence, and it was scored against
+      // everything). And while a repair is active, a note that
+      // cannot be transcribed grades NOTHING: the duration proof
+      // never grades a piece.
+      const fixLineFor = (missed: Record<string, unknown> | null, sentence: string): string => {
+        const missedWord = missed ? String(missed.word ?? '') : ''
+        if (!missed || !missedWord) return ''
+        return bt(lang, 'voice.fix', {
+          word: `<b>${esc(missedWord)}</b>`,
+          readingSuffix: missed.reading && missed.reading !== missed.word
+            ? `（${esc(String(missed.reading))}）`
+            : '',
+          meaningSuffix: missed.meaning ? ` — ${esc(String(missed.meaning))}` : '',
+          sentence: esc(sentence),
+        })
+      }
+      const transcript = await transcribeVoiceNote(voice)
+      const repairRow = await loadRepair(link.user_id)
+      const repair = repairRow && repairRow.passageId === currentId ? repairRow : null
+      if (transcript) {
+        const passageText = String(passage.text)
+        if (repair) {
+          const halves = passageHalves(passageText)
+          const target = repair.stage === 'half1' ? (halves?.first ?? passageText)
+            : repair.stage === 'half2' ? (halves?.second ?? passageText)
+            : repair.stage === 'full' ? passageText
+            : (repair.sentences[repair.queue[0]] ?? passageText)
+          const chunk = await scoreAgainstTarget(link, passage as Record<string, unknown>, transcript, target)
+          const pct = Math.round(chunk.score * 100)
+          await logEvent(link.user_id, 'shadow_attempted', {
+            passageId: currentId,
+            score: Math.round(chunk.score * 1000) / 1000,
+            method: 'groq-whisper',
+            target: repair.stage === 'sentences' ? 'sentence' : repair.stage === 'full' ? 'passage' : 'half',
+          })
+          const passed = chunk.score >= READ_ALOUD_PASS_SCORE
+          const kb = { reply_markup: voiceResultKeyboard(lang, currentId) }
+          if (repair.stage === 'sentences') {
+            const current = repair.sentences[repair.queue[0]] ?? passageText
+            if (!passed) {
+              await sendMessage(botToken, chatId, bt(lang, 'voice.repairSentenceMiss', { pct, sentence: esc(current) }) + fixLineFor(chunk.missed, current), kb)
+              return
+            }
+            const queue = repair.queue.slice(1)
+            if (queue.length > 0) {
+              await saveRepair(link.user_id, { ...repair, queue })
+              await sendMessage(botToken, chatId, bt(lang, 'voice.repairSentenceClear', { pct, done: repair.total - queue.length, total: repair.total, sentence: esc(repair.sentences[queue[0]]) }), kb)
+              return
+            }
+            if (halves) {
+              await saveRepair(link.user_id, { ...repair, stage: 'half1', queue: [] })
+              await sendMessage(botToken, chatId, bt(lang, 'voice.repairSentencesDone', { pct }) + bt(lang, 'voice.repairHalfIntro', { half: esc(halves.first) }), kb)
+            } else {
+              await saveRepair(link.user_id, { ...repair, stage: 'full', queue: [] })
+              await sendMessage(botToken, chatId, bt(lang, 'voice.repairSentencesDone', { pct }) + bt(lang, 'voice.repairFullIntro'), kb)
+            }
+            return
+          }
+          if (repair.stage === 'half1' || repair.stage === 'half2') {
+            if (!passed) {
+              const mw = chunk.missed ? String(chunk.missed.word ?? '') : ''
+              const fix = chunk.missed && mw ? fixLineFor(chunk.missed, sentenceWith(passageText, mw)) : ''
+              await sendMessage(botToken, chatId, bt(lang, 'voice.repairHalfMiss', { pct, half: esc(target) }) + fix, kb)
+              return
+            }
+            if (repair.stage === 'half1' && halves) {
+              await saveRepair(link.user_id, { ...repair, stage: 'half2' })
+              await sendMessage(botToken, chatId, bt(lang, 'voice.repairHalfClear', { pct, half: esc(halves.second) }), kb)
+            } else {
+              await saveRepair(link.user_id, { ...repair, stage: 'full' })
+              await sendMessage(botToken, chatId, bt(lang, 'voice.repairSecondHalfClear', { pct }) + bt(lang, 'voice.repairFullIntro'), kb)
+            }
+            return
+          }
+          // stage 'full': the whole passage, graded exactly as a
+          // normal full read — the rung that counts.
+          if (!passed) {
+            const queue = missedSentences(passageText, transcript, chunk.newWords)
+            if (queue.length > 0) {
+              const sentences = splitPassageSentences(passageText)
+              await saveRepair(link.user_id, { passageId: currentId, stage: 'sentences', sentences, queue, total: queue.length })
+              await sendMessage(botToken, chatId, bt(lang, 'voice.repairFullMiss', { pct }) + bt(lang, queue.length === 1 ? 'voice.repairStartOne' : 'voice.repairStartMany', { count: queue.length, sentence: esc(sentences[queue[0]]) }), kb)
+            } else {
+              await sendMessage(botToken, chatId, bt(lang, 'voice.repairFullMissCalm', { pct }), kb)
+            }
+            return
+          }
+          await saveRepair(link.user_id, null)
+          const repairEffect = await applyVoiceReadEffect(link, currentId, 'voice')
+          await sendMessage(botToken, chatId, bt(lang, 'voice.repairComplete', { pct }), kb)
+          if (repairEffect.trialUp) {
+            await sendMessage(botToken, chatId, botTrialUpCopy(lang, repairEffect.target), { reply_markup: continuationKeyboard(lang) })
+          }
+          return
+        }
+
+        const scored = await scoreAgainstTarget(link, passage as Record<string, unknown>, transcript, passageText)
         const pct = Math.round(scored.score * 100)
         await logEvent(link.user_id, 'shadow_attempted', {
           passageId: currentId,
@@ -2766,14 +2918,7 @@ serve(async (req: Request) => {
         })
         const missedWord = scored.missed ? String(scored.missed.word ?? '') : ''
         const fixLine = scored.missed && missedWord
-          ? bt(lang, 'voice.fix', {
-            word: `<b>${esc(missedWord)}</b>`,
-            readingSuffix: scored.missed.reading && scored.missed.reading !== scored.missed.word
-              ? `（${esc(String(scored.missed.reading))}）`
-              : '',
-            meaningSuffix: scored.missed.meaning ? ` — ${esc(String(scored.missed.meaning))}` : '',
-            sentence: esc(sentenceWith(String(passage.text), missedWord)),
-          })
+          ? fixLineFor(scored.missed, sentenceWith(passageText, missedWord))
           : ''
         if (scored.score >= READ_ALOUD_PASS_SCORE) {
           const voiceEffect = await applyVoiceReadEffect(link, currentId, 'voice')
@@ -2794,6 +2939,34 @@ serve(async (req: Request) => {
             { reply_markup: voiceResultKeyboard(lang, currentId) },
           )
         }
+        // Ladder entry: any sentence this read missed — or the
+        // sentence holding the skipped word — starts a repair.
+        // The first voice note after this one is graded against
+        // that sentence alone.
+        const queue = missedSentences(passageText, transcript, scored.newWords)
+        if (queue.length > 0) {
+          const sentences = splitPassageSentences(passageText)
+          await saveRepair(link.user_id, { passageId: currentId, stage: 'sentences', sentences, queue, total: queue.length })
+          await sendMessage(
+            botToken,
+            chatId,
+            bt(lang, queue.length === 1 ? 'voice.repairStartOne' : 'voice.repairStartMany', { count: queue.length, sentence: esc(sentences[queue[0]]) }),
+            { reply_markup: voiceResultKeyboard(lang, currentId) },
+          )
+        }
+        return
+      }
+      if (repair) {
+        // Mid-ladder and the note could not be transcribed: grade
+        // NOTHING. The duration proof below judges whole passages;
+        // running it here would grade a piece by a whole-passage
+        // ruler — the failure this ladder exists to end.
+        const halves = passageHalves(String(passage.text))
+        const target = repair.stage === 'half1' ? (halves?.first ?? String(passage.text))
+          : repair.stage === 'half2' ? (halves?.second ?? String(passage.text))
+          : repair.stage === 'full' ? String(passage.text)
+          : (repair.sentences[repair.queue[0]] ?? String(passage.text))
+        await sendMessage(botToken, chatId, bt(lang, 'voice.repairNotHeard', { chunk: esc(target) }), { reply_markup: voiceResultKeyboard(lang, currentId) })
         return
       }
 
