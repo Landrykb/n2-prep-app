@@ -17,8 +17,12 @@ import { useLanguage } from '../hooks/useLanguage.js'
 // from pick.newWords on every pick change.
 //
 // Props:
-//   chips      [{ word, reading, meaning, candidate }] — candidate
-//              is the passage's new-word candidate object or null.
+//   chips      [{ word, reading, meaning, candidate, alts }] —
+//              candidate is the passage's new-word candidate
+//              object or null; alts, when present, are the word's
+//              OTHER readings (amendment #35, Landry's two-readings
+//              rule): the detail card shows them after the reading
+//              used in this text, which stands bold.
 //   activeWord the currently highlighted surface ('' for none)
 //   onHighlight(word) — pulse/scroll the word in the passage
 //   onMineWord(candidates) — Reader's single-word mine flow
@@ -56,7 +60,10 @@ export default function KanjiChips({ chips, activeWord, onHighlight, onMineWord 
         <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 p-3">
           <p className="text-slate-100">
             <span className="text-lg font-bold">{active.word}</span>
-            {active.reading && <span className="ml-2 text-sm text-slate-400">{active.reading}</span>}
+            {active.reading && <span className="ml-2 text-sm font-semibold text-slate-100">{active.reading}</span>}
+            {Array.isArray(active.alts) && active.alts.length > 0 && (
+              <span className="ml-1.5 text-sm text-slate-500">/ {active.alts.join(' / ')}</span>
+            )}
           </p>
           {active.meaning && <p className="mt-1 text-sm text-slate-300">{active.meaning}</p>}
           {active.candidate && (

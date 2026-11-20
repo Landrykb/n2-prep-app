@@ -65,10 +65,50 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 // Deck rows parsed by the app's own parser; local entries preferred on
 // ties by keeping the longer meaning, exactly like dictionary.js.
 // Exported for tests/reader.test.mjs (segmenter parity fixtures).
+
+/** The WordsDB search index (JMdict common, in-repo) as dictionary
+ *  entries + a first-reading map. Added 2026-11-20 (amendment #35):
+ *  the deck + local list simply do not carry everyday words like
+ *  温かい or 手作り, so the tokeniser shredded them （温 h=温い) and
+ *  the readings block listed a different word. The index is the
+ *  widest in-repo source; it ranks LAST in the merge, so deck and
+ *  local entries always win where they exist. */
+export function wordsdbData() {
+  try {
+    const rows = JSON.parse(readFileSync(join(root, 'public/data/wordsdb/search-index.json'), 'utf8'))
+    const entries = []
+    const firstByWord = new Map()
+    for (const row of rows) {
+      const [, wordField, reading, meaning] = row
+      if (!wordField || !reading) continue
+      for (const word of String(wordField).split('/')) {
+        if (!word) continue
+        entries.push({ word, reading, meaning: meaning || '' })
+        if (!firstByWord.has(word)) firstByWord.set(word, { reading, meaning: meaning || '' })
+      }
+    }
+    return { entries, firstByWord }
+  } catch {
+    return { entries: [], firstByWord: new Map() }
+  }
+}
+
 export function buildDictionary() {
   const rows = JSON.parse(readFileSync(join(root, 'public/data/ankiVocab.json'), 'utf8'))
   const deck = rows.map(parseDeckEntry)
+  const wordsdb = wordsdbData()
   const byKey = new Map()
+  // The wide WordsDB index is deliberately NOT a segmentation
+  // source (amendment #35, scope held): it is consulted for
+  // readings and glosses only (the する-unglue below, the gloss
+  // OVERRIDES' evidence). Widening the segmenter's dictionary
+  // merges compounds into single tokens （電話番号, 市役所) and
+  // silently recalibrates every fit ratio in the bank — measured
+  // 2026-11-20: Landry's graded fits fell 0.02–0.05 and four of
+  // seven passages dropped out of the 93–97% band. That
+  // recalibration is a product decision for Landry, not a side
+  // effect of a readings fix; the readings list and the voice
+  // resolve the wide words at serve time instead.
   for (const group of [deck, localEntries()]) {
     for (const entry of group) {
       if (!entry.word) continue
@@ -80,6 +120,21 @@ export function buildDictionary() {
     }
   }
   let entries = [...byKey.values()]
+  // する-unglue (amendment #35): the deck writes noun readings with
+  // the verb's する glued on （生活 せいかつする "to live"). When the
+  // wide dictionary's own reading for the word is exactly the deck
+  // reading minus する, the dictionary is right and the glue is a
+  // deck artefact — take its reading and gloss. A word whose true
+  // reading ends in する never matches the rule (its wide reading
+  // keeps the する）, so nothing legitimate is rewritten.
+  for (const entry of entries) {
+    if (!entry.reading || !entry.reading.endsWith('する')) continue
+    const wide = wordsdb.firstByWord.get(entry.word)
+    if (wide && entry.reading === `${wide.reading}する`) {
+      entry.reading = wide.reading
+      if (wide.meaning) entry.meaning = wide.meaning
+    }
+  }
   const wordsWithReading = new Set(entries.filter((e) => e.reading).map((e) => e.word))
   entries = entries.filter((e) => e.reading || !wordsWithReading.has(e.word))
   const byWord = new Map()

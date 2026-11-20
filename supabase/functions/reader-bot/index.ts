@@ -1,9 +1,9 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { applyFeedback, BANDS, bandRank, buildKnownSet, capCandidates, countKnownContent, currentBatchWords, deckCreditSet, evaluateDraft, fitCallback, FOUNDATIONS_COMFY_TARGET, hasFeedbackFor, isColdStart, isDispatchDue, kanjiReadings, levelKeyboard, nextForbiddenList, parseFitCallback, passageNewKanji, passageRatio, passageRecyclesBatch, pickGentle, pickPassage, pickStarter, resolveBand, seenKanjiSet, serveBandFor, shouldAskLevel, shouldGenerate, unknownContentHeadwords, voiceReadWindow } from './fit.ts'
+import { applyFeedback, BANDS, bandRank, buildKnownSet, capCandidates, countKnownContent, currentBatchWords, deckCreditSet, evaluateDraft, fitCallback, FOUNDATIONS_COMFY_TARGET, hasFeedbackFor, isColdStart, isDispatchDue, kanjiReadings, levelKeyboard, nextForbiddenList, parseFitCallback, passageNewKanji, passageRatio, passageRecyclesBatch, pickGentle, pickPassage, pickStarter, resolveBand, seenKanjiSet, serveBandFor, shouldAskLevel, shouldGenerate, spokenText, unknownContentHeadwords, voiceReadWindow } from './fit.ts'
 import { DECK_LEVELS } from './deck.ts'
 import { DECK_GLOSS } from './gloss.ts'
-import { JMDICT_COMPOUNDS } from './jmdict-gloss.ts'
+import { JMDICT_COMPOUNDS, JMDICT_READINGS_ALT } from './jmdict-gloss.ts'
 import { segmentText } from './segment.ts'
 import { synthesizeSpeechOgg } from './voice.ts'
 import { READ_ALOUD_PASS_SCORE, candidatesInText, firstMissedCandidate, missedSentences, passageHalves, scoreReadAloud, splitPassageSentences } from './score.ts'
@@ -512,6 +512,26 @@ function withCandidateLevels(passage: Record<string, unknown>) {
   })
 }
 
+// The text a speech engine should SAY for a passage (amendment
+// #35): spokenText over the passage's tokens, guided by the deck
+// gloss, the JMdict supplement and the alternate-readings map —
+// so この町 is spoken このまち, never このちょう. Synthesis only:
+// scoring and the stored text keep the raw passage, exactly as
+// before. Falls back to the raw text when no tokens are stored.
+function spokenPassageText(passage: Record<string, unknown>): string {
+  const raw = String(passage.text ?? '')
+  const tokens = Array.isArray(passage.tokens) ? passage.tokens : []
+  if (!tokens.length) return raw
+  const glossBook = DECK_GLOSS as Record<string, { reading: string; meaning: string }>
+  const compounds = JMDICT_COMPOUNDS as Record<string, [string, string]>
+  const guided = spokenText(
+    tokens as { s: string; h: string }[],
+    (h: string) => glossBook[h]?.reading ?? compounds[h]?.[0],
+    (w: string) => (JMDICT_READINGS_ALT as Record<string, string[]>)[w],
+  )
+  return guided || raw
+}
+
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -929,7 +949,7 @@ serve(async (req: Request) => {
     const enqueueVoiceJob = async (chatId: number, passage: Record<string, unknown>): Promise<boolean> => {
       try {
         const passageId = String(passage.id ?? '')
-        const text = String(passage.text ?? '')
+        const text = spokenPassageText(passage)
         if (!passageId || !text) return false
         // One live job per passage is enough: a pending/claimed job
         // will produce the audio, and a done one is awaiting (or
@@ -972,7 +992,7 @@ serve(async (req: Request) => {
         // attempt below survives only as the last resort when no
         // job could be queued.
         if (await enqueueVoiceJob(chatId, passage)) return
-        const bytes = await synthesizeSpeechOgg(String(passage.text ?? ''))
+        const bytes = await synthesizeSpeechOgg(spokenPassageText(passage))
         if (bytes) {
           const form = new FormData()
           form.append('chat_id', String(chatId))
@@ -1501,10 +1521,14 @@ serve(async (req: Request) => {
           const s = (JMDICT_COMPOUNDS as Record<string, [string, string]>)[w]
           return s ? { reading: s[0], meaning: s[1] } : null
         },
+        // Amendment #35 (Landry's two-readings rule): the other
+        // readings JMdict knows for the word, shown after the one
+        // used in this text.
+        (w: string) => (JMDICT_READINGS_ALT as Record<string, string[]>)[w],
       )
       const readingsBlock = readings.length > 0
         ? `<blockquote expandable>${bt(lang, 'passage.readingsHeader')}\n` +
-          readings.map((r) => `${esc(r.word)} （${esc(r.reading)}）${r.meaning ? ` — ${esc(r.meaning)}` : ''}`).join('\n') +
+          readings.map((r) => `${esc(r.word)} （<b>${esc(r.reading)}</b>${Array.isArray(r.alts) && r.alts.length ? ` / ${r.alts.map((a) => esc(a)).join(' / ')}` : ''}）${r.meaning ? ` — ${esc(r.meaning)}` : ''}`).join('\n') +
           '</blockquote>'
         : null
       // Step order (integration audit, hierarchy standard in text
