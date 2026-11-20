@@ -9,12 +9,13 @@ import { addToQueue, loadQueue, queueItemId } from '../lib/queue.js'
 import { loadDictionary } from '../lib/dictionary.js'
 import { recordMetric } from '../lib/metrics.js'
 import { loadWordSearchIndex } from '../lib/wordsDb.js'
+import { loadKanjiIndex } from '../lib/kanjiDb.js'
 import { prewarmNeuralAudio } from '../lib/neuralVoice.js'
 import { modelCast } from '../lib/voicePreference.js'
 import {
   BANDS, bandRank, buildKnownSet, countKnownContent, currentBatchWords, deckCreditSet,
   isColdStart, kanjiReadings, passageNewKanji, passageRatio, passageRecyclesBatch,
-  pickPassage, pickStarter, capCandidates,
+  pickPassage, pickStarter, capCandidates, spokenText,
   resolveBand, seenKanjiSet, serveBandFor, applyFeedback,
 } from '../lib/readerFit.js'
 import {
@@ -198,21 +199,52 @@ export default function Reader({ setActive, onSignIn }) {
   // The WordsDB common index resolves them; loaded once,
   // through the same loader the Heard panel uses.
   const [wordIndex, setWordIndex] = useState(null)
+  // Alternate readings for the two-readings rule (amendment #35):
+  // every reading the index carries for a word, grouped — plus, for
+  // single-kanji words, the kanji's own on/kun from the kanjidb
+  // （町 → ちょう rides in on the on'yomi; the common index files
+  // 町 under まち only).
+  const [wordAlts, setWordAlts] = useState(null)
   useEffect(() => {
     let live = true
     loadWordSearchIndex()
       .then((rows) => {
         if (!live || !Array.isArray(rows)) return
         const m = new Map()
+        const alts = new Map()
         for (const row of rows) {
           const w = row?.[1]
           const r = row?.[2]
           if (!w || !r) continue
           for (const v of String(w).split('/')) {
-            if (v && !m.has(v)) m.set(v, { reading: r, meaning: typeof row?.[3] === 'string' ? row[3] : '' })
+            if (!v) continue
+            if (!m.has(v)) m.set(v, { reading: r, meaning: typeof row?.[3] === 'string' ? row[3] : '' })
+            if (!alts.has(v)) alts.set(v, [])
+            if (!alts.get(v).includes(r)) alts.get(v).push(r)
           }
         }
         setWordIndex(m)
+        setWordAlts(alts)
+      })
+      .catch(() => {})
+    return () => { live = false }
+  }, [])
+  const [kanjiAlts, setKanjiAlts] = useState(null)
+  useEffect(() => {
+    let live = true
+    loadKanjiIndex()
+      .then((rows) => {
+        if (!live || !Array.isArray(rows)) return
+        const kataToHira = (s) => s.replace(/[ァ-ン]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60))
+        const m = new Map()
+        for (const row of rows) {
+          if (!row?.char) continue
+          const list = []
+          if (row.on) for (const on of String(row.on).split('・')) { const h = kataToHira(on.trim()); if (h && !list.includes(h)) list.push(h) }
+          if (row.kun) for (const kun of String(row.kun).split('・')) { const k = kun.replace(/\(.*\)/, '').trim(); if (k && !list.includes(k)) list.push(k) }
+          if (list.length > 1) m.set(row.char, list)
+        }
+        setKanjiAlts(m)
       })
       .catch(() => {})
     return () => { live = false }
@@ -391,11 +423,8 @@ export default function Reader({ setActive, onSignIn }) {
     setMineNote('')
     setPhase('ready')
     // Voice pre-warm (2026-11-15): synthesis at serve time, not
-    // at tap time. The bot synthesizes a passage's voice when it
-    // sends it; the web asks the voice function for this text in
-    // the background now, so the learner's tap on play meets a
-    // hot cache (~1s) instead of the synthesizer (~10s).
-    prewarmNeuralAudio(next.passage.text, modelCast())
+    // at tap time — the effect on `spoken` below fires it for the
+    // guided text (amendment #35) as soon as the pick lands.
     // Doc 16 §8: reading_opened is THIS surface's event (the bot logs
     // passage_sent only); passage_sent is logged too, in the bot's
     // payload shape, so the 14-day exclusion spans both surfaces and
@@ -1063,7 +1092,15 @@ export default function Reader({ setActive, onSignIn }) {
     // there, not the deck's しんぱいする）, then the deck.
     const meaningOf = (h) => gloss.get(h)?.meaning || wordIndex?.get(h)?.meaning || byWord.get(h)?.meaning || undefined
     const compoundOf = (w) => gloss.get(w) || wordIndex?.get(w) || byWord.get(w) || undefined
-    return kanjiReadings(pick.passage.tokens, readingOf, meaningOf, compoundOf).map((r) => {
+    // Two-readings rule (amendment #35): the index's other readings
+    // for the word; for a single-kanji word, the kanji's on/kun.
+    const altOf = (w) => {
+      const idx = wordAlts?.get(w)
+      if (idx && idx.length > 1) return idx
+      if ([...w].length === 1) return kanjiAlts?.get(w) || idx
+      return idx
+    }
+    return kanjiReadings(pick.passage.tokens, readingOf, meaningOf, compoundOf, altOf).map((r) => {
       const head = headOf.get(r.word) || r.word
       const candidate = pick.newWords.find((c) => c.word === r.word || (c.h || c.word) === head) || null
       return {
@@ -1072,7 +1109,39 @@ export default function Reader({ setActive, onSignIn }) {
         candidate,
       }
     })
-  }, [pick, wordIndex])
+  }, [pick, wordIndex, wordAlts, kanjiAlts])
+
+  // The text the passage voice should SAY (amendment #35): the
+  // bot's voice notes are guided the same way — a word whose
+  // reading the engine could pick wrong （町 → まち, never ちょう)
+  // is spoken in kana; everything else keeps its kanji. One
+  // builder for both the prewarm (at pick time) and the button,
+  // so the warmed cache entry is the one the button asks for.
+  const guidedTextFor = (passage) => {
+    if (!passage) return ''
+    const ctx = ctxRef.current
+    const byWord = ctx?.dictByWord || new Map()
+    const gloss = new Map()
+    for (const c of Array.isArray(passage.new_word_candidates) ? passage.new_word_candidates : []) {
+      const head = c.h || c.word
+      if (head && !gloss.has(head)) gloss.set(head, c)
+      if (c.word && !gloss.has(c.word)) gloss.set(c.word, c)
+    }
+    const readingOf = (h) => gloss.get(h)?.reading || wordIndex?.get(h)?.reading || byWord.get(h)?.reading || undefined
+    const altOf = (w) => {
+      const idx = wordAlts?.get(w)
+      if (idx && idx.length > 1) return idx
+      if ([...w].length === 1) return kanjiAlts?.get(w) || idx
+      return idx
+    }
+    return spokenText(passage.tokens, readingOf, altOf) || passage.text || ''
+  }
+  const spoken = useMemo(() => (pick ? guidedTextFor(pick.passage) : ''), [pick, wordIndex, wordAlts, kanjiAlts])
+  // Pre-warm the voice cache with the GUIDED text, so the entry
+  // warmed is the one the listen button asks for.
+  useEffect(() => {
+    if (pick && spoken) prewarmNeuralAudio(spoken, modelCast())
+  }, [pick?.passage?.id, spoken])
 
   // The repair ladder's current chunk (amendment #34): the one
   // piece the next capture is graded against.
@@ -1225,7 +1294,7 @@ export default function Reader({ setActive, onSignIn }) {
                 to hear the passage at all. Same order as the bot:
                 listen first, then read it back. */}
             <div>
-              <TtsButton text={pick.passage.text} browserTimeoutMs={2500} className="px-4 py-2 text-sm font-medium" />
+              <TtsButton text={spoken || pick.passage.text} browserTimeoutMs={2500} className="px-4 py-2 text-sm font-medium" />
             </div>
             {/* Actions sit directly under the passage (hierarchy:
                 the passage is the job, these are its one tier of

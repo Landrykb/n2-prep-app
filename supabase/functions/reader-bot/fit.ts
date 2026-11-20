@@ -705,6 +705,8 @@ export function isDispatchDue({ morningMinutes, nowMinutes, sentMorningToday } =
  *  win — the ones the learner meets first while reading. */
 export const KANJI_READINGS_CAP = 40
 
+const KANA_RE = /[ぁ-ゖァ-ヺー]/
+
 /**
  * The readings breakdown for a passage's tokens: [{ word, reading }]
  * in order of first appearance, deduped by the word shown. A token
@@ -725,8 +727,20 @@ export const KANJI_READINGS_CAP = 40
  * own gloss source, and the rule stays identical either way. Junk
  * (non-array tokens, empty surfaces, a missing or throwing
  * readingOf) yields fewer entries, never a crash.
+ *
+ * Amendment #35 (2026-11-20, Landry's graded-new-neighbour card):
+ * the word pass below generalises the old compound pass — it reads
+ * kanji+kana words （温かい, 手作り) as well as pure-kanji compounds
+ * （面談), because a segmenter shred （温 h=温い + かい) otherwise
+ * lists a different word （温い ぬるい "lukewarm") for the word the
+ * text actually carries. And when a word carries more than one
+ * reading, the entry gains `alts`: the OTHER readings a source
+ * knows, beside the one used in this text (Landry: "If it has two
+ * readings mention both but highlight the one used herein this
+ * text" — renderers bold the used reading). altOf is injected
+ * like the other sources and stays optional.
  */
-export function kanjiReadings(tokens, readingOf, meaningOf, compoundOf) {
+export function kanjiReadings(tokens, readingOf, meaningOf, compoundOf, altOf) {
   if (!Array.isArray(tokens) || typeof readingOf !== 'function') return []
   const toks = tokens.map((token) =>
     typeof token === 'string' ? { s: token, h: token } : token,
@@ -746,36 +760,76 @@ export function kanjiReadings(tokens, readingOf, meaningOf, compoundOf) {
   const entries = []
   const seen = new Set()
   const consumed = new Set()
-  // Compound pass: at each kanji, the LONGEST known compound
-  // (2–4 kanji) starting there wins, and the tokens it spans are
-  // consumed — their fragments never list separately for this
-  // occurrence. compoundOf is injected like the other sources
-  // and stays optional: without it the block is exactly the
-  // per-token one.
+  // Alternate readings (amendment #35): the entry keeps the reading
+  // used in THIS text; altOf names the others the dictionary knows.
+  const withAlts = (entry) => {
+    if (typeof altOf !== 'function') return entry
+    let alts = null
+    try {
+      alts = altOf(entry.word)
+    } catch {
+      alts = null
+    }
+    if (!Array.isArray(alts)) return entry
+    const others = [...new Set(alts.filter((a) => typeof a === 'string' && a && a !== entry.reading))].slice(0, 3)
+    return others.length ? { ...entry, alts: others } : entry
+  }
+  // Word pass (amendment #14, generalised by #35): at each kanji,
+  // the LONGEST known word starting there wins — pure-kanji
+  // compounds （面談) and kanji+kana words （温かい, 手作り) alike —
+  // and the tokens it spans are consumed: their fragments never
+  // list separately for this occurrence. compoundOf is injected
+  // like the other sources and stays optional: without it the
+  // block is exactly the per-token one.
   if (typeof compoundOf === 'function') {
+    const AUX_HEAD = /^(て|で|た|ます|ました|ません|ない|なかった|たい|たかった|れる|られる|せる|させる|ちゃ|じゃ)/
     let i = 0
     while (i < chars.length) {
       if (consumed.has(chars[i].tok) || !KANJI_RE.test(chars[i].ch)) {
         i++
         continue
       }
-      let runEnd = i
-      while (runEnd < chars.length && KANJI_RE.test(chars[runEnd].ch)) runEnd++
       let matched = 0
-      for (let len = Math.min(4, runEnd - i); len >= 2; len--) {
+      for (let len = Math.min(6, chars.length - i); len >= 2; len--) {
+        // A candidate is kanji/kana only (it starts at a kanji, so
+        // it always carries one); any other character —
+        // punctuation, latin, a digit — ends the window.
+        let ok = true
+        for (let k = i; k < i + len; k++) {
+          if (!KANJI_RE.test(chars[k].ch) && !KANA_RE.test(chars[k].ch)) { ok = false; break }
+        }
+        if (!ok) continue
         const cand = chars.slice(i, i + len).map((c) => c.ch).join('')
         if (seen.has(cand)) continue
-        // Phrase-token guard (2026-11-11): a compound lying
-        // entirely inside ONE token whose surface is a set
-        // phrase longer than the candidate （今日は the greeting)
-        // must not eat the phrase and list its first half as a
-        // different word （今日 きょう, against the text's own
-        // こんにちは ruby).
         const startTok = chars[i].tok
-        if (startTok === chars[i + len - 1].tok) {
-          const tokSurface = typeof toks[startTok]?.s === 'string' ? toks[startTok].s : ''
+        const endTok = chars[i + len - 1].tok
+        const endSurface = typeof toks[endTok]?.s === 'string' ? toks[endTok].s : ''
+        const endHead = typeof toks[endTok]?.h === 'string' && toks[endTok].h ? toks[endTok].h : endSurface
+        if (startTok === endTok && endSurface.length > len && i === tokenStart[startTok]) {
+          // Phrase-token guard (2026-11-11, refined by #35): a
+          // candidate that is the FIRST HALF of a set-phrase
+          // token must not eat the phrase and list its first
+          // half as a different word （今日 きょう, against the
+          // text's own こんにちは ruby). A candidate that is the
+          // token's core after a prefix （時間 inside お時間) is
+          // not a halving — it is the word the learner needs,
+          // and the guard leaves it alone.
           const tokHead = typeof toks[startTok]?.h === 'string' ? toks[startTok].h : ''
-          if (tokSurface.length > len && tokHead === tokSurface) continue
+          if (tokHead === endSurface) continue
+        }
+        // Inflection guard (#35): a candidate that is the stem of
+        // an inflected form — its end token's headword is another
+        // word and a verb-chain auxiliary follows (the rest of
+        // the end token, or the next token) — belongs to that
+        // inflection （覚え before て is 覚える at work, 作り before
+        // ます is 作る）; the per-token pass and its inflection
+        // refinement own it.
+        if (endHead !== cand) {
+          const endTokStart = tokenStart[endTok]
+          const after = i + len < endTokStart + endSurface.length
+            ? endSurface.slice(i + len - endTokStart)
+            : (typeof toks[endTok + 1]?.s === 'string' ? toks[endTok + 1].s : '')
+          if (AUX_HEAD.test(after)) continue
         }
         let hit = null
         try {
@@ -787,9 +841,9 @@ export function kanjiReadings(tokens, readingOf, meaningOf, compoundOf) {
           seen.add(cand)
           entries.push({
             pos: i,
-            entry: typeof hit.meaning === 'string' && hit.meaning
+            entry: withAlts(typeof hit.meaning === 'string' && hit.meaning
               ? { word: cand, reading: hit.reading, meaning: hit.meaning }
-              : { word: cand, reading: hit.reading },
+              : { word: cand, reading: hit.reading }),
           })
           for (let k = i; k < i + len; k++) consumed.add(chars[k].tok)
           matched = len
@@ -841,10 +895,49 @@ export function kanjiReadings(tokens, readingOf, meaningOf, compoundOf) {
       : (lookup(surface) || (headword !== surface ? lookup(headword) : null))
     if (!entry || seen.has(entry.word)) return
     seen.add(entry.word)
-    entries.push({ pos: tokenStart[ti], entry })
+    entries.push({ pos: tokenStart[ti], entry: withAlts(entry) })
   })
   entries.sort((a, b) => a.pos - b.pos)
   return entries.slice(0, KANJI_READINGS_CAP).map((e) => e.entry)
+}
+
+/**
+ * The text a speech engine should SAY for a passage (amendment
+ * #35): the surfaces joined back, except that a word standing in
+ * its dictionary form with a genuinely competing reading — a
+ * source knows more than one reading for it — is replaced by
+ * the reading used here, in kana （町 → まち, never ちょう).
+ * A word with one settled reading keeps its kanji however many
+ * kanji it has or lacks: substitution there buys nothing and
+ * only flattens the prosody. Inflected surfaces are never
+ * touched （行っ stays 行っ: substitution would break the
+ * inflection). readingOf/altOf are injected exactly as in
+ * kanjiReadings; without them the text is returned as-is.
+ */
+export function spokenText(tokens, readingOf, altOf) {
+  if (!Array.isArray(tokens)) return ''
+  return tokens.map((token) => {
+    const t = typeof token === 'string' ? { s: token, h: token } : token
+    const surface = typeof t?.s === 'string' ? t.s : ''
+    const headword = typeof t?.h === 'string' && t.h ? t.h : surface
+    if (!surface || surface !== headword || !KANJI_RE.test(surface)) return surface
+    if (typeof readingOf !== 'function' || typeof altOf !== 'function') return surface
+    let reading = null
+    try {
+      reading = readingOf(headword)
+    } catch {
+      reading = null
+    }
+    if (typeof reading !== 'string' || !reading || reading === surface) return surface
+    let alts = null
+    try {
+      alts = altOf(headword)
+    } catch {
+      alts = null
+    }
+    const hasAlt = Array.isArray(alts) && alts.some((a) => typeof a === 'string' && a && a !== reading)
+    return hasAlt ? reading : surface
+  }).join('')
 }
 
 // ---------- Fit v2: encounters, seen kanji, dose, batch (amendment #10) ----------

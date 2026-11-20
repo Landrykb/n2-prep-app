@@ -1378,15 +1378,25 @@ check('twin parity: kanjiReadings agrees across the twins (fixtures, cap, consta
 
 const deckGloss = (await import('../supabase/functions/reader-bot/gloss.ts')).DECK_GLOSS
 
+check('deck gloss: the する-glued noun readings are unglued at build time (amendment #35)', () => {
+  // The deck writes 生活 as せいかつする "to live"; the wide
+  // dictionary's own reading is the noun's — the builder takes it.
+  assert.equal(deckGloss['生活']?.reading, 'せいかつ')
+  assert.equal(deckGloss['遠慮']?.reading, 'えんりょ')
+  assert.equal(deckGloss['心配']?.reading, 'しんぱい')
+})
+
 check('kanjiReadings (seeded bank): the school-teacher letter carries its full breakdown', () => {
   const rows = parseSeedRows(new URL('../supabase/seed/reading_passages.sql', import.meta.url))
   const row = rows.get('scene-school-teacher')
   assert.ok(row, 'seeded row scene-school-teacher exists')
   const readingOf = (h) => deckGloss[h]?.reading
   const out = fit.kanjiReadings(row.tokens, readingOf)
-  // The exact breakdown of the passage Landry actually received —
-  // including words far below candidacy (本, 日): the block serves
-  // the staring-at-a-kanji moment, not the new-word list.
+  // The deck-only pass over the seeded tokens — the segmenter
+  // still shreds 面談・本日 in the stored tokens, so this pass
+  // alone shows fragments; the production-wiring check below is
+  // the one that must show the words whole. 心配 reads しんぱい
+  // since the build-time する-unglue (amendment #35).
   assert.deepEqual(out, [
     { word: '面', reading: 'めん' },
     { word: '時間', reading: 'じかん' },
@@ -1395,7 +1405,7 @@ check('kanjiReadings (seeded bank): the school-teacher letter carries its full b
     { word: '国語', reading: 'こくご' },
     { word: '授業', reading: 'じゅぎょう' },
     { word: '友達', reading: 'ともだち' },
-    { word: '心配', reading: 'しんぱいする' },
+    { word: '心配', reading: 'しんぱい' },
   ])
   // Every entry is a word of the text, in reading order.
   let last = -1
@@ -1413,9 +1423,11 @@ check('kanjiReadings (seeded bank, production wiring): compounds resolve whole, 
   const rows = parseSeedRows(new URL('../supabase/seed/reading_passages.sql', import.meta.url))
   const row = rows.get('scene-school-teacher')
   // Wired exactly as reader-bot/index.ts wires it: deck first,
-  // then the JMdict compound supplement. The segmenter chopped
-  // 面談 into 面 + 談のお… — the block must still show the word
-  // the passage actually says, whole (Landry's catch).
+  // then the JMdict word supplement. The stored tokens shred
+  // 面談 and 本日 — the block must still show the words the
+  // passage actually says, whole: 面談 and 本日 reassembled
+  // across the cuts, 時間 out of the polite-prefixed お時間
+  // (Landry's catches, 2026-11-11 and 2026-11-20).
   const compoundOf = (w) => {
     const d = deckGloss[w]
     if (d) return d
@@ -1435,7 +1447,7 @@ check('kanjiReadings (seeded bank, production wiring): compounds resolve whole, 
     { word: '国語', reading: 'こくご', meaning: 'national language' },
     { word: '授業', reading: 'じゅぎょう', meaning: 'lesson' },
     { word: '友達', reading: 'ともだち', meaning: 'friend' },
-    { word: '心配', reading: 'しんぱいする', meaning: 'to worry' },
+    { word: '心配', reading: 'しんぱい', meaning: 'worry' },
   ])
   assert.deepEqual(
     port.kanjiReadings(row.tokens, (h) => deckGloss[h]?.reading, (h) => deckGloss[h]?.meaning, compoundOf),

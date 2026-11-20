@@ -484,7 +484,11 @@ console.log('call history rides the account (Landry 2026-11-18 — "Calls kept i
       assert.equal(collected.callHistory[0].bestScore, 92)
       // A second device records its own call, then the merged
       // document applies: both entries survive on this device.
-      const other = h('h-other', '2026-11-18T01:00:00Z', 'missed')
+      // The other entry is dated far in the future so it sorts
+      // newest-first no matter when the suite runs (the original
+      // 2026-11-18 date silently expired the day after it was
+      // written — the recorded entry is stamped with real now).
+      const other = h('h-other', '2999-01-01T00:00:00Z', 'missed')
       client.applyCallHistory([other, ...collected.callHistory])
       const after = client.loadCallHistory()
       assert.equal(after.length, 2)
