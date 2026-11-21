@@ -39,7 +39,7 @@ const BOT_CHAT_URL = 'https://t.me/YondeReaderBot'
 // current view can't hold a microphone (the Telegram webview
 // on iOS exposes no recogniser at all) — one tap out, not a
 // dead end.
-const APP_URL = 'https://jpn2easy.vercel.app'
+const APP_URL = 'https://yonde.bleepx.dev'
 const HEARD_FLOOR = 2
 
 const jstToday = () => new Intl.DateTimeFormat('en-CA', {
@@ -324,7 +324,7 @@ export default function HeardPitch({ variant = 'full', onReadPassage }) {
   const privacy = (
     <p className="flex items-start gap-2 text-xs text-slate-400 leading-relaxed">
       <ShieldCheck size={14} className="text-emerald-300 shrink-0 mt-px" />
-      <span>{t('today.heardPitchPrivacy')}</span>
+      <span>{t('today.heardPitchPrivacy')} <a href="#/privacy" className="underline decoration-slate-500 underline-offset-2 hover:text-slate-200">{t('today.heardPitchPrivacyLink')}</a></span>
     </p>
   )
   const header = (title, sub, eating = false) => (
