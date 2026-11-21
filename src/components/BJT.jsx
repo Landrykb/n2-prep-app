@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Building2, Headphones, BookOpen, Award, ExternalLink, Brain, Dumbbell, Play, Layers, Timer } from 'lucide-react'
+import { Building2, Headphones, BookOpen, Award, ExternalLink, Brain, Dumbbell, Play, Timer } from 'lucide-react'
+import { RowsSkeleton } from './Skeleton.jsx'
 import {
   bjtScoreMapping,
   bjtLevels,
@@ -86,7 +87,7 @@ function BjtVideoBox({ query }) {
     return () => { cancelled = true }
   }, [query])
 
-  if (loading) return <div className="text-sm text-slate-400 flex items-center gap-2"><Layers size={16} className="animate-spin" /> Loading videos…</div>
+  if (loading) return <RowsSkeleton rows={4} />
   if (error) return <p className="text-sm text-rose-300">{error}</p>
   if (!videos.length) return <p className="text-sm text-slate-500">No BJT videos found. Try the resource links below.</p>
 

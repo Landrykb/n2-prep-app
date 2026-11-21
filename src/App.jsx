@@ -50,7 +50,7 @@ import { cleanReading } from './lib/furigana.js'
 import { supabase } from './lib/supabaseClient.js'
 import { findStudyItem } from './lib/findStudyItem.js'
 import { localDictionary, loadDictionary, lookup } from './lib/dictionary.js'
-import { PageSkeleton } from './components/Skeleton.jsx'
+import { PageSkeleton, RowsSkeleton } from './components/Skeleton.jsx'
 import { loadDiagnosis } from './lib/profile.js'
 import { loadPromise } from './lib/promise.js'
 import { addToQueue, loadQueue } from './lib/queue.js'
@@ -1672,11 +1672,7 @@ function Videos() {
         <h2 className="text-2xl font-bold text-white">{t('legacy.videos.title')}</h2>
         <p className="text-sm text-slate-400 mt-1">{t('legacy.videos.subtitle')}</p>
       </div>
-      {loading && (
-        <div className="flex items-center gap-2 text-slate-400">
-          <Loader2 size={20} className="animate-spin" /> {t('legacy.videos.loading')}
-        </div>
-      )}
+      {loading && <RowsSkeleton rows={3} />}
       {/* No API talk on screen (fleet coherence, 2026-11-08): if
           the live search fails or comes back empty, the curated
           shelf simply shows — the learner never sees plumbing. */}
