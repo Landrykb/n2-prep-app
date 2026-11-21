@@ -1,10 +1,11 @@
 import { brand } from '../lib/brand.js'
 
-// Privacy Policy — drafted from Doc 10 (Security & Privacy) facts only.
-// DRAFT until Landry confirms the contact email and the hosted URL
-// (Doc 15 §1: Apple 5.1.1(i) requires this policy linked in store metadata
-// AND easily accessible in-app — this page is the in-app half).
-const CONTACT = 'support@yonde.app'
+// Privacy Policy — drafted from Doc 10 (Security & Privacy) facts,
+// extended 2026-11-22 with the Heard Words listening facts verified
+// in src/lib/useAutoListen.js and src/lib/heardMatch.js (issue #14).
+// (Doc 15 §1: Apple 5.1.1(i) requires this policy linked in store
+// metadata AND easily accessible in-app — this page is the in-app half).
+const CONTACT = 'yonde@bleepx.dev'
 
 function Section({ title, children }) {
   return (
@@ -20,11 +21,11 @@ export default function PrivacyPolicy({ setActive }) {
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-white">Privacy Policy</h2>
-        <p className="text-sm text-slate-400 mt-1">{brand.name} — {brand.tagline}. Last updated 5 November 2026. <span className="text-amber-300">Draft: the contact address below is to be confirmed before public launch.</span></p>
+        <p className="text-sm text-slate-400 mt-1">{brand.name} — {brand.tagline}. Last updated 22 November 2026.</p>
       </div>
 
       <Section title="The short version">
-        <p>{brand.name} learns how you learn. Almost everything it knows about you lives <strong className="text-slate-100">on your own device</strong>. We do not sell your data, we do not show you ads, and we do not keep recordings of your voice. You can see everything your fleet knows about you, export it, or delete it — inside the app, whenever you want.</p>
+        <p>{brand.name} learns how you learn. Almost everything it knows about you lives <strong className="text-slate-100">on your own device</strong>. We do not sell your data, we do not show you ads, and we do not keep recordings of your voice. You can see everything your fleet knows about you, export it, or delete it — inside the app, whenever you want. And if you use Heard Words listening, it keeps the words it recognises, never the conversations: no recording or transcript of anyone's speech is kept, as the listening section below explains.</p>
       </Section>
 
       <Section title="What lives on your device">
@@ -37,6 +38,16 @@ export default function PrivacyPolicy({ setActive }) {
 
       <Section title="Your voice">
         <p>When you speak in a scene or a Yobidashi call, your browser's speech recognition turns your voice into text. That text — your version of the sentence — is what gets corrected, and it is kept on your device as part of your learning record. <strong className="text-slate-100">We do not record or store audio of your voice.</strong> Depending on your browser, its speech service may process audio on the browser maker's servers; your browser's own privacy policy covers that part.</p>
+      </Section>
+
+      <Section title="Automatic listening — Heard Words">
+        <p>Heard Words is an optional listening mode. You start it yourself, its state is shown on screen while it runs, it works only while the app is in front of you, and you can stop it at any moment. A session also stops by itself after four hours.</p>
+        <p>On most devices, listening works like this: the app sends short clips of sound, about fifteen seconds each, to our server, where a transcription service (Groq) turns them into text and the text is matched against a general Japanese dictionary. <strong className="text-slate-100">The clip and its transcript are deleted the moment the matching finishes.</strong></p>
+        <p>Where that recorder is not available, your browser's own speech recognition turns the sound into text and the matching happens on your device instead. The recognised text is dropped the moment it is matched, and only word counts ever leave your device.</p>
+        <p>In the Telegram bot, listening works the same way: a stretch of sound you send is matched, the voice message is deleted from the chat, and the transcript is discarded.</p>
+        <p><strong className="text-slate-100">What is kept:</strong> the dictionary words that were matched, how many times each one was heard, and the day. No audio. No transcript. No record of who was speaking. Anything that is not a general dictionary word — a name, a number, a company — cannot be kept at all, because the matcher does not know it. That is not a setting you have to trust us to keep; it is how the matcher is built.</p>
+        <p>When listening starts, stops, or runs into a problem, the app also sends a small technical note about the event (for example, that the microphone was refused). These notes carry flags and counts only, never sound and never words, and they exist so that failures can be found and fixed.</p>
+        <p>{brand.name} keeps no recording of the people around you, and nothing they said can be reconstructed from word counts. You are still the one listening in that room, so use the mode where listening is welcome — the Terms carry a short section on listening responsibly.</p>
       </Section>
 
       <Section title="Documents you paste (Mine Your Japanese)">
@@ -64,7 +75,7 @@ export default function PrivacyPolicy({ setActive }) {
       </Section>
 
       <Section title="Changes and contact">
-        <p>If this policy changes in a way that matters, the app will say so plainly, in the app, before the change applies to you. Questions, corrections, or a deletion request you would rather make by email: <span className="text-slate-100">{CONTACT}</span> <span className="text-amber-300">(address to be confirmed before public launch)</span>.</p>
+        <p>If this policy changes in a way that matters, the app will say so plainly, in the app, before the change applies to you. Questions, corrections, or a deletion request you would rather make by email: <span className="text-slate-100">{CONTACT}</span>.</p>
       </Section>
 
       <div className="flex flex-wrap gap-2 pt-2">

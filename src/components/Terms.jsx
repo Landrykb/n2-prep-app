@@ -1,8 +1,8 @@
 import { brand } from '../lib/brand.js'
 
 // Terms of Use — plain language, honest about what Yonde is and is not.
-// DRAFT until the same confirmations as the Privacy Policy (Doc 15).
-const CONTACT = 'support@yonde.app'
+// Listening-responsibly section added 2026-11-22 (issue #14).
+const CONTACT = 'yonde@bleepx.dev'
 
 function Section({ title, children }) {
   return (
@@ -18,7 +18,7 @@ export default function Terms({ setActive }) {
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-white">Terms Of Use</h2>
-        <p className="text-sm text-slate-400 mt-1">{brand.name} — {brand.tagline}. Last updated 5 November 2026. <span className="text-amber-300">Draft — to be confirmed before public launch.</span></p>
+        <p className="text-sm text-slate-400 mt-1">{brand.name} — {brand.tagline}. Last updated 22 November 2026.</p>
       </div>
 
       <Section title="What Yonde is">
@@ -41,6 +41,10 @@ export default function Terms({ setActive }) {
         <p>Use {brand.name} to learn. Don't use it to abuse the service, to generate harmful content, or to misrepresent AI output as official documents or certified translations. Accounts that do may be closed, with their data handled as the Privacy Policy describes.</p>
       </Section>
 
+      <Section title="Listening responsibly">
+        <p>Heard Words listening is a mode you start and stop yourself, and {brand.name} keeps no recording of anyone's voice, as the Privacy Policy explains. Even so, you are responsible for where and when you listen. The laws about recording where you live, and your workplace's rules, are yours to follow, and they differ from place to place. Use listening to learn from your own day, in places where having your phone listen is acceptable. Do not use it to monitor people, and do not use it where recording would need a consent you do not have.</p>
+      </Section>
+
       <Section title="Money">
         <p>{brand.name} is free today. If paid plans are introduced later, digital purchases will be sold through the app stores' own payment systems, with the price and what you get stated plainly before you subscribe — and nothing you already have will be taken away by a pricing change.</p>
       </Section>
@@ -50,7 +54,7 @@ export default function Terms({ setActive }) {
       </Section>
 
       <Section title="Changes and contact">
-        <p>If these terms change in a way that matters, the app will say so before the change applies to you. Questions: <span className="text-slate-100">{CONTACT}</span> <span className="text-amber-300">(address to be confirmed before public launch)</span>.</p>
+        <p>If these terms change in a way that matters, the app will say so before the change applies to you. Questions: <span className="text-slate-100">{CONTACT}</span>.</p>
       </Section>
 
       <div className="flex flex-wrap gap-2 pt-2">
