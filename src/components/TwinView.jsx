@@ -11,6 +11,7 @@ import { day30Status, loadModeSpells, modeSpellsSummary } from '../lib/day30.js'
 import { PERSONAS, PAINS, PROOF_TARGETS } from '../lib/profile.js'
 import { SECTION_KEYS } from '../lib/levels.js'
 import Mascot from './Mascot.jsx'
+import { Skel } from './Skeleton.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { useLanguage } from '../hooks/useLanguage.js'
 import { modelCast, saveVoiceCast } from '../lib/voicePreference.js'
@@ -166,7 +167,13 @@ function ReaderLinkCard({ user, setActive }) {
 
   return (
     <Section title={t('twin.reader.title')} hint={t('twin.reader.hint')}>
-      {status === 'loading' && <p className="text-sm text-slate-400">{t('twin.reader.checking')}</p>}
+      {status === 'loading' && (
+        <div role="status" className="space-y-2.5">
+          <span className="sr-only">{t('twin.reader.checking')}</span>
+          <Skel className="h-4 w-56 max-w-full" />
+          <Skel className="h-4 w-40 max-w-full" />
+        </div>
+      )}
       {status === 'setup' && (
         <p className="text-sm text-slate-300">
           {user

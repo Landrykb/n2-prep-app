@@ -1,6 +1,7 @@
 import { useState, lazy, Suspense } from 'react'
-import { MessageCircle, X, Bot, Loader2 } from 'lucide-react'
+import { MessageCircle, X, Bot } from 'lucide-react'
 import { useLanguage } from '../hooks/useLanguage.js'
+import { Skel } from './Skeleton.jsx'
 
 // Only pull the tutor bundle once the user actually opens the chat.
 const AiTutor = lazy(() => import('./AiTutor.jsx'))
@@ -36,7 +37,7 @@ export default function ChatBubble({ context }) {
               </button>
             </div>
             <div className="flex-1 min-h-0 overflow-hidden p-4">
-              <Suspense fallback={<div className="h-full flex items-center justify-center gap-2 text-slate-400 text-sm"><Loader2 size={18} className="animate-spin" /> {t('shell.tutor.loading')}</div>}>
+              <Suspense fallback={<div role="status" className="space-y-3 pt-1"><span className="sr-only">{t('shell.tutor.loading')}</span><Skel className="h-16 w-3/4 rounded-2xl" /><Skel className="h-16 w-2/3 rounded-2xl ml-auto" /><Skel className="h-16 w-3/4 rounded-2xl" /></div>}>
                 <AiTutor context={context} compact />
               </Suspense>
             </div>

@@ -197,6 +197,38 @@ rt {
   animation: pulse-glow 0.6s ease-out;
 }
 
+/* Boot splash (issue #16): the icon settles, ONE flat coral ring
+   pulses out — a call going out, no glow, no gradient — then the
+   wordmark and tagline rise. Reduced motion gets a still mark. */
+@keyframes splashMarkIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.94); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes splashRing {
+  0% { opacity: 0.85; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.5); }
+}
+@keyframes splashWordIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.splash-mark {
+  animation: splashMarkIn 0.5s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+.splash-ring {
+  animation: splashRing 0.9s ease-out 0.3s both;
+}
+.splash-word {
+  animation: splashWordIn 0.45s ease-out 0.2s both;
+}
+.splash-tag {
+  animation: splashWordIn 0.45s ease-out 0.38s both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .splash-mark, .splash-word, .splash-tag { animation: none; }
+  .splash-ring { display: none; }
+}
+
 /* Fleet motion (Doc 13 §4 — alive, not static). Gentle loops only; the
    celebration hop and ring bounce are short and joyful, never frantic. */
 @keyframes mascotBob {
