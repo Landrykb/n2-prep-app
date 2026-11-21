@@ -126,10 +126,10 @@ export const AuthProvider = ({ children }) => {
     signIn: (email, password) => supabase?.auth.signInWithPassword({ email, password }),
     signOut: () => supabase?.auth.signOut(),
     // Password reset (Doc 12 audit #1): the reset email links back to
-    // the app's canonical origin (production: https://jpn2easy.vercel.app).
+    // the app's canonical origin (production: https://yonde.bleepx.dev).
     // The UI copy never confirms whether the email has an account.
     resetPassword: (email) => supabase?.auth.resetPasswordForEmail(email, {
-      redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/` : 'https://jpn2easy.vercel.app/',
+      redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/` : 'https://yonde.bleepx.dev/',
     }),
   }
 

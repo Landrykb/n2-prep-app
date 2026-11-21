@@ -155,7 +155,7 @@ export function buildHeardDict(wordbook?: { heads?: string[]; readings?: string[
  * still serves the in-page recogniser lane, where the browser
  * can afford it. The bot fetches the lite book once per process.
  */
-export const WORDBOOK_URL = 'https://jpn2easy.vercel.app/data/wordbook-lite/manifest.json'
+export const WORDBOOK_URL = 'https://yonde.bleepx.dev/data/wordbook-lite/manifest.json'
 
 let dictCache: { at: number; dict: ReturnType<typeof buildHeardDict>; wide: boolean } | null = null
 

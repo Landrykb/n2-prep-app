@@ -1884,7 +1884,7 @@ function App() {
   const { nextExam, daysToExam, examLabel, setting: examSetting, setSetting: setExamSetting } = useExamDate()
 
   // The literal /reader path (Doc 16 §2): the Telegram "Open in
-  // Reader" button points at https://jpn2easy.vercel.app/reader, and
+  // Reader" button points at https://yonde.bleepx.dev/reader, and
   // vercel.json's SPA fallback serves this app there — open on the
   // Reader view when we land on that path. /session is the same
   // door for the bot's no-fit replies: their copy names a study
