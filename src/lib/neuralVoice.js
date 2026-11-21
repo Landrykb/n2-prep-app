@@ -114,11 +114,29 @@ const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAI
 // is unavailable or fails.
 let actx = null
 let currentSource = null
+// iOS mutes WebAudio when the hardware silent switch is on —
+// the context reports running, the clock advances, the probe in
+// playDecoded passes, and the line plays in total silence
+// (issue #18: the One Session partner line on the owner's
+// iPhone; same signature as the 2026-11-15 Reader silence).
+// The platform's answer is the Audio Session API: declaring
+// type 'playback' marks this as media playback, which sounds
+// regardless of the switch. Safari 16.4+ exposes it; anywhere
+// else this is a no-op. Declared inside the tap unlock and at
+// context creation, so every route inherits it.
+export function declarePlaybackSession() {
+  try {
+    if (typeof navigator !== 'undefined' && 'audioSession' in navigator) {
+      navigator.audioSession.type = 'playback'
+    }
+  } catch { /* best effort — absence changes nothing */ }
+}
 function audioCtx() {
   try {
     if (!actx) {
       const AC = window.AudioContext || window.webkitAudioContext
       if (!AC) return null
+      declarePlaybackSession()
       actx = new AC()
     }
     if (actx.state === 'suspended') actx.resume().catch(() => {})
@@ -198,6 +216,7 @@ function stopDecoded() {
  * did. Best effort; safe to call on every tap.
  */
 export function primeAudioOutput() {
+  declarePlaybackSession()
   try {
     const a = sharedAudio()
     if (a.paused) {
