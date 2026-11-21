@@ -39,7 +39,7 @@ const BOT_CHAT_URL = 'https://t.me/YondeReaderBot'
 // current view can't hold a microphone (the Telegram webview
 // on iOS exposes no recogniser at all) — one tap out, not a
 // dead end.
-const APP_URL = 'https://jpn2easy.vercel.app'
+const APP_URL = 'https://yonde.bleepx.dev'
 const HEARD_FLOOR = 2
 
 const jstToday = () => new Intl.DateTimeFormat('en-CA', {
