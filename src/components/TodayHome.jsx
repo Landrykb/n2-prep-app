@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Calendar, Target, Layers, Mic, Stethoscope, Pickaxe, RefreshCw, Flame, CheckCircle2, Play, Coffee, Phone, Mail } from 'lucide-react'
 import { brand } from '../lib/brand.js'
-import { detectMode, modeLabel, modeLine } from '../lib/modes.js'
+import { detectMode, modeLine } from '../lib/modes.js'
 import { getPlanFor, tomorrowStr } from '../lib/planner.js'
 import { loadDiagnosisHistory } from '../lib/twin.js'
 import {
@@ -276,7 +276,6 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
           <Mascot agent="michi" size={38} mood={modeInfo.mode === 'badweek' ? 'resting' : 'happy'} />
           <div>
             <p className="text-sm text-slate-200"><span className="font-semibold text-white">{t('today.michiCoach')}</span> {modeLine(modeInfo.mode, t)}</p>
-            <p className="text-[11px] text-slate-500 mt-1">{t('today.modeWeek', { brand: brand.name, tagline: brand.tagline, label: modeLabel(modeInfo.mode, t) })}</p>
           </div>
         </section>
       )}
@@ -320,7 +319,6 @@ export default function TodayHome({ streak, daysToExam, examLabel, nextExam, set
               ? t(tomorrowPlan.noteKey, { title: tomorrowPlan.sceneTitle, cards: tomorrowPlan.cardBudget, minutes: tomorrowPlan.minutes, reason: t(tomorrowPlan.noteVars?.reasonKey || 'planner.reasonMatched', tomorrowPlan.noteVars?.reasonVars || {}) })
               : tomorrowPlan.note}</p>
             {tomorrowPlan.experiment && <p className="text-xs text-slate-400 mt-1">{t('today.tomorrowExperiment', { variant: tomorrowPlan.experiment.variantLabel })}</p>}
-            <p className="text-[11px] text-slate-500 mt-1">{t('today.tomorrowFooter')}</p>
           </div>
         </section>
       )}

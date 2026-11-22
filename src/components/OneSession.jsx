@@ -315,11 +315,11 @@ export default function OneSession({ setActive }) {
         <p className="flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#FF8A75]"><Sparkles size={14} /> {t('session.eyebrow')}</p>
         {state.done && <div className="mb-3"><Mascot agent="michi" size={64} showName={false} mood="proud" motion="hop" label={t('session.mascotDoneLabel', { name: 'Michi' })} /></div>}
         <h2 className="text-2xl sm:text-3xl font-bold text-white">{state.done ? t('session.titleDone') : isBusy ? t('session.titleBusy') : t('session.titleStart')}</h2>
-        <p className="text-sm text-slate-400 max-w-xl mx-auto">
-          {state.step > 0 && !state.done
-            ? t('session.resumeLine')
-            : t('session.introLine')}
-        </p>
+        {(state.step > 0 || state.done) && (
+          <p className="text-sm text-slate-400 max-w-xl mx-auto">
+            {state.done ? t('session.introLine') : t('session.resumeLine')}
+          </p>
+        )}
         {!state.done && (
           <button onClick={() => switchVariant(isBusy ? 'full' : 'busy')} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-bun-800/70 border border-bun-600/40 text-slate-300 hover:text-white transition">
             <Coffee size={12} /> {isBusy ? t('session.toFull') : t('session.toBusy')}
@@ -339,9 +339,9 @@ export default function OneSession({ setActive }) {
       )}
 
       {!state.done && state.planNote && state.step === 0 && (
-        <div className="rounded-2xl bg-sky-500/10 border border-sky-500/25 p-4 flex items-start gap-3">
-          <Mascot agent="saki" size={32} showName={false} />
-          <p className="text-sm text-slate-200"><span className="font-semibold text-white">{t('session.planPrefix', { name: 'Saki' })}</span> {state.planNoteKey
+        <div className="rounded-xl bg-sky-500/10 border border-sky-500/25 px-3 py-2 flex items-center gap-2.5">
+          <Mascot agent="saki" size={24} showName={false} />
+          <p className="text-xs text-slate-300 line-clamp-2"><span className="font-semibold text-white">{t('session.planPrefix', { name: 'Saki' })}</span> {state.planNoteKey
             ? t(state.planNoteKey, { title: state.planSceneTitle, cards: state.planCardBudget, minutes: state.planMinutes, reason: t(state.planNoteVars?.reasonKey || 'planner.reasonMatched', state.planNoteVars?.reasonVars || {}) })
             : state.planNote}</p>
         </div>
@@ -351,13 +351,13 @@ export default function OneSession({ setActive }) {
       {!state.done && state.step === 0 && (
         <section className="rounded-2xl glass p-5 sm:p-6 card-glow space-y-4">
           <div>
-            <h3 className="text-lg font-bold text-white">{scene.title}</h3>
+            <h3 className="text-xl font-bold text-white">{scene.title}</h3>
             <p className="text-xs text-slate-400">{t('session.sceneMeta', { domain: scene.domain, level: scene.level })}</p>
           </div>
           <div className="rounded-xl bg-bun-700/40 border border-bun-600/20 p-4">
             <p className="text-xs text-slate-400 mb-1">{t('voice.partnerSays')}</p>
             <div className="flex items-start gap-2">
-              <p className="text-slate-100 leading-loose flex-1"><KanjiTapText text={scene.partner} /></p>
+              <p className="text-lg text-slate-100 leading-loose flex-1"><KanjiTapText text={scene.partner} /></p>
               <TtsButton text={scene.partner} cast={scene.partnerVoice || undefined} audioSrc={scene.partnerAudio || undefined} />
             </div>
           </div>
