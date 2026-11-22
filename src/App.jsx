@@ -21,7 +21,6 @@ import {
   Layers,
   Library,
   ExternalLink,
-  User,
   LogOut,
   Bot,
   Loader2,
@@ -40,8 +39,12 @@ import {
   Repeat,
   Users,
   Mail,
+  Download,
+  Shield,
+  Trash2,
 } from 'lucide-react'
 import { brand } from './lib/brand.js'
+import { downloadAllLocalData } from './lib/accountDeletion.js'
 import { subscribeStateSync, isFirstSyncPending } from './lib/stateSync.js'
 import { useAuth } from './hooks/useAuth.js'
 import { useKanjiModal } from './hooks/useKanjiModal.js'
@@ -385,7 +388,7 @@ function Badge({ children, color = 'plum' }) {
   )
 }
 
-function Header({ active, daysToExam, user, onSignOut, isSupabaseConfigured, onToggleMenu, menuOpen, onOpenTwin }) {
+function Header({ active, daysToExam, user, onSignOut, onToggleMenu, menuOpen, onNavigate }) {
   const { t } = useLanguage()
   // P0-4: the header used to show invented stats ("N2 Candidate / Next
   // mock in 2 days") and a streak flame. It now shows only what the
@@ -414,6 +417,7 @@ function Header({ active, daysToExam, user, onSignOut, isSupabaseConfigured, onT
     return () => { window.removeEventListener('jpn:state-synced', read); window.removeEventListener('focus', read) }
   }, [active]) // eslint-disable-line react-hooks/exhaustive-deps
   const { enabled: furiganaOn, toggle: toggleFurigana } = useFurigana()
+  const [profileOpen, setProfileOpen] = useState(false)
   return (
     <header className="border-b border-bun-600/30 page-gutter py-3 flex items-center justify-between gap-2">
       <div className="flex items-center gap-2 min-w-0">
@@ -453,34 +457,44 @@ function Header({ active, daysToExam, user, onSignOut, isSupabaseConfigured, onT
           <Calendar size={14} className="text-[#FF8A75]" />
           <span className="font-medium">{t('shell.header.daysToJlpt', { days: daysToExam })}</span>
         </div>
-        {isSupabaseConfigured && (
-          <div className="flex items-center gap-2">
-            <div className="hidden sm:flex items-center gap-2 text-xs text-slate-300" title={user?.email ?? ''}>
-              <User size={14} />
-              <span className="max-w-[120px] truncate">{user?.email ?? t('shell.header.guest')}</span>
-            </div>
-            {user && (
-              <button
-                onClick={onSignOut}
-                aria-label={t('shell.header.signOut')}
-                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-full border border-bun-600/30 bg-bun-700/50 hover:bg-rose-500/20 hover:border-rose-500/30 text-slate-300 hover:text-rose-300 transition text-xs sm:text-sm font-medium min-h-[42px] whitespace-nowrap shrink-0"
-                title={t('shell.header.signOut')}
-              >
-                <LogOut size={16} />
-                <span className="whitespace-nowrap">{t('shell.header.logOut')}</span>
-              </button>
-            )}
-          </div>
-        )}
-        <button
-          onClick={onOpenTwin}
-          aria-label={t('shell.nav.twin')}
-          aria-current={active === 'twin' ? 'page' : undefined}
-          title={t('shell.nav.twin')}
-          className={`w-10 h-10 rounded-full bg-bun-700 border flex items-center justify-center shrink-0 overflow-hidden transition ${active === 'twin' ? 'border-[#FF6B57]/60' : 'border-bun-600/40 hover:border-bun-600'}`}
-        >
-          <Mascot agent="koe" size={30} showName={false} />
-        </button>
+        <div className="relative shrink-0">
+          <button
+            onClick={() => setProfileOpen((o) => !o)}
+            aria-label={t('shell.nav.twin')}
+            aria-expanded={profileOpen}
+            aria-current={active === 'twin' ? 'page' : undefined}
+            title={t('shell.nav.twin')}
+            className={`w-10 h-10 rounded-full bg-bun-700 border flex items-center justify-center shrink-0 transition ${profileOpen || active === 'twin' ? 'border-[#FF6B57]/60' : 'border-bun-600/40 hover:border-bun-600'}`}
+          >
+            <span className="text-base font-bold text-[#FF6B57] leading-none">よ</span>
+          </button>
+          {profileOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setProfileOpen(false)} />
+              <div className="absolute right-0 top-12 z-50 w-64 rounded-2xl bg-bun-800 border border-bun-600/40 shadow-xl p-2">
+                <p className="px-3 pt-2 pb-1.5 text-xs text-slate-400 truncate" title={user?.email ?? ''}>{user?.email ?? t('shell.header.guest')}</p>
+                <button onClick={() => { setProfileOpen(false); onNavigate('twin') }} className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-bun-700 text-sm text-slate-100 transition text-left">
+                  <Users size={16} className="text-slate-400 shrink-0" /> {t('shell.nav.twin')}
+                </button>
+                <button onClick={() => { setProfileOpen(false); onNavigate('privacy') }} className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-bun-700 text-sm text-slate-100 transition text-left">
+                  <Shield size={16} className="text-slate-400 shrink-0" /> {t('twin.privacy.policy')}
+                </button>
+                <button onClick={() => { setProfileOpen(false); downloadAllLocalData() }} className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-bun-700 text-sm text-slate-100 transition text-left">
+                  <Download size={16} className="text-slate-400 shrink-0" /> {t('twin.privacy.exportAll')}
+                </button>
+                {user && (
+                  <button onClick={() => { setProfileOpen(false); onSignOut() }} className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-bun-700 text-sm text-slate-100 transition text-left">
+                    <LogOut size={16} className="text-slate-400 shrink-0" /> {t('shell.header.logOut')}
+                  </button>
+                )}
+                <div className="my-1.5 border-t border-bun-600/30" />
+                <button onClick={() => { setProfileOpen(false); try { sessionStorage.setItem('yonde:twin-goto', 'account') } catch { /* best effort */ } onNavigate('twin') }} className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-rose-500/10 text-sm text-rose-300 transition text-left">
+                  <Trash2 size={16} className="shrink-0" /> {t('twin.account.deleteButton')}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </header>
   )
@@ -2082,10 +2096,9 @@ function App() {
             daysToExam={daysToExam}
             user={user}
             onSignOut={signOut}
-            isSupabaseConfigured={isSupabaseConfigured}
             onToggleMenu={() => setMobileOpen((o) => !o)}
             menuOpen={mobileOpen}
-            onOpenTwin={() => setActive('twin')}
+            onNavigate={(id) => setActive(id)}
           />
         </div>
         <div className="flex-1 page-gutter py-5 sm:py-6 lg:py-8 overflow-y-auto swipe-area pb-28 lg:pb-8">
