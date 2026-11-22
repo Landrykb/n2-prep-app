@@ -477,6 +477,17 @@ export default function TwinView({ setActive }) {
   const [delAgreed, setDelAgreed] = useState(false)
   const [delResult, setDelResult] = useState(null)
   const [deleted, setDeleted] = useState(false)
+
+  // Profile-menu Delete door (issue #24): the header menu's
+  // Delete account item lands on this section's guarded flow.
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem('yonde:twin-goto') === 'account') {
+        sessionStorage.removeItem('yonde:twin-goto')
+        document.getElementById('twin-account')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    } catch { /* best effort */ }
+  }, [])
   const { meta } = detectMode()
   const methodLabels = {
     voice: t('twin.method.voice'),
@@ -839,7 +850,7 @@ export default function TwinView({ setActive }) {
         {tgNote && tgLink !== 'elsewhere' && <p className="text-sm text-rose-300 mt-2">{tgNote}</p>}
       </Section>
 
-      <section className="rounded-2xl border border-bun-600/30 p-5 space-y-4">
+      <section id="twin-account" className="rounded-2xl border border-bun-600/30 p-5 space-y-4">
         <div>
           <h3 className="text-lg font-bold text-white">{t('twin.privacy.title')}</h3>
           <p className="text-xs text-slate-500 mt-0.5">{t('twin.privacy.hint')}</p>
