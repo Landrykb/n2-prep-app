@@ -385,7 +385,7 @@ function Badge({ children, color = 'plum' }) {
   )
 }
 
-function Header({ active, daysToExam, user, onSignOut, isSupabaseConfigured, onToggleMenu, menuOpen }) {
+function Header({ active, daysToExam, user, onSignOut, isSupabaseConfigured, onToggleMenu, menuOpen, onOpenTwin }) {
   const { t } = useLanguage()
   // P0-4: the header used to show invented stats ("N2 Candidate / Next
   // mock in 2 days") and a streak flame. It now shows only what the
@@ -472,11 +472,15 @@ function Header({ active, daysToExam, user, onSignOut, isSupabaseConfigured, onT
             )}
           </div>
         )}
-        {!isSupabaseConfigured && (
-          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-cyan-500 to-[#71368A] flex items-center justify-center text-sm font-bold shadow-md" title="Yonde">
-            よ
-          </div>
-        )}
+        <button
+          onClick={onOpenTwin}
+          aria-label={t('shell.nav.twin')}
+          aria-current={active === 'twin' ? 'page' : undefined}
+          title={t('shell.nav.twin')}
+          className={`w-10 h-10 rounded-full bg-bun-700 border flex items-center justify-center shrink-0 overflow-hidden transition ${active === 'twin' ? 'border-[#FF6B57]/60' : 'border-bun-600/40 hover:border-bun-600'}`}
+        >
+          <Mascot agent="koe" size={30} showName={false} />
+        </button>
       </div>
     </header>
   )
@@ -2081,6 +2085,7 @@ function App() {
             isSupabaseConfigured={isSupabaseConfigured}
             onToggleMenu={() => setMobileOpen((o) => !o)}
             menuOpen={mobileOpen}
+            onOpenTwin={() => setActive('twin')}
           />
         </div>
         <div className="flex-1 page-gutter py-5 sm:py-6 lg:py-8 overflow-y-auto swipe-area pb-28 lg:pb-8">
